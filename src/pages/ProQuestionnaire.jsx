@@ -1,5 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
+
+// Set document title and favicon
+if (typeof document !== 'undefined') {
+  document.title = "Kaseya - Pro Website Content Form";
+  
+  // Update favicon
+  const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+  link.type = 'image/png';
+  link.rel = 'icon';
+  link.href = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6925fec3678942d22522b010/96c140c55_kaseya-logo.png';
+  document.head.appendChild(link);
+}
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Send, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
