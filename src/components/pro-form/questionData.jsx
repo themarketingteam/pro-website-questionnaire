@@ -1,4 +1,3 @@
-
 // Pro Website Questionnaire Data
 export const SERVICE_OPTIONS_GROUPED = {
   "Cloud & Infrastructure": [
@@ -300,6 +299,7 @@ export const QUESTIONS = [
     type: "checkbox",
     options: PRICING_MODEL_OPTIONS,
     showOther: true,
+    limits: { min: 1, max: 3 },
     examples: { selections: ["Per-user pricing", "Flat-rate monthly service packages"] }
   },
   {
