@@ -1,15 +1,33 @@
 // Pro Website Questionnaire Data
 export const SERVICE_OPTIONS = [
-  "Managed IT Services / Help Desk",
-  "Cybersecurity & Threat Protection",
-  "Microsoft 365 / Cloud Management",
-  "Network Design & Infrastructure",
-  "Data Backup & Disaster Recovery",
-  "VoIP / Unified Communications",
-  "IT Consulting & Strategy (vCIO)",
-  "Cloud Migrations & Hosting",
-  "Compliance & Security Assessments",
-  "Hardware Procurement & Lifecycle"
+  "Cloud Services",
+  "CMMC Compliance",
+  "Co-Managed IT",
+  "Cybersecurity",
+  "Data Backup & Recovery",
+  "Disaster Recovery Planning",
+  "FTC Compliance",
+  "Hardware as a Service",
+  "HIPAA Compliance",
+  "Hourly IT Support",
+  "Hybrid Cloud Services",
+  "Internet Services",
+  "IT Compliance",
+  "IT Consulting",
+  "IT Help Desk",
+  "Managed IT",
+  "Microsoft 365",
+  "NIST Framework Compliance",
+  "Outsourced IT Help Desk",
+  "PCI Compliance",
+  "Printer & Office Machine",
+  "Private Cloud Services",
+  "Ransomware Removal",
+  "Security Awareness Training",
+  "SOC2 Compliance",
+  "Structured Cabling",
+  "Video Surveillance Solutions",
+  "VoIP Phone Systems"
 ];
 
 export const INDUSTRY_OPTIONS = [
