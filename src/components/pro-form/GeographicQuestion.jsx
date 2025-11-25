@@ -46,14 +46,34 @@ export default function GeographicQuestion({ value = [], onChange, onMetaChange,
     });
   }, [isLoaded]);
 
-  const handleAddLocation = (label, lat, lon, place_id) => {
-    if (value.length >= max) return;
+  const handleAddLocation = (label, lat = null, lon = null, place_id = null) => {
+    if (value.length >= max || !label.trim()) return;
     
     const newValues = [...value, label];
-    const newMeta = [...metaValue, { label, lat, lon, place_id, source: 'google_places' }];
+    const newMeta = [...metaValue, { 
+      label, 
+      lat, 
+      lon, 
+      place_id, 
+      source: place_id ? 'google_places' : 'manual' 
+    }];
     
     onChange(newValues);
     if (onMetaChange) onMetaChange(newMeta);
+  };
+
+  const handleManualAdd = () => {
+    if (input.trim()) {
+      handleAddLocation(input.trim());
+      setInput('');
+    }
+  };
+
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleManualAdd();
+    }
   };
 
   const handleRemove = (index) => {
@@ -88,12 +108,22 @@ export default function GeographicQuestion({ value = [], onChange, onMetaChange,
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={canAddMore ? "Search for a city, region, or area..." : "Maximum locations reached"}
+              onKeyPress={handleKeyPress}
+              placeholder={canAddMore ? "Search for a city, region, or area (or type and press Enter)" : "Maximum locations reached"}
               disabled={!canAddMore}
-              className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+              className={`w-full pl-10 pr-24 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                 canAddMore ? 'border-slate-300' : 'border-slate-200 bg-slate-50 cursor-not-allowed'
               }`}
             />
+            {canAddMore && input.trim() && (
+              <button
+                type="button"
+                onClick={handleManualAdd}
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded transition-colors"
+              >
+                Add
+              </button>
+            )}
           </div>
         </div>
         {!isLoaded && (
