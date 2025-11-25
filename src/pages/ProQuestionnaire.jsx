@@ -218,13 +218,9 @@ export default function ProQuestionnaire() {
       case 'numeric_range':
         return (
           <NumericRangeQuestion
-            questionNumber={question.id}
-            title={question.title}
-            hint={question.guidance}
             minValue={question.minValue}
             maxValue={question.maxValue}
             onChange={(val) => updateResponse(question.id, val)}
-            isOpen={true}
           />
         );
       
@@ -306,33 +302,29 @@ export default function ProQuestionnaire() {
                     </div>
                   )}
                   
-                  {question.type === 'numeric_range' ? (
-                    renderQuestion(question)
-                  ) : (
-                    <QuestionWrapper
-                      number={question.id}
-                      title={question.title}
-                      guidance={question.guidance}
-                      why={question.why}
-                      examples={question.examples}
-                      isCollapsible={true}
-                      isExpanded={expandedQuestions[question.id]}
-                      onToggle={() => toggleQuestion(question.id)}
-                    >
-                      {renderQuestion(question)}
-                      
-                      {/* Show span indicator after Q6 */}
-                      {question.id === "6" && (
-                        <div className="mt-6">
-                          <SelectionSpanIndicator
-                            servicesCount={servicesCount}
-                            industriesCount={industriesCount}
-                            regionsCount={regionsCount}
-                          />
-                        </div>
-                      )}
-                    </QuestionWrapper>
-                  )}
+                  <QuestionWrapper
+                    number={question.id}
+                    title={question.title}
+                    guidance={question.guidance}
+                    why={question.why}
+                    examples={question.examples}
+                    isCollapsible={true}
+                    isExpanded={expandedQuestions[question.id]}
+                    onToggle={() => toggleQuestion(question.id)}
+                  >
+                    {renderQuestion(question)}
+                    
+                    {/* Show span indicator after Q6 */}
+                    {question.id === "6" && (
+                      <div className="mt-6">
+                        <SelectionSpanIndicator
+                          servicesCount={servicesCount}
+                          industriesCount={industriesCount}
+                          regionsCount={regionsCount}
+                        />
+                      </div>
+                    )}
+                  </QuestionWrapper>
                   
                   {renderConditionalChildren(question)}
                 </div>
