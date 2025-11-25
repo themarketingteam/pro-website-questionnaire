@@ -309,12 +309,22 @@ export default function ProQuestionnaire() {
             <MultiGeographicQuestion
               selectedLocations={responses[question.id] || []}
               onAdd={(location) => {
-                const current = responses[question.id] || [];
-                updateResponse(question.id, [...current, location]);
+                setResponses(prev => {
+                  const current = prev[question.id] || [];
+                  const newResponses = { ...prev, [question.id]: [...current, location] };
+                  saveToStorage(newResponses);
+                  setShowAutoSave(s => s + 1);
+                  return newResponses;
+                });
               }}
               onRemove={(index) => {
-                const current = responses[question.id] || [];
-                updateResponse(question.id, current.filter((_, i) => i !== index));
+                setResponses(prev => {
+                  const current = prev[question.id] || [];
+                  const newResponses = { ...prev, [question.id]: current.filter((_, i) => i !== index) };
+                  saveToStorage(newResponses);
+                  setShowAutoSave(s => s + 1);
+                  return newResponses;
+                });
               }}
               maxLocations={question.limits?.max || 5}
             />
