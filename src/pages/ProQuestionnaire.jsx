@@ -23,6 +23,7 @@ export default function ProQuestionnaire() {
   const [expandedQuestions, setExpandedQuestions] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allExpanded, setAllExpanded] = useState(false);
+  const [showAutoSave, setShowAutoSave] = useState(0);
 
   // Load from cookie on mount
   useEffect(() => {
@@ -58,6 +59,7 @@ export default function ProQuestionnaire() {
     const newResponses = { ...responses, [questionId]: value };
     setResponses(newResponses);
     saveToStorage(newResponses);
+    setShowAutoSave(prev => prev + 1);
   };
 
   const toggleQuestion = (questionId) => {
@@ -339,7 +341,7 @@ export default function ProQuestionnaire() {
         </form>
       </main>
 
-      <AutoSaveIndicator />
+      <AutoSaveIndicator show={showAutoSave} />
     </div>
   );
 }
