@@ -484,6 +484,7 @@ export const QUESTIONS = [
     guidance: "Select the most important action for new visitors. If you typically convert best through consultations, choose that. If your ICP prefers calling directly, choose a phone call CTA. Only choose one primary objective to maintain a clear and focused conversion path.",
     type: "radio",
     options: PRIMARY_CTA_OPTIONS,
+    showOther: true,
     examples: { selection: "Schedule a Consultation" }
   },
   {
