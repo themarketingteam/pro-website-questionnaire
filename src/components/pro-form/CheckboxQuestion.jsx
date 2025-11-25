@@ -39,7 +39,7 @@ export default function CheckboxQuestion({
         </span>
       )}
       
-      <div className="space-y-2.5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
         {options.map((option) => (
           <div 
             key={option}
@@ -52,14 +52,14 @@ export default function CheckboxQuestion({
                 : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
             }`}
           >
-            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
+            <div className={`w-5 h-5 flex-shrink-0 rounded border-2 flex items-center justify-center transition-all ${
               value.includes(option) 
                 ? 'border-blue-500 bg-blue-500' 
                 : 'border-slate-300'
             }`}>
               {value.includes(option) && <Check className="w-3 h-3 text-white" />}
             </div>
-            <span className={`select-none ${
+            <span className={`select-none text-sm ${
               value.includes(option) ? 'text-blue-700 font-medium' : 'text-slate-700'
             }`}>
               {option}
