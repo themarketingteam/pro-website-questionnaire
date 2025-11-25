@@ -255,15 +255,6 @@ export default function ProQuestionnaire() {
                 </h2>
               </div>
 
-              {/* Show span indicator after "About Your Business" section header */}
-              {sectionName === "About Your Business" && (
-                <SelectionSpanIndicator
-                  servicesCount={servicesCount}
-                  industriesCount={industriesCount}
-                  regionsCount={regionsCount}
-                />
-              )}
-
               {sectionQuestions.map((question, qIndex) => (
                 <div key={question.id}>
                   <QuestionWrapper
