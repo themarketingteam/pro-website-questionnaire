@@ -1,4 +1,3 @@
-
 // Pro Website Questionnaire Data
 export const SERVICE_OPTIONS_GROUPED = {
   "Cloud & Infrastructure": [
@@ -274,13 +273,13 @@ export const QUESTIONS = [
   {
     id: "6",
     section: "About Your Business",
-    title: "What markets or regions do you primarily serve?",
-    why: "Your geographic focus determines whether we generate location-specific SEO pages and how local or national your messaging should be. This affects local SEO, Google Business Profile optimization, and how we describe your service footprint throughout the site.",
-    guidance: "Enter 1 to 5 locations that accurately represent your service area. These can be metropolitan areas, regions, multi-state areas, or national coverage. If you serve clients remotely nationwide, you may list 'Nationwide remote support.' Must be between 1 and 5 entries. Combined total with Q4 and Q5 must be between 8 and 15.",
+    title: "What are your service cities or geological regions of service?",
+    why: "Your geographic focus determines whether we generate location-specific SEO pages and how local or national your messaging should be. This affects local SEO, Google Business Profile optimization, and how we describe your service footprint throughout the site. Selecting specific cities or towns yields the best SEO results compared to broad selections like states or countries.",
+    guidance: "Select 1 to 5 validated locations using the search field. For optimal SEO performance, we strongly recommend choosing specific cities or towns rather than states or countries. Each validated location will count toward your total selection balance. Continents are not allowed. Must be between 1 and 5 validated entries. Combined total with Q4 and Q5 must be between 8 and 15.",
     type: "multi_text",
     limits: { min: 1, max: 5 },
     isSpanQuestion: true,
-    examples: { entries: ["Greater Nashville Area", "Middle Tennessee"] }
+    examples: { entries: ["Nashville, TN", "Brentwood, TN"] }
   },
   {
     id: "7",
