@@ -1,3 +1,4 @@
+
 // Pro Website Questionnaire Data
 export const SERVICE_OPTIONS_GROUPED = {
   "Cloud & Infrastructure": [
@@ -400,10 +401,11 @@ export const QUESTIONS = [
     section: "About Your Target Clients",
     title: "What size businesses do you primarily support?",
     why: "Company size influences complexity, budget expectations, growth trajectory, and the scale of IT support required. This data helps us adjust your messaging—from SMB-focused to mid-market or enterprise-support positioning.",
-    guidance: "Select all business size ranges that represent the majority of your client base. Only choose sizes that reflect your actual current clients or realistic targets for your MSP. Your selections influence how we structure persona-driven content and CTA language.",
-    type: "checkbox",
-    options: BUSINESS_SIZE_OPTIONS,
-    examples: { selections: ["10–25 employees", "26–50 employees", "51–100 employees"] }
+    guidance: "Specify the range of business sizes you primarily support. Enter the smallest and largest company sizes by number of employees.",
+    type: "numeric_range",
+    minValue: 1,
+    maxValue: 50,
+    examples: { shortAnswer: "10-100 employees" }
   },
   {
     id: "19",
