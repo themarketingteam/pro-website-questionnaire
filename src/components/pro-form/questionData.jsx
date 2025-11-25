@@ -43,16 +43,22 @@ export const SERVICE_OPTIONS_GROUPED = {
 export const SERVICE_OPTIONS = Object.values(SERVICE_OPTIONS_GROUPED).flat();
 
 export const INDUSTRY_OPTIONS = [
+  "Agriculture / Farming",
+  "Dental Practices",
+  "Energy / Oil & Gas",
+  "Engineering / Architecture Firms",
+  "Financial / Accounting / CPA",
+  "Government / Municipalities",
   "Healthcare / Medical",
-  "Financial / CPA / Accounting",
-  "Legal / Law Firms",
-  "Manufacturing",
-  "Professional Services",
-  "Nonprofit Organizations",
-  "Construction / Real Estate",
-  "Insurance",
-  "Education",
-  "Government / Public Sector"
+  "Insurance Agencies",
+  "Legal Firms",
+  "Manufacturing / Construction",
+  "Nonprofits / Education",
+  "Professional Services (Marketing, Real Estate, etc.)",
+  "Real Estate / Property Management",
+  "Retail / Hospitality",
+  "Technology / SaaS Companies",
+  "Transportation / Logistics"
 ];
 
 export const DELIVERY_MODEL_OPTIONS = [
