@@ -28,6 +28,13 @@ export default function ProQuestionnaire() {
   const [showAutoSave, setShowAutoSave] = useState(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  // Extract URL parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const businessNameParam = urlParams.get('businessName') || '';
+  const domainSL = urlParams.get('domainSL') || '';
+  const domainTL = urlParams.get('domainTL') || '';
+  const domainParam = domainSL && domainTL ? `${domainSL}.${domainTL}` : '';
+
   // Load from cookie on mount
   useEffect(() => {
     const saved = localStorage.getItem(COOKIE_NAME);
@@ -466,8 +473,8 @@ export default function ProQuestionnaire() {
           formData={responses}
           onConfirm={handleConfirmSubmit}
           onCancel={() => setShowConfirmModal(false)}
-          initialBusinessName=""
-          initialDomain=""
+          initialBusinessName={businessNameParam}
+          initialDomain={domainParam}
         />
       )}
       </div>
