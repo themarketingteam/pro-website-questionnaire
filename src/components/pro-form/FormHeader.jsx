@@ -15,7 +15,7 @@ export default function FormHeader() {
       <div className="relative px-6 py-16 md:py-20">
         <div className="max-w-4xl mx-auto">
           <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight">
-            Pro - Website Content Questionnaire
+            Website Content Questionnaire
           </h1>
           <p className="mt-3 text-blue-100 text-lg">
             Help us get to know your business.

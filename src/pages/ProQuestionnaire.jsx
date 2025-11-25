@@ -13,7 +13,6 @@ import TextareaQuestion from '@/components/pro-form/TextareaQuestion';
 import MultiTextQuestion from '@/components/pro-form/MultiTextQuestion';
 import FileUploadQuestion from '@/components/pro-form/FileUploadQuestion';
 import NumericRangeQuestion from '@/components/pro-form/NumericRangeQuestion';
-import GeographicQuestion from '@/components/pro-form/GeographicQuestion';
 import SelectionSpanIndicator from '@/components/pro-form/SelectionSpanIndicator';
 import AutoSaveIndicator from '@/components/pro-form/AutoSaveIndicator';
 import ConfirmModal from '@/components/pro-form/ConfirmModal';
@@ -166,13 +165,6 @@ export default function ProQuestionnaire() {
         const min = question.limits?.min || 0;
         return filled >= min;
       }
-
-      case 'geographic': {
-        const locations = Array.isArray(answer) ? answer : [];
-        const min = question.limits?.min || 1;
-        const max = question.limits?.max || 5;
-        return locations.length >= min && locations.length <= max;
-      }
       
       case 'file_upload':
         return !!answer;
@@ -252,7 +244,7 @@ export default function ProQuestionnaire() {
     : (otherServices?.trim() ? 1 : 0);
   const servicesCount = (responses['4'] || []).length + otherServicesCount;
   const industriesCount = (responses['5'] || []).length + (responses['5_other'] ? 1 : 0);
-  const regionsCount = Array.isArray(responses['6']) ? responses['6'].length : 0;
+  const regionsCount = (responses['6'] || [''])?.filter(r => r.trim()).length || 0;
 
   // Group questions by section
   const sections = QUESTIONS.reduce((acc, question) => {
@@ -325,19 +317,7 @@ export default function ProQuestionnaire() {
             onChange={(val) => updateResponse(question.id, val)}
           />
         );
-
-      case 'geographic':
-        return (
-          <GeographicQuestion
-            value={responses[question.id] || []}
-            onChange={(val) => updateResponse(question.id, val)}
-            metaValue={responses[`${question.id}_meta`] || []}
-            onMetaChange={(val) => updateResponse(`${question.id}_meta`, val)}
-            min={question.limits?.min}
-            max={question.limits?.max}
-          />
-        );
-
+      
       default:
         return null;
     }
