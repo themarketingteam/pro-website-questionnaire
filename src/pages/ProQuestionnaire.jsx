@@ -76,12 +76,6 @@ export default function ProQuestionnaire() {
           newState[child.id] = false;
         });
       }
-      // If expanding a parent with conditional children and answer is "yes", expand the children
-      if (question?.conditionalChildren && !prev[questionId] && responses[questionId] === 'yes') {
-        question.conditionalChildren.forEach(child => {
-          newState[child.id] = true;
-        });
-      }
       return newState;
     });
   };
@@ -222,7 +216,8 @@ export default function ProQuestionnaire() {
   };
 
   const renderConditionalChildren = (parent) => {
-    if (!parent.conditionalChildren || responses[parent.id] !== 'yes') {
+    // Hide children if parent is collapsed OR if answer is not "yes"
+    if (!parent.conditionalChildren || responses[parent.id] !== 'yes' || !expandedQuestions[parent.id]) {
       return null;
     }
 
