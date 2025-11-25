@@ -11,6 +11,7 @@ import CheckboxQuestion from '@/components/pro-form/CheckboxQuestion';
 import RadioQuestion from '@/components/pro-form/RadioQuestion';
 import TextareaQuestion from '@/components/pro-form/TextareaQuestion';
 import MultiTextQuestion from '@/components/pro-form/MultiTextQuestion';
+import MultiGeographicQuestion from '@/components/pro-form/MultiGeographicQuestion';
 import FileUploadQuestion from '@/components/pro-form/FileUploadQuestion';
 import NumericRangeQuestion from '@/components/pro-form/NumericRangeQuestion';
 import SelectionSpanIndicator from '@/components/pro-form/SelectionSpanIndicator';
@@ -161,6 +162,12 @@ export default function ProQuestionnaire() {
       
       case 'multi_text': {
         const entries = Array.isArray(answer) ? answer : [];
+        // For question 6 (geographic), check for validated locations
+        if (questionId === '6') {
+          const min = question.limits?.min || 1;
+          return entries.length >= min;
+        }
+        // For other multi-text questions, check for filled text entries
         const filled = entries.filter(e => e?.trim()).length;
         const min = question.limits?.min || 0;
         return filled >= min;
@@ -244,7 +251,7 @@ export default function ProQuestionnaire() {
     : (otherServices?.trim() ? 1 : 0);
   const servicesCount = (responses['4'] || []).length + otherServicesCount;
   const industriesCount = (responses['5'] || []).length + (responses['5_other'] ? 1 : 0);
-  const regionsCount = (responses['6'] || [''])?.filter(r => r.trim()).length || 0;
+  const regionsCount = Array.isArray(responses['6']) ? responses['6'].length : 0;
 
   // Group questions by section
   const sections = QUESTIONS.reduce((acc, question) => {
@@ -296,6 +303,24 @@ export default function ProQuestionnaire() {
         return <TextareaQuestion {...commonProps} />;
       
       case 'multi_text':
+        // Question 6 uses geographic validation
+        if (question.id === '6') {
+          return (
+            <MultiGeographicQuestion
+              selectedLocations={responses[question.id] || []}
+              onAdd={(location) => {
+                const current = responses[question.id] || [];
+                updateResponse(question.id, [...current, location]);
+              }}
+              onRemove={(index) => {
+                const current = responses[question.id] || [];
+                updateResponse(question.id, current.filter((_, i) => i !== index));
+              }}
+              maxLocations={question.limits?.max || 5}
+            />
+          );
+        }
+        // Other multi-text questions use simple text inputs
         return (
           <MultiTextQuestion
             value={responses[question.id] || ['']}
