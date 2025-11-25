@@ -7,6 +7,8 @@ export default function GeographicQuestion({ value = [], onChange, onMetaChange,
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
 
+  const geoGCPToken = import.meta.env.VITE_GCP_TOKEN || 'AIzaSyDyQuexeP2lIif4UEYVe845bIYrytVp6O0';
+
   // Load Google Places API
   useEffect(() => {
     if (window.google?.maps?.places) {
@@ -15,7 +17,7 @@ export default function GeographicQuestion({ value = [], onChange, onMetaChange,
     }
 
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyDSbv7iyIbBKtzFq3svkOoxh66D0gSLDNs&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${geoGCPToken}&libraries=places`;
     script.async = true;
     script.defer = true;
     script.onload = () => setIsLoaded(true);
