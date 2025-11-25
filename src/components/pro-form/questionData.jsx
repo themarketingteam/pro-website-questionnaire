@@ -1,3 +1,4 @@
+
 // Pro Website Questionnaire Data
 export const SERVICE_OPTIONS_GROUPED = {
   "Cloud & Infrastructure": [
@@ -284,11 +285,11 @@ export const QUESTIONS = [
     section: "About Your Business",
     title: "How do you typically deliver your services?",
     why: "Your delivery model determines your service positioning and how we write your offer structure. This influences pricing language, expectations, CTA blocks, and the way we describe your working relationship with clients.",
-    guidance: "Select all delivery models that accurately describe how clients engage with your MSP. If you use multiple models (e.g., managed + project-based), select all that apply. Choose based on what you actively sell—not models you used historically but no longer offer.",
-    type: "checkbox",
+    guidance: "Select the primary delivery model that accurately describes how clients engage with your MSP. Choose based on what you actively sell—not models you used historically but no longer offer.",
+    type: "radio",
     options: DELIVERY_MODEL_OPTIONS,
     showOther: true,
-    examples: { selections: ["Fully Managed IT Provider", "Co-Managed IT (internal IT support partnership)"] }
+    examples: { selection: "Fully Managed IT Provider" }
   },
   {
     id: "8",
@@ -364,11 +365,11 @@ export const QUESTIONS = [
     section: "About Your Business",
     title: "How do clients usually find you?",
     why: "This informs your website's funnel and helps emphasize the channels that already work. If referrals are your top source, your messaging should highlight client experience. If SEO drives leads, we may strengthen educational or resource-focused content.",
-    guidance: "Select all acquisition channels that consistently produce leads. Avoid selecting channels you plan to explore later but do not use today. This question helps align the website with real-world lead behavior.",
-    type: "checkbox",
+    guidance: "Select the primary acquisition channel that consistently produces leads. Choose the channel that represents your main source of new business today.",
+    type: "radio",
     options: CLIENT_ACQUISITION_OPTIONS,
     showOther: true,
-    examples: { selections: ["Referrals / Word of Mouth", "Google Search / SEO"] }
+    examples: { selection: "Referrals / Word of Mouth" }
   },
   {
     id: "16",
@@ -439,12 +440,12 @@ export const QUESTIONS = [
     id: "22",
     section: "About Your Target Clients",
     title: "Who usually makes the buying decision?",
-    why: "Understanding the primary decision makers ensures we tailor the messaging, CTAs, and content structure to their needs and expectations. Different roles care about different aspects of IT (security, risk, budget, efficiency, staff support, etc.).",
-    guidance: "Choose the roles or titles typically involved in signing agreements or approving MSP services. If there are multiple influencers (e.g., CEO + Office Manager), select all that apply. This information helps us create persona-targeted messaging.",
-    type: "checkbox",
+    why: "Understanding the primary decision maker ensures we tailor the messaging, CTAs, and content structure to their needs and expectations. Different roles care about different aspects of IT (security, risk, budget, efficiency, staff support, etc.).",
+    guidance: "Choose the primary role or title typically involved in signing agreements or approving MSP services. Select the main decision maker for your target clients.",
+    type: "radio",
     options: DECISION_MAKERS_OPTIONS,
     showOther: true,
-    examples: { selections: ["Business Owner / CEO", "IT Manager / Director"] }
+    examples: { selection: "Business Owner / CEO" }
   },
   {
     id: "23",

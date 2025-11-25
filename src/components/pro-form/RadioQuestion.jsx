@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function RadioQuestion({ options, value, onChange }) {
+export default function RadioQuestion({ options, value, onChange, showOther = false, otherValue = '', onOtherChange }) {
   return (
     <div className="space-y-2.5">
       {options.map((option) => (
@@ -24,6 +24,22 @@ export default function RadioQuestion({ options, value, onChange }) {
           </span>
         </label>
       ))}
+      
+      {showOther && (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 transition-all">
+          <label className="block">
+            <span className="font-semibold text-slate-900 text-sm">Other (please specify):</span>
+            <input
+              type="text"
+              placeholder="Enter your option..."
+              className="w-full mt-3 p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={otherValue}
+              onChange={(e) => onOtherChange(e.target.value)}
+              onFocus={() => onChange('Other')}
+            />
+          </label>
+        </div>
+      )}
     </div>
   );
 }

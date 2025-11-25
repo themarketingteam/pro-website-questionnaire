@@ -191,6 +191,9 @@ export default function ProQuestionnaire() {
           <RadioQuestion
             options={question.options}
             {...commonProps}
+            showOther={question.showOther}
+            otherValue={responses[`${question.id}_other`] || ''}
+            onOtherChange={(val) => updateResponse(`${question.id}_other`, val)}
           />
         );
       
