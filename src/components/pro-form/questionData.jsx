@@ -287,6 +287,7 @@ export const QUESTIONS = [
     guidance: "Select all delivery models that accurately describe how clients engage with your MSP. If you use multiple models (e.g., managed + project-based), select all that apply. Choose based on what you actively sell—not models you used historically but no longer offer.",
     type: "checkbox",
     options: DELIVERY_MODEL_OPTIONS,
+    showOther: true,
     examples: { selections: ["Fully Managed IT Provider", "Co-Managed IT (internal IT support partnership)"] }
   },
   {
@@ -297,6 +298,7 @@ export const QUESTIONS = [
     guidance: "Select all pricing models you actively use. For example, some MSPs offer flat-rate per-user pricing for managed clients but use hourly billing for special projects. Select the models that reflect your current and intended engagement structure.",
     type: "checkbox",
     options: PRICING_MODEL_OPTIONS,
+    showOther: true,
     examples: { selections: ["Per-user pricing", "Flat-rate monthly service packages"] }
   },
   {
@@ -316,6 +318,7 @@ export const QUESTIONS = [
     guidance: "Select up to three goals that represent your highest business priorities. These should reflect what you want your website and marketing to help you achieve. Avoid selecting every option—focus on what matters most.",
     type: "checkbox",
     options: COMPANY_GOALS_OPTIONS,
+    showOther: true,
     limits: { max: 3 },
     examples: { selections: ["Increase recurring revenue", "Modernize marketing and brand image", "Improve client retention"] }
   },
@@ -364,6 +367,7 @@ export const QUESTIONS = [
     guidance: "Select all acquisition channels that consistently produce leads. Avoid selecting channels you plan to explore later but do not use today. This question helps align the website with real-world lead behavior.",
     type: "checkbox",
     options: CLIENT_ACQUISITION_OPTIONS,
+    showOther: true,
     examples: { selections: ["Referrals / Word of Mouth", "Google Search / SEO"] }
   },
   {
@@ -374,6 +378,7 @@ export const QUESTIONS = [
     guidance: "Select up to three objectives that reflect your highest priorities. If your top goal is lead-generation, CTAs will be more prominent. If your focus is credibility, we will emphasize proof elements such as case studies, certifications, and differentiators.",
     type: "checkbox",
     options: WEBSITE_OBJECTIVES_OPTIONS,
+    showOther: true,
     limits: { max: 3 },
     examples: { selections: ["Generate qualified leads", "Strengthen credibility and authority", "Educate and build trust"] }
   },
@@ -405,6 +410,7 @@ export const QUESTIONS = [
     guidance: "Select the top recurring problems clients share when they first contact you. Choose issues you can solve exceptionally well and that resonate with your ICP. Select up to 3. These will be used to frame your problem–solution narrative.",
     type: "checkbox",
     options: CLIENT_PROBLEMS_OPTIONS,
+    showOther: true,
     limits: { max: 3 },
     examples: { selections: ["Frequent downtime or outages", "Security incidents or data loss", "Lack of IT strategy or planning"] }
   },
@@ -425,6 +431,7 @@ export const QUESTIONS = [
     guidance: "Select up to 3 outcomes that reflect what your clients most commonly want from IT support. These may include reliability, security, reduced downtime, predictable costs, or long-term strategy. Focus on the outcomes that align best with your strengths.",
     type: "checkbox",
     options: CLIENT_OUTCOMES_OPTIONS,
+    showOther: true,
     limits: { max: 3 },
     examples: { selections: ["Reliable systems and less downtime", "Stronger cybersecurity posture", "Predictable monthly costs"] }
   },
@@ -436,6 +443,7 @@ export const QUESTIONS = [
     guidance: "Choose the roles or titles typically involved in signing agreements or approving MSP services. If there are multiple influencers (e.g., CEO + Office Manager), select all that apply. This information helps us create persona-targeted messaging.",
     type: "checkbox",
     options: DECISION_MAKERS_OPTIONS,
+    showOther: true,
     examples: { selections: ["Business Owner / CEO", "IT Manager / Director"] }
   },
   {
