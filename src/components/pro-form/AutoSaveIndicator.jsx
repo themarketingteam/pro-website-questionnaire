@@ -1,9 +1,34 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
 
-export default function AutoSaveIndicator() {
+export default function AutoSaveIndicator({ show }) {
+  const [visible, setVisible] = useState(false);
+  const [fading, setFading] = useState(false);
+
+  useEffect(() => {
+    if (show) {
+      setVisible(true);
+      setFading(false);
+      
+      const fadeTimer = setTimeout(() => {
+        setFading(true);
+      }, 3000);
+      
+      const hideTimer = setTimeout(() => {
+        setVisible(false);
+      }, 3500);
+      
+      return () => {
+        clearTimeout(fadeTimer);
+        clearTimeout(hideTimer);
+      };
+    }
+  }, [show]);
+
+  if (!visible) return null;
+
   return (
-    <div className="fixed bottom-6 right-6 bg-white border border-slate-200 shadow-lg rounded-xl px-4 py-3 flex items-center gap-3 z-50">
+    <div className={`fixed bottom-6 right-6 bg-white border border-slate-200 shadow-lg rounded-xl px-4 py-3 flex items-center gap-3 z-50 transition-opacity duration-500 ${fading ? 'opacity-0' : 'opacity-100'}`}>
       <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
         <Save className="w-4 h-4 text-blue-600" />
       </div>
