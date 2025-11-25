@@ -10,7 +10,8 @@ export default function CheckboxQuestion({
   max,
   showOther = false,
   otherValue = '',
-  onOtherChange
+  onOtherChange,
+  columns = 2
 }) {
   // Use multi-other when there's a max limit
   const multiOther = showOther && max;
@@ -57,7 +58,7 @@ export default function CheckboxQuestion({
           {Object.entries(groupedOptions).map(([groupName, groupOptions]) => (
             <div key={groupName}>
               <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">{groupName}</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div className={`grid grid-cols-1 md:grid-cols-${columns} gap-2`}>
                 {groupOptions.map((option) => (
                   <div 
                     key={option}
@@ -89,7 +90,7 @@ export default function CheckboxQuestion({
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+        <div className={`grid grid-cols-1 md:grid-cols-${columns} gap-2.5`}>
           {options.map((option) => (
             <div 
               key={option}
