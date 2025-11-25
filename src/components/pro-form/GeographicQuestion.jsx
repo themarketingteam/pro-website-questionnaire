@@ -24,16 +24,25 @@ export default function GeographicQuestion({ value = [], onChange, onMetaChange,
     script.src = `https://maps.googleapis.com/maps/api/js?key=${geoGCPToken}&libraries=places`;
     script.async = true;
     script.defer = true;
-    script.onload = () => setIsLoaded(true);
+    script.onload = () => {
+      setIsLoaded(true);
+    };
+    script.onerror = () => {
+      console.error('Failed to load Google Maps API');
+    };
     document.head.appendChild(script);
   }, []);
 
   // Initialize services
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!isLoaded || !window.google?.maps?.places) return;
     
-    autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
-    placesServiceRef.current = new window.google.maps.places.PlacesService(document.createElement('div'));
+    try {
+      autocompleteServiceRef.current = new window.google.maps.places.AutocompleteService();
+      placesServiceRef.current = new window.google.maps.places.PlacesService(document.createElement('div'));
+    } catch (error) {
+      console.error('Failed to initialize Google Places services:', error);
+    }
   }, [isLoaded]);
 
   // Handle input changes and fetch predictions
@@ -81,26 +90,41 @@ export default function GeographicQuestion({ value = [], onChange, onMetaChange,
   const handleSelectPrediction = (prediction) => {
     if (value.length >= max) return;
 
-    // Get place details
+    // Immediately add the location optimistically
+    const locationLabel = prediction.description;
+    const tempMeta = {
+      label: locationLabel,
+      lat: null,
+      lon: null,
+      place_id: prediction.place_id,
+      source: 'google_places'
+    };
+
+    // Update UI immediately
+    const newValues = [...value, locationLabel];
+    const newMeta = [...metaValue, tempMeta];
+    
+    onChange(newValues);
+    if (onMetaChange) onMetaChange(newMeta);
+    
+    // Clear input and dropdown
+    setInput('');
+    setPredictions([]);
+    setShowDropdown(false);
+
+    // Fetch full details in background to update coordinates
     if (placesServiceRef.current) {
       placesServiceRef.current.getDetails(
         { placeId: prediction.place_id },
         (place, status) => {
-          if (status === window.google.maps.places.PlacesServiceStatus.OK) {
-            const newValues = [...value, prediction.description];
-            const newMeta = [...metaValue, {
-              label: prediction.description,
-              lat: place.geometry?.location?.lat() || null,
-              lon: place.geometry?.location?.lng() || null,
-              place_id: prediction.place_id,
-              source: 'google_places'
-            }];
-
-            onChange(newValues);
-            if (onMetaChange) onMetaChange(newMeta);
-            setInput('');
-            setPredictions([]);
-            setShowDropdown(false);
+          if (status === window.google.maps.places.PlacesServiceStatus.OK && place.geometry) {
+            const updatedMeta = [...newMeta];
+            updatedMeta[updatedMeta.length - 1] = {
+              ...tempMeta,
+              lat: place.geometry.location.lat(),
+              lon: place.geometry.location.lng()
+            };
+            if (onMetaChange) onMetaChange(updatedMeta);
           }
         }
       );
