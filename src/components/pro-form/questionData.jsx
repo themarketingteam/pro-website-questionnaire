@@ -132,9 +132,9 @@ export const QUESTIONS = [
   {
     id: "1",
     section: "Additional Page Options",
-    title: "Would you like to include a dedicated "Why Choose Us" page on your website?",
+    title: "Would you like to include a dedicated 'Why Choose Us' page on your website?",
     why: "This question determines whether your website will include a trust-building page focused entirely on your company's differentiators, strengths, and credibility markers.",
-    guidance: "Select "Yes" if you want a standalone page that highlights the reasons a prospective client should choose your MSP. Select "No" if these elements should only appear in smaller modules on other pages.",
+    guidance: "Select 'Yes' if you want a standalone page that highlights the reasons a prospective client should choose your MSP. Select 'No' if these elements should only appear in smaller modules on other pages.",
     type: "yes_no",
     conditionalChildren: [
       {
@@ -158,9 +158,9 @@ export const QUESTIONS = [
   {
     id: "2",
     section: "Additional Page Options",
-    title: "Would you like to include a "Meet the Team" page on your website?",
+    title: "Would you like to include a 'Meet the Team' page on your website?",
     why: "This question determines whether your website will feature a team-focused page to humanize your company and build trust with prospects.",
-    guidance: "Select "Yes" if you want a dedicated page showcasing your team. Select "No" if you prefer not to feature team members individually.",
+    guidance: "Select 'Yes' if you want a dedicated page showcasing your team. Select 'No' if you prefer not to feature team members individually.",
     type: "yes_no",
     conditionalChildren: [
       {
