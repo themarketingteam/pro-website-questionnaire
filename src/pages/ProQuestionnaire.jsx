@@ -257,6 +257,17 @@ export default function ProQuestionnaire() {
 
               {sectionQuestions.map((question, qIndex) => (
                 <div key={question.id}>
+                  {/* Show span indicator before question 4 */}
+                  {question.id === "4" && (
+                    <div className="mb-8">
+                      <SelectionSpanIndicator
+                        servicesCount={servicesCount}
+                        industriesCount={industriesCount}
+                        regionsCount={regionsCount}
+                      />
+                    </div>
+                  )}
+                  
                   <QuestionWrapper
                     number={question.id}
                     title={question.title}
