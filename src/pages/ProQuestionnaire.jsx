@@ -28,14 +28,18 @@ export default function ProQuestionnaire() {
   // Load from cookie on mount
   useEffect(() => {
     const saved = localStorage.getItem(COOKIE_NAME);
+    let initialResponses = {};
     if (saved) {
       try {
-        const parsed = JSON.parse(saved);
-        setResponses(parsed);
+        initialResponses = JSON.parse(saved);
       } catch (e) {
         console.error('Failed to parse saved responses:', e);
       }
     }
+    // Default Q1 and Q2 to "no" if not set
+    if (!initialResponses['1']) initialResponses['1'] = 'no';
+    if (!initialResponses['2']) initialResponses['2'] = 'no';
+    setResponses(initialResponses);
     
     // Initialize all questions as collapsed
     const expanded = {};
@@ -63,10 +67,23 @@ export default function ProQuestionnaire() {
   };
 
   const toggleQuestion = (questionId) => {
-    setExpandedQuestions(prev => ({
-      ...prev,
-      [questionId]: !prev[questionId]
-    }));
+    setExpandedQuestions(prev => {
+      const newState = { ...prev, [questionId]: !prev[questionId] };
+      // If collapsing a parent with conditional children, collapse the children too
+      const question = QUESTIONS.find(q => q.id === questionId);
+      if (question?.conditionalChildren && prev[questionId]) {
+        question.conditionalChildren.forEach(child => {
+          newState[child.id] = false;
+        });
+      }
+      // If expanding a parent with conditional children and answer is "yes", expand the children
+      if (question?.conditionalChildren && !prev[questionId] && responses[questionId] === 'yes') {
+        question.conditionalChildren.forEach(child => {
+          newState[child.id] = true;
+        });
+      }
+      return newState;
+    });
   };
 
   const expandAll = () => {
