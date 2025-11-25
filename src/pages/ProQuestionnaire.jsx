@@ -167,10 +167,8 @@ export default function ProQuestionnaire() {
             min={question.limits?.min}
             max={question.limits?.max}
             showOther={question.showOther}
-            otherValue={responses[`${question.id}_other`] || (question.id === "4" ? [''] : '')}
+            otherValue={responses[`${question.id}_other`] || (question.showOther && question.limits?.max ? [''] : '')}
             onOtherChange={(val) => updateResponse(`${question.id}_other`, val)}
-            multiOther={question.id === "4"}
-            multiOtherMax={10}
           />
         );
       

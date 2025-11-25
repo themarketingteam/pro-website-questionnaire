@@ -10,10 +10,11 @@ export default function CheckboxQuestion({
   max,
   showOther = false,
   otherValue = '',
-  onOtherChange,
-  multiOther = false,
-  multiOtherMax = 10
+  onOtherChange
 }) {
+  // Use multi-other when there's a max limit
+  const multiOther = showOther && max;
+  const multiOtherMax = max || 10;
   const handleToggle = (option) => {
     const newValue = value.includes(option)
       ? value.filter(v => v !== option)
