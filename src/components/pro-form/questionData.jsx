@@ -1,34 +1,46 @@
 // Pro Website Questionnaire Data
-export const SERVICE_OPTIONS = [
-  "Cloud Services",
-  "CMMC Compliance",
-  "Co-Managed IT",
-  "Cybersecurity",
-  "Data Backup & Recovery",
-  "Disaster Recovery Planning",
-  "FTC Compliance",
-  "Hardware as a Service",
-  "HIPAA Compliance",
-  "Hourly IT Support",
-  "Hybrid Cloud Services",
-  "Internet Services",
-  "IT Compliance",
-  "IT Consulting",
-  "IT Help Desk",
-  "Managed IT",
-  "Microsoft 365",
-  "NIST Framework Compliance",
-  "Outsourced IT Help Desk",
-  "PCI Compliance",
-  "Printer & Office Machine",
-  "Private Cloud Services",
-  "Ransomware Removal",
-  "Security Awareness Training",
-  "SOC2 Compliance",
-  "Structured Cabling",
-  "Video Surveillance Solutions",
-  "VoIP Phone Systems"
-];
+export const SERVICE_OPTIONS_GROUPED = {
+  "Cloud & Infrastructure": [
+    "Cloud Services",
+    "Hybrid Cloud Services",
+    "Internet Services",
+    "Microsoft 365",
+    "Private Cloud Services",
+    "Structured Cabling"
+  ],
+  "Compliance": [
+    "CMMC Compliance",
+    "FTC Compliance",
+    "HIPAA Compliance",
+    "IT Compliance",
+    "NIST Framework Compliance",
+    "PCI Compliance",
+    "SOC2 Compliance"
+  ],
+  "IT Services": [
+    "Co-Managed IT",
+    "Hourly IT Support",
+    "IT Consulting",
+    "IT Help Desk",
+    "Managed IT",
+    "Outsourced IT Help Desk"
+  ],
+  "Security": [
+    "Cybersecurity",
+    "Ransomware Removal",
+    "Security Awareness Training",
+    "Video Surveillance Solutions"
+  ],
+  "Hardware & Recovery": [
+    "Data Backup & Recovery",
+    "Disaster Recovery Planning",
+    "Hardware as a Service",
+    "Printer & Office Machine",
+    "VoIP Phone Systems"
+  ]
+};
+
+export const SERVICE_OPTIONS = Object.values(SERVICE_OPTIONS_GROUPED).flat();
 
 export const INDUSTRY_OPTIONS = [
   "Healthcare / Medical",
