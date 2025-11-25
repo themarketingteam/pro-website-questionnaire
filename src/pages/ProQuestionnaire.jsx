@@ -22,7 +22,7 @@ export default function ProQuestionnaire() {
   const [responses, setResponses] = useState({});
   const [expandedQuestions, setExpandedQuestions] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [allExpanded, setAllExpanded] = useState(true);
+  const [allExpanded, setAllExpanded] = useState(false);
 
   // Load from cookie on mount
   useEffect(() => {
@@ -36,13 +36,13 @@ export default function ProQuestionnaire() {
       }
     }
     
-    // Initialize all questions as expanded
+    // Initialize all questions as collapsed
     const expanded = {};
     QUESTIONS.forEach(q => {
-      expanded[q.id] = true;
+      expanded[q.id] = false;
       if (q.conditionalChildren) {
         q.conditionalChildren.forEach(child => {
-          expanded[child.id] = true;
+          expanded[child.id] = false;
         });
       }
     });
