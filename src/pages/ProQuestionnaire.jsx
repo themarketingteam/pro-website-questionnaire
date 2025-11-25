@@ -182,6 +182,7 @@ export default function ProQuestionnaire() {
             showOther={question.showOther}
             otherValue={responses[`${question.id}_other`] || (question.showOther && question.limits?.max ? [''] : '')}
             onOtherChange={(val) => updateResponse(`${question.id}_other`, val)}
+            columns={question.id === "4" ? 3 : 2}
           />
         );
       
