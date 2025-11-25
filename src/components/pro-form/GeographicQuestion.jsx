@@ -82,27 +82,29 @@ export default function GeographicQuestion({ value = [], onChange, onMetaChange,
     if (value.length >= max) return;
 
     // Get place details
-    placesServiceRef.current.getDetails(
-      { placeId: prediction.place_id },
-      (place, status) => {
-        if (status === window.google.maps.places.PlacesServiceStatus.OK) {
-          const newValues = [...value, prediction.description];
-          const newMeta = [...metaValue, {
-            label: prediction.description,
-            lat: place.geometry?.location?.lat() || null,
-            lon: place.geometry?.location?.lng() || null,
-            place_id: prediction.place_id,
-            source: 'google_places'
-          }];
+    if (placesServiceRef.current) {
+      placesServiceRef.current.getDetails(
+        { placeId: prediction.place_id },
+        (place, status) => {
+          if (status === window.google.maps.places.PlacesServiceStatus.OK) {
+            const newValues = [...value, prediction.description];
+            const newMeta = [...metaValue, {
+              label: prediction.description,
+              lat: place.geometry?.location?.lat() || null,
+              lon: place.geometry?.location?.lng() || null,
+              place_id: prediction.place_id,
+              source: 'google_places'
+            }];
 
-          onChange(newValues);
-          if (onMetaChange) onMetaChange(newMeta);
-          setInput('');
-          setPredictions([]);
-          setShowDropdown(false);
+            onChange(newValues);
+            if (onMetaChange) onMetaChange(newMeta);
+            setInput('');
+            setPredictions([]);
+            setShowDropdown(false);
+          }
         }
-      }
-    );
+      );
+    }
   };
 
   const handleRemove = (index) => {
