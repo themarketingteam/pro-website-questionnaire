@@ -39,7 +39,7 @@ export default function SelectionSpanIndicator({
             {isValid 
               ? 'Your selections are within the optimal range.'
               : isTooLow
-              ? `Add ${minTotal - total} more selection${minTotal - total > 1 ? 's' : ''} across Services, Industries, or Regions.`
+              ? `Add ${minTotal - total} more selection${minTotal - total > 1 ? 's' : ''} across Services, Industries, or Locations.`
               : `Remove ${total - maxTotal} selection${total - maxTotal > 1 ? 's' : ''} to stay within limits.`
             }
           </p>
@@ -51,7 +51,7 @@ export default function SelectionSpanIndicator({
               Industries: <strong className="text-slate-900">{industriesCount}</strong>
             </span>
             <span className="text-slate-600">
-              Regions: <strong className="text-slate-900">{regionsCount}</strong>
+              Locations: <strong className="text-slate-900">{regionsCount}</strong>
             </span>
           </div>
         </div>
