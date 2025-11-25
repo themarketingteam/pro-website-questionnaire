@@ -308,6 +308,7 @@ export default function ProQuestionnaire() {
           return (
             <MultiGeographicQuestion
               selectedLocations={responses[question.id] || []}
+              primaryIndex={responses['6_primary'] || 0}
               onAdd={(location) => {
                 setResponses(prev => {
                   const current = prev[question.id] || [];
@@ -320,7 +321,26 @@ export default function ProQuestionnaire() {
               onRemove={(index) => {
                 setResponses(prev => {
                   const current = prev[question.id] || [];
-                  const newResponses = { ...prev, [question.id]: current.filter((_, i) => i !== index) };
+                  let primaryIndex = prev['6_primary'] || 0;
+                  // Adjust primary index if we're removing it or something before it
+                  if (index === primaryIndex) {
+                    primaryIndex = 0; // Reset to first
+                  } else if (index < primaryIndex) {
+                    primaryIndex = primaryIndex - 1;
+                  }
+                  const newResponses = { 
+                    ...prev, 
+                    [question.id]: current.filter((_, i) => i !== index),
+                    '6_primary': primaryIndex
+                  };
+                  saveToStorage(newResponses);
+                  setShowAutoSave(s => s + 1);
+                  return newResponses;
+                });
+              }}
+              onSetPrimary={(index) => {
+                setResponses(prev => {
+                  const newResponses = { ...prev, '6_primary': index };
                   saveToStorage(newResponses);
                   setShowAutoSave(s => s + 1);
                   return newResponses;
