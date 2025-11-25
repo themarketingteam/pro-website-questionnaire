@@ -130,7 +130,11 @@ export default function ProQuestionnaire() {
   };
 
   // Calculate span totals
-  const servicesCount = (responses['4'] || []).length + (responses['4_other'] ? 1 : 0);
+  const otherServices = responses['4_other'];
+  const otherServicesCount = Array.isArray(otherServices) 
+    ? otherServices.filter(v => v?.trim()).length 
+    : (otherServices?.trim() ? 1 : 0);
+  const servicesCount = (responses['4'] || []).length + otherServicesCount;
   const industriesCount = (responses['5'] || []).length + (responses['5_other'] ? 1 : 0);
   const regionsCount = (responses['6'] || [''])?.filter(r => r.trim()).length || 0;
 
@@ -163,8 +167,10 @@ export default function ProQuestionnaire() {
             min={question.limits?.min}
             max={question.limits?.max}
             showOther={question.showOther}
-            otherValue={responses[`${question.id}_other`] || ''}
+            otherValue={responses[`${question.id}_other`] || (question.id === "4" ? [''] : '')}
             onOtherChange={(val) => updateResponse(`${question.id}_other`, val)}
+            multiOther={question.id === "4"}
+            multiOtherMax={10}
           />
         );
       

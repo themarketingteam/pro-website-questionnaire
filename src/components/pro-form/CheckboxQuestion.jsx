@@ -10,7 +10,9 @@ export default function CheckboxQuestion({
   max,
   showOther = false,
   otherValue = '',
-  onOtherChange
+  onOtherChange,
+  multiOther = false,
+  multiOtherMax = 10
 }) {
   const handleToggle = (option) => {
     const newValue = value.includes(option)
@@ -23,19 +25,28 @@ export default function CheckboxQuestion({
     onChange(newValue);
   };
 
+  // Count other entries for max calculation
+  const otherEntriesCount = multiOther 
+    ? (Array.isArray(otherValue) ? otherValue.filter(v => v.trim()).length : 0)
+    : (otherValue?.trim() ? 1 : 0);
+
+  const totalSelections = value.length + otherEntriesCount;
+
   const isDisabled = (option) => {
     if (!max) return false;
-    return value.length >= max && !value.includes(option);
+    return totalSelections >= max && !value.includes(option);
   };
+
+  const canAddMoreOther = !max || totalSelections < max;
 
   return (
     <div className="space-y-4">
       {(min || max) && (
         <span className={`text-sm font-medium block ${
-          value.length < (min || 0) ? 'text-amber-600' : 
-          value.length > (max || Infinity) ? 'text-red-600' : 'text-slate-600'
+          totalSelections < (min || 0) ? 'text-amber-600' : 
+          totalSelections > (max || Infinity) ? 'text-red-600' : 'text-slate-600'
         }`}>
-          {value.length} / {max || '∞'} selections
+          {totalSelections} / {max || '∞'} selections
           {min && ` (minimum ${min})`}
         </span>
       )}
@@ -107,7 +118,7 @@ export default function CheckboxQuestion({
         </div>
       )}
       
-      {showOther && (
+      {showOther && !multiOther && (
         <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 transition-all">
           <label className="block">
             <span className="font-semibold text-slate-900 text-sm">Other (please specify):</span>
@@ -124,6 +135,58 @@ export default function CheckboxQuestion({
           </label>
         </div>
       )}
-    </div>
-  );
-}
+
+      {showOther && multiOther && (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 transition-all">
+          <div className="mb-3">
+            <span className="font-semibold text-slate-900 text-sm">Other (please specify):</span>
+            <span className="text-xs text-slate-500 block mt-1">
+              Add custom services not listed above (up to {multiOtherMax} entries). Each counts toward your selection limit.
+            </span>
+          </div>
+          <div className="space-y-2">
+            {(Array.isArray(otherValue) ? otherValue : ['']).map((entry, idx) => (
+              <div key={idx} className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder={`e.g., "Mac Certified Technician"`}
+                  className="flex-1 p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  value={entry}
+                  onChange={(e) => {
+                    const newOther = [...(Array.isArray(otherValue) ? otherValue : [''])];
+                    newOther[idx] = e.target.value;
+                    onOtherChange(newOther);
+                  }}
+                />
+                {(Array.isArray(otherValue) ? otherValue : ['']).length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newOther = (Array.isArray(otherValue) ? otherValue : ['']).filter((_, i) => i !== idx);
+                      onOtherChange(newOther.length ? newOther : ['']);
+                    }}
+                    className="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            ))}
+            {(Array.isArray(otherValue) ? otherValue : ['']).length < multiOtherMax && canAddMoreOther && (
+              <button
+                type="button"
+                onClick={() => {
+                  const newOther = [...(Array.isArray(otherValue) ? otherValue : ['']), ''];
+                  onOtherChange(newOther);
+                }}
+                className="text-sm text-blue-600 hover:text-blue-700 font-medium mt-2"
+              >
+                + Add another
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      </div>
+      );
+      }
