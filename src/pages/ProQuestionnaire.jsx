@@ -15,6 +15,7 @@ import FileUploadQuestion from '@/components/pro-form/FileUploadQuestion';
 import NumericRangeQuestion from '@/components/pro-form/NumericRangeQuestion';
 import SelectionSpanIndicator from '@/components/pro-form/SelectionSpanIndicator';
 import AutoSaveIndicator from '@/components/pro-form/AutoSaveIndicator';
+import ConfirmModal from '@/components/pro-form/ConfirmModal';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 
 const COOKIE_NAME = 'pro_questionnaire_responses';
@@ -25,6 +26,7 @@ export default function ProQuestionnaire() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allExpanded, setAllExpanded] = useState(false);
   const [showAutoSave, setShowAutoSave] = useState(0);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Load from cookie on mount
   useEffect(() => {
@@ -117,9 +119,92 @@ export default function ProQuestionnaire() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const isQuestionComplete = (questionId) => {
+    const question = QUESTIONS.find(q => q.id === questionId);
+    if (!question) return false;
+
+    const answer = responses[questionId];
+    const otherValue = responses[`${questionId}_other`];
+
+    switch (question.type) {
+      case 'yes_no':
+        return answer === 'yes' || answer === 'no';
+      
+      case 'checkbox': {
+        const selections = Array.isArray(answer) ? answer : [];
+        let otherCount = 0;
+        if (otherValue) {
+          if (Array.isArray(otherValue)) {
+            otherCount = otherValue.filter(v => v?.trim()).length;
+          } else if (otherValue.trim()) {
+            otherCount = 1;
+          }
+        }
+        const totalCount = selections.length + otherCount;
+        const min = question.limits?.min || 0;
+        const max = question.limits?.max || Infinity;
+        return totalCount >= min && totalCount <= max;
+      }
+      
+      case 'radio':
+        return !!answer && (answer !== 'Other' || (otherValue && otherValue.trim()));
+      
+      case 'textarea':
+        return answer && answer.trim().length > 0;
+      
+      case 'multi_text': {
+        const entries = Array.isArray(answer) ? answer : [];
+        const filled = entries.filter(e => e?.trim()).length;
+        const min = question.limits?.min || 0;
+        return filled >= min;
+      }
+      
+      case 'file_upload':
+        return !!answer;
+      
+      case 'numeric_range':
+        return answer && answer.trim().length > 0;
+      
+      default:
+        return false;
+    }
+  };
+
+  const isFormValid = () => {
+    // Check all main questions 1-27
+    for (let i = 1; i <= 27; i++) {
+      const questionId = i.toString();
+      const question = QUESTIONS.find(q => q.id === questionId);
+      
+      if (!question) continue;
+      
+      if (!isQuestionComplete(questionId)) {
+        return false;
+      }
+
+      // Check conditional children if parent is 'yes'
+      if (question.conditionalChildren && responses[questionId] === 'yes') {
+        for (const child of question.conditionalChildren) {
+          if (child.requiredIfParentYes && !isQuestionComplete(child.id)) {
+            return false;
+          }
+        }
+      }
+    }
+    return true;
+  };
+
+  const handleSubmitClick = () => {
+    if (!isFormValid()) {
+      alert('Please complete all required fields');
+      return;
+    }
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirmSubmit = async (businessName, domain) => {
     setIsSubmitting(true);
+    setShowConfirmModal(false);
 
     try {
       const user = await base44.auth.me();
@@ -128,6 +213,8 @@ export default function ProQuestionnaire() {
         submission_status: 'submitted',
         submitter_email: user?.email || '',
         submitter_name: user?.full_name || '',
+        business_name: businessName,
+        domain: domain,
         responses: responses,
         submitted_at: new Date().toISOString()
       });
@@ -280,7 +367,7 @@ export default function ProQuestionnaire() {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-16">
+        <div className="space-y-16">
           {Object.entries(sections).map(([sectionName, sectionQuestions], sectionIndex) => (
             <section key={sectionName} className="space-y-8">
               <div className="pb-6 border-b-2 border-slate-200">
@@ -335,10 +422,15 @@ export default function ProQuestionnaire() {
           {/* Submit Section */}
           <div className="pt-8 border-t-2 border-slate-200">
             <div className="flex flex-col sm:flex-row gap-4">
-              <Button
-                type="submit"
-                disabled={isSubmitting}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-6 text-lg font-semibold rounded-xl shadow-lg shadow-blue-500/25 transition-all hover:shadow-xl hover:shadow-blue-500/30"
+              <button
+                type="button"
+                onClick={handleSubmitClick}
+                disabled={!isFormValid() || isSubmitting}
+                className={`flex-1 py-6 text-lg font-semibold rounded-xl shadow-lg transition-all flex items-center justify-center ${
+                  isFormValid() && !isSubmitting
+                    ? 'bg-green-600 hover:bg-green-700 text-white shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/30'
+                    : 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                }`}
               >
                 {isSubmitting ? (
                   <>
@@ -351,8 +443,8 @@ export default function ProQuestionnaire() {
                     Submit Questionnaire
                   </>
                 )}
-              </Button>
-              
+              </button>
+
               <Button
                 type="button"
                 variant="outline"
@@ -364,10 +456,20 @@ export default function ProQuestionnaire() {
               </Button>
             </div>
           </div>
-        </form>
+          </div>
       </main>
 
       <AutoSaveIndicator show={showAutoSave} />
-    </div>
-  );
-}
+
+      {showConfirmModal && (
+        <ConfirmModal
+          formData={responses}
+          onConfirm={handleConfirmSubmit}
+          onCancel={() => setShowConfirmModal(false)}
+          initialBusinessName=""
+          initialDomain=""
+        />
+      )}
+      </div>
+      );
+      }
