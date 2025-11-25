@@ -90,20 +90,19 @@ export default function GeographicQuestion({ value = [], onChange, onMetaChange,
   const handleSelectPrediction = (prediction) => {
     if (value.length >= max) return;
 
-    // Immediately add the location optimistically
     const locationLabel = prediction.description;
-    const tempMeta = {
+    
+    // Create new arrays with the added location
+    const newValues = [...value, locationLabel];
+    const newMeta = [...metaValue, {
       label: locationLabel,
       lat: null,
       lon: null,
       place_id: prediction.place_id,
       source: 'google_places'
-    };
-
-    // Update UI immediately
-    const newValues = [...value, locationLabel];
-    const newMeta = [...metaValue, tempMeta];
+    }];
     
+    // Update parent state immediately
     onChange(newValues);
     if (onMetaChange) onMetaChange(newMeta);
     
@@ -112,19 +111,21 @@ export default function GeographicQuestion({ value = [], onChange, onMetaChange,
     setPredictions([]);
     setShowDropdown(false);
 
-    // Fetch full details in background to update coordinates
+    // Fetch coordinates in background
     if (placesServiceRef.current) {
       placesServiceRef.current.getDetails(
         { placeId: prediction.place_id },
         (place, status) => {
           if (status === window.google.maps.places.PlacesServiceStatus.OK && place.geometry) {
-            const updatedMeta = [...newMeta];
-            updatedMeta[updatedMeta.length - 1] = {
-              ...tempMeta,
+            const finalMeta = [...newMeta];
+            finalMeta[finalMeta.length - 1] = {
+              label: locationLabel,
               lat: place.geometry.location.lat(),
-              lon: place.geometry.location.lng()
+              lon: place.geometry.location.lng(),
+              place_id: prediction.place_id,
+              source: 'google_places'
             };
-            if (onMetaChange) onMetaChange(updatedMeta);
+            if (onMetaChange) onMetaChange(finalMeta);
           }
         }
       );
