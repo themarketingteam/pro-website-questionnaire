@@ -14,7 +14,7 @@ import MultiTextQuestion from '@/components/pro-form/MultiTextQuestion';
 import FileUploadQuestion from '@/components/pro-form/FileUploadQuestion';
 import SelectionSpanIndicator from '@/components/pro-form/SelectionSpanIndicator';
 import AutoSaveIndicator from '@/components/pro-form/AutoSaveIndicator';
-import { QUESTIONS } from '@/components/pro-form/questionData';
+import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 
 const COOKIE_NAME = 'pro_questionnaire_responses';
 
@@ -157,6 +157,7 @@ export default function ProQuestionnaire() {
         return (
           <CheckboxQuestion
             options={question.options}
+            groupedOptions={question.id === "4" ? SERVICE_OPTIONS_GROUPED : null}
             value={responses[question.id] || []}
             onChange={(val) => updateResponse(question.id, val)}
             min={question.limits?.min}
