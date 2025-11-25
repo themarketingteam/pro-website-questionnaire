@@ -90,11 +90,13 @@ export const COMPANY_GOALS_OPTIONS = [
 ];
 
 export const BRAND_VOICE_OPTIONS = [
-  "Professional and authoritative",
-  "Friendly and approachable",
-  "Technical and precise",
-  "Conversational and casual",
-  "Bold and confident"
+  "Professional & Corporate",
+  "Friendly & Approachable",
+  "Technical & Expert-Driven",
+  "Modern & Innovative",
+  "Confident & Authoritative Expert",
+  "High-End & Premium",
+  "Story-Driven & Mission-Focused"
 ];
 
 export const CLIENT_ACQUISITION_OPTIONS = [
