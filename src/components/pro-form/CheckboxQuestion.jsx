@@ -41,8 +41,9 @@ export default function CheckboxQuestion({
       
       <div className="space-y-2.5">
         {options.map((option) => (
-          <label 
+          <div 
             key={option}
+            onClick={() => !isDisabled(option) && handleToggle(option)}
             className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-all ${
               value.includes(option)
                 ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500/20'
@@ -63,7 +64,7 @@ export default function CheckboxQuestion({
             }`}>
               {option}
             </span>
-          </label>
+          </div>
         ))}
       </div>
       
