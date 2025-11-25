@@ -34,17 +34,22 @@ export default function GeographicQuestion({ value = [], onChange, onMetaChange,
 
     autocompleteRef.current.addListener('place_changed', () => {
       const place = autocompleteRef.current.getPlace();
-      if (place.geometry) {
-        handleAddLocation(
-          place.formatted_address || place.name,
-          place.geometry.location.lat(),
-          place.geometry.location.lng(),
-          place.place_id
-        );
+      if (place.geometry && value.length < max) {
+        const newValues = [...value, place.formatted_address || place.name];
+        const newMeta = [...metaValue, { 
+          label: place.formatted_address || place.name, 
+          lat: place.geometry.location.lat(), 
+          lon: place.geometry.location.lng(), 
+          place_id: place.place_id, 
+          source: 'google_places' 
+        }];
+        
+        onChange(newValues);
+        if (onMetaChange) onMetaChange(newMeta);
         setInput('');
       }
     });
-  }, [isLoaded]);
+  }, [isLoaded, value, metaValue, onChange, onMetaChange, max]);
 
   const handleAddLocation = (label, lat = null, lon = null, place_id = null) => {
     if (value.length >= max || !label.trim()) return;
