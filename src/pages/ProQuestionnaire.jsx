@@ -216,6 +216,7 @@ export default function ProQuestionnaire() {
             title={child.title}
             guidance={child.guidance}
             why={child.why}
+            examples={child.examples}
             isCollapsible={true}
             isExpanded={expandedQuestions[child.id]}
             onToggle={() => toggleQuestion(child.id)}
@@ -278,6 +279,7 @@ export default function ProQuestionnaire() {
                     title={question.title}
                     guidance={question.guidance}
                     why={question.why}
+                    examples={question.examples}
                     isCollapsible={true}
                     isExpanded={expandedQuestions[question.id]}
                     onToggle={() => toggleQuestion(question.id)}
