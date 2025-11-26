@@ -237,6 +237,75 @@ export default function ProQuestionnaire() {
     setShowConfirmModal(true);
   };
 
+  const transformResponsesToPayload = (responses, businessName, domain) => {
+    // Transform geographic areas with metadata
+    const geographicAreas = (responses['6'] || []).map((location, index) => ({
+      geographic_area_meta: {
+        name: typeof location === 'string' ? location : location.name,
+        label: typeof location === 'string' ? location : location.label,
+        lat: typeof location === 'object' ? location.lat : null,
+        lon: typeof location === 'object' ? location.lon : null,
+        place_id: typeof location === 'object' ? location.place_id : null,
+        source: "google",
+        primary: index === (responses['6_primary'] || 0)
+      }
+    }));
+
+    return {
+      metadata: {
+        business_name: businessName,
+        businessDomain: domain,
+        submission_datetime: new Date().toISOString(),
+        service_type: "express"
+      },
+      userdata: {
+        additional_pages_needed: responses['1'] === 'yes',
+        additional_pages_list: responses['1a'] || '',
+        business_details_update_needed: responses['2'] === 'yes',
+        business_details_update_description: responses['2a'] || '',
+        company_description: responses['3'] || '',
+        service_offerings: responses['4'] || [],
+        service_offerings_other: responses['4_other'] || '',
+        target_industries: responses['5'] || [],
+        target_industries_other: responses['5_other'] || '',
+        geographic_areas: geographicAreas,
+        delivery_model: responses['7'] || '',
+        delivery_model_other: responses['7_other'] || '',
+        pricing_packaging: responses['8'] || '',
+        pricing_packaging_other: responses['8_other'] || '',
+        differentiation: responses['9'] || '',
+        company_goals: responses['10'] || [],
+        company_goals_other: responses['10_other'] || '',
+        brand_tone: responses['11'] || '',
+        brand_tone_other: responses['11_other'] || '',
+        certifications_partnerships: responses['12'] || '',
+        sales_process: responses['13'] || '',
+        service_guarantee: responses['14'] === 'yes',
+        service_guarantee_description: responses['14a'] || '',
+        client_acquisition: responses['15'] || '',
+        client_acquisition_other: responses['15_other'] || '',
+        website_objectives: responses['16'] || '',
+        website_objectives_other: responses['16_other'] || '',
+        target_client_description: responses['17'] || '',
+        client_size: responses['18'] || '',
+        client_challenges: responses['19'] || [],
+        client_challenges_other: responses['19_other'] || '',
+        client_frustrations: responses['20'] || [],
+        client_frustrations_other: responses['20_other'] || '',
+        client_outcomes: responses['21'] || [],
+        client_outcomes_other: responses['21_other'] || '',
+        decision_makers: responses['22'] || '',
+        decision_makers_other: responses['22_other'] || '',
+        value_description: responses['23'] || '',
+        ideal_client: responses['24'] || '',
+        avoided_clients: responses['25'] || '',
+        primary_cta: responses['26'] || '',
+        primary_cta_other: responses['26_other'] || '',
+        additional_notes: responses['27'] || ''
+      }
+    };
+  };
+
   const handleConfirmSubmit = async (businessName, domain) => {
     setIsSubmitting(true);
     setShowConfirmModal(false);
@@ -256,6 +325,9 @@ export default function ProQuestionnaire() {
 
       await base44.entities.ProFormSubmission.create(submissionData);
 
+      // Transform payload for Zapier webhook
+      const transformedPayload = transformResponsesToPayload(responses, businessName, domain);
+
       // Send to Zapier webhook
       const hookID = import.meta.env.VITE_API_HOOK_ID || "23529934";
       const hookKey = import.meta.env.VITE_API_HOOK_KEY || "uk2zhso";
@@ -264,7 +336,7 @@ export default function ProQuestionnaire() {
       await fetch(webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(submissionData)
+        body: JSON.stringify(transformedPayload)
       });
 
       toast.success('Questionnaire submitted successfully!');
