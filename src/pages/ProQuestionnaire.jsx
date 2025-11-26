@@ -241,11 +241,11 @@ export default function ProQuestionnaire() {
     // Transform geographic areas with metadata
     const geographicAreas = (responses['6'] || []).map((location, index) => ({
       geographic_area_meta: {
-        name: typeof location === 'string' ? location : location.name,
-        label: typeof location === 'string' ? location : location.label,
-        lat: typeof location === 'object' ? location.lat : null,
-        lon: typeof location === 'object' ? location.lon : null,
-        place_id: typeof location === 'object' ? location.place_id : null,
+        name: typeof location === 'string' ? location : (location.name || location.label || ''),
+        label: typeof location === 'string' ? location : (location.label || location.name || ''),
+        lat: location.lat != null ? String(location.lat) : null,
+        lon: location.lon != null ? String(location.lon) : null,
+        place_id: location.place_id || null,
         source: "google",
         primary: index === (responses['6_primary'] || 0)
       }
