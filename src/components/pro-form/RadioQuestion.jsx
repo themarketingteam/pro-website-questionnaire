@@ -41,10 +41,8 @@ export default function RadioQuestion({ options, value, onChange, showOther = fa
               placeholder="Enter your option..."
               className="w-full mt-3 p-3 border border-[#C1C6C8] rounded focus:outline-none focus:ring-2 focus:ring-[#1C82DE] focus:border-transparent"
               value={otherValue}
-              onChange={(e) => {
-                onOtherChange(e.target.value);
-                onChange('Other');
-              }}
+              onChange={(e) => onOtherChange(e.target.value)}
+              onFocus={() => onChange('Other')}
             />
           </label>
         </div>
