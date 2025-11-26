@@ -28,10 +28,11 @@ export default function SelectionSpanIndicator({
           <AlertCircle className={`w-5 h-5 mt-0.5 ${isTooLow ? 'text-[#F29100]' : 'text-red-600'}`} />
         )}
         <div className="flex-1">
-          <p className={`font-semibold ${
-            isValid ? 'text-[#6AA72F]' : isTooLow ? 'text-[#D37E00]' : 'text-red-800'
-          }`}>
-            Selection Balance: {total} / {minTotal}-{maxTotal}
+          <p className="font-semibold">
+            <span className="text-black">Selection Balance:</span>
+            <span className={isValid ? 'text-[#6AA72F]' : isTooLow ? 'text-[#D37E00]' : 'text-red-800'}>
+              {' '}{total} / {minTotal}-{maxTotal}
+            </span>
           </p>
           <p className={`text-sm mt-1 ${
             isValid ? 'text-[#6AA72F]' : isTooLow ? 'text-[#D37E00]' : 'text-red-700'
