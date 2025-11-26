@@ -427,6 +427,7 @@ export default function ProQuestionnaire() {
             onToggle={() => toggleQuestion(child.id)}
             required={child.requiredIfParentYes}
             onReset={() => resetQuestion(child.id)}
+            hasAnswer={!!responses[child.id] || !!responses[`${child.id}_other`]}
           >
             {renderQuestion(child)}
           </QuestionWrapper>
@@ -490,6 +491,7 @@ export default function ProQuestionnaire() {
                     isExpanded={expandedQuestions[question.id]}
                     onToggle={() => toggleQuestion(question.id)}
                     onReset={() => resetQuestion(question.id)}
+                    hasAnswer={!!responses[question.id] || !!responses[`${question.id}_other`]}
                   >
                     {renderQuestion(question)}
                     
