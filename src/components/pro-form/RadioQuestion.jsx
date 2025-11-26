@@ -11,8 +11,14 @@ export default function RadioQuestion({ options, value, onChange, showOther = fa
               ? 'border-[#1C82DE] bg-[#E8F3FC] ring-2 ring-[#1C82DE]/20'
               : 'border-[#C1C6C8] hover:border-[#A9AAAC] hover:bg-gray-50'
           }`}
-          onClick={() => onChange(option)}
         >
+          <input
+            type="radio"
+            name={`radio-${Math.random()}`}
+            checked={value === option}
+            onChange={() => onChange(option)}
+            className="sr-only"
+          />
           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
             value === option ? 'border-[#1C82DE] bg-[#1C82DE]' : 'border-[#A9AAAC]'
           }`}>
@@ -35,8 +41,10 @@ export default function RadioQuestion({ options, value, onChange, showOther = fa
               placeholder="Enter your option..."
               className="w-full mt-3 p-3 border border-[#C1C6C8] rounded focus:outline-none focus:ring-2 focus:ring-[#1C82DE] focus:border-transparent"
               value={otherValue}
-              onChange={(e) => onOtherChange(e.target.value)}
-              onFocus={() => onChange('Other')}
+              onChange={(e) => {
+                onOtherChange(e.target.value);
+                onChange('Other');
+              }}
             />
           </label>
         </div>
