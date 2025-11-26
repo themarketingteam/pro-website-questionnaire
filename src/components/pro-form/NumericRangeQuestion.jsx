@@ -78,7 +78,7 @@ export default function NumericRangeQuestion({
             min="1"
             value={smallest}
             onChange={handleSmallestChange}
-            className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full p-3 border border-[#C1C6C8] rounded focus:outline-none focus:ring-2 focus:ring-[#1C82DE] focus:border-transparent"
           />
         </div>
         
@@ -93,15 +93,15 @@ export default function NumericRangeQuestion({
             placeholder="1000+"
             value={largest > 1000 ? '' : largestInput}
             onChange={handleLargestChange}
-            className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full p-3 border border-[#C1C6C8] rounded focus:outline-none focus:ring-2 focus:ring-[#1C82DE] focus:border-transparent"
           />
         </div>
         
         <span className="text-sm text-slate-600 mt-7">employees</span>
       </div>
       
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <span className="text-sm font-medium text-blue-900">
+      <div className="bg-[#E8F3FC] border border-[#1C82DE] rounded p-3">
+        <span className="text-sm font-medium text-[#003865]">
           Result: {smallest}-{largestDisplay} employees
         </span>
       </div>

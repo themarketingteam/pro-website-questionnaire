@@ -425,7 +425,7 @@ export default function ProQuestionnaire() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <FormHeader />
       
       <main className="max-w-4xl mx-auto px-6 py-12">
@@ -434,14 +434,14 @@ export default function ProQuestionnaire() {
           <button
             type="button"
             onClick={expandAll}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition-colors text-sm"
+            className="px-4 py-2 bg-[#E8EBED] hover:bg-[#C1C6C8] text-[#1E3950] font-medium rounded transition-colors text-sm uppercase"
           >
             Expand All
           </button>
           <button
             type="button"
             onClick={collapseAll}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition-colors text-sm"
+            className="px-4 py-2 bg-[#E8EBED] hover:bg-[#C1C6C8] text-[#1E3950] font-medium rounded transition-colors text-sm uppercase"
           >
             Collapse All
           </button>
@@ -450,8 +450,8 @@ export default function ProQuestionnaire() {
         <div className="space-y-16">
           {Object.entries(sections).map(([sectionName, sectionQuestions], sectionIndex) => (
             <section key={sectionName} className="space-y-8">
-              <div className="pb-6 border-b-2 border-slate-200">
-                <h2 className="text-2xl font-bold text-slate-900">
+              <div className="pb-6 border-b-2 border-[#C1C6C8]">
+                <h2 className="text-2xl font-bold text-[#122947]">
                   Section {sectionIndex + 1}: {sectionName}
                 </h2>
               </div>
@@ -500,16 +500,16 @@ export default function ProQuestionnaire() {
           ))}
 
           {/* Submit Section */}
-          <div className="pt-8 border-t-2 border-slate-200">
+          <div className="pt-8 border-t-2 border-[#C1C6C8]">
             <div className="flex flex-col sm:flex-row gap-4">
               <button
                 type="button"
                 onClick={handleSubmitClick}
                 disabled={!isFormValid() || isSubmitting}
-                className={`flex-1 py-6 text-lg font-semibold rounded-xl shadow-lg transition-all flex items-center justify-center ${
+                className={`flex-1 py-6 text-sm font-semibold rounded shadow-lg transition-all flex items-center justify-center uppercase tracking-wide ${
                   isFormValid() && !isSubmitting
-                    ? 'bg-green-600 hover:bg-green-700 text-white shadow-green-500/25 hover:shadow-xl hover:shadow-green-500/30'
-                    : 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                    ? 'bg-[#90C944] hover:bg-[#7DB83A] text-white shadow-lg hover:shadow-xl'
+                    : 'bg-[#C1C6C8] text-[#566C75] cursor-not-allowed shadow-none'
                 }`}
               >
                 {isSubmitting ? (
@@ -529,7 +529,7 @@ export default function ProQuestionnaire() {
                 type="button"
                 variant="outline"
                 onClick={clearAll}
-                className="px-8 py-6 text-slate-600 border-slate-300 hover:bg-red-50 hover:text-red-600 hover:border-red-300 rounded-xl transition-all"
+                className="px-8 py-6 text-[#1E3950] border-[#C1C6C8] hover:bg-[#E8EBED] hover:border-[#A9AAAC] rounded transition-all uppercase text-sm tracking-wide"
               >
                 <RotateCcw className="w-5 h-5 mr-2" />
                 Clear All

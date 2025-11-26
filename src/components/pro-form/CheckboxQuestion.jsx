@@ -45,8 +45,8 @@ export default function CheckboxQuestion({
     <div className="space-y-4">
       {(min || max) && (
         <span className={`text-sm font-medium block ${
-          totalSelections < (min || 0) ? 'text-amber-600' : 
-          totalSelections > (max || Infinity) ? 'text-red-600' : 'text-slate-600'
+          totalSelections < (min || 0) ? 'text-[#F29100]' : 
+          totalSelections > (max || Infinity) ? 'text-red-600' : 'text-[#566C75]'
         }`}>
           {totalSelections} / {max || '∞'} selections
           {min && ` (minimum ${min})`}
@@ -57,29 +57,29 @@ export default function CheckboxQuestion({
         <div className="space-y-4">
           {Object.entries(groupedOptions).map(([groupName, groupOptions]) => (
             <div key={groupName}>
-              <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">{groupName}</h4>
+              <h4 className="text-xs font-semibold text-[#566C75] uppercase tracking-wide mb-2">{groupName}</h4>
               <div className={columns === 3 ? 'grid grid-cols-1 md:grid-cols-3 gap-2' : 'grid grid-cols-1 md:grid-cols-2 gap-2'}>
                 {groupOptions.map((option) => (
                   <div 
                     key={option}
                     onClick={() => !isDisabled(option) && handleToggle(option)}
-                    className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${
+                    className={`flex items-center gap-3 p-3 border rounded cursor-pointer transition-all ${
                       value.includes(option)
-                        ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500/20'
+                        ? 'border-[#1C82DE] bg-[#E8F3FC] ring-2 ring-[#1C82DE]/20'
                         : isDisabled(option)
-                        ? 'border-slate-100 bg-slate-50 cursor-not-allowed opacity-50'
-                        : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                        ? 'border-[#E8EBED] bg-[#E8EBED] cursor-not-allowed opacity-50'
+                        : 'border-[#C1C6C8] hover:border-[#A9AAAC] hover:bg-gray-50'
                     }`}
                   >
                     <div className={`w-5 h-5 flex-shrink-0 rounded border-2 flex items-center justify-center transition-all ${
                       value.includes(option) 
-                        ? 'border-blue-500 bg-blue-500' 
-                        : 'border-slate-300'
+                        ? 'border-[#1C82DE] bg-[#1C82DE]' 
+                        : 'border-[#A9AAAC]'
                     }`}>
                       {value.includes(option) && <Check className="w-3 h-3 text-white" />}
                     </div>
                     <span className={`select-none text-sm ${
-                      value.includes(option) ? 'text-blue-700 font-medium' : 'text-slate-700'
+                      value.includes(option) ? 'text-[#1C82DE] font-medium' : 'text-[#1E3950]'
                     }`}>
                       {option}
                     </span>
@@ -95,23 +95,23 @@ export default function CheckboxQuestion({
             <div 
               key={option}
               onClick={() => !isDisabled(option) && handleToggle(option)}
-              className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-all ${
+              className={`flex items-center gap-3 p-4 border rounded cursor-pointer transition-all ${
                 value.includes(option)
-                  ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500/20'
+                  ? 'border-[#1C82DE] bg-[#E8F3FC] ring-2 ring-[#1C82DE]/20'
                   : isDisabled(option)
-                  ? 'border-slate-100 bg-slate-50 cursor-not-allowed opacity-50'
-                  : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                  ? 'border-[#E8EBED] bg-[#E8EBED] cursor-not-allowed opacity-50'
+                  : 'border-[#C1C6C8] hover:border-[#A9AAAC] hover:bg-gray-50'
               }`}
             >
               <div className={`w-5 h-5 flex-shrink-0 rounded border-2 flex items-center justify-center transition-all ${
                 value.includes(option) 
-                  ? 'border-blue-500 bg-blue-500' 
-                  : 'border-slate-300'
+                  ? 'border-[#1C82DE] bg-[#1C82DE]' 
+                  : 'border-[#A9AAAC]'
               }`}>
                 {value.includes(option) && <Check className="w-3 h-3 text-white" />}
               </div>
               <span className={`select-none text-sm ${
-                value.includes(option) ? 'text-blue-700 font-medium' : 'text-slate-700'
+                value.includes(option) ? 'text-[#1C82DE] font-medium' : 'text-[#1E3950]'
               }`}>
                 {option}
               </span>
@@ -121,16 +121,16 @@ export default function CheckboxQuestion({
       )}
       
       {showOther && !multiOther && (
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 transition-all">
+        <div className="bg-gray-50 border border-[#C1C6C8] rounded p-4 transition-all">
           <label className="block">
-            <span className="font-semibold text-slate-900 text-sm">Other (please specify):</span>
-            <span className="text-xs text-slate-500 block mt-1">
+            <span className="font-semibold text-[#122947] text-sm">Other (please specify):</span>
+            <span className="text-xs text-[#566C75] block mt-1">
               Enter a single option only (no commas or multiple items)
             </span>
             <input
               type="text"
               placeholder="Enter one option only..."
-              className="w-full mt-3 p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full mt-3 p-3 border border-[#C1C6C8] rounded focus:outline-none focus:ring-2 focus:ring-[#1C82DE] focus:border-transparent"
               value={otherValue}
               onChange={(e) => onOtherChange(e.target.value)}
             />
@@ -139,10 +139,10 @@ export default function CheckboxQuestion({
       )}
 
       {showOther && multiOther && (
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 transition-all">
+        <div className="bg-gray-50 border border-[#C1C6C8] rounded p-4 transition-all">
           <div className="mb-3">
-            <span className="font-semibold text-slate-900 text-sm">Other (please specify):</span>
-            <span className="text-xs text-slate-500 block mt-1">
+            <span className="font-semibold text-[#122947] text-sm">Other (please specify):</span>
+            <span className="text-xs text-[#566C75] block mt-1">
               Add custom services not listed above (up to {multiOtherMax} entries). Each counts toward your selection limit.
             </span>
           </div>
@@ -152,7 +152,7 @@ export default function CheckboxQuestion({
                 <input
                   type="text"
                   placeholder={`e.g., "Mac Certified Technician"`}
-                  className="flex-1 p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                  className="flex-1 p-3 border border-[#C1C6C8] rounded focus:outline-none focus:ring-2 focus:ring-[#1C82DE] focus:border-transparent text-sm"
                   value={entry}
                   onChange={(e) => {
                     const newOther = [...(Array.isArray(otherValue) ? otherValue : [''])];
@@ -167,7 +167,7 @@ export default function CheckboxQuestion({
                       const newOther = (Array.isArray(otherValue) ? otherValue : ['']).filter((_, i) => i !== idx);
                       onOtherChange(newOther.length ? newOther : ['']);
                     }}
-                    className="px-3 py-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    className="px-3 py-2 text-red-500 hover:bg-red-50 rounded transition-colors"
                   >
                     ×
                   </button>
@@ -181,7 +181,7 @@ export default function CheckboxQuestion({
                   const newOther = [...(Array.isArray(otherValue) ? otherValue : ['']), ''];
                   onOtherChange(newOther);
                 }}
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium mt-2"
+                className="text-sm text-[#1C82DE] hover:text-[#075DA7] font-medium mt-2"
               >
                 + Add another
               </button>
