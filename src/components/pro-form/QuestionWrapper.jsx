@@ -24,7 +24,7 @@ export default function QuestionWrapper({
           onClick={isCollapsible ? onToggle : undefined}
         >
           <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold text-slate-900">
+            <span className="text-lg font-semibold text-[#122947]">
               {number}. {title}
               {required && <span className="text-red-500 ml-1">*</span>}
             </span>
@@ -32,7 +32,7 @@ export default function QuestionWrapper({
             {(guidance || why || examples) && (
               <button
                 type="button"
-                className="w-6 h-6 rounded-full border border-slate-300 hover:border-blue-400 hover:bg-blue-50 flex items-center justify-center text-slate-600 hover:text-blue-600 transition-all"
+                className="w-6 h-6 rounded-full border border-[#C1C6C8] hover:border-[#1C82DE] hover:bg-[#E8F3FC] flex items-center justify-center text-[#566C75] hover:text-[#1C82DE] transition-all"
                 aria-label="More information"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -45,9 +45,9 @@ export default function QuestionWrapper({
             
             {isCollapsible && (
               isExpanded ? (
-                <ChevronUp className="w-5 h-5 text-slate-400 ml-auto" />
+                <ChevronUp className="w-5 h-5 text-[#566C75] ml-auto" />
               ) : (
-                <ChevronDown className="w-5 h-5 text-slate-400 ml-auto" />
+                <ChevronDown className="w-5 h-5 text-[#566C75] ml-auto" />
               )
             )}
           </div>

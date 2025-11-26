@@ -30,7 +30,7 @@ export default function MultiTextQuestion({
 
   return (
     <div className="space-y-3">
-      <span className="text-sm font-medium text-slate-600 block">
+      <span className="text-sm font-medium text-[#566C75] block">
         {value.length} / {max} entries (minimum {min})
       </span>
       
@@ -41,7 +41,7 @@ export default function MultiTextQuestion({
             value={item}
             onChange={(e) => handleChange(index, e.target.value)}
             placeholder={`${placeholder} ${index + 1}`}
-            className="flex-1 p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            className="flex-1 p-3 border border-[#C1C6C8] rounded focus:outline-none focus:ring-2 focus:ring-[#1C82DE] focus:border-transparent transition-all"
           />
           {value.length > min && (
             <Button
@@ -49,7 +49,7 @@ export default function MultiTextQuestion({
               variant="ghost"
               size="icon"
               onClick={() => handleRemove(index)}
-              className="text-slate-400 hover:text-red-500 hover:bg-red-50"
+              className="text-[#566C75] hover:text-red-500 hover:bg-red-50"
             >
               <X className="w-4 h-4" />
             </Button>
@@ -62,7 +62,7 @@ export default function MultiTextQuestion({
           type="button"
           variant="outline"
           onClick={handleAdd}
-          className="w-full border-dashed border-slate-300 text-slate-600 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50"
+          className="w-full border-dashed border-[#C1C6C8] text-[#566C75] hover:border-[#1C82DE] hover:text-[#1C82DE] hover:bg-[#E8F3FC]"
         >
           <Plus className="w-4 h-4 mr-2" />
           Add Another Entry
