@@ -45,6 +45,13 @@ export default function ProQuestionnaire() {
     link.rel = 'icon';
     link.href = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6925fec3678942d22522b010/96c140c55_kaseya-logo.png';
     document.head.appendChild(link);
+
+    // Add BugHerd script
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = 'https://www.bugherd.com/sidebarv2.js?apikey=pqtfc3umj0mlw2ipj9bsoq';
+    script.async = true;
+    document.head.appendChild(script);
   }, []);
 
   // Load from cookie on mount
