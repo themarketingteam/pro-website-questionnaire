@@ -251,7 +251,7 @@ export default function ProQuestionnaire() {
     try {
       const user = await base44.auth.me();
       
-      await base44.entities.ProFormSubmission.create({
+      const submissionData = {
         submission_status: 'submitted',
         submitter_email: user?.email || '',
         submitter_name: user?.full_name || '',
@@ -259,6 +259,19 @@ export default function ProQuestionnaire() {
         domain: domain,
         responses: responses,
         submitted_at: new Date().toISOString()
+      };
+
+      await base44.entities.ProFormSubmission.create(submissionData);
+
+      // Send to Zapier webhook
+      const hookID = import.meta.env.VITE_API_HOOK_ID || "23529934";
+      const hookKey = import.meta.env.VITE_API_HOOK_KEY || "uk2zhso";
+      const webhookUrl = `https://hooks.zapier.com/hooks/catch/${hookID}/${hookKey}/`;
+      
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(submissionData)
       });
 
       toast.success('Questionnaire submitted successfully!');
