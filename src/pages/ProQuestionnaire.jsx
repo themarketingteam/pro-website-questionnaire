@@ -95,6 +95,16 @@ export default function ProQuestionnaire() {
     setShowAutoSave(prev => prev + 1);
   };
 
+  const resetQuestion = (questionId) => {
+    const newResponses = { ...responses };
+    delete newResponses[questionId];
+    delete newResponses[`${questionId}_other`];
+    delete newResponses[`${questionId}_primary`];
+    setResponses(newResponses);
+    saveToStorage(newResponses);
+    setShowAutoSave(prev => prev + 1);
+  };
+
   const toggleQuestion = (questionId) => {
     setExpandedQuestions(prev => {
       const newState = { ...prev, [questionId]: !prev[questionId] };
@@ -416,6 +426,7 @@ export default function ProQuestionnaire() {
             isExpanded={expandedQuestions[child.id]}
             onToggle={() => toggleQuestion(child.id)}
             required={child.requiredIfParentYes}
+            onReset={() => resetQuestion(child.id)}
           >
             {renderQuestion(child)}
           </QuestionWrapper>
@@ -478,6 +489,7 @@ export default function ProQuestionnaire() {
                     isCollapsible={true}
                     isExpanded={expandedQuestions[question.id]}
                     onToggle={() => toggleQuestion(question.id)}
+                    onReset={() => resetQuestion(question.id)}
                   >
                     {renderQuestion(question)}
                     

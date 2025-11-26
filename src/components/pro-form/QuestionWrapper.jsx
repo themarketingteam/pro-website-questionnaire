@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info, RotateCcw } from 'lucide-react';
 import QuestionHelpModal from './QuestionHelpModal';
 
 export default function QuestionWrapper({ 
@@ -12,7 +12,8 @@ export default function QuestionWrapper({
   isCollapsible = true,
   isExpanded = true,
   onToggle,
-  required = false
+  required = false,
+  onReset
 }) {
   const [showModal, setShowModal] = useState(false);
 
@@ -40,6 +41,21 @@ export default function QuestionWrapper({
                 }}
               >
                 <Info className="w-3.5 h-3.5" />
+              </button>
+            )}
+            
+            {onReset && (
+              <button
+                type="button"
+                className="w-6 h-6 rounded-full border border-[#C1C6C8] hover:border-red-500 hover:bg-red-50 flex items-center justify-center text-[#566C75] hover:text-red-500 transition-all"
+                aria-label="Reset question"
+                title="Clear answer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReset();
+                }}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
               </button>
             )}
             

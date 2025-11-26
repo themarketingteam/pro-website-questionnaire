@@ -6,19 +6,20 @@ export default function RadioQuestion({ options, value, onChange, showOther = fa
       {options.map((option) => (
         <label 
           key={option}
-          className={`flex items-center gap-3 p-4 border rounded-xl cursor-pointer transition-all ${
+          className={`flex items-center gap-3 p-4 border rounded cursor-pointer transition-all ${
             value === option
-              ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-500/20'
-              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+              ? 'border-[#1C82DE] bg-[#E8F3FC] ring-2 ring-[#1C82DE]/20'
+              : 'border-[#C1C6C8] hover:border-[#A9AAAC] hover:bg-gray-50'
           }`}
+          onClick={() => onChange(option)}
         >
           <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-            value === option ? 'border-blue-500 bg-blue-500' : 'border-slate-300'
+            value === option ? 'border-[#1C82DE] bg-[#1C82DE]' : 'border-[#A9AAAC]'
           }`}>
             {value === option && <div className="w-2 h-2 rounded-full bg-white" />}
           </div>
           <span className={`select-none ${
-            value === option ? 'text-blue-700 font-medium' : 'text-slate-700'
+            value === option ? 'text-[#1C82DE] font-medium' : 'text-[#1E3950]'
           }`}>
             {option}
           </span>
@@ -26,13 +27,13 @@ export default function RadioQuestion({ options, value, onChange, showOther = fa
       ))}
       
       {showOther && (
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 transition-all">
+        <div className="bg-gray-50 border border-[#C1C6C8] rounded p-4 transition-all">
           <label className="block">
-            <span className="font-semibold text-slate-900 text-sm">Other (please specify):</span>
+            <span className="font-semibold text-[#122947] text-sm">Other (please specify):</span>
             <input
               type="text"
               placeholder="Enter your option..."
-              className="w-full mt-3 p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full mt-3 p-3 border border-[#C1C6C8] rounded focus:outline-none focus:ring-2 focus:ring-[#1C82DE] focus:border-transparent"
               value={otherValue}
               onChange={(e) => onOtherChange(e.target.value)}
               onFocus={() => onChange('Other')}
