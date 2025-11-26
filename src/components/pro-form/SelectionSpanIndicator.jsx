@@ -16,10 +16,10 @@ export default function SelectionSpanIndicator({
   return (
     <div className={`p-4 rounded border-2 ${
       isValid 
-        ? 'bg-[#90C944]/10 border-[#90C944]' 
+        ? 'bg-[#90C944]/5 border-[#90C944]' 
         : isTooLow 
-        ? 'bg-[#F29100]/10 border-[#F29100]'
-        : 'bg-red-50 border-red-200'
+        ? 'bg-[#F29100]/5 border-[#F29100]'
+        : 'bg-red-50/50 border-red-200'
     }`}>
       <div className="flex items-start gap-3">
         {isValid ? (
