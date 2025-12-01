@@ -197,7 +197,8 @@ export default function ImageTaggingQuestion({ value, onChange }) {
                       src={value.url}
                       alt="Team"
                       onClick={handleImageClick}
-                      className="max-w-full h-auto rounded-lg shadow-lg cursor-crosshair"
+                      className="max-w-full rounded-lg shadow-lg cursor-crosshair"
+                      style={{ minHeight: '300px', maxHeight: '600px', height: 'auto' }}
                     />
                     {tags.map((tag, index) => (
                       <div
