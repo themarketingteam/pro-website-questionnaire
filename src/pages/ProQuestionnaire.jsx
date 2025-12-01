@@ -15,6 +15,7 @@ import MultiGeographicQuestion from '@/components/pro-form/MultiGeographicQuesti
 import FileUploadQuestion from '@/components/pro-form/FileUploadQuestion';
 import NumericRangeQuestion from '@/components/pro-form/NumericRangeQuestion';
 import MultiCertificationQuestion from '@/components/pro-form/MultiCertificationQuestion';
+import ImageTaggingQuestion from '@/components/pro-form/ImageTaggingQuestion';
 import SelectionSpanIndicator from '@/components/pro-form/SelectionSpanIndicator';
 import AutoSaveIndicator from '@/components/pro-form/AutoSaveIndicator';
 import ConfirmModal from '@/components/pro-form/ConfirmModal';
@@ -219,8 +220,11 @@ export default function ProQuestionnaire() {
         return validItems.length >= min;
       }
 
-      default:
-        return false;
+          case 'image_tagging':
+            return answer && answer.url && Array.isArray(answer.tags) && answer.tags.length > 0 && answer.tags.every(tag => tag.person?.name);
+
+          default:
+            return false;
     }
   };
 
@@ -507,8 +511,11 @@ export default function ProQuestionnaire() {
           />
         );
 
-      default:
-        return null;
+          case 'image_tagging':
+            return <ImageTaggingQuestion {...commonProps} />;
+
+          default:
+            return null;
     }
   };
 

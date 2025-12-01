@@ -1,3 +1,4 @@
+
 // Pro Website Questionnaire Data
 export const SERVICE_OPTIONS_GROUPED = {
   "Cloud & Infrastructure": [
@@ -216,21 +217,12 @@ export const QUESTIONS = [
       },
       {
         id: "2.2",
-        title: "Upload a team photo.",
-        why: "A high-quality team photo adds authenticity and is a centerpiece of the Meet the Team page. This element improves user trust and signals professionalism.",
-        guidance: "Upload the highest-quality version available of your team photo. Accepted formats include .jpg, .jpeg, or .png. If you have multiple photos, upload the primary image you prefer to feature. Landscape orientation is typically best.",
-        type: "file_upload",
+        title: "Upload a team photo and tag each person.",
+        why: "A high-quality team photo with tagged team members adds authenticity and is a centerpiece of the Meet the Team page. This element improves user trust and signals professionalism.",
+        guidance: "Upload the highest-quality version available of your team photo. After uploading, you'll be able to click on each person in the photo to add their name, position/role, and bio. The system will automatically order them from left to right and top to bottom.",
+        type: "image_tagging",
         requiredIfParentYes: true,
-        examples: { fileTypes: ["jpg", "jpeg", "png"], notes: "A single high-quality image is recommended." }
-      },
-      {
-        id: "2.3",
-        title: "List each person in the photo along with their name, title, and a short description.",
-        why: "These details allow the system to create clean, structured bio sections for each team member. This improves both readability and SEO value.",
-        guidance: "List each person in order from left to right (and front to back if applicable). For each team member, provide their full name, role or title, and a one- to two-sentence description of their expertise or responsibilities.",
-        type: "textarea",
-        requiredIfParentYes: true,
-        examples: { shortAnswer: "Left to right: John Smith – CEO – 20+ years leading IT operations. Sarah Lee – Lead Engineer – Specialist in cloud migrations and cybersecurity. Mark Patel – Help Desk Manager – Known for rapid response times and customer care." }
+        examples: { fileTypes: ["jpg", "jpeg", "png"], notes: "Upload an image, then click to tag each team member with their details." }
       }
     ]
   },
