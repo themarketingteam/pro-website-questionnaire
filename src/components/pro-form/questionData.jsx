@@ -337,7 +337,7 @@ export const QUESTIONS = [
   },
   {
     id: "12",
-    section: "Company & Service Information",
+    section: "About Your Business",
     title: "Do you have any certifications, accolades, awards, or partnerships that you would like to highlight?",
     why: "Highlighting official recognitions, partnerships with major vendors, and certifications establishes credibility and authority.",
     guidance: "These elements are powerful trust signals that can differentiate you from competitors.",
