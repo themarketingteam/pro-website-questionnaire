@@ -83,6 +83,13 @@ export default function MultiGeographicQuestion({
           return;
         }
 
+        // Determine if this is a city/town/municipality
+        const isCity = addressComponents.some(component => 
+          component.types.includes('locality') || 
+          component.types.includes('sublocality') ||
+          component.types.includes('postal_town')
+        );
+
         const meta = {
           name: place.formatted_address || place.name,
           label: place.formatted_address || place.name,
@@ -92,7 +99,8 @@ export default function MultiGeographicQuestion({
           source: "google",
           originalName: place.formatted_address || place.name,
           originalLabel: place.formatted_address || place.name,
-          isGreaterArea: false
+          isGreaterArea: false,
+          isCity: isCity
         };
 
         // Check if already added
@@ -196,35 +204,37 @@ export default function MultiGeographicQuestion({
                 </div>
               </div>
               
-              <label className="flex items-center gap-2 ml-5 text-sm text-green-800 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={location.isGreaterArea || false}
-                  onChange={(e) => {
-                    const baseName = location.originalName || location.name || location.label || '';
-                    const cityName = baseName.split(',')[0].trim();
-                    
-                    const updatedLocation = {
-                      ...location,
-                      isGreaterArea: e.target.checked,
-                      name: e.target.checked ? `Greater ${cityName} Area` : (location.originalName || baseName),
-                      label: e.target.checked ? `Greater ${cityName} Area` : (location.originalLabel || baseName),
-                      originalName: location.originalName || baseName,
-                      originalLabel: location.originalLabel || baseName
-                    };
-                    
-                    // Replace the location at this index
-                    const newLocations = [...selectedLocations];
-                    newLocations[index] = updatedLocation;
-                    
-                    // Clear and re-add all
-                    selectedLocations.forEach((_, i) => onRemove(0));
-                    newLocations.forEach(loc => onAdd(loc));
-                  }}
-                  className="w-4 h-4 rounded border-green-400 text-green-600 focus:ring-green-500"
-                />
-                <span className="font-medium">Greater Area (expands beyond city limits)</span>
-              </label>
+              {location.isCity && (
+                <label className="flex items-center gap-2 ml-5 text-sm text-green-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={location.isGreaterArea || false}
+                    onChange={(e) => {
+                      const baseName = location.originalName || location.name || location.label || '';
+                      const cityName = baseName.split(',')[0].trim();
+                      
+                      const updatedLocation = {
+                        ...location,
+                        isGreaterArea: e.target.checked,
+                        name: e.target.checked ? `Greater ${cityName} Area` : (location.originalName || baseName),
+                        label: e.target.checked ? `Greater ${cityName} Area` : (location.originalLabel || baseName),
+                        originalName: location.originalName || baseName,
+                        originalLabel: location.originalLabel || baseName
+                      };
+                      
+                      // Replace the location at this index
+                      const newLocations = [...selectedLocations];
+                      newLocations[index] = updatedLocation;
+                      
+                      // Clear and re-add all
+                      selectedLocations.forEach((_, i) => onRemove(0));
+                      newLocations.forEach(loc => onAdd(loc));
+                    }}
+                    className="w-4 h-4 rounded border-green-400 text-green-600 focus:ring-green-500"
+                  />
+                  <span className="font-medium">Greater Area (expands beyond city limits)</span>
+                </label>
+              )}
             </div>
           ))}
         </div>
