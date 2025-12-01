@@ -83,8 +83,26 @@ export default function MultiGeographicQuestion({
           return;
         }
 
-        // Determine if this is a city/town/municipality
-        const isCity = addressComponents.some(component => 
+        // US States list
+        const usStates = [
+          'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 
+          'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 
+          'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 
+          'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 
+          'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 
+          'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 
+          'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 
+          'Wisconsin', 'Wyoming'
+        ];
+
+        const locationName = place.formatted_address || place.name || '';
+        
+        // Check if it's a state or county
+        const isState = usStates.some(state => locationName.includes(state) && !locationName.includes(','));
+        const isCounty = locationName.toLowerCase().includes('county');
+        
+        // Determine if this is a city/town/municipality (and not a state or county)
+        const isCity = !isState && !isCounty && addressComponents.some(component => 
           component.types.includes('locality') || 
           component.types.includes('sublocality') ||
           component.types.includes('postal_town')
