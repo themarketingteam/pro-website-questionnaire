@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp, Info, RotateCcw } from 'lucide-react';
 import QuestionHelpModal from './QuestionHelpModal';
 
 export default function QuestionWrapper({ 
+  id,
   number, 
   title, 
   guidance, 
@@ -19,7 +20,7 @@ export default function QuestionWrapper({
   const [showModal, setShowModal] = useState(false);
 
   return (
-    <div className="space-y-4">
+    <div id={id} className="space-y-4">
       <div className="flex items-start gap-3">
         <div 
           className={`block flex-1 ${isCollapsible ? 'cursor-pointer' : ''}`}
