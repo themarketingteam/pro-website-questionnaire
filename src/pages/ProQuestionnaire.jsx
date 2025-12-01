@@ -14,6 +14,7 @@ import MultiTextQuestion from '@/components/pro-form/MultiTextQuestion';
 import MultiGeographicQuestion from '@/components/pro-form/MultiGeographicQuestion';
 import FileUploadQuestion from '@/components/pro-form/FileUploadQuestion';
 import NumericRangeQuestion from '@/components/pro-form/NumericRangeQuestion';
+import MultiCertificationQuestion from '@/components/pro-form/MultiCertificationQuestion';
 import SelectionSpanIndicator from '@/components/pro-form/SelectionSpanIndicator';
 import AutoSaveIndicator from '@/components/pro-form/AutoSaveIndicator';
 import ConfirmModal from '@/components/pro-form/ConfirmModal';
@@ -209,7 +210,14 @@ export default function ProQuestionnaire() {
       
       case 'numeric_range':
         return answer && answer.trim().length > 0;
-      
+
+      case 'multi_certification': {
+        const items = Array.isArray(answer) ? answer : [];
+        const validItems = items.filter(item => item.name?.trim() && item.type);
+        const min = question.limits?.min || 0;
+        return validItems.length >= min;
+      }
+
       default:
         return false;
     }
@@ -488,7 +496,16 @@ export default function ProQuestionnaire() {
             onChange={(val) => updateResponse(question.id, val)}
           />
         );
-      
+
+      case 'multi_certification':
+        return (
+          <MultiCertificationQuestion
+            value={responses[question.id] || []}
+            onChange={(val) => updateResponse(question.id, val)}
+            max={question.limits?.max || 10}
+          />
+        );
+
       default:
         return null;
     }
