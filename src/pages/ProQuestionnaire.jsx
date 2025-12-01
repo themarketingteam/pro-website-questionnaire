@@ -16,6 +16,7 @@ import FileUploadQuestion from '@/components/pro-form/FileUploadQuestion';
 import NumericRangeQuestion from '@/components/pro-form/NumericRangeQuestion';
 import MultiCertificationQuestion from '@/components/pro-form/MultiCertificationQuestion';
 import ImageTaggingQuestion from '@/components/pro-form/ImageTaggingQuestion';
+import InfoMessageQuestion from '@/components/pro-form/InfoMessageQuestion';
 import SelectionSpanIndicator from '@/components/pro-form/SelectionSpanIndicator';
 import AutoSaveIndicator from '@/components/pro-form/AutoSaveIndicator';
 import ConfirmModal from '@/components/pro-form/ConfirmModal';
@@ -223,8 +224,11 @@ export default function ProQuestionnaire() {
           case 'image_tagging':
             return answer && answer.url && Array.isArray(answer.tags) && answer.tags.length > 0 && answer.tags.every(tag => tag.person?.name);
 
-          default:
-            return false;
+              case 'info_message':
+                return true; // Info messages don't require user input
+
+              default:
+                return false;
     }
   };
 
@@ -514,8 +518,11 @@ export default function ProQuestionnaire() {
           case 'image_tagging':
             return <ImageTaggingQuestion {...commonProps} />;
 
-          default:
-            return null;
+              case 'info_message':
+                return <InfoMessageQuestion guidance={question.guidance} />;
+
+              default:
+                return null;
     }
   };
 

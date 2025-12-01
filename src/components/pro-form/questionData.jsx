@@ -188,12 +188,11 @@ export const QUESTIONS = [
       },
       {
         id: "1.2",
-        title: "(Optional) List any awards, partnerships, certifications, or recognitions that reinforce your credibility.",
-        why: "This information is used to build authority signals and trust indicators on the Why Choose Us page and the homepage. Certifications and awards help increase conversions and improve perceived legitimacy.",
-        guidance: "List any major certifications (Microsoft Partner, Cisco, AWS), vendor partnerships (Datto, Huntress, Duo), professional accreditations, security certifications, or notable awards. If you do not have any, you may leave this blank. If you do have some but are unsure which matter, list everything and our system will categorize and optimize automatically.",
-        type: "textarea",
-        requiredIfParentYes: false,
-        examples: { shortAnswer: "Microsoft Partner, Datto Gold Partner, SonicWall SecureFirst, Cisco Certified Technician" }
+        title: "Certifications, Awards, and Partnerships",
+        why: "These elements are powerful trust signals for your Why Choose Us page. They establish credibility and authority, helping differentiate you from competitors.",
+        guidance: "📌 You'll be able to add your certifications, awards, and partnerships in detail when you reach Question 12. There, you can upload logos, images, and supporting documents for each credential. This will help strengthen both your Why Choose Us page and your overall site credibility.",
+        type: "info_message",
+        requiredIfParentYes: false
       }
     ]
   },
