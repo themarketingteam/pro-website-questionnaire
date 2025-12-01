@@ -73,7 +73,7 @@ export default function QuestionWrapper({
       </div>
       
       {isExpanded && (
-        <div className="animate-in fade-in slide-in-from-top-2 duration-200 mb-[5%]">
+        <div className="animate-in fade-in slide-in-from-top-2 duration-200 my-[5%]">
           {children}
         </div>
       )}
