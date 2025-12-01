@@ -204,7 +204,7 @@ export default function MultiGeographicQuestion({
                 </div>
               </div>
               
-              {location.isCity && (
+              {(location.isCity !== false) && (
                 <label className="flex items-center gap-2 ml-5 text-sm text-green-800 cursor-pointer">
                   <input
                     type="checkbox"
