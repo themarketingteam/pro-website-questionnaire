@@ -222,37 +222,55 @@ export default function MultiGeographicQuestion({
                 </div>
               </div>
               
-              {(location.isCity !== false) && (
-                <label className="flex items-center gap-2 ml-5 text-sm text-green-800 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={location.isGreaterArea || false}
-                    onChange={(e) => {
-                      const baseName = location.originalName || location.name || location.label || '';
-                      const cityName = baseName.split(',')[0].trim();
-                      
-                      const updatedLocation = {
-                        ...location,
-                        isGreaterArea: e.target.checked,
-                        name: e.target.checked ? `Greater ${cityName} Area` : (location.originalName || baseName),
-                        label: e.target.checked ? `Greater ${cityName} Area` : (location.originalLabel || baseName),
-                        originalName: location.originalName || baseName,
-                        originalLabel: location.originalLabel || baseName
-                      };
-                      
-                      // Replace the location at this index
-                      const newLocations = [...selectedLocations];
-                      newLocations[index] = updatedLocation;
-                      
-                      // Clear and re-add all
-                      selectedLocations.forEach((_, i) => onRemove(0));
-                      newLocations.forEach(loc => onAdd(loc));
-                    }}
-                    className="w-4 h-4 rounded border-green-400 text-green-600 focus:ring-green-500"
-                  />
-                  <span className="font-medium">Greater Area (expands beyond city limits)</span>
-                </label>
-              )}
+              {(() => {
+                const usStates = [
+                  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 
+                  'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 
+                  'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 
+                  'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 
+                  'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 
+                  'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 
+                  'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 
+                  'Wisconsin', 'Wyoming'
+                ];
+
+                const locationName = location.name || location.label || '';
+                const hasCounty = locationName.toLowerCase().includes('county');
+                const hasState = usStates.some(state => locationName.includes(state));
+                const showCheckbox = !hasCounty && !hasState;
+
+                return showCheckbox ? (
+                  <label className="flex items-center gap-2 ml-5 text-sm text-green-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={location.isGreaterArea || false}
+                      onChange={(e) => {
+                        const baseName = location.originalName || location.name || location.label || '';
+                        const cityName = baseName.split(',')[0].trim();
+
+                        const updatedLocation = {
+                          ...location,
+                          isGreaterArea: e.target.checked,
+                          name: e.target.checked ? `Greater ${cityName} Area` : (location.originalName || baseName),
+                          label: e.target.checked ? `Greater ${cityName} Area` : (location.originalLabel || baseName),
+                          originalName: location.originalName || baseName,
+                          originalLabel: location.originalLabel || baseName
+                        };
+
+                        // Replace the location at this index
+                        const newLocations = [...selectedLocations];
+                        newLocations[index] = updatedLocation;
+
+                        // Clear and re-add all
+                        selectedLocations.forEach((_, i) => onRemove(0));
+                        newLocations.forEach(loc => onAdd(loc));
+                      }}
+                      className="w-4 h-4 rounded border-green-400 text-green-600 focus:ring-green-500"
+                    />
+                    <span className="font-medium">Greater Area (expands beyond city limits)</span>
+                  </label>
+                ) : null;
+              })()}
             </div>
           ))}
         </div>
