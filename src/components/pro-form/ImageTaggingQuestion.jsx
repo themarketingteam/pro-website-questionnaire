@@ -177,7 +177,7 @@ export default function ImageTaggingQuestion({ value, onChange }) {
         >
           <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <div className="p-6 border-b border-slate-200">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-4">
                 <div>
                   <h3 className="text-xl font-bold text-slate-900">Tag Team Members</h3>
                   <p className="text-sm text-slate-600 mt-1">Click on each person in the photo to add their information</p>
@@ -188,6 +188,18 @@ export default function ImageTaggingQuestion({ value, onChange }) {
                 >
                   Done
                 </button>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Image Name
+                </label>
+                <input
+                  type="text"
+                  value={value.name}
+                  onChange={(e) => onChange({ ...value, name: e.target.value })}
+                  placeholder="team-photo"
+                  className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
               </div>
             </div>
 
