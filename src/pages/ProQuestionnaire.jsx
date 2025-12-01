@@ -265,20 +265,18 @@ export default function ProQuestionnaire() {
   };
 
   const transformResponsesToPayload = (responses, businessName, domain) => {
-    // Transform geographic areas with metadata
+    // Transform geographic areas - flatten structure, no wrapper
     const geographicAreas = (responses['6'] || []).map((location, index) => ({
-      geographic_area_meta: {
-        name: typeof location === 'string' ? location : (location.name || location.label || ''),
-        label: typeof location === 'string' ? location : (location.label || location.name || ''),
-        lat: location.lat != null ? String(location.lat) : null,
-        lon: location.lon != null ? String(location.lon) : null,
-        place_id: location.place_id || null,
-        source: "google",
-        primary: index === (responses['6_primary'] || 0)
-      }
+      name: typeof location === 'string' ? location : (location.name || location.label || ''),
+      label: typeof location === 'string' ? location : (location.label || location.name || ''),
+      lat: location.lat != null ? String(location.lat) : '',
+      lon: location.lon != null ? String(location.lon) : '',
+      place_id: location.place_id || '',
+      source: "google",
+      primary: index === (responses['6_primary'] || 0)
     }));
 
-    // Transform certifications/partnerships
+    // Transform certifications/partnerships - always return array
     const certificationsPartnerships = responses['12'] === 'yes' && responses['12a'] 
       ? (responses['12a'] || []).map(item => ({
           cert_item_name: item.name || '',
@@ -286,6 +284,18 @@ export default function ProQuestionnaire() {
           cert_item_image_url: item.image?.url || '',
           cert_item_file_url: Array.isArray(item.files) && item.files.length > 0 ? item.files[0].url : ''
         }))
+      : [];
+
+    // Transform team photo - always return object structure
+    const teamPhoto = responses['2'] === 'yes' && responses['2.2']
+      ? responses['2.2']
+      : { url: '', name: '', type: '', tags: [] };
+
+    // Transform client frustrations to array
+    const clientFrustrations = responses['20'] 
+      ? (typeof responses['20'] === 'string' 
+          ? responses['20'].split(',').map(s => s.trim()).filter(s => s) 
+          : responses['20'])
       : [];
 
     return {
@@ -297,9 +307,10 @@ export default function ProQuestionnaire() {
       },
       userdata: {
         additional_pages_needed: responses['1'] === 'yes',
-        additional_pages_list: responses['1a'] || '',
-        business_details_update_needed: responses['2'] === 'yes',
-        business_details_update_description: responses['2a'] || '',
+        additional_pages_list: responses['1'] === 'yes' ? (responses['1.1'] || '') : '',
+        meet_the_team_page: responses['2'] === 'yes',
+        team_introduction: responses['2'] === 'yes' ? (responses['2.1'] || '') : '',
+        team_photo_with_tags: teamPhoto,
         company_description: responses['3'] || '',
         service_offerings: responses['4'] || [],
         service_offerings_other: responses['4_other'] || '',
@@ -308,7 +319,7 @@ export default function ProQuestionnaire() {
         geographic_areas: geographicAreas,
         delivery_model: responses['7'] || '',
         delivery_model_other: responses['7_other'] || '',
-        pricing_packaging: responses['8'] || '',
+        pricing_packaging: responses['8'] || [],
         pricing_packaging_other: responses['8_other'] || '',
         differentiation: responses['9'] || '',
         company_goals: responses['10'] || [],
@@ -318,16 +329,16 @@ export default function ProQuestionnaire() {
         certifications_partnerships: certificationsPartnerships,
         sales_process: responses['13'] || '',
         service_guarantee: responses['14'] === 'yes',
-        service_guarantee_description: responses['14a'] || '',
+        service_guarantee_description: responses['14'] === 'yes' ? (responses['14a'] || '') : '',
         client_acquisition: responses['15'] || '',
         client_acquisition_other: responses['15_other'] || '',
-        website_objectives: responses['16'] || '',
+        website_objectives: responses['16'] || [],
         website_objectives_other: responses['16_other'] || '',
         target_client_description: responses['17'] || '',
         client_size: responses['18'] || '',
         client_challenges: responses['19'] || [],
         client_challenges_other: responses['19_other'] || '',
-        client_frustrations: responses['20'] || [],
+        client_frustrations: clientFrustrations,
         client_frustrations_other: responses['20_other'] || '',
         client_outcomes: responses['21'] || [],
         client_outcomes_other: responses['21_other'] || '',
