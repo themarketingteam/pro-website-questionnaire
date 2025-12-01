@@ -173,7 +173,7 @@ export default function ImageTaggingQuestion({ value, onChange }) {
       {showModal && (
         <div 
           className="fixed bg-black/50 z-[9999] flex items-center justify-center p-4"
-          style={{ top: 0, left: 0, right: 0, bottom: 0, position: 'fixed' }}
+          style={{ top: 0, left: 0, right: 0, bottom: 0, position: 'fixed', margin: 0 }}
         >
           <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
             <div className="p-6 border-b border-slate-200">
