@@ -315,7 +315,7 @@ export default function ProQuestionnaire() {
         company_goals_other: responses['10_other'] || '',
         brand_tone: responses['11'] || '',
         brand_tone_other: responses['11_other'] || '',
-        certifications_partnerships: responses['12'] || '',
+        certifications_partnerships: certificationsPartnerships,
         sales_process: responses['13'] || '',
         service_guarantee: responses['14'] === 'yes',
         service_guarantee_description: responses['14a'] || '',
