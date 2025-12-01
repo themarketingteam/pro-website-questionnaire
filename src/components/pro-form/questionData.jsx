@@ -337,12 +337,23 @@ export const QUESTIONS = [
   },
   {
     id: "12",
-    section: "About Your Business",
-    title: "What certifications, awards, or partnerships should we highlight?",
-    why: "Certifications and partnerships significantly increase perceived trust, especially in industries like healthcare, finance, and legal. They also support SEO by validating your expertise.",
-    guidance: "List any certifications or awards you want displayed on your site. These may include vendor partnerships (Microsoft Partner, Datto Gold), security certifications (CompTIA Security+), or business awards. Include anything that reinforces expertise.",
-    type: "textarea",
-    examples: { shortAnswer: "Microsoft Partner, Datto Gold Partner, Cisco Meraki CMNA" }
+    section: "Company & Service Information",
+    title: "Do you have any certifications, accolades, awards, or partnerships that you would like to highlight?",
+    why: "Highlighting official recognitions, partnerships with major vendors, and certifications establishes credibility and authority.",
+    guidance: "These elements are powerful trust signals that can differentiate you from competitors.",
+    examples: { yes: "Yes, we have certifications or awards to highlight.", no: "No, we do not have any to highlight." },
+    type: "yes_no",
+    conditionalChildren: [
+      {
+        id: "12a",
+        title: "Add your certifications, accolades, awards, or partnerships",
+        why: "Adding specific details helps us showcase your credentials effectively.",
+        guidance: "For each item, provide the name, type, and optionally include images or supporting documentation.",
+        type: "multi_certification",
+        requiredIfParentYes: true,
+        limits: { min: 1, max: 10 }
+      }
+    ]
   },
   {
     id: "13",
