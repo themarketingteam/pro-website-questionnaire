@@ -293,7 +293,7 @@ export default function ProQuestionnaire() {
         business_name: businessName,
         businessDomain: domain,
         submission_datetime: new Date().toISOString(),
-        service_type: "express"
+        service_type: "pro"
       },
       userdata: {
         additional_pages_needed: responses['1'] === 'yes',
