@@ -518,11 +518,24 @@ export default function ProQuestionnaire() {
           case 'image_tagging':
             return <ImageTaggingQuestion {...commonProps} />;
 
-              case 'info_message':
-                return <InfoMessageQuestion guidance={question.guidance} />;
+                  case 'info_message':
+                    return <InfoMessageQuestion 
+                      guidance={question.guidance}
+                      onLinkClick={() => {
+                        // Scroll to question 12
+                        const q12Element = document.getElementById('question-12');
+                        if (q12Element) {
+                          q12Element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                          // Expand question 12 after a brief delay
+                          setTimeout(() => {
+                            setExpandedQuestions(prev => ({ ...prev, '12': true }));
+                          }, 500);
+                        }
+                      }}
+                    />;
 
-              default:
-                return null;
+                  default:
+                    return null;
     }
   };
 
@@ -602,6 +615,7 @@ export default function ProQuestionnaire() {
                   )}
                   
                   <QuestionWrapper
+                    id={`question-${question.id}`}
                     number={question.id}
                     title={question.title}
                     guidance={question.guidance}
