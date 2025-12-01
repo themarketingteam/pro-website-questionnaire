@@ -49,11 +49,16 @@ export default function ProQuestionnaire() {
 
   // Load from cookie on mount
   useEffect(() => {
-    const saved = localStorage.getItem(COOKIE_NAME);
+    const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+      const [key, value] = cookie.trim().split('=');
+      acc[key] = value;
+      return acc;
+    }, {});
+    
     let initialResponses = {};
-    if (saved) {
+    if (cookies[COOKIE_NAME]) {
       try {
-        initialResponses = JSON.parse(saved);
+        initialResponses = JSON.parse(decodeURIComponent(cookies[COOKIE_NAME]));
       } catch (e) {
         console.error('Failed to parse saved responses:', e);
       }
@@ -78,7 +83,12 @@ export default function ProQuestionnaire() {
 
   // Auto-save to cookie
   const saveToStorage = useCallback((data) => {
-    localStorage.setItem(COOKIE_NAME, JSON.stringify(data));
+    const jsonData = JSON.stringify(data);
+    const encodedData = encodeURIComponent(jsonData);
+    // Set cookie to expire in 30 days
+    const expires = new Date();
+    expires.setDate(expires.getDate() + 30);
+    document.cookie = `${COOKIE_NAME}=${encodedData}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
   }, []);
 
   const updateResponse = (questionId, value) => {
@@ -143,7 +153,7 @@ export default function ProQuestionnaire() {
   const clearAll = () => {
     if (window.confirm('Are you sure you want to clear all responses? This cannot be undone.')) {
       setResponses({});
-      localStorage.removeItem(COOKIE_NAME);
+      document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
       toast.success('All responses cleared');
     }
   };
@@ -340,7 +350,7 @@ export default function ProQuestionnaire() {
       });
 
       toast.success('Questionnaire submitted successfully!');
-      localStorage.removeItem(COOKIE_NAME);
+      document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
       setResponses({});
     } catch (error) {
       console.error('Submission error:', error);
