@@ -64,9 +64,10 @@ export default function ProQuestionnaire() {
         console.error('Failed to parse saved responses:', e);
       }
     }
-    // Default Q1 and Q2 to "no" if not set
+    // Default Q1, Q2, and Q12 to "no" if not set
     if (!initialResponses['1']) initialResponses['1'] = 'no';
     if (!initialResponses['2']) initialResponses['2'] = 'no';
+    if (!initialResponses['12']) initialResponses['12'] = 'no';
     setResponses(initialResponses);
     
     // Initialize all questions as collapsed
