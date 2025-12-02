@@ -11,11 +11,13 @@ export default function CheckboxQuestion({
   showOther = false,
   otherValue = '',
   onOtherChange,
-  columns = 2
+  columns = 2,
+  allowCategorySelection = false
 }) {
   // Use multi-other when there's a max limit
   const multiOther = showOther && max;
   const multiOtherMax = max || 10;
+  
   const handleToggle = (option) => {
     const newValue = value.includes(option)
       ? value.filter(v => v !== option)
@@ -25,6 +27,36 @@ export default function CheckboxQuestion({
     if (max && newValue.length > max) return;
     
     onChange(newValue);
+  };
+
+  const handleCategoryToggle = (categoryName) => {
+    const categoryPrefix = `CATEGORY:${categoryName}`;
+    const categoryOptions = groupedOptions[categoryName];
+    
+    // Check if category is currently selected
+    const isCategorySelected = value.includes(categoryPrefix);
+    
+    if (isCategorySelected) {
+      // Deselect category
+      onChange(value.filter(v => v !== categoryPrefix));
+    } else {
+      // Select category and remove any individual selections from that category
+      const newValue = value.filter(v => !categoryOptions.includes(v));
+      newValue.push(categoryPrefix);
+      
+      // Enforce max limit
+      if (max && newValue.length > max) return;
+      
+      onChange(newValue);
+    }
+  };
+
+  const isCategorySelected = (categoryName) => {
+    return value.includes(`CATEGORY:${categoryName}`);
+  };
+
+  const isIndividualDisabled = (categoryName) => {
+    return isCategorySelected(categoryName);
   };
 
   // Count other entries for max calculation
@@ -54,40 +86,78 @@ export default function CheckboxQuestion({
       )}
       
       {groupedOptions ? (
-        <div className="space-y-4">
-          {Object.entries(groupedOptions).map(([groupName, groupOptions]) => (
-            <div key={groupName}>
-              <h4 className="text-xs font-semibold text-[#566C75] uppercase tracking-wide mb-2">{groupName}</h4>
-              <div className={columns === 3 ? 'grid grid-cols-1 md:grid-cols-3 gap-2' : 'grid grid-cols-1 md:grid-cols-2 gap-2'}>
-                {groupOptions.map((option) => (
+        <div className="space-y-6">
+          {Object.entries(groupedOptions).map(([groupName, groupOptions]) => {
+            const categorySelected = isCategorySelected(groupName);
+            const individualOptionsDisabled = isIndividualDisabled(groupName);
+            
+            return (
+              <div key={groupName} className={`border-2 rounded-lg p-4 transition-all ${
+                categorySelected ? 'border-[#90C944] bg-[#F0F8E8]' : 'border-[#E8EBED]'
+              }`}>
+                {allowCategorySelection && (
                   <div 
-                    key={option}
-                    onClick={() => !isDisabled(option) && handleToggle(option)}
-                    className={`flex items-center gap-3 p-3 border rounded cursor-pointer transition-all ${
-                      value.includes(option)
-                        ? 'border-[#1C82DE] bg-[#E8F3FC] ring-2 ring-[#1C82DE]/20'
-                        : isDisabled(option)
-                        ? 'border-[#E8EBED] bg-[#E8EBED] cursor-not-allowed opacity-50'
-                        : 'border-[#C1C6C8] hover:border-[#A9AAAC] hover:bg-gray-50'
+                    onClick={() => handleCategoryToggle(groupName)}
+                    className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all mb-3 ${
+                      categorySelected
+                        ? 'border-[#90C944] bg-[#90C944] ring-2 ring-[#90C944]/30'
+                        : 'border-[#C1C6C8] hover:border-[#90C944] hover:bg-[#F0F8E8]'
                     }`}
                   >
-                    <div className={`w-5 h-5 flex-shrink-0 rounded border-2 flex items-center justify-center transition-all ${
-                      value.includes(option) 
-                        ? 'border-[#1C82DE] bg-[#1C82DE]' 
+                    <div className={`w-6 h-6 flex-shrink-0 rounded border-2 flex items-center justify-center transition-all ${
+                      categorySelected 
+                        ? 'border-white bg-white' 
                         : 'border-[#A9AAAC]'
                     }`}>
-                      {value.includes(option) && <Check className="w-3 h-3 text-white" />}
+                      {categorySelected && <Check className="w-4 h-4 text-[#90C944]" />}
                     </div>
-                    <span className={`select-none text-sm ${
-                      value.includes(option) ? 'text-[#1C82DE] font-medium' : 'text-[#1E3950]'
+                    <span className={`select-none font-semibold ${
+                      categorySelected ? 'text-white' : 'text-[#122947]'
                     }`}>
-                      {option}
+                      {groupName} (All Services)
                     </span>
                   </div>
-                ))}
+                )}
+                
+                {!allowCategorySelection && (
+                  <h4 className="text-xs font-semibold text-[#566C75] uppercase tracking-wide mb-3">{groupName}</h4>
+                )}
+                
+                <div className={columns === 3 ? 'grid grid-cols-1 md:grid-cols-3 gap-2' : 'grid grid-cols-1 md:grid-cols-2 gap-2'}>
+                  {groupOptions.map((option) => {
+                    const optionDisabled = isDisabled(option) || individualOptionsDisabled;
+                    
+                    return (
+                      <div 
+                        key={option}
+                        onClick={() => !optionDisabled && handleToggle(option)}
+                        className={`flex items-center gap-3 p-3 border rounded cursor-pointer transition-all ${
+                          value.includes(option)
+                            ? 'border-[#1C82DE] bg-[#E8F3FC] ring-2 ring-[#1C82DE]/20'
+                            : optionDisabled
+                            ? 'border-[#E8EBED] bg-[#E8EBED] cursor-not-allowed opacity-50'
+                            : 'border-[#C1C6C8] hover:border-[#A9AAAC] hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className={`w-5 h-5 flex-shrink-0 rounded border-2 flex items-center justify-center transition-all ${
+                          value.includes(option) 
+                            ? 'border-[#1C82DE] bg-[#1C82DE]' 
+                            : 'border-[#A9AAAC]'
+                        }`}>
+                          {value.includes(option) && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                        <span className={`select-none text-sm ${
+                          value.includes(option) ? 'text-[#1C82DE] font-medium' : 'text-[#1E3950]'
+                        }`}>
+                          {option}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className={columns === 3 ? 'grid grid-cols-1 md:grid-cols-3 gap-2.5' : 'grid grid-cols-1 md:grid-cols-2 gap-2.5'}>

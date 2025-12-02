@@ -312,7 +312,8 @@ export default function ProQuestionnaire() {
         team_introduction: responses['2'] === 'yes' ? (responses['2.1'] || '') : '',
         team_photo_with_tags: teamPhoto,
         company_description: responses['3'] || '',
-        service_offerings: responses['4'] || [],
+        service_offerings: (responses['4'] || []).filter(s => !s.startsWith('CATEGORY:')),
+        service_offerings_categories: (responses['4'] || []).filter(s => s.startsWith('CATEGORY:')).map(s => s.replace('CATEGORY:', '')),
         service_offerings_other: responses['4_other'] || '',
         target_industries: responses['5'] || [],
         target_industries_other: responses['5_other'] || '',
@@ -439,6 +440,7 @@ export default function ProQuestionnaire() {
             otherValue={responses[`${question.id}_other`] || (question.showOther && question.limits?.max ? [''] : '')}
             onOtherChange={(val) => updateResponse(`${question.id}_other`, val)}
             columns={question.id === "4" ? 3 : 2}
+            allowCategorySelection={question.id === "4"}
           />
         );
       
