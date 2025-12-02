@@ -14,6 +14,10 @@ export default function CheckboxQuestion({
   columns = 2,
   allowCategorySelection = false
 }) {
+  const [showModal, setShowModal] = React.useState(false);
+  const [modalCategory, setModalCategory] = React.useState('');
+  const [shownModals, setShownModals] = React.useState(new Set());
+  
   // Use multi-other when there's a max limit
   const multiOther = showOther && max;
   const multiOtherMax = max || 10;
@@ -40,6 +44,13 @@ export default function CheckboxQuestion({
       // Deselect category
       onChange(value.filter(v => v !== categoryPrefix));
     } else {
+      // Show modal only if not shown before for this category
+      if (!shownModals.has(categoryName)) {
+        setModalCategory(categoryName);
+        setShowModal(true);
+        setShownModals(prev => new Set([...prev, categoryName]));
+      }
+      
       // Select category and remove any individual selections from that category
       const newValue = value.filter(v => !categoryOptions.includes(v));
       newValue.push(categoryPrefix);
@@ -95,6 +106,8 @@ export default function CheckboxQuestion({
               <div key={groupName} className={`border-2 rounded-lg p-4 transition-all ${
                 categorySelected ? 'border-[#90C944] bg-[#F0F8E8]' : 'border-[#E8EBED]'
               }`}>
+                <h4 className="text-xs font-semibold text-[#566C75] uppercase tracking-wide mb-3">{groupName}</h4>
+                
                 {allowCategorySelection && (
                   <div 
                     onClick={() => handleCategoryToggle(groupName)}
@@ -114,13 +127,9 @@ export default function CheckboxQuestion({
                     <span className={`select-none font-semibold ${
                       categorySelected ? 'text-white' : 'text-[#122947]'
                     }`}>
-                      {groupName} (All Services)
+                      {groupName}
                     </span>
                   </div>
-                )}
-                
-                {!allowCategorySelection && (
-                  <h4 className="text-xs font-semibold text-[#566C75] uppercase tracking-wide mb-3">{groupName}</h4>
                 )}
                 
                 <div className={columns === 3 ? 'grid grid-cols-1 md:grid-cols-3 gap-2' : 'grid grid-cols-1 md:grid-cols-2 gap-2'}>
