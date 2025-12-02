@@ -5,8 +5,7 @@ export const SERVICE_OPTIONS_GROUPED = {
     "Co-Managed IT",
     "Remote Monitoring & Management (RMM)",
     "IT Asset Management",
-    "On-Site Support",
-    "IT Project Services"
+    "On-Site Support"
   ],
   "IT Support Services": [
     "IT Help Desk",
