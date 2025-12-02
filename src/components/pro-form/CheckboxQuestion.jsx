@@ -268,6 +268,29 @@ export default function CheckboxQuestion({
           </div>
         </div>
       )}
+      
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
+            <h3 className="text-xl font-bold text-[#122947] mb-4">Category Selection</h3>
+            <p className="text-[#1E3950] leading-relaxed mb-4">
+              This selection will create a single page on your new website called: <strong>{modalCategory}</strong>.
+            </p>
+            <p className="text-[#1E3950] leading-relaxed mb-4">
+              ALL SUB SERVICES will be listed on this page as services your organization offers.
+            </p>
+            <p className="text-[#1E3950] leading-relaxed mb-6">
+              <strong>If you do not offer one of these services in the sub category</strong> please deselect the <strong>"{modalCategory}"</strong> option for this category. You can then proceed to select the sub category options your organization serves.
+            </p>
+            <button
+              onClick={() => setShowModal(false)}
+              className="w-full px-6 py-3 bg-[#1C82DE] hover:bg-[#075DA7] text-white rounded-lg font-medium transition-colors"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
       </div>
       );
       }
