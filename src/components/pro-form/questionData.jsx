@@ -1,43 +1,84 @@
-
 // Pro Website Questionnaire Data
 export const SERVICE_OPTIONS_GROUPED = {
-  "Cloud & Infrastructure": [
+  "Managed IT Services": [
+    "Managed IT",
+    "Co-Managed IT",
+    "Remote Monitoring & Management (RMM)",
+    "IT Asset Management",
+    "On-Site Support",
+    "IT Project Services"
+  ],
+  "IT Support Services": [
+    "IT Help Desk",
+    "Outsourced IT Help Desk",
+    "Hourly IT Support",
+    "IT Consulting"
+  ],
+  "Cloud Services": [
     "Cloud Services",
     "Hybrid Cloud Services",
-    "Internet Services",
-    "Microsoft 365",
     "Private Cloud Services",
-    "Structured Cabling"
+    "Cloud Migrations",
+    "Azure Services",
+    "Google Workspace",
+    "Cloud Storage",
+    "Virtual Desktop Infrastructure (VDI)",
+    "Cloud Cost Optimization"
   ],
-  "Compliance": [
+  "Modern Workplace / Productivity Solutions": [
+    "Microsoft 365",
+    "Internet Services"
+  ],
+  "Cybersecurity Services": [
+    "Cybersecurity",
+    "MDR (Managed Detection & Response)",
+    "EDR (Endpoint Detection & Response)",
+    "Email Security",
+    "Vulnerability Scanning",
+    "Penetration Testing",
+    "Dark Web Monitoring",
+    "SOC Services",
+    "Security Awareness Training",
+    "Ransomware Removal"
+  ],
+  "Compliance & Regulatory Services": [
     "CMMC Compliance",
     "FTC Compliance",
     "HIPAA Compliance",
     "IT Compliance",
     "NIST Framework Compliance",
     "PCI Compliance",
-    "SOC2 Compliance"
+    "SOC 2 Compliance",
+    "Compliance Gap Assessments",
+    "GRC Program Management",
+    "Policy Documentation"
   ],
-  "IT Services": [
-    "Co-Managed IT",
-    "Hourly IT Support",
-    "IT Consulting",
-    "IT Help Desk",
-    "Managed IT",
-    "Outsourced IT Help Desk"
+  "Network & Infrastructure Services": [
+    "Network Design & Implementation",
+    "Wi-Fi / Wireless Solutions",
+    "Server Installation & Management",
+    "Firewall & Network Security Appliances",
+    "Structured Cabling",
+    "Printer & Office Machine",
+    "Hardware Procurement",
+    "Lifecycle Management"
   ],
-  "Security": [
-    "Cybersecurity",
-    "Ransomware Removal",
-    "Security Awareness Training",
-    "Video Surveillance Solutions"
+  "Business Continuity": [
+    "Business Continuity Planning",
+    "High-Availability Solutions",
+    "Backup Monitoring & Management"
   ],
-  "Hardware & Recovery": [
+  "Data Backup & Disaster Recovery": [
     "Data Backup & Recovery",
     "Disaster Recovery Planning",
-    "Hardware as a Service",
-    "Printer & Office Machine",
-    "VoIP Phone Systems"
+    "Offsite / Cloud Backups",
+    "Hardware as a Service"
+  ],
+  "Physical Security Solutions": [
+    "Video Surveillance Solutions",
+    "Access Control Systems",
+    "Smart Building / IoT Security",
+    "Alarm System Integration"
   ]
 };
 
