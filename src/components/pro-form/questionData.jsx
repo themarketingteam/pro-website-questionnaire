@@ -13,7 +13,7 @@ export const SERVICE_OPTIONS_GROUPED = {
     "Hourly IT Support",
     "IT Consulting"
   ],
-  "Cloud Services": [
+  "Cloud Solutions": [
     "Cloud Services",
     "Hybrid Cloud Services",
     "Private Cloud Services",
@@ -24,7 +24,7 @@ export const SERVICE_OPTIONS_GROUPED = {
     "Virtual Desktop Infrastructure (VDI)",
     "Cloud Cost Optimization"
   ],
-  "Modern Workplace / Productivity Solutions": [
+  "Modern Workplace & Productivity Solutions": [
     "Microsoft 365",
     "Internet Services"
   ],
@@ -62,12 +62,12 @@ export const SERVICE_OPTIONS_GROUPED = {
     "Hardware Procurement",
     "Lifecycle Management"
   ],
-  "Business Continuity": [
+  "Business Continuity Services": [
     "Business Continuity Planning",
     "High-Availability Solutions",
     "Backup Monitoring & Management"
   ],
-  "Data Backup & Disaster Recovery": [
+  "Data Backup & Disaster Recovery Services": [
     "Data Backup & Recovery",
     "Disaster Recovery Planning",
     "Offsite / Cloud Backups",
