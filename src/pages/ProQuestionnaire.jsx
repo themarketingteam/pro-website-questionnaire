@@ -232,8 +232,8 @@ export default function ProQuestionnaire() {
     }
   };
 
-  const isFormValid = () => {
-    // Check all main questions 1-27
+  const getIncompleteQuestions = () => {
+    const incomplete = [];
     for (let i = 1; i <= 27; i++) {
       const questionId = i.toString();
       const question = QUESTIONS.find(q => q.id === questionId);
@@ -241,24 +241,30 @@ export default function ProQuestionnaire() {
       if (!question) continue;
       
       if (!isQuestionComplete(questionId)) {
-        return false;
+        incomplete.push(`Q${questionId}: ${question.title}`);
       }
 
       // Check conditional children if parent is 'yes'
       if (question.conditionalChildren && responses[questionId] === 'yes') {
         for (const child of question.conditionalChildren) {
           if (child.requiredIfParentYes && !isQuestionComplete(child.id)) {
-            return false;
+            incomplete.push(`Q${child.id}: ${child.title}`);
           }
         }
       }
     }
-    return true;
+    return incomplete;
+  };
+
+  const isFormValid = () => {
+    return getIncompleteQuestions().length === 0;
   };
 
   const handleSubmitClick = () => {
     if (!isFormValid()) {
-      alert('Please complete all required fields');
+      const incomplete = getIncompleteQuestions();
+      const message = `Please complete all required fields:\n\n${incomplete.join('\n')}`;
+      alert(message);
       return;
     }
     setShowConfirmModal(true);
