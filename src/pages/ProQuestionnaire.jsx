@@ -678,6 +678,36 @@ export default function ProQuestionnaire() {
 
           {/* Submit Section */}
           <div className="pt-8 border-t-2 border-[#C1C6C8]">
+            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded">
+              <button
+                type="button"
+                onClick={() => {
+                  const incomplete = getIncompleteQuestions();
+                  console.log('=== FORM DEBUG INFO ===');
+                  console.log('All Responses:', responses);
+                  console.log('Incomplete Questions:', incomplete);
+                  console.log('Form Valid:', isFormValid());
+                  
+                  // Check each question's completion status
+                  for (let i = 1; i <= 27; i++) {
+                    const qId = i.toString();
+                    const q = QUESTIONS.find(qu => qu.id === qId);
+                    if (q) {
+                      console.log(`Q${qId} (${q.type}):`, {
+                        answer: responses[qId],
+                        other: responses[`${qId}_other`],
+                        complete: isQuestionComplete(qId)
+                      });
+                    }
+                  }
+                  
+                  alert(`Form Valid: ${isFormValid()}\n\nIncomplete Questions (${incomplete.length}):\n${incomplete.join('\n') || 'None'}\n\nCheck console for full debug info`);
+                }}
+                className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded font-medium text-sm"
+              >
+                🐛 Debug: Show Validation Status
+              </button>
+            </div>
             <div className="flex flex-col sm:flex-row gap-4">
               <button
                 type="button"
