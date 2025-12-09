@@ -216,7 +216,11 @@ export default function ProQuestionnaire() {
 
       case 'multi_certification': {
         const items = Array.isArray(answer) ? answer : [];
-        const validItems = items.filter(item => item.name?.trim() && item.type);
+        const validItems = items.filter(item => 
+          item.name?.trim() && 
+          item.type && 
+          (item.image?.url || true)
+        );
         const min = question.limits?.min || 0;
         return validItems.length >= min;
       }
@@ -531,6 +535,7 @@ export default function ProQuestionnaire() {
           <NumericRangeQuestion
             minValue={question.minValue}
             maxValue={question.maxValue}
+            value={responses[question.id]}
             onChange={(val) => updateResponse(question.id, val)}
           />
         );

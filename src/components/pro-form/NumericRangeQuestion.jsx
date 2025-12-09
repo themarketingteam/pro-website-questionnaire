@@ -1,67 +1,112 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Lock } from 'lucide-react';
 
 export default function NumericRangeQuestion({
   minValue = 1,
   maxValue = 50,
-  onChange
+  onChange,
+  value
 }) {
   const [smallest, setSmallest] = useState(minValue);
   const [largest, setLargest] = useState(maxValue);
+  const [smallestInput, setSmallestInput] = useState(minValue.toString());
   const [largestInput, setLargestInput] = useState(maxValue.toString());
-  const emptyTimerRef = useRef(null);
+  const [isLocked, setIsLocked] = useState(false);
+  const smallestTimerRef = useRef(null);
+  const largestTimerRef = useRef(null);
 
-  // Cleanup timer on unmount
+  // Initialize from saved value
+  useEffect(() => {
+    if (value && typeof value === 'string') {
+      const match = value.match(/^(\d+)-(\d+\+?)\s+employees$/);
+      if (match) {
+        const min = parseInt(match[1], 10);
+        const maxStr = match[2];
+        setSmallest(min);
+        setSmallestInput(min.toString());
+        
+        if (maxStr.includes('+')) {
+          setLargest(1001);
+          setLargestInput('');
+        } else {
+          const max = parseInt(maxStr, 10);
+          setLargest(max);
+          setLargestInput(max.toString());
+        }
+        setIsLocked(true);
+      }
+    }
+  }, []);
+
+  // Cleanup timers on unmount
   useEffect(() => {
     return () => {
-      if (emptyTimerRef.current) {
-        clearTimeout(emptyTimerRef.current);
-      }
+      if (smallestTimerRef.current) clearTimeout(smallestTimerRef.current);
+      if (largestTimerRef.current) clearTimeout(largestTimerRef.current);
     };
   }, []);
 
-  // Output format
-  useEffect(() => {
-    const largestDisplay = largest > 1000 ? "1000+" : largest;
-    const formattedValue = `${smallest}-${largestDisplay} employees`;
-    onChange(formattedValue);
-  }, [smallest, largest, onChange]);
-
   const handleSmallestChange = (e) => {
     const value = e.target.value;
-    const parsed = parseInt(value, 10);
-    const clamped = Math.max(1, isNaN(parsed) ? 1 : parsed);
-    setSmallest(clamped);
+    setSmallestInput(value);
+    setIsLocked(false);
+
+    // Clear any existing timer
+    if (smallestTimerRef.current) {
+      clearTimeout(smallestTimerRef.current);
+      smallestTimerRef.current = null;
+    }
+
+    // Check if empty
+    if (value === '') {
+      smallestTimerRef.current = setTimeout(() => {
+        setSmallestInput(minValue.toString());
+        setSmallest(minValue);
+      }, 5000);
+    } else {
+      const parsed = parseInt(value, 10);
+      if (!isNaN(parsed)) {
+        const clamped = Math.max(1, parsed);
+        setSmallest(clamped);
+      }
+    }
   };
 
   const handleLargestChange = (e) => {
     const value = e.target.value;
     setLargestInput(value);
+    setIsLocked(false);
 
     // Clear any existing timer
-    if (emptyTimerRef.current) {
-      clearTimeout(emptyTimerRef.current);
-      emptyTimerRef.current = null;
+    if (largestTimerRef.current) {
+      clearTimeout(largestTimerRef.current);
+      largestTimerRef.current = null;
     }
 
-    // Check if empty or null
-    if (value === '' || value === null) {
-      // Start NEW 5-second timer
-      emptyTimerRef.current = setTimeout(() => {
+    // Check if empty
+    if (value === '') {
+      largestTimerRef.current = setTimeout(() => {
         setLargestInput(maxValue.toString());
         setLargest(maxValue);
       }, 5000);
     } else {
-      // Parse as integer
       const parsed = parseInt(value, 10);
       if (!isNaN(parsed)) {
         const clamped = Math.max(1, parsed);
         if (clamped > 1000) {
-          setLargest(1001); // special flag
+          setLargest(1001);
         } else {
           setLargest(clamped);
         }
       }
     }
+  };
+
+  const handleLockIn = () => {
+    const largestDisplay = largest > 1000 ? "1000+" : largest;
+    const formattedValue = `${smallest}-${largestDisplay} employees`;
+    onChange(formattedValue);
+    setIsLocked(true);
   };
 
   const largestDisplay = largest > 1000 ? "1000+" : largest;
@@ -74,9 +119,9 @@ export default function NumericRangeQuestion({
             Smallest company size
           </label>
           <input
-            type="number"
+            type="text"
             min="1"
-            value={smallest}
+            value={smallestInput}
             onChange={handleSmallestChange}
             className="w-full p-3 border border-[#C1C6C8] rounded focus:outline-none focus:ring-2 focus:ring-[#1C82DE] focus:border-transparent"
           />
@@ -100,10 +145,25 @@ export default function NumericRangeQuestion({
         <span className="text-sm text-slate-600 mt-7">employees</span>
       </div>
       
-      <div className="bg-[#E8F3FC] border border-[#1C82DE] rounded p-3">
-        <span className="text-sm font-medium text-[#003865]">
-          Result: {smallest}-{largestDisplay} employees
-        </span>
+      <div className="flex items-center gap-3">
+        <div className="flex-1 bg-[#E8F3FC] border border-[#1C82DE] rounded p-3">
+          <span className="text-sm font-medium text-[#003865]">
+            Result: {smallest}-{largestDisplay} employees
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handleLockIn}
+          disabled={isLocked}
+          className={`px-6 py-3 rounded font-medium transition-colors flex items-center gap-2 ${
+            isLocked 
+              ? 'bg-green-600 text-white cursor-default' 
+              : 'bg-[#1C82DE] hover:bg-[#075DA7] text-white'
+          }`}
+        >
+          <Lock className="w-4 h-4" />
+          {isLocked ? 'Locked' : 'Lock In'}
+        </button>
       </div>
     </div>
   );
