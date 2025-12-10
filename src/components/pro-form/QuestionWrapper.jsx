@@ -32,11 +32,11 @@ export default function QuestionWrapper({
   };
 
   return (
-    <div id={id} className={`space-y-4 ${isExpanded ? 'my-[5%]' : 'mb-[3%]'}`}>
-      <div className="flex items-start gap-4">
-        <div className="flex-shrink-0 pt-1">
-          {getStatusIcon()}
-        </div>
+    <div id={id} className={`space-y-4 ${isExpanded ? 'my-[5%]' : 'mb-[3%]'} relative`}>
+      <div className="absolute -left-10 top-1">
+        {getStatusIcon()}
+      </div>
+      <div className="flex items-start">
         <div 
           className={`block flex-1 ${isCollapsible ? 'cursor-pointer' : ''}`}
           onClick={isCollapsible ? onToggle : undefined}

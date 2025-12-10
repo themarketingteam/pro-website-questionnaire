@@ -624,7 +624,7 @@ export default function ProQuestionnaire() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <FormHeader />
       
-      <main className="max-w-4xl mx-auto px-6 py-12">
+      <main className="max-w-4xl mx-auto px-6 py-12 pl-16">
         {/* Expand/Collapse Controls */}
         <div className="flex gap-3 mb-8">
           <button
