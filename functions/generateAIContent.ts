@@ -2,8 +2,6 @@ Deno.serve(async (req) => {
   try {
     const { userInstruction, questionContext, draftContent } = await req.json();
 
-    console.log('🚀 [Backend] Starting AI generation...');
-
     if (!userInstruction?.trim()) {
       return Response.json({ error: 'User instruction is required' }, { status: 400 });
     }
@@ -26,7 +24,6 @@ Deno.serve(async (req) => {
     });
     
     const conversation = await createConvResponse.json();
-    console.log('✅ Conversation created:', conversation.id);
 
     const prompt = draftContent 
       ? `${questionContext}\n\n${userInstruction}\n\nCurrent text:\n${draftContent}`
@@ -45,60 +42,38 @@ Deno.serve(async (req) => {
       })
     });
 
-    // Stream the response
-    const stream = new ReadableStream({
-      async start(controller) {
-        const encoder = new TextEncoder();
-        let lastContent = '';
-        const startTime = Date.now();
-        const maxWaitTime = 60000;
+    // Poll for complete response
+    let finalContent = '';
+    let isQuestions = false;
+    const startTime = Date.now();
+    const maxWaitTime = 55000;
 
-        while (Date.now() - startTime < maxWaitTime) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          const getConvResponse = await fetch(`${baseUrl}/apps/${appId}/agents/conversations/${conversation.id}`, {
-            headers: { 'Authorization': `Bearer ${serviceRoleKey}` }
-          });
-          const updatedConversation = await getConvResponse.json();
-          const messages = updatedConversation.messages || [];
-          const lastMessage = messages[messages.length - 1];
+    while (Date.now() - startTime < maxWaitTime) {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      const getConvResponse = await fetch(`${baseUrl}/apps/${appId}/agents/conversations/${conversation.id}`, {
+        headers: { 'Authorization': `Bearer ${serviceRoleKey}` }
+      });
+      const updatedConversation = await getConvResponse.json();
+      const messages = updatedConversation.messages || [];
+      const lastMessage = messages[messages.length - 1];
 
-          if (lastMessage?.role === 'assistant' && lastMessage.content) {
-            const content = lastMessage.content;
-            
-            // Send incremental update if content changed
-            if (content !== lastContent) {
-              lastContent = content;
-              const chunk = JSON.stringify({ content, streaming: lastMessage.streaming }) + '\n';
-              controller.enqueue(encoder.encode(chunk));
-            }
-            
-            // Check if complete
-            if (lastMessage.streaming === false) {
-              const hasMultipleQuestions = (content.match(/\?/g) || []).length >= 2;
-              const hasQuestionPrompts = /could you|can you|do you|what|how|tell me more|help me/i.test(content);
-              const isShort = content.length < 500;
-              const isQuestions = hasMultipleQuestions && hasQuestionPrompts && isShort;
-              
-              controller.enqueue(encoder.encode(JSON.stringify({ done: true, isQuestions }) + '\n'));
-              controller.close();
-              return;
-            }
-          }
-        }
-
-        controller.enqueue(encoder.encode(JSON.stringify({ error: 'Timeout' }) + '\n'));
-        controller.close();
+      if (lastMessage?.role === 'assistant' && lastMessage.content && lastMessage.streaming === false) {
+        const content = lastMessage.content;
+        const hasMultipleQuestions = (content.match(/\?/g) || []).length >= 2;
+        const hasQuestionPrompts = /could you|can you|do you|what|how|tell me more|help me/i.test(content);
+        const isShort = content.length < 500;
+        isQuestions = hasMultipleQuestions && hasQuestionPrompts && isShort;
+        finalContent = content;
+        break;
       }
-    });
+    }
 
-    return new Response(stream, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive'
-      }
-    });
+    if (!finalContent) {
+      throw new Error('No response received from agent');
+    }
+
+    return Response.json({ content: finalContent, isQuestions });
 
   } catch (error) {
     console.error('❌ Error:', error);

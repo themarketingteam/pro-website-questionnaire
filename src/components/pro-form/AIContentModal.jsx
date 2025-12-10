@@ -44,48 +44,27 @@ export default function AIContentModal({
     setAiQuestions('');
     
     try {
-      const appId = import.meta.env.VITE_APP_ID;
-      const response = await fetch(`https://api.base44.app/apps/${appId}/functions/generateAIContent`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userInstruction, questionContext, draftContent })
+      const response = await base44.functions.invoke('generateAIContent', {
+        userInstruction,
+        questionContext,
+        draftContent
       });
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          
-          const data = JSON.parse(line);
-          
-          if (data.error) {
-            throw new Error(data.error);
-          }
-          
-          if (data.content) {
-            setDraftContent(data.content);
-          }
-          
-          if (data.done) {
-            if (data.isQuestions) {
-              setAiQuestions(draftContent);
-              setDraftContent('');
-            }
-            setUserInstruction('');
-            toast.success('Content generated!');
-          }
-        }
+      if (response.data.error) {
+        throw new Error(response.data.error);
       }
+
+      const { content, isQuestions } = response.data;
+
+      if (isQuestions) {
+        setAiQuestions(content);
+      } else {
+        setDraftContent(content);
+        setAiQuestions('');
+      }
+
+      setUserInstruction('');
+      toast.success('Content generated!');
     } catch (error) {
       console.error('❌ Generation error:', error);
       toast.error(error.message || 'Failed to generate content.');
