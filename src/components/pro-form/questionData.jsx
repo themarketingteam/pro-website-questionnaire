@@ -1,4 +1,3 @@
-
 // Pro Website Questionnaire Data
 export const SERVICE_OPTIONS_GROUPED = {
   "Managed IT Services": [
@@ -401,9 +400,20 @@ export const QUESTIONS = [
     section: "About Your Business",
     title: "Do you have a specific guarantee or service standard?",
     why: "Guarantees help differentiate your MSP and reduce buyer friction. They function as high-impact trust elements and often appear in hero sections, CTA blocks, and the Why Choose Us page.",
-    guidance: "If you offer response-time guarantees, uptime commitments, contract flexibility, or satisfaction guarantees, list them here. If you have SLAs that define your standards, summarize the highlight points for clients.",
-    type: "textarea",
-    examples: { shortAnswer: "10-minute help desk response guarantee and no long-term contracts." }
+    guidance: "Select 'Yes' if you offer response-time guarantees, uptime commitments, contract flexibility, satisfaction guarantees, or defined SLAs. Select 'No' if you do not have formal guarantees or service standards to highlight.",
+    type: "yes_no",
+    examples: { yes: "Yes, we have guarantees or service standards.", no: "No, we do not have formal guarantees." },
+    conditionalChildren: [
+      {
+        id: "14.1",
+        title: "Please add and describe your specific guarantee or service standard.",
+        why: "Adding specific details helps us showcase your guarantees effectively throughout your website, building trust and differentiating you from competitors.",
+        guidance: "For each guarantee or service standard, provide the name, select the type, and either upload a supporting file or provide a description. At least one of these (file or description) is required.",
+        type: "multi_guarantee",
+        requiredIfParentYes: true,
+        limits: { min: 1, max: 10 }
+      }
+    ]
   },
   {
     id: "15",

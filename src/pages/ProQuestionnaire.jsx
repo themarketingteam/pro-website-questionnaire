@@ -15,6 +15,7 @@ import MultiGeographicQuestion from '@/components/pro-form/MultiGeographicQuesti
 import FileUploadQuestion from '@/components/pro-form/FileUploadQuestion';
 import NumericRangeQuestion from '@/components/pro-form/NumericRangeQuestion';
 import MultiCertificationQuestion from '@/components/pro-form/MultiCertificationQuestion';
+import MultiGuaranteeQuestion from '@/components/pro-form/MultiGuaranteeQuestion';
 import ImageTaggingQuestion from '@/components/pro-form/ImageTaggingQuestion';
 import InfoMessageQuestion from '@/components/pro-form/InfoMessageQuestion';
 import SelectionSpanIndicator from '@/components/pro-form/SelectionSpanIndicator';
@@ -67,10 +68,11 @@ export default function ProQuestionnaire() {
         console.error('Failed to parse saved responses:', e);
       }
     }
-    // Default Q1, Q2, and Q12 to "no" if not set
+    // Default Q1, Q2, Q12, and Q14 to "no" if not set
     if (!initialResponses['1']) initialResponses['1'] = 'no';
     if (!initialResponses['2']) initialResponses['2'] = 'no';
     if (!initialResponses['12']) initialResponses['12'] = 'no';
+    if (!initialResponses['14']) initialResponses['14'] = 'no';
     setResponses(initialResponses);
     
     // Initialize all questions as collapsed
@@ -251,6 +253,17 @@ export default function ProQuestionnaire() {
         return validItems.length >= min;
       }
 
+      case 'multi_guarantee': {
+        const items = Array.isArray(answer) ? answer : [];
+        // Count items that are either explicitly saved OR complete
+        const validItems = items.filter(item => {
+          const isComplete = item.name?.trim() && item.type && (item.file || item.description?.trim());
+          return item.saved === true || (isComplete && item.saved !== false);
+        });
+        const min = question.limits?.min || 0;
+        return validItems.length >= min;
+      }
+
           case 'image_tagging':
             return answer && answer.url && Array.isArray(answer.tags) && answer.tags.length > 0 && answer.tags.every(tag => tag.person?.name);
 
@@ -365,8 +378,14 @@ export default function ProQuestionnaire() {
         brand_tone_other: responses['11_other'] || '',
         certifications_partnerships: certificationsPartnerships,
         sales_process: responses['13'] || '',
-        service_guarantee: responses['14'] === 'yes',
-        service_guarantee_description: responses['14'] === 'yes' ? (responses['14a'] || '') : '',
+        service_guarantees: responses['14'] === 'yes' && responses['14.1']
+          ? (responses['14.1'] || []).map(item => ({
+              guarantee_name: item.name || '',
+              guarantee_type: item.type || '',
+              guarantee_file_url: item.file?.url || '',
+              guarantee_description: item.description || ''
+            }))
+          : [],
         client_acquisition: responses['15'] || '',
         client_acquisition_other: responses['15_other'] || '',
         website_objectives: responses['16'] || [],
@@ -593,7 +612,16 @@ export default function ProQuestionnaire() {
           />
         );
 
-          case 'image_tagging':
+      case 'multi_guarantee':
+        return (
+          <MultiGuaranteeQuestion
+            value={responses[question.id] || []}
+            onChange={(val) => updateResponse(question.id, val)}
+            max={question.limits?.max || 10}
+          />
+        );
+
+              case 'image_tagging':
             return <ImageTaggingQuestion {...commonProps} />;
 
                   case 'info_message':
