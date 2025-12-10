@@ -668,14 +668,6 @@ export default function ProQuestionnaire() {
 
                   return (
                     <div key="span-questions-wrapper">
-                      <div className="mb-8">
-                        <SelectionSpanIndicator
-                          servicesCount={servicesCount}
-                          industriesCount={industriesCount}
-                          regionsCount={regionsCount}
-                        />
-                      </div>
-
                       <div className={`rounded-lg p-4 -mx-4 ${getSpanBackgroundClass()}`}>
                         {spanQuestions.map(q => (
                           <div key={q.id} className="mb-8 last:mb-0">
