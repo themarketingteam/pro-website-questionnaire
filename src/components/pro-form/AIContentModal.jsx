@@ -40,48 +40,57 @@ export default function AIContentModal({
       return;
     }
 
-    console.log('🚀 [AI Modal] Starting generation...');
-    console.log('📝 [AI Modal] User instruction:', userInstruction);
-    console.log('📄 [AI Modal] Current draft content:', draftContent);
-    console.log('❓ [AI Modal] Question context:', questionContext);
-
     setIsGenerating(true);
-    setAiQuestions(''); // Clear previous questions
+    setAiQuestions('');
     
     try {
-      console.log('🔄 [AI Modal] Calling backend function...');
-      const response = await base44.functions.invoke('generateAIContent', {
-        userInstruction,
-        questionContext,
-        draftContent
+      const appId = import.meta.env.VITE_APP_ID;
+      const response = await fetch(`https://api.base44.app/apps/${appId}/functions/generateAIContent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userInstruction, questionContext, draftContent })
       });
 
-      console.log('✅ [AI Modal] Backend response:', response);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-      if (response.data.error) {
-        throw new Error(response.data.error);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          
+          const data = JSON.parse(line);
+          
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          
+          if (data.content) {
+            setDraftContent(data.content);
+          }
+          
+          if (data.done) {
+            if (data.isQuestions) {
+              setAiQuestions(draftContent);
+              setDraftContent('');
+            }
+            setUserInstruction('');
+            toast.success('Content generated!');
+          }
+        }
       }
-
-      const { content, isQuestions } = response.data;
-
-      if (isQuestions) {
-        console.log('❓ [AI Modal] Detected AI questions');
-        setAiQuestions(content);
-      } else {
-        console.log('📝 [AI Modal] Detected draft content');
-        setDraftContent(content);
-        setAiQuestions('');
-      }
-
-      setUserInstruction('');
-      console.log('🎉 [AI Modal] Generation complete!');
-      toast.success('Content generated!');
     } catch (error) {
-      console.error('❌ [AI Modal] Generation error:', error);
+      console.error('❌ Generation error:', error);
       toast.error(error.message || 'Failed to generate content.');
     } finally {
       setIsGenerating(false);
-      console.log('🏁 [AI Modal] Generation process ended');
     }
   };
 

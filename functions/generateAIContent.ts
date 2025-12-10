@@ -3,9 +3,6 @@ Deno.serve(async (req) => {
     const { userInstruction, questionContext, draftContent } = await req.json();
 
     console.log('🚀 [Backend] Starting AI generation...');
-    console.log('📝 [Backend] User instruction:', userInstruction);
-    console.log('📄 [Backend] Draft content:', draftContent);
-    console.log('❓ [Backend] Question context:', questionContext);
 
     if (!userInstruction?.trim()) {
       return Response.json({ error: 'User instruction is required' }, { status: 400 });
@@ -15,8 +12,7 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get('BASE44_SERVICE_ROLE_KEY');
     const baseUrl = 'https://base44.app/api';
 
-    // Create conversation using direct API call
-    console.log('🔄 [Backend] Creating conversation via API...');
+    // Create conversation
     const createConvResponse = await fetch(`${baseUrl}/apps/${appId}/agents/conversations`, {
       method: 'POST',
       headers: {
@@ -30,14 +26,13 @@ Deno.serve(async (req) => {
     });
     
     const conversation = await createConvResponse.json();
-    console.log('✅ [Backend] Conversation created:', conversation.id);
+    console.log('✅ Conversation created:', conversation.id);
 
     const prompt = draftContent 
       ? `${questionContext}\n\n${userInstruction}\n\nCurrent text:\n${draftContent}`
       : `${questionContext}\n\n${userInstruction}`;
 
-    // Send message via API
-    console.log('📤 [Backend] Sending message to agent via API...');
+    // Send message
     await fetch(`${baseUrl}/apps/${appId}/agents/conversations/${conversation.id}/messages`, {
       method: 'POST',
       headers: {
@@ -49,62 +44,64 @@ Deno.serve(async (req) => {
         content: prompt
       })
     });
-    console.log('✅ [Backend] Message sent successfully');
 
-    // Poll for response since websocket subscriptions don't work in backend
-    console.log('🔄 [Backend] Polling for response...');
-    let finalContent = '';
-    let isQuestions = false;
-    const startTime = Date.now();
-    const maxWaitTime = 55000; // 55 seconds
+    // Stream the response
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        let lastContent = '';
+        const startTime = Date.now();
+        const maxWaitTime = 60000;
 
-    while (Date.now() - startTime < maxWaitTime) {
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5 seconds between polls
-      
-      // Get conversation via API
-      const getConvResponse = await fetch(`${baseUrl}/apps/${appId}/agents/conversations/${conversation.id}`, {
-        headers: {
-          'Authorization': `Bearer ${serviceRoleKey}`
-        }
-      });
-      const updatedConversation = await getConvResponse.json();
-      const messages = updatedConversation.messages || [];
-      const lastMessage = messages[messages.length - 1];
-      
-      console.log(`🔄 [Backend] Poll attempt - Messages count: ${messages.length}, Last message role: ${lastMessage?.role}`);
-
-      if (lastMessage?.role === 'assistant' && lastMessage.content) {
-        const content = lastMessage.content;
-        console.log('🤖 [Backend] Got assistant response, length:', content.length, 'streaming:', lastMessage.streaming);
-        
-        // Check if streaming is complete
-        if (lastMessage.streaming === false) {
-          // Check if this is questions (multiple question marks, short response)
-          const hasMultipleQuestions = (content.match(/\?/g) || []).length >= 2;
-          const hasQuestionPrompts = /could you|can you|do you|what|how|tell me more|help me/i.test(content);
-          const isShort = content.length < 500;
-          isQuestions = hasMultipleQuestions && hasQuestionPrompts && isShort;
+        while (Date.now() - startTime < maxWaitTime) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
           
-          finalContent = content;
-          console.log('✅ [Backend] Response complete, isQuestions:', isQuestions);
-          break;
+          const getConvResponse = await fetch(`${baseUrl}/apps/${appId}/agents/conversations/${conversation.id}`, {
+            headers: { 'Authorization': `Bearer ${serviceRoleKey}` }
+          });
+          const updatedConversation = await getConvResponse.json();
+          const messages = updatedConversation.messages || [];
+          const lastMessage = messages[messages.length - 1];
+
+          if (lastMessage?.role === 'assistant' && lastMessage.content) {
+            const content = lastMessage.content;
+            
+            // Send incremental update if content changed
+            if (content !== lastContent) {
+              lastContent = content;
+              const chunk = JSON.stringify({ content, streaming: lastMessage.streaming }) + '\n';
+              controller.enqueue(encoder.encode(chunk));
+            }
+            
+            // Check if complete
+            if (lastMessage.streaming === false) {
+              const hasMultipleQuestions = (content.match(/\?/g) || []).length >= 2;
+              const hasQuestionPrompts = /could you|can you|do you|what|how|tell me more|help me/i.test(content);
+              const isShort = content.length < 500;
+              const isQuestions = hasMultipleQuestions && hasQuestionPrompts && isShort;
+              
+              controller.enqueue(encoder.encode(JSON.stringify({ done: true, isQuestions }) + '\n'));
+              controller.close();
+              return;
+            }
+          }
         }
+
+        controller.enqueue(encoder.encode(JSON.stringify({ error: 'Timeout' }) + '\n'));
+        controller.close();
       }
-    }
+    });
 
-    if (!finalContent) {
-      throw new Error('No response received from agent');
-    }
-
-    const result = { content: finalContent, isQuestions };
-
-    console.log('🎉 [Backend] Generation complete!');
-    return Response.json(result);
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive'
+      }
+    });
 
   } catch (error) {
-    console.error('❌ [Backend] Error:', error);
-    return Response.json({ 
-      error: error.message || 'Failed to generate content'
-    }, { status: 500 });
+    console.error('❌ Error:', error);
+    return Response.json({ error: error.message }, { status: 500 });
   }
 });
