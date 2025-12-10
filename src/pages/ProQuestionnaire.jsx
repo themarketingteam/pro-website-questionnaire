@@ -253,12 +253,12 @@ export default function ProQuestionnaire() {
 
   const getIncompleteQuestions = () => {
     const incomplete = [];
-    for (let i = 1; i <= 27; i++) {
+    for (let i = 1; i <= 25; i++) {
       const questionId = i.toString();
       const question = QUESTIONS.find(q => q.id === questionId);
-      
+
       if (!question) continue;
-      
+
       if (!isQuestionComplete(questionId)) {
         incomplete.push(`Q${questionId}: ${question.title}`);
       }
@@ -317,10 +317,10 @@ export default function ProQuestionnaire() {
       : { url: '', name: '', type: '', tags: [] };
 
     // Transform client frustrations to array
-    const clientFrustrations = responses['20'] 
-      ? (typeof responses['20'] === 'string' 
-          ? responses['20'].split(',').map(s => s.trim()).filter(s => s) 
-          : responses['20'])
+    const clientFrustrations = responses['19'] 
+      ? (typeof responses['19'] === 'string' 
+          ? responses['19'].split(',').map(s => s.trim()).filter(s => s) 
+          : responses['19'])
       : [];
 
     return {
@@ -360,22 +360,19 @@ export default function ProQuestionnaire() {
         client_acquisition_other: responses['15_other'] || '',
         website_objectives: responses['16'] || [],
         website_objectives_other: responses['16_other'] || '',
-        target_client_description: responses['17'] || '',
-        client_size: responses['18'] || '',
-        client_challenges: responses['19'] || [],
-        client_challenges_other: responses['19_other'] || '',
+        client_size: responses['17'] || '',
+        client_challenges: responses['18'] || [],
+        client_challenges_other: responses['18_other'] || '',
         client_frustrations: clientFrustrations,
-        client_frustrations_other: responses['20_other'] || '',
-        client_outcomes: responses['21'] || [],
-        client_outcomes_other: responses['21_other'] || '',
-        decision_makers: responses['22'] || '',
-        decision_makers_other: responses['22_other'] || '',
-        value_description: responses['23'] || '',
-        ideal_client: responses['24'] || '',
-        avoided_clients: responses['25'] || '',
-        primary_cta: responses['26'] || '',
-        primary_cta_other: responses['26_other'] || '',
-        additional_notes: responses['27'] || ''
+        client_frustrations_other: responses['19_other'] || '',
+        client_outcomes: responses['20'] || [],
+        client_outcomes_other: responses['20_other'] || '',
+        value_description: responses['21'] || '',
+        ideal_client: responses['22'] || '',
+        avoided_clients: responses['23'] || '',
+        primary_cta: responses['24'] || '',
+        primary_cta_other: responses['24_other'] || '',
+        additional_notes: responses['25'] || ''
       }
     };
   };

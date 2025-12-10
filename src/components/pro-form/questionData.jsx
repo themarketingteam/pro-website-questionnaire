@@ -1,3 +1,4 @@
+
 // Pro Website Questionnaire Data
 export const SERVICE_OPTIONS_GROUPED = {
   "Managed IT Services": [
@@ -431,15 +432,6 @@ export const QUESTIONS = [
   {
     id: "17",
     section: "About Your Target Clients",
-    title: "What types of clients do you serve best?",
-    why: "This defines your Ideal Customer Profile (ICP) and helps us create targeted messaging across your homepage, industry pages, and service descriptions. When we understand who you serve best, the voice and value proposition can be refined to attract and convert those clients.",
-    guidance: "Describe the characteristics of your ideal client—size, industry, IT maturity, compliance needs, or business style. Focus on clients who are profitable, easy to support, and represent the majority of your best-fit opportunities. Avoid listing every possible client type. Be specific and descriptive.",
-    type: "textarea",
-    examples: { shortAnswer: "We serve regulated professional firms with 25–150 employees who prioritize security, compliance, and strategic long-term IT planning." }
-  },
-  {
-    id: "18",
-    section: "About Your Target Clients",
     title: "What size businesses do you primarily support?",
     why: "Company size influences complexity, budget expectations, growth trajectory, and the scale of IT support required. This data helps us adjust your messaging—from SMB-focused to mid-market or enterprise-support positioning.",
     guidance: "Specify the range of business sizes you primarily support. Enter the smallest and largest company sizes by number of employees.",
@@ -449,7 +441,7 @@ export const QUESTIONS = [
     examples: { shortAnswer: "10-100 employees" }
   },
   {
-    id: "19",
+    id: "18",
     section: "About Your Target Clients",
     title: "What common problems do clients experience before hiring you?",
     why: "This question identifies your prospects' pain points, which helps create a strong connection with visitors by immediately addressing the issues they are actively facing. It impacts the Home page stakes section, service page intros, and trust-building copy.",
@@ -461,7 +453,7 @@ export const QUESTIONS = [
     examples: { selections: ["Frequent downtime or outages", "Security incidents or data loss", "Lack of IT strategy or planning"] }
   },
   {
-    id: "20",
+    id: "19",
     section: "About Your Target Clients",
     title: "What are the biggest frustrations your clients express?",
     why: "Understanding client frustrations helps create empathetic messaging that connects emotionally with prospects. It improves the resonance of your brand voice and is used to position your MSP as the solution to their negative past experiences.",
@@ -470,7 +462,7 @@ export const QUESTIONS = [
     examples: { shortAnswer: "Clients often tell us their previous MSP took days to respond, lacked a clear process, and provided little visibility into what was actually being done." }
   },
   {
-    id: "21",
+    id: "20",
     section: "About Your Target Clients",
     title: "What results or outcomes do your clients want most?",
     why: "Identifying desired outcomes helps us focus your value propositions around measurable wins and aspirational benefits. These insights drive your benefit-focused messaging throughout the site, especially on your homepage and service pages.",
@@ -482,18 +474,7 @@ export const QUESTIONS = [
     examples: { selections: ["Reliable systems and less downtime", "Stronger cybersecurity posture", "Predictable monthly costs"] }
   },
   {
-    id: "22",
-    section: "About Your Target Clients",
-    title: "Who usually makes the buying decision?",
-    why: "Understanding the primary decision maker ensures we tailor the messaging, CTAs, and content structure to their needs and expectations. Different roles care about different aspects of IT (security, risk, budget, efficiency, staff support, etc.).",
-    guidance: "Choose the primary role or title typically involved in signing agreements or approving MSP services. Select the main decision maker for your target clients.",
-    type: "radio",
-    options: DECISION_MAKERS_OPTIONS,
-    showOther: true,
-    examples: { selection: "Business Owner / CEO" }
-  },
-  {
-    id: "23",
+    id: "21",
     section: "About Your Target Clients",
     title: "What words or phrases do clients typically use to describe your value?",
     why: "This question provides real client language that can shape testimonials, trust-building statements, and tone. Using your clients' own words significantly boosts authenticity and conversion rates.",
@@ -502,7 +483,7 @@ export const QUESTIONS = [
     examples: { shortAnswer: "Responsive, proactive, and easy to work with—clients often say they trust us because we communicate clearly and never leave them guessing." }
   },
   {
-    id: "24",
+    id: "22",
     section: "About Your Target Clients",
     title: "Describe your ideal client in one or two sentences.",
     why: "This distills your ICP into a short statement that shapes your overall brand targeting strategy. It influences the site's tone, messaging, and which benefits are emphasized most prominently.",
@@ -511,7 +492,7 @@ export const QUESTIONS = [
     examples: { shortAnswer: "Our ideal clients are 25–100 employee professional firms who value proactive IT strategy, compliance support, and consistent partnership." }
   },
   {
-    id: "25",
+    id: "23",
     section: "About Your Target Clients",
     title: "Are there any industries or client types you prefer to avoid?",
     why: "This helps ensure your site does not attract leads that are unprofitable, high-risk, or outside your desired service areas. It also helps refine SEO and prevent misalignment between marketing and operational reality.",
@@ -520,7 +501,7 @@ export const QUESTIONS = [
     examples: { shortAnswer: "We avoid restaurants, retail stores, and micro-businesses under 5 employees." }
   },
   {
-    id: "26",
+    id: "24",
     section: "About Your Target Clients",
     title: "What is the #1 action you want website visitors to take?",
     why: "Identifying the primary CTA ensures that your site design supports your core business goal—whether it's generating consultations, quote requests, or direct calls. This affects button placement, top-level navigation, and funnel architecture.",
@@ -531,7 +512,7 @@ export const QUESTIONS = [
     examples: { selection: "Schedule a Consultation" }
   },
   {
-    id: "27",
+    id: "25",
     section: "About Your Target Clients",
     title: "Is there anything else we should know before building your website or writing your copy?",
     why: "This final question captures details that may not fit neatly into other categories—such as special requirements, unique offerings, website restrictions, brand elements, or internal goals.",
