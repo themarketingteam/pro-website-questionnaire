@@ -52,6 +52,7 @@ export default function NumericRangeQuestion({
     setSmallestInput(value);
     setIsLocked(false);
     setValidationError('');
+    onChange(''); // Clear the saved value when user starts editing
 
     // Clear any existing timer
     if (smallestTimerRef.current) {
@@ -79,6 +80,7 @@ export default function NumericRangeQuestion({
     setLargestInput(value);
     setIsLocked(false);
     setValidationError('');
+    onChange(''); // Clear the saved value when user starts editing
 
     // Clear any existing timer
     if (largestTimerRef.current) {
