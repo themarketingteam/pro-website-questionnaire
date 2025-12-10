@@ -34,34 +34,43 @@ export default function AIContentModal({
         metadata: { source: 'pro_questionnaire' }
       });
 
-      const message = `Question Context: ${questionContext}\n\nUser Instruction: ${userInstruction}\n\nCurrent Draft:\n${draftContent || '(empty)'}`;
+      const prompt = draftContent 
+        ? `${userInstruction}\n\nCurrent text:\n${draftContent}`
+        : userInstruction;
 
       await base44.agents.addMessage(conversation, {
         role: 'user',
-        content: message
+        content: prompt
       });
 
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error('Response timeout'));
-        }, 60000); // 60 second timeout
+        }, 60000);
 
+        let lastContent = '';
         const unsubscribe = base44.agents.subscribeToConversation(conversation.id, (data) => {
-          const lastMessage = data.messages[data.messages.length - 1];
-          if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.streaming) {
-            clearTimeout(timeout);
-            setDraftContent(lastMessage.content);
-            setUserInstruction('');
-            unsubscribe();
-            resolve();
+          const messages = data.messages || [];
+          const lastMessage = messages[messages.length - 1];
+          
+          if (lastMessage?.role === 'assistant') {
+            lastContent = lastMessage.content || '';
+            setDraftContent(lastContent);
+            
+            if (lastMessage.streaming === false) {
+              clearTimeout(timeout);
+              setUserInstruction('');
+              unsubscribe();
+              resolve();
+            }
           }
         });
       });
 
-      toast.success('Content generated successfully!');
+      toast.success('Content generated!');
     } catch (error) {
-      console.error('Failed to generate content:', error);
-      toast.error('Failed to generate content. Please try again.');
+      console.error('Generation error:', error);
+      toast.error(error.message || 'Failed to generate content.');
     } finally {
       setIsGenerating(false);
     }
@@ -75,11 +84,9 @@ export default function AIContentModal({
         metadata: { source: 'pro_questionnaire_grammar' }
       });
 
-      const message = `Fix spelling and grammar errors in the following text. Do not change the tone or length. Return only the corrected text without any additional commentary.\n\n${draftContent}`;
-
       await base44.agents.addMessage(conversation, {
         role: 'user',
-        content: message
+        content: `Fix grammar and spelling only. Return the corrected text:\n\n${draftContent}`
       });
 
       await new Promise((resolve, reject) => {
@@ -87,21 +94,28 @@ export default function AIContentModal({
           reject(new Error('Response timeout'));
         }, 60000);
 
+        let lastContent = '';
         const unsubscribe = base44.agents.subscribeToConversation(conversation.id, (data) => {
-          const lastMessage = data.messages[data.messages.length - 1];
-          if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.streaming) {
-            clearTimeout(timeout);
-            setDraftContent(lastMessage.content);
-            unsubscribe();
-            resolve();
+          const messages = data.messages || [];
+          const lastMessage = messages[messages.length - 1];
+          
+          if (lastMessage?.role === 'assistant') {
+            lastContent = lastMessage.content || '';
+            setDraftContent(lastContent);
+            
+            if (lastMessage.streaming === false) {
+              clearTimeout(timeout);
+              unsubscribe();
+              resolve();
+            }
           }
         });
       });
 
-      toast.success('Grammar check complete!');
+      toast.success('Grammar checked!');
     } catch (error) {
-      console.error('Failed to check grammar:', error);
-      toast.error('Failed to check grammar. Please try again.');
+      console.error('Grammar check error:', error);
+      toast.error(error.message || 'Failed to check grammar.');
     } finally {
       setIsCheckingGrammar(false);
     }
