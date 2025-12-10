@@ -237,7 +237,7 @@ export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
                       />
                       <label
                         htmlFor={`file-${index}`}
-                        className={`flex items-center justify-center gap-2 p-3 border-2 border-dashed rounded cursor-pointer transition-colors ${
+                        className={`flex flex-col items-center justify-center py-4 border-2 border-dashed rounded cursor-pointer transition-colors ${
                           item.uploadingFile
                             ? 'border-slate-300 bg-slate-50 cursor-not-allowed'
                             : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
@@ -245,12 +245,12 @@ export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
                       >
                         {item.uploadingFile ? (
                           <>
-                            <Loader2 className="w-4 h-4 text-slate-600 animate-spin" />
+                            <Loader2 className="w-6 h-6 text-slate-600 animate-spin mb-2" />
                             <span className="text-sm text-slate-600">Uploading...</span>
                           </>
                         ) : (
                           <>
-                            <Upload className="w-4 h-4 text-slate-600" />
+                            <Upload className="w-5 h-5 text-slate-400 mb-1" />
                             <span className="text-sm text-slate-600">Upload File</span>
                           </>
                         )}
