@@ -300,21 +300,25 @@ export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
 
       {/* Add New Button */}
       {items.length < max && (
-        <Button
+        <button
           type="button"
           onClick={handleAddItem}
-          variant="outline"
-          className="w-full border-dashed border-2"
+          disabled={items.length > 0 && !items[items.length - 1].saved}
+          className={`w-full py-4 border-2 border-dashed rounded-lg flex items-center justify-center gap-2 transition-all ${
+            items.length > 0 && !items[items.length - 1].saved
+              ? 'border-[#C1C6C8] text-[#A9AAAC] cursor-not-allowed'
+              : 'border-[#1C82DE] text-[#1C82DE] hover:bg-blue-50 cursor-pointer'
+          }`}
         >
-          <Plus className="w-4 h-4 mr-2" />
-          Add New Item
-        </Button>
+          <Plus className="w-5 h-5" />
+          Add {items.length > 0 ? 'Another' : 'New'} Item ({items.length}/{max})
+        </button>
       )}
 
-      {items.length >= max && (
-        <p className="text-sm text-slate-500 text-center">
-          Maximum {max} items reached
-        </p>
+      {items.length === 0 && (
+        <div className="text-sm text-[#566C75] text-center py-2">
+          Click the button above to add your first guarantee or service standard.
+        </div>
       )}
     </div>
   );
