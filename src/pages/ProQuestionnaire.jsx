@@ -216,9 +216,13 @@ export default function ProQuestionnaire() {
 
       case 'multi_certification': {
         const items = Array.isArray(answer) ? answer : [];
-        const savedItems = items.filter(item => item.saved === true);
+        // Count items that are either explicitly saved OR complete (legacy items)
+        const validItems = items.filter(item => {
+          const isComplete = item.name?.trim() && item.type;
+          return item.saved === true || (isComplete && item.saved !== false);
+        });
         const min = question.limits?.min || 0;
-        return savedItems.length >= min;
+        return validItems.length >= min;
       }
 
           case 'image_tagging':
