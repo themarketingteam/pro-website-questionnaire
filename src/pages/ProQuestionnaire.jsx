@@ -24,6 +24,37 @@ import ConfirmModal from '@/components/pro-form/ConfirmModal';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 
 const COOKIE_NAME = 'pro_questionnaire_responses';
+const CREDENTIALS_COOKIE_NAME = 'pro_questionnaire_credentials';
+
+// Helper functions for credential management
+const setCredentialsCookie = (credentials) => {
+  const jsonData = JSON.stringify(credentials);
+  const encodedData = encodeURIComponent(jsonData);
+  const expires = new Date();
+  expires.setDate(expires.getDate() + 30);
+  document.cookie = `${CREDENTIALS_COOKIE_NAME}=${encodedData}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+};
+
+const getCredentialsCookie = () => {
+  const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+    const [key, value] = cookie.trim().split('=');
+    acc[key] = value;
+    return acc;
+  }, {});
+  
+  if (cookies[CREDENTIALS_COOKIE_NAME]) {
+    try {
+      return JSON.parse(decodeURIComponent(cookies[CREDENTIALS_COOKIE_NAME]));
+    } catch (e) {
+      console.error('Failed to parse credentials:', e);
+      return {};
+    }
+  }
+  return {};
+};
+
+// Export helper to access credentials from anywhere
+export const getStoredCredentials = getCredentialsCookie;
 
 export default function ProQuestionnaire() {
   const [responses, setResponses] = useState({});
@@ -40,6 +71,25 @@ export default function ProQuestionnaire() {
   const domainSL = urlParams.get('domainSL') || '';
   const domainTL = urlParams.get('domainTL') || '';
   const domainParam = domainSL && domainTL ? `${domainSL}.${domainTL}` : '';
+  
+  // Extract and store credentials from URL
+  useEffect(() => {
+    const credentials = {
+      businessName: businessNameParam,
+      domain: domainParam,
+      userId: urlParams.get('userId') || '',
+      userEmail: urlParams.get('userEmail') || '',
+      userName: urlParams.get('userName') || '',
+      accessToken: urlParams.get('accessToken') || '',
+      // Add any other credential fields you need
+    };
+    
+    // Only store if at least one credential field is present
+    if (Object.values(credentials).some(val => val)) {
+      setCredentialsCookie(credentials);
+      console.log('✅ Credentials stored in cookie:', credentials);
+    }
+  }, [businessNameParam, domainParam]);
 
   // Set document title and favicon
   useEffect(() => {
