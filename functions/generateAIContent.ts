@@ -1,8 +1,5 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.4';
-
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
     const { userInstruction, questionContext, draftContent } = await req.json();
 
     console.log('🚀 [Backend] Starting AI generation...');
@@ -14,25 +11,43 @@ Deno.serve(async (req) => {
       return Response.json({ error: 'User instruction is required' }, { status: 400 });
     }
 
-    // Create conversation using service role
-    console.log('🔄 [Backend] Creating conversation with service role...');
-    const conversation = await base44.asServiceRole.agents.createConversation({
-      agent_name: 'msp_content_strategist',
-      metadata: { source: 'pro_questionnaire_backend' }
+    const appId = Deno.env.get('BASE44_APP_ID');
+    const serviceRoleKey = Deno.env.get('BASE44_SERVICE_ROLE_KEY');
+    const baseUrl = 'https://base44.app/api';
+
+    // Create conversation using direct API call
+    console.log('🔄 [Backend] Creating conversation via API...');
+    const createConvResponse = await fetch(`${baseUrl}/apps/${appId}/agents/conversations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${serviceRoleKey}`
+      },
+      body: JSON.stringify({
+        agent_name: 'msp_content_strategist',
+        metadata: { source: 'pro_questionnaire_backend' }
+      })
     });
+    
+    const conversation = await createConvResponse.json();
     console.log('✅ [Backend] Conversation created:', conversation.id);
 
     const prompt = draftContent 
       ? `${questionContext}\n\n${userInstruction}\n\nCurrent text:\n${draftContent}`
       : `${questionContext}\n\n${userInstruction}`;
 
-    console.log('📤 [Backend] Sending prompt to agent...');
-
-    // Send message using SDK service role (pass conversation object, not ID)
-    console.log('📤 [Backend] Sending message to agent...');
-    await base44.asServiceRole.agents.addMessage(conversation, {
-      role: 'user',
-      content: prompt
+    // Send message via API
+    console.log('📤 [Backend] Sending message to agent via API...');
+    await fetch(`${baseUrl}/apps/${appId}/agents/conversations/${conversation.id}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${serviceRoleKey}`
+      },
+      body: JSON.stringify({
+        role: 'user',
+        content: prompt
+      })
     });
     console.log('✅ [Backend] Message sent successfully');
 
@@ -46,7 +61,13 @@ Deno.serve(async (req) => {
     while (Date.now() - startTime < maxWaitTime) {
       await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5 seconds between polls
       
-      const updatedConversation = await base44.asServiceRole.agents.getConversation(conversation.id);
+      // Get conversation via API
+      const getConvResponse = await fetch(`${baseUrl}/apps/${appId}/agents/conversations/${conversation.id}`, {
+        headers: {
+          'Authorization': `Bearer ${serviceRoleKey}`
+        }
+      });
+      const updatedConversation = await getConvResponse.json();
       const messages = updatedConversation.messages || [];
       const lastMessage = messages[messages.length - 1];
       
