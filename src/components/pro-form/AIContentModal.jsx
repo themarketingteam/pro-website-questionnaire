@@ -37,8 +37,8 @@ export default function AIContentModal({
       console.log('Conversation created:', conversation.id);
 
       const prompt = draftContent 
-        ? `${userInstruction}\n\nCurrent text:\n${draftContent}`
-        : userInstruction;
+        ? `${questionContext}\n\n${userInstruction}\n\nCurrent text:\n${draftContent}`
+        : `${questionContext}\n\n${userInstruction}`;
 
       console.log('Sending message:', prompt);
       await base44.agents.addMessage(conversation, {
