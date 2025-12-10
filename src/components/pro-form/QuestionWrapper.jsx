@@ -35,7 +35,7 @@ export default function QuestionWrapper({
   return (
     <div id={id} className={`space-y-4 ${isExpanded ? 'my-[5%]' : 'mb-[3%]'} relative`}>
       {!isSubQuestion && (
-        <div className="absolute -left-10 top-1">
+        <div className="absolute -left-[43px] top-1">
           {getStatusIcon()}
         </div>
       )}
