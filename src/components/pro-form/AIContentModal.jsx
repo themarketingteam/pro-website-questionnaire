@@ -49,68 +49,31 @@ export default function AIContentModal({
     setAiQuestions(''); // Clear previous questions
     
     try {
-      console.log('🔄 [AI Modal] Creating conversation with agent: msp_content_strategist');
-      const conversation = await base44.agents.createConversation({
-        agent_name: 'msp_content_strategist',
-        metadata: { source: 'pro_questionnaire' }
-      });
-      console.log('✅ [AI Modal] Conversation created:', conversation.id);
-
-      const prompt = draftContent 
-        ? `${questionContext}\n\n${userInstruction}\n\nCurrent text:\n${draftContent}`
-        : `${questionContext}\n\n${userInstruction}`;
-      console.log('📤 [AI Modal] Prompt to send:', prompt);
-
-      // Subscribe BEFORE sending message to catch all updates
-      await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          console.error('⏱️ [AI Modal] Response timeout after 45s');
-          reject(new Error('Response timeout'));
-        }, 45000);
-
-        console.log('👂 [AI Modal] Subscribing to conversation updates...');
-        const unsubscribe = base44.agents.subscribeToConversation(conversation.id, (data) => {
-          console.log('📨 [AI Modal] Received update:', data);
-          const messages = data.messages || [];
-          const lastMessage = messages[messages.length - 1];
-          console.log('💬 [AI Modal] Last message:', lastMessage);
-          
-          if (lastMessage?.role === 'assistant') {
-            const content = lastMessage.content || '';
-            console.log('🤖 [AI Modal] Assistant message content:', content);
-            console.log('🔄 [AI Modal] Streaming status:', lastMessage.streaming);
-            
-            // Check if this is questions vs draft content
-            if (isQuestionResponse(content)) {
-              console.log('❓ [AI Modal] Detected AI questions');
-              setAiQuestions(content);
-            } else {
-              console.log('📝 [AI Modal] Detected draft content');
-              setDraftContent(content);
-              setAiQuestions(''); // Clear questions if we got content
-            }
-            
-            if (lastMessage.streaming === false) {
-              console.log('✅ [AI Modal] Streaming complete');
-              clearTimeout(timeout);
-              setUserInstruction('');
-              unsubscribe();
-              resolve();
-            }
-          }
-        });
-
-        // Send message after subscription is set up
-        console.log('📮 [AI Modal] Sending message to agent...');
-        base44.agents.addMessage(conversation, {
-          role: 'user',
-          content: prompt
-        }).catch((err) => {
-          console.error('❌ [AI Modal] Failed to send message:', err);
-          reject(err);
-        });
+      console.log('🔄 [AI Modal] Calling backend function...');
+      const response = await base44.functions.invoke('generateAIContent', {
+        userInstruction,
+        questionContext,
+        draftContent
       });
 
+      console.log('✅ [AI Modal] Backend response:', response);
+
+      if (response.data.error) {
+        throw new Error(response.data.error);
+      }
+
+      const { content, isQuestions } = response.data;
+
+      if (isQuestions) {
+        console.log('❓ [AI Modal] Detected AI questions');
+        setAiQuestions(content);
+      } else {
+        console.log('📝 [AI Modal] Detected draft content');
+        setDraftContent(content);
+        setAiQuestions('');
+      }
+
+      setUserInstruction('');
       console.log('🎉 [AI Modal] Generation complete!');
       toast.success('Content generated!');
     } catch (error) {
