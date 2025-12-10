@@ -212,7 +212,7 @@ export default function AIContentModal({
               value={draftContent}
               onChange={(e) => setDraftContent(e.target.value)}
               rows={12}
-              className="w-full font-mono text-sm"
+              className="w-full text-sm"
             />
           </div>
 
