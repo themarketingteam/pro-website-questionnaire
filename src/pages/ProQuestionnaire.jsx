@@ -645,14 +645,14 @@ export default function ProQuestionnaire() {
           <button
             type="button"
             onClick={expandAll}
-            className="px-4 py-2 bg-[#E8EBED] hover:bg-[#C1C6C8] text-[#1E3950] font-medium rounded transition-colors text-sm uppercase"
+            className="px-6 py-3 bg-[#5B8AC4] hover:bg-[#4A7AB3] text-white font-bold rounded transition-colors text-sm uppercase"
           >
             Expand All
           </button>
           <button
             type="button"
             onClick={collapseAll}
-            className="px-4 py-2 bg-[#E8EBED] hover:bg-[#C1C6C8] text-[#1E3950] font-medium rounded transition-colors text-sm uppercase"
+            className="px-6 py-3 bg-[#6B7780] hover:bg-[#5A666F] text-white font-bold rounded transition-colors text-sm uppercase"
           >
             Collapse All
           </button>
