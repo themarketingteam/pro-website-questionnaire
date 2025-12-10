@@ -29,15 +29,18 @@ export default function AIContentModal({
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
+      console.log('Creating conversation...');
       const conversation = await base44.agents.createConversation({
         agent_name: 'msp_content_strategist',
         metadata: { source: 'pro_questionnaire' }
       });
+      console.log('Conversation created:', conversation.id);
 
       const prompt = draftContent 
         ? `${userInstruction}\n\nCurrent text:\n${draftContent}`
         : userInstruction;
 
+      console.log('Sending message:', prompt);
       await base44.agents.addMessage(conversation, {
         role: 'user',
         content: prompt
@@ -45,19 +48,25 @@ export default function AIContentModal({
 
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-          reject(new Error('Response timeout'));
+          console.error('Timeout reached');
+          reject(new Error('Response timeout after 60 seconds'));
         }, 60000);
 
-        let lastContent = '';
+        console.log('Subscribing to conversation...');
         const unsubscribe = base44.agents.subscribeToConversation(conversation.id, (data) => {
+          console.log('Subscription update:', data);
           const messages = data.messages || [];
           const lastMessage = messages[messages.length - 1];
           
+          console.log('Last message:', lastMessage);
+          
           if (lastMessage?.role === 'assistant') {
-            lastContent = lastMessage.content || '';
-            setDraftContent(lastContent);
+            const content = lastMessage.content || '';
+            console.log('Assistant content:', content, 'Streaming:', lastMessage.streaming);
+            setDraftContent(content);
             
             if (lastMessage.streaming === false) {
+              console.log('Stream complete, resolving');
               clearTimeout(timeout);
               setUserInstruction('');
               unsubscribe();
