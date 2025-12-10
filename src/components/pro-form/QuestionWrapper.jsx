@@ -89,9 +89,20 @@ export default function QuestionWrapper({
           </div>
         </div>
       </div>
-      
+
       {isExpanded && (
         <div className="animate-in fade-in slide-in-from-top-2 duration-200 my-[5%]">
+          {guidance && (
+            <div 
+              className="text-[#566C75] italic text-[15px] leading-relaxed mb-4"
+              dangerouslySetInnerHTML={{
+                __html: guidance
+                  .split('\n\n')
+                  .map(para => para.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>'))
+                  .join('<br/><br/>')
+              }}
+            />
+          )}
           {children}
         </div>
       )}

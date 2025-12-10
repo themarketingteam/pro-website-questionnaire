@@ -513,9 +513,9 @@ export const QUESTIONS = [
   {
     id: "25",
     section: "About Your Target Clients",
-    title: "Is there anything else we should know before building your website or writing your copy?",
+    title: "Is there any additional information or requests that would help us write the content for your website?",
     why: "This final question captures details that may not fit neatly into other categories—such as special requirements, unique offerings, website restrictions, brand elements, or internal goals.",
-    guidance: "Share any additional context, requirements, preferences, or business nuances you want reflected in the project. If anything from your current website must be preserved or avoided, include that information here.",
+    guidance: "This question is specifically about content, **not design** preferences.\n\nShare any additional context, requirements, preferences, or business nuances you want reflected in the project. If anything from your current website must be preserved or avoided, include that information here.",
     type: "textarea",
     examples: { shortAnswer: "Please avoid using stock photos that resemble call centers. We prefer actual team imagery whenever possible." }
   }
