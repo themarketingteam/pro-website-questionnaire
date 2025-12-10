@@ -676,7 +676,7 @@ export default function ProQuestionnaire() {
                         />
                       </div>
 
-                      <div className={`rounded-lg p-6 -mx-6 ${getSpanBackgroundClass()}`}>
+                      <div className={`rounded-lg p-4 -mx-4 ${getSpanBackgroundClass()}`}>
                         {spanQuestions.map(q => (
                           <div key={q.id} className="mb-8 last:mb-0">
                             <QuestionWrapper
