@@ -493,7 +493,10 @@ export default function ProQuestionnaire() {
                 This question is specifically about content, <strong>not design</strong> preferences.
               </div>
             )}
-            <TextareaQuestion {...commonProps} />
+            <TextareaQuestion 
+              {...commonProps} 
+              questionContext={`Question ${question.id}: ${question.title}`}
+            />
           </>
         );
       
