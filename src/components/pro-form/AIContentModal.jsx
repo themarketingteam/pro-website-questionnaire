@@ -26,6 +26,13 @@ export default function AIContentModal({
     }
   }, [open, currentValue]);
 
+  const isQuestionResponse = (text) => {
+    const hasMultipleQuestions = (text.match(/\?/g) || []).length >= 2;
+    const hasQuestionPrompts = /could you|can you|do you|what|how|tell me more|help me/i.test(text);
+    const isShort = text.length < 500;
+    return hasMultipleQuestions && hasQuestionPrompts && isShort;
+  };
+
   const handleGenerate = async () => {
     if (!userInstruction.trim()) {
       toast.error('Please enter instructions');
@@ -33,6 +40,8 @@ export default function AIContentModal({
     }
 
     setIsGenerating(true);
+    setAiQuestions(''); // Clear previous questions
+    
     try {
       const conversation = await base44.agents.createConversation({
         agent_name: 'msp_content_strategist',
@@ -55,7 +64,14 @@ export default function AIContentModal({
           
           if (lastMessage?.role === 'assistant') {
             const content = lastMessage.content || '';
-            setDraftContent(content);
+            
+            // Check if this is questions vs draft content
+            if (isQuestionResponse(content)) {
+              setAiQuestions(content);
+            } else {
+              setDraftContent(content);
+              setAiQuestions(''); // Clear questions if we got content
+            }
             
             if (lastMessage.streaming === false) {
               clearTimeout(timeout);
