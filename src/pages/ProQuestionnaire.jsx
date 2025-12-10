@@ -68,11 +68,12 @@ export default function ProQuestionnaire() {
         console.error('Failed to parse saved responses:', e);
       }
     }
-    // Default Q1, Q2, Q12, and Q14 to "no" if not set
+    // Default Q1, Q2, Q12, Q14, and Q23 to "no" if not set
     if (!initialResponses['1']) initialResponses['1'] = 'no';
     if (!initialResponses['2']) initialResponses['2'] = 'no';
     if (!initialResponses['12']) initialResponses['12'] = 'no';
     if (!initialResponses['14']) initialResponses['14'] = 'no';
+    if (!initialResponses['23']) initialResponses['23'] = 'no';
     setResponses(initialResponses);
     
     // Initialize all questions as collapsed
@@ -399,7 +400,7 @@ export default function ProQuestionnaire() {
         client_outcomes_other: responses['20_other'] || '',
         value_description: responses['21'] || '',
         ideal_client: responses['22'] || '',
-        avoided_clients: responses['23'] || '',
+        avoided_clients: responses['23'] === 'yes' ? (responses['23.1'] || '') : '',
         primary_cta: responses['24'] || '',
         primary_cta_other: responses['24_other'] || '',
         additional_notes: responses['25'] || ''

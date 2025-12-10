@@ -506,9 +506,20 @@ export const QUESTIONS = [
     section: "About Your Target Clients",
     title: "Are there any industries or client types you prefer to avoid?",
     why: "This helps ensure your site does not attract leads that are unprofitable, high-risk, or outside your desired service areas. It also helps refine SEO and prevent misalignment between marketing and operational reality.",
-    guidance: "List any industries, business sizes, or client patterns that you prefer not to target. Be honest—if certain clients drain resources or don't align with your expertise, we use this information to avoid attracting them.",
-    type: "textarea",
-    examples: { shortAnswer: "We avoid restaurants, retail stores, and micro-businesses under 5 employees." }
+    guidance: "Select 'Yes' if there are specific industries, business sizes, or client patterns you prefer not to target. Select 'No' if you serve all types of businesses without restriction.",
+    type: "yes_no",
+    examples: { yes: "Yes, there are client types we prefer to avoid.", no: "No, we serve all types of businesses." },
+    conditionalChildren: [
+      {
+        id: "23.1",
+        title: "Please list the industries or client types you do NOT serve.",
+        why: "This detailed list helps us refine your site's messaging, SEO strategy, and lead qualification to ensure you attract only the right clients.",
+        guidance: "List any industries, business sizes, or client patterns that you prefer not to target. Be honest—if certain clients drain resources or don't align with your expertise, we use this information to avoid attracting them.",
+        type: "textarea",
+        requiredIfParentYes: false,
+        examples: { shortAnswer: "We avoid restaurants, retail stores, and micro-businesses under 5 employees." }
+      }
+    ]
   },
   {
     id: "24",
