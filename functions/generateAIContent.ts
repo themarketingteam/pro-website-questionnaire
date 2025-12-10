@@ -28,12 +28,13 @@ Deno.serve(async (req) => {
 
     console.log('📤 [Backend] Sending prompt to agent...');
 
-    // Send message using SDK service role
+    // Send message using SDK service role (pass conversation object, not ID)
     console.log('📤 [Backend] Sending message to agent...');
-    await base44.asServiceRole.agents.addMessage(conversation.id, {
+    await base44.asServiceRole.agents.addMessage(conversation, {
       role: 'user',
       content: prompt
     });
+    console.log('✅ [Backend] Message sent successfully');
 
     // Poll for response since websocket subscriptions don't work in backend
     console.log('🔄 [Backend] Polling for response...');
@@ -43,15 +44,17 @@ Deno.serve(async (req) => {
     const maxWaitTime = 55000; // 55 seconds
 
     while (Date.now() - startTime < maxWaitTime) {
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second between polls
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5 seconds between polls
       
       const updatedConversation = await base44.asServiceRole.agents.getConversation(conversation.id);
       const messages = updatedConversation.messages || [];
       const lastMessage = messages[messages.length - 1];
+      
+      console.log(`🔄 [Backend] Poll attempt - Messages count: ${messages.length}, Last message role: ${lastMessage?.role}`);
 
       if (lastMessage?.role === 'assistant' && lastMessage.content) {
         const content = lastMessage.content;
-        console.log('🤖 [Backend] Got assistant response, length:', content.length);
+        console.log('🤖 [Backend] Got assistant response, length:', content.length, 'streaming:', lastMessage.streaming);
         
         // Check if streaming is complete
         if (lastMessage.streaming === false) {
@@ -62,7 +65,7 @@ Deno.serve(async (req) => {
           isQuestions = hasMultipleQuestions && hasQuestionPrompts && isShort;
           
           finalContent = content;
-          console.log('✅ [Backend] Response complete');
+          console.log('✅ [Backend] Response complete, isQuestions:', isQuestions);
           break;
         }
       }
