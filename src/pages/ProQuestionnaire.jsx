@@ -659,27 +659,68 @@ export default function ProQuestionnaire() {
               </div>
 
               {sectionQuestions.map((question, qIndex) => {
-                // Check if this is the start of the span questions (Q3-5)
-                const isSpanStart = question.id === "3";
-                const isSpanEnd = question.id === "5";
                 const isInSpan = ["3", "4", "5"].includes(question.id);
 
-                return (
-                  <div key={question.id}>
-                    {/* Start of span wrapper */}
-                    {isSpanStart && (
-                      <>
-                        <div className="mb-8">
+                // For questions 3-5, render with background wrapper
+                if (question.id === "3") {
+                  // Find Q3, Q4, Q5
+                  const spanQuestions = sectionQuestions.filter(q => ["3", "4", "5"].includes(q.id));
+
+                  return (
+                    <div key="span-questions-wrapper">
+                      <div className="mb-8">
+                        <SelectionSpanIndicator
+                          servicesCount={servicesCount}
+                          industriesCount={industriesCount}
+                          regionsCount={regionsCount}
+                        />
+                      </div>
+
+                      <div className={`rounded-lg p-6 -mx-6 ${getSpanBackgroundClass()}`}>
+                        {spanQuestions.map(q => (
+                          <div key={q.id} className="mb-8 last:mb-0">
+                            <QuestionWrapper
+                              id={`question-${q.id}`}
+                              number={q.id}
+                              title={q.title}
+                              guidance={q.guidance}
+                              why={q.why}
+                              examples={q.examples}
+                              isCollapsible={true}
+                              isExpanded={expandedQuestions[q.id]}
+                              onToggle={() => toggleQuestion(q.id)}
+                              onReset={() => resetQuestion(q.id)}
+                              hasAnswer={!!responses[q.id] || !!responses[`${q.id}_other`]}
+                              isComplete={isQuestionComplete(q.id)}
+                              wasTouched={touchedQuestions[q.id]}
+                            >
+                              {renderQuestion(q)}
+                            </QuestionWrapper>
+
+                            {renderConditionalChildren(q)}
+                          </div>
+                        ))}
+
+                        <div className="mt-6">
                           <SelectionSpanIndicator
                             servicesCount={servicesCount}
                             industriesCount={industriesCount}
                             regionsCount={regionsCount}
                           />
                         </div>
-                        <div className={`rounded-lg p-6 -mx-6 ${getSpanBackgroundClass()}`}>
-                      </>
-                    )}
+                      </div>
+                    </div>
+                  );
+                }
 
+                // Skip Q4 and Q5 since they're rendered above
+                if (question.id === "4" || question.id === "5") {
+                  return null;
+                }
+
+                // Render all other questions normally
+                return (
+                  <div key={question.id}>
                     <QuestionWrapper
                       id={`question-${question.id}`}
                       number={question.id}
@@ -696,25 +737,9 @@ export default function ProQuestionnaire() {
                       wasTouched={touchedQuestions[question.id]}
                     >
                       {renderQuestion(question)}
-
-                      {/* Show span indicator after Q5 */}
-                      {question.id === "5" && (
-                        <div className="mt-6">
-                          <SelectionSpanIndicator
-                            servicesCount={servicesCount}
-                            industriesCount={industriesCount}
-                            regionsCount={regionsCount}
-                          />
-                        </div>
-                      )}
                     </QuestionWrapper>
 
                     {renderConditionalChildren(question)}
-
-                    {/* End of span wrapper */}
-                    {isSpanEnd && (
-                      </div>
-                    )}
                   </div>
                 );
               })}
