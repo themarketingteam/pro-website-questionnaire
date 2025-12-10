@@ -251,7 +251,7 @@ export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
                         ) : (
                           <>
                             <Upload className="w-5 h-5 text-slate-400 mb-1" />
-                            <span className="text-sm text-slate-600">Upload File</span>
+                            <span className="text-sm text-slate-600">Click to upload file</span>
                           </>
                         )}
                       </label>
