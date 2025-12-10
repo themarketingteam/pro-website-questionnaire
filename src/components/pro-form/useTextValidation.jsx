@@ -52,7 +52,79 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
       return;
     }
 
-    // Check for spam patterns
+    // Question 6 specific validations
+    if (qId === '6') {
+      // Check for bullet points
+      const bulletPattern = /^[\s]*[•\-\*][\s]+/m;
+      if (bulletPattern.test(text)) {
+        setValidationState({
+          status: 'red',
+          message: 'Please use sentences or numbered points. Bullet points are not allowed here.',
+          charCount
+        });
+        return;
+      }
+
+      // Check for gibberish or irrelevant content
+      const relevanceCheck = detectIrrelevantContent(text);
+      if (relevanceCheck.isIrrelevant) {
+        setValidationState({
+          status: 'red',
+          message: 'This doesn\'t look like a valid company description. Please try again.',
+          charCount
+        });
+        return;
+      }
+
+      // Check max threshold
+      if (charCount > rules.maxThreshold) {
+        setValidationState({
+          status: 'red',
+          message: 'Too long. Please condense this to 1-2 sentences.',
+          charCount
+        });
+        return;
+      }
+
+      // Check grammar issues
+      if (relevanceCheck.hasGrammarIssues) {
+        setValidationState({
+          status: 'yellow',
+          message: 'It looks like there may be some grammar issues. Please review your answer.',
+          charCount
+        });
+        return;
+      }
+
+      // Length validations for Q6
+      if (charCount < rules.errorThreshold) {
+        setValidationState({
+          status: 'red',
+          message: 'Too short. Please write at least one full sentence.',
+          charCount
+        });
+        return;
+      }
+
+      if (charCount >= rules.warningThreshold) {
+        setValidationState({
+          status: 'yellow',
+          message: 'This is a bit long for a 2-sentence summary. Verify it isn\'t a paragraph.',
+          charCount
+        });
+        return;
+      }
+
+      // Success case for Q6
+      setValidationState({
+        status: 'green',
+        message: 'Looking good!',
+        charCount
+      });
+      return;
+    }
+
+    // Check for spam patterns (for other questions)
     const spamDetected = detectSpam(text);
     if (spamDetected) {
       const spamMessage = qId === '2.1' 
@@ -111,7 +183,7 @@ function getValidationRules(questionId) {
   const rulesMap = {
     '1.1': { errorThreshold: 100, warningThreshold: 200 },
     '2.1': { errorThreshold: 50, warningThreshold: 150 },
-    '6': { errorThreshold: 50, warningThreshold: 100 },
+    '6': { errorThreshold: 30, warningThreshold: 151, maxThreshold: 350 },
     '9': { errorThreshold: 100, warningThreshold: 200 },
     '13': { errorThreshold: 50, warningThreshold: 100 },
     '14': { errorThreshold: 30, warningThreshold: 75 },
@@ -155,4 +227,31 @@ function detectSpam(text) {
   }
 
   return false;
+}
+
+function detectIrrelevantContent(text) {
+  const trimmed = text.trim().toLowerCase();
+  
+  // Check for gibberish patterns
+  const hasVowels = /[aeiou]/i.test(trimmed);
+  const hasMultipleConsonants = (trimmed.match(/[bcdfghjklmnpqrstvwxyz]{4,}/gi) || []).length > 0;
+  const isGibberish = !hasVowels || hasMultipleConsonants;
+  
+  // Check for completely irrelevant content
+  const irrelevantPhrases = [
+    'pizza', 'food', 'restaurant', 'movie', 'game', 'sport',
+    'asdfjkl', 'qwerty', 'asdfgh', 'testing', 'test test'
+  ];
+  const containsIrrelevant = irrelevantPhrases.some(phrase => trimmed.includes(phrase));
+  
+  // Basic grammar check - look for severe issues
+  const words = trimmed.split(/\s+/);
+  const hasMultipleWords = words.length >= 3;
+  const hasSentenceStructure = /[.!?]/.test(text);
+  const hasGrammarIssues = hasMultipleWords && !hasSentenceStructure && text.length > 50;
+  
+  return {
+    isIrrelevant: isGibberish || containsIrrelevant,
+    hasGrammarIssues
+  };
 }
