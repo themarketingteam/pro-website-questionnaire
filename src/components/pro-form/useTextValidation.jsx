@@ -55,9 +55,15 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
     // Check for spam patterns
     const spamDetected = detectSpam(text);
     if (spamDetected) {
+      const spamMessage = qId === '2.1' 
+        ? 'Please enter a valid team description.'
+        : qId === '1.1'
+        ? 'Please provide a detailed description without repetition.'
+        : 'Spam or repetitive content detected. Please provide genuine information.';
+      
       setValidationState({
         status: 'red',
-        message: 'Spam or repetitive content detected. Please provide genuine information.',
+        message: spamMessage,
         charCount
       });
       return;
@@ -65,15 +71,27 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
 
     // Check character count thresholds
     if (charCount < rules.errorThreshold) {
+      const errorMessage = qId === '2.1'
+        ? 'This introduction is too short. Please add at least one full sentence about your team\'s experience or focus.'
+        : qId === '1.1'
+        ? 'Please provide a detailed description (minimum 100 characters) without repetition.'
+        : `Too short. Minimum ${rules.errorThreshold} characters required.`;
+      
       setValidationState({
         status: 'red',
-        message: `Too short. Minimum ${rules.errorThreshold} characters required.`,
+        message: errorMessage,
         charCount
       });
     } else if (charCount < rules.warningThreshold) {
+      const warningMessage = qId === '2.1'
+        ? 'This answer will work, but it\'s a bit brief. A great team intro usually highlights experience levels or certifications. Aim for 150+ characters.'
+        : qId === '1.1'
+        ? 'This answer is valid but short. For the best website copy, we recommend adding 2-3 specific examples of why clients choose you.'
+        : `Consider expanding. Aim for at least ${rules.warningThreshold} characters for best results.`;
+      
       setValidationState({
         status: 'yellow',
-        message: `Consider expanding. Aim for at least ${rules.warningThreshold} characters for best results.`,
+        message: warningMessage,
         charCount
       });
     } else {
@@ -92,7 +110,7 @@ function getValidationRules(questionId) {
   // Define rules based on Form QA Validator agent specifications
   const rulesMap = {
     '1.1': { errorThreshold: 100, warningThreshold: 200 },
-    '2.1': { errorThreshold: 80, warningThreshold: 150 },
+    '2.1': { errorThreshold: 50, warningThreshold: 150 },
     '6': { errorThreshold: 50, warningThreshold: 100 },
     '9': { errorThreshold: 100, warningThreshold: 200 },
     '13': { errorThreshold: 50, warningThreshold: 100 },
@@ -108,17 +126,17 @@ function getValidationRules(questionId) {
 }
 
 function detectSpam(text) {
-  // Check for excessive repetition of characters
-  const charRepeatPattern = /(.)\1{10,}/;
+  // Check for excessive repetition of characters (5+ times)
+  const charRepeatPattern = /(.)\1{4,}/;
   if (charRepeatPattern.test(text)) return true;
 
-  // Check for excessive repetition of words
+  // Check for excessive repetition of words (4+ times)
   const words = text.toLowerCase().split(/\s+/);
   const wordCounts = {};
   for (const word of words) {
-    if (word.length > 3) {
+    if (word.length > 2) {
       wordCounts[word] = (wordCounts[word] || 0) + 1;
-      if (wordCounts[word] > 5) return true;
+      if (wordCounts[word] >= 4) return true;
     }
   }
 
