@@ -35,6 +35,11 @@ Deno.serve(async (req) => {
     const fullConv = await base44.asServiceRole.agents.getConversation(conversation.id);
     console.log('📦 [Backend] Full conversation fetched, messages count:', fullConv.messages?.length || 0);
     
+    // Ensure messages array exists before calling addMessage
+    if (!fullConv.messages) {
+      fullConv.messages = [];
+    }
+    
     // Pass the full conversation object with messages array
     await base44.asServiceRole.agents.addMessage(fullConv, {
       role: 'user',
