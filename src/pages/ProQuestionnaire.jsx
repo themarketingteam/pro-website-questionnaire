@@ -433,9 +433,9 @@ export default function ProQuestionnaire() {
 
   // Determine background color based on selection balance
   const getSpanBackgroundClass = () => {
-    if (totalSelections < 8) return 'bg-red-100/20';
-    if (totalSelections > 15) return 'bg-amber-100/20';
-    return 'bg-green-100/20';
+    if (totalSelections < 8) return 'bg-red-100/25';
+    if (totalSelections > 15) return 'bg-amber-100/25';
+    return 'bg-green-100/25';
   };
 
   // Group questions by section
