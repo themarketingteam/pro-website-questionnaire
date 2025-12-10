@@ -169,8 +169,8 @@ export default function AIContentModal({
             <div className="text-sm font-semibold text-blue-900 mb-1">
               Current Question:
             </div>
-            <div className="text-sm text-blue-800">
-              {questionContext}
+            <div className="text-sm text-black">
+              {questionContext.replace(/^Question \d+(\.\d+)?:\s*/, '')}
             </div>
           </div>
 
