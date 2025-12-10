@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Info, RotateCcw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info, RotateCcw, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
 import QuestionHelpModal from './QuestionHelpModal';
 
 export default function QuestionWrapper({ 
@@ -15,13 +15,28 @@ export default function QuestionWrapper({
   onToggle,
   required = false,
   onReset,
-  hasAnswer = false
+  hasAnswer = false,
+  isComplete = false,
+  wasTouched = false
 }) {
   const [showModal, setShowModal] = useState(false);
 
+  const getStatusIcon = () => {
+    if (isComplete) {
+      return <CheckCircle2 className="w-6 h-6 text-green-600" />;
+    }
+    if (wasTouched && !isComplete) {
+      return <AlertCircle className="w-6 h-6 text-red-600" />;
+    }
+    return <div className="w-6 h-6" />;
+  };
+
   return (
     <div id={id} className={`space-y-4 ${isExpanded ? 'my-[5%]' : 'mb-[3%]'}`}>
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-4">
+        <div className="flex-shrink-0 pt-1">
+          {getStatusIcon()}
+        </div>
         <div 
           className={`block flex-1 ${isCollapsible ? 'cursor-pointer' : ''}`}
           onClick={isCollapsible ? onToggle : undefined}

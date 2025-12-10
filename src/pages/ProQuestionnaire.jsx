@@ -27,6 +27,7 @@ const COOKIE_NAME = 'pro_questionnaire_responses';
 export default function ProQuestionnaire() {
   const [responses, setResponses] = useState({});
   const [expandedQuestions, setExpandedQuestions] = useState({});
+  const [touchedQuestions, setTouchedQuestions] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allExpanded, setAllExpanded] = useState(false);
   const [showAutoSave, setShowAutoSave] = useState(0);
@@ -115,6 +116,10 @@ export default function ProQuestionnaire() {
   const toggleQuestion = (questionId) => {
     setExpandedQuestions(prev => {
       const newState = { ...prev, [questionId]: !prev[questionId] };
+      // If expanding, mark as touched
+      if (!prev[questionId]) {
+        setTouchedQuestions(t => ({ ...t, [questionId]: true }));
+      }
       // If collapsing a parent with conditional children, collapse the children too
       const question = QUESTIONS.find(q => q.id === questionId);
       if (question?.conditionalChildren && prev[questionId]) {
@@ -595,6 +600,8 @@ export default function ProQuestionnaire() {
             required={child.requiredIfParentYes}
             onReset={() => resetQuestion(child.id)}
             hasAnswer={!!responses[child.id] || !!responses[`${child.id}_other`]}
+            isComplete={isQuestionComplete(child.id)}
+            wasTouched={touchedQuestions[child.id]}
           >
             {renderQuestion(child)}
           </QuestionWrapper>
@@ -660,6 +667,8 @@ export default function ProQuestionnaire() {
                     onToggle={() => toggleQuestion(question.id)}
                     onReset={() => resetQuestion(question.id)}
                     hasAnswer={!!responses[question.id] || !!responses[`${question.id}_other`]}
+                    isComplete={isQuestionComplete(question.id)}
+                    wasTouched={touchedQuestions[question.id]}
                   >
                     {renderQuestion(question)}
                     
@@ -683,36 +692,6 @@ export default function ProQuestionnaire() {
 
           {/* Submit Section */}
           <div className="pt-8 border-t-2 border-[#C1C6C8]">
-            <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded">
-              <button
-                type="button"
-                onClick={() => {
-                  const incomplete = getIncompleteQuestions();
-                  console.log('=== FORM DEBUG INFO ===');
-                  console.log('All Responses:', responses);
-                  console.log('Incomplete Questions:', incomplete);
-                  console.log('Form Valid:', isFormValid());
-                  
-                  // Check each question's completion status
-                  for (let i = 1; i <= 27; i++) {
-                    const qId = i.toString();
-                    const q = QUESTIONS.find(qu => qu.id === qId);
-                    if (q) {
-                      console.log(`Q${qId} (${q.type}):`, {
-                        answer: responses[qId],
-                        other: responses[`${qId}_other`],
-                        complete: isQuestionComplete(qId)
-                      });
-                    }
-                  }
-                  
-                  alert(`Form Valid: ${isFormValid()}\n\nIncomplete Questions (${incomplete.length}):\n${incomplete.join('\n') || 'None'}\n\nCheck console for full debug info`);
-                }}
-                className="w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded font-medium text-sm"
-              >
-                🐛 Debug: Show Validation Status
-              </button>
-            </div>
             <div className="flex flex-col sm:flex-row gap-4">
               <button
                 type="button"
