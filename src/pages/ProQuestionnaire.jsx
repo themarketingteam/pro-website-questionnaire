@@ -429,6 +429,14 @@ export default function ProQuestionnaire() {
   const servicesCount = (responses['3'] || []).length + otherServicesCount;
   const industriesCount = (responses['4'] || []).length + (responses['4_other'] ? 1 : 0);
   const regionsCount = Array.isArray(responses['5']) ? responses['5'].length : 0;
+  const totalSelections = servicesCount + industriesCount + regionsCount;
+
+  // Determine background color based on selection balance
+  const getSpanBackgroundClass = () => {
+    if (totalSelections < 8) return 'bg-red-100/50';
+    if (totalSelections > 15) return 'bg-amber-100/50';
+    return 'bg-green-100/50';
+  };
 
   // Group questions by section
   const sections = QUESTIONS.reduce((acc, question) => {
@@ -650,51 +658,66 @@ export default function ProQuestionnaire() {
                 </h2>
               </div>
 
-              {sectionQuestions.map((question, qIndex) => (
-                <div key={question.id}>
-                  {/* Show span indicator before question 3 */}
-                  {question.id === "3" && (
-                    <div className="mb-8">
-                      <SelectionSpanIndicator
-                        servicesCount={servicesCount}
-                        industriesCount={industriesCount}
-                        regionsCount={regionsCount}
-                      />
-                    </div>
-                  )}
+              {sectionQuestions.map((question, qIndex) => {
+                // Check if this is the start of the span questions (Q3-5)
+                const isSpanStart = question.id === "3";
+                const isSpanEnd = question.id === "5";
+                const isInSpan = ["3", "4", "5"].includes(question.id);
 
-                  <QuestionWrapper
-                    id={`question-${question.id}`}
-                    number={question.id}
-                    title={question.title}
-                    guidance={question.guidance}
-                    why={question.why}
-                    examples={question.examples}
-                    isCollapsible={true}
-                    isExpanded={expandedQuestions[question.id]}
-                    onToggle={() => toggleQuestion(question.id)}
-                    onReset={() => resetQuestion(question.id)}
-                    hasAnswer={!!responses[question.id] || !!responses[`${question.id}_other`]}
-                    isComplete={isQuestionComplete(question.id)}
-                    wasTouched={touchedQuestions[question.id]}
-                  >
-                    {renderQuestion(question)}
+                return (
+                  <div key={question.id}>
+                    {/* Start of span wrapper */}
+                    {isSpanStart && (
+                      <>
+                        <div className="mb-8">
+                          <SelectionSpanIndicator
+                            servicesCount={servicesCount}
+                            industriesCount={industriesCount}
+                            regionsCount={regionsCount}
+                          />
+                        </div>
+                        <div className={`rounded-lg p-6 -mx-6 ${getSpanBackgroundClass()}`}>
+                      </>
+                    )}
 
-                    {/* Show span indicator after Q5 */}
-                    {question.id === "5" && (
-                      <div className="mt-6">
-                        <SelectionSpanIndicator
-                          servicesCount={servicesCount}
-                          industriesCount={industriesCount}
-                          regionsCount={regionsCount}
-                        />
+                    <QuestionWrapper
+                      id={`question-${question.id}`}
+                      number={question.id}
+                      title={question.title}
+                      guidance={question.guidance}
+                      why={question.why}
+                      examples={question.examples}
+                      isCollapsible={true}
+                      isExpanded={expandedQuestions[question.id]}
+                      onToggle={() => toggleQuestion(question.id)}
+                      onReset={() => resetQuestion(question.id)}
+                      hasAnswer={!!responses[question.id] || !!responses[`${question.id}_other`]}
+                      isComplete={isQuestionComplete(question.id)}
+                      wasTouched={touchedQuestions[question.id]}
+                    >
+                      {renderQuestion(question)}
+
+                      {/* Show span indicator after Q5 */}
+                      {question.id === "5" && (
+                        <div className="mt-6">
+                          <SelectionSpanIndicator
+                            servicesCount={servicesCount}
+                            industriesCount={industriesCount}
+                            regionsCount={regionsCount}
+                          />
+                        </div>
+                      )}
+                    </QuestionWrapper>
+
+                    {renderConditionalChildren(question)}
+
+                    {/* End of span wrapper */}
+                    {isSpanEnd && (
                       </div>
                     )}
-                  </QuestionWrapper>
-                  
-                  {renderConditionalChildren(question)}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </section>
           ))}
 
