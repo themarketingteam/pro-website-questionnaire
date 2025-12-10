@@ -661,8 +661,8 @@ export default function ProQuestionnaire() {
         <div className="space-y-16">
           {Object.entries(sections).map(([sectionName, sectionQuestions], sectionIndex) => (
             <section key={sectionName} className="space-y-8">
-              <div className="pb-6 border-b-2 border-[#C1C6C8]">
-                <h2 className="text-2xl font-bold text-[#122947]">
+              <div className="pb-6 border-b-2 border-[#0D7CB5]">
+                <h2 className="text-2xl font-bold text-[#0D7CB5]">
                   Section {sectionIndex + 1}: {sectionName}
                 </h2>
               </div>
