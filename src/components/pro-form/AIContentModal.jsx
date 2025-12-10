@@ -112,6 +112,16 @@ export default function AIContentModal({
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Question Context */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="text-sm font-semibold text-blue-900 mb-1">
+              Current Question:
+            </div>
+            <div className="text-sm text-blue-800">
+              {questionContext}
+            </div>
+          </div>
+
           {/* User Instruction */}
           <div>
             <label className="text-sm font-medium text-slate-700 mb-2 block">
