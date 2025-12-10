@@ -302,8 +302,8 @@ export default function ProQuestionnaire() {
     }));
 
     // Transform certifications/partnerships - always return array
-    const certificationsPartnerships = responses['12'] === 'yes' && responses['12a'] 
-      ? (responses['12a'] || []).map(item => ({
+    const certificationsPartnerships = responses['12'] === 'yes' && responses['12.1'] 
+      ? (responses['12.1'] || []).map(item => ({
           cert_item_name: item.name || '',
           cert_item_type: item.type || '',
           cert_item_image_url: item.image?.url || '',

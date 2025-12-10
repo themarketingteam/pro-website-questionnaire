@@ -1,4 +1,3 @@
-
 // Pro Website Questionnaire Data
 export const SERVICE_OPTIONS_GROUPED = {
   "Managed IT Services": [
@@ -377,7 +376,7 @@ export const QUESTIONS = [
     type: "yes_no",
     conditionalChildren: [
       {
-        id: "12a",
+        id: "12.1",
         title: "Add your certifications, accolades, awards, or partnerships",
         why: "Adding specific details helps us showcase your credentials effectively.",
         guidance: "For each item, provide the name, type, and optionally include images or supporting documentation.",
