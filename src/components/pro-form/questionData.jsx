@@ -269,15 +269,6 @@ export const QUESTIONS = [
   {
     id: "3",
     section: "About Your Business",
-    title: "How would you describe your company in one or two sentences?",
-    why: "This concise description informs the top-level messaging for the homepage hero section, About page introduction, and metadata language. It helps establish your positioning and communicates your value in a high-level, client-friendly format.",
-    guidance: "Provide a short summary that clearly states what your company does and who you serve. Focus on your specialization, geographic focus, or core differentiators. Avoid long lists or technical jargon—this should be polished, brand-ready language.",
-    type: "textarea",
-    examples: { shortAnswer: "We are a cybersecurity-driven Managed IT Provider supporting small and mid-sized professional firms throughout the Midwest." }
-  },
-  {
-    id: "4",
-    section: "About Your Business",
     title: "What specific IT services and solutions do you provide?",
     why: "Your service selections directly determine which service pages are generated, how your navigation is structured, and which SEO opportunities are prioritized. This ensures the site focuses on what you actually sell and positions you correctly in the market.",
     guidance: "Select the core services that represent your active offerings—not every service you've ever provided. Choose the areas where you have meaningful expertise or where you want to grow. You must choose between 3 and 10 items, and the combined total with Q5 and Q6 must fall between 8 and 15.",
@@ -289,7 +280,7 @@ export const QUESTIONS = [
     examples: { selections: ["Managed IT Services / Help Desk", "Cybersecurity & Threat Protection", "Microsoft 365 / Cloud Management"], other: "IT Compliance Consulting (HIPAA, SOC 2)" }
   },
   {
-    id: "5",
+    id: "4",
     section: "About Your Business",
     title: "What industries do you specialize in supporting?",
     why: "Industry selection determines the Industry pages generated and helps us tailor messaging to the unique challenges of your target verticals. Industry alignment is one of the strongest differentiators for MSPs and is often a major factor in lead quality.",
@@ -302,7 +293,7 @@ export const QUESTIONS = [
     examples: { selections: ["Healthcare / Medical", "Financial / Accounting / CPA", "Manufacturing / Construction"], other: "Real Estate and Property Management" }
   },
   {
-    id: "6",
+    id: "5",
     section: "About Your Business",
     title: "What are your service cities or geological regions of service?",
     why: "Your geographic focus determines whether we generate location-specific SEO pages and how local or national your messaging should be. This affects local SEO, Google Business Profile optimization, and how we describe your service footprint throughout the site. Selecting specific cities or towns yields the best SEO results compared to broad selections like states or countries.",
@@ -311,8 +302,17 @@ export const QUESTIONS = [
     limits: { min: 1, max: 5 },
     isSpanQuestion: true,
     examples: { entries: ["Nashville, TN", "Brentwood, TN"] }
-  },
-  {
+    },
+    {
+    id: "6",
+    section: "About Your Business",
+    title: "How would you describe your company in one or two sentences?",
+    why: "This concise description informs the top-level messaging for the homepage hero section, About page introduction, and metadata language. It helps establish your positioning and communicates your value in a high-level, client-friendly format.",
+    guidance: "Provide a short summary that clearly states what your company does and who you serve. Focus on your specialization, geographic focus, or core differentiators. Avoid long lists or technical jargon—this should be polished, brand-ready language.",
+    type: "textarea",
+    examples: { shortAnswer: "We are a cybersecurity-driven Managed IT Provider supporting small and mid-sized professional firms throughout the Midwest." }
+    },
+    {
     id: "7",
     section: "About Your Business",
     title: "How do you typically deliver your services?",

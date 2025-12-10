@@ -212,8 +212,8 @@ export default function ProQuestionnaire() {
       
       case 'multi_text': {
         const entries = Array.isArray(answer) ? answer : [];
-        // For question 6 (geographic), check for validated locations
-        if (questionId === '6') {
+        // For question 5 (geographic), check for validated locations
+        if (questionId === '5') {
           const min = question.limits?.min || 1;
           return entries.length >= min;
         }
@@ -291,14 +291,14 @@ export default function ProQuestionnaire() {
 
   const transformResponsesToPayload = (responses, businessName, domain) => {
     // Transform geographic areas - flatten structure, no wrapper
-    const geographicAreas = (responses['6'] || []).map((location, index) => ({
+    const geographicAreas = (responses['5'] || []).map((location, index) => ({
       name: typeof location === 'string' ? location : (location.name || location.label || ''),
       label: typeof location === 'string' ? location : (location.label || location.name || ''),
       lat: location.lat != null ? String(location.lat) : '',
       lon: location.lon != null ? String(location.lon) : '',
       place_id: location.place_id || '',
       source: "google",
-      primary: index === (responses['6_primary'] || 0)
+      primary: index === (responses['5_primary'] || 0)
     }));
 
     // Transform certifications/partnerships - always return array
@@ -336,13 +336,13 @@ export default function ProQuestionnaire() {
         meet_the_team_page: responses['2'] === 'yes',
         team_introduction: responses['2'] === 'yes' ? (responses['2.1'] || '') : '',
         team_photo_with_tags: teamPhoto,
-        company_description: responses['3'] || '',
-        service_offerings: (responses['4'] || []).filter(s => !s.startsWith('CATEGORY:')),
-        service_offerings_categories: (responses['4'] || []).filter(s => s.startsWith('CATEGORY:')).map(s => s.replace('CATEGORY:', '')),
-        service_offerings_other: responses['4_other'] || '',
-        target_industries: responses['5'] || [],
-        target_industries_other: responses['5_other'] || '',
+        service_offerings: (responses['3'] || []).filter(s => !s.startsWith('CATEGORY:')),
+        service_offerings_categories: (responses['3'] || []).filter(s => s.startsWith('CATEGORY:')).map(s => s.replace('CATEGORY:', '')),
+        service_offerings_other: responses['3_other'] || '',
+        target_industries: responses['4'] || [],
+        target_industries_other: responses['4_other'] || '',
         geographic_areas: geographicAreas,
+        company_description: responses['6'] || '',
         delivery_model: responses['7'] || '',
         delivery_model_other: responses['7_other'] || '',
         pricing_packaging: responses['8'] || [],
@@ -422,13 +422,13 @@ export default function ProQuestionnaire() {
   };
 
   // Calculate span totals
-  const otherServices = responses['4_other'];
+  const otherServices = responses['3_other'];
   const otherServicesCount = Array.isArray(otherServices) 
     ? otherServices.filter(v => v?.trim()).length 
     : (otherServices?.trim() ? 1 : 0);
-  const servicesCount = (responses['4'] || []).length + otherServicesCount;
-  const industriesCount = (responses['5'] || []).length + (responses['5_other'] ? 1 : 0);
-  const regionsCount = Array.isArray(responses['6']) ? responses['6'].length : 0;
+  const servicesCount = (responses['3'] || []).length + otherServicesCount;
+  const industriesCount = (responses['4'] || []).length + (responses['4_other'] ? 1 : 0);
+  const regionsCount = Array.isArray(responses['5']) ? responses['5'].length : 0;
 
   // Group questions by section
   const sections = QUESTIONS.reduce((acc, question) => {
@@ -453,7 +453,7 @@ export default function ProQuestionnaire() {
         return (
           <CheckboxQuestion
             options={question.options}
-            groupedOptions={question.id === "4" ? SERVICE_OPTIONS_GROUPED : null}
+            groupedOptions={question.id === "3" ? SERVICE_OPTIONS_GROUPED : null}
             value={responses[question.id] || []}
             onChange={(val) => updateResponse(question.id, val)}
             min={question.limits?.min}
@@ -461,8 +461,8 @@ export default function ProQuestionnaire() {
             showOther={question.showOther}
             otherValue={responses[`${question.id}_other`] || (question.showOther && question.limits?.max ? [''] : '')}
             onOtherChange={(val) => updateResponse(`${question.id}_other`, val)}
-            columns={question.id === "4" ? 3 : 2}
-            allowCategorySelection={question.id === "4"}
+            columns={question.id === "3" ? 3 : 2}
+            allowCategorySelection={question.id === "3"}
           />
         );
       
@@ -481,12 +481,12 @@ export default function ProQuestionnaire() {
         return <TextareaQuestion {...commonProps} />;
       
       case 'multi_text':
-        // Question 6 uses geographic validation
-        if (question.id === '6') {
+        // Question 5 uses geographic validation
+        if (question.id === '5') {
           return (
             <MultiGeographicQuestion
               selectedLocations={responses[question.id] || []}
-              primaryIndex={responses['6_primary'] || 0}
+              primaryIndex={responses['5_primary'] || 0}
               onAdd={(location) => {
                 setResponses(prev => {
                   const current = prev[question.id] || [];
@@ -499,7 +499,7 @@ export default function ProQuestionnaire() {
               onRemove={(index) => {
                 setResponses(prev => {
                   const current = prev[question.id] || [];
-                  let primaryIndex = prev['6_primary'] || 0;
+                  let primaryIndex = prev['5_primary'] || 0;
                   // Adjust primary index if we're removing it or something before it
                   if (index === primaryIndex) {
                     primaryIndex = 0; // Reset to first
@@ -509,7 +509,7 @@ export default function ProQuestionnaire() {
                   const newResponses = { 
                     ...prev, 
                     [question.id]: current.filter((_, i) => i !== index),
-                    '6_primary': primaryIndex
+                    '5_primary': primaryIndex
                   };
                   saveToStorage(newResponses);
                   setShowAutoSave(s => s + 1);
@@ -518,7 +518,7 @@ export default function ProQuestionnaire() {
               }}
               onSetPrimary={(index) => {
                 setResponses(prev => {
-                  const newResponses = { ...prev, '6_primary': index };
+                  const newResponses = { ...prev, '5_primary': index };
                   saveToStorage(newResponses);
                   setShowAutoSave(s => s + 1);
                   return newResponses;
@@ -652,8 +652,8 @@ export default function ProQuestionnaire() {
 
               {sectionQuestions.map((question, qIndex) => (
                 <div key={question.id}>
-                  {/* Show span indicator before question 4 */}
-                  {question.id === "4" && (
+                  {/* Show span indicator before question 3 */}
+                  {question.id === "3" && (
                     <div className="mb-8">
                       <SelectionSpanIndicator
                         servicesCount={servicesCount}
@@ -662,7 +662,7 @@ export default function ProQuestionnaire() {
                       />
                     </div>
                   )}
-                  
+
                   <QuestionWrapper
                     id={`question-${question.id}`}
                     number={question.id}
@@ -679,9 +679,9 @@ export default function ProQuestionnaire() {
                     wasTouched={touchedQuestions[question.id]}
                   >
                     {renderQuestion(question)}
-                    
-                    {/* Show span indicator after Q6 */}
-                    {question.id === "6" && (
+
+                    {/* Show span indicator after Q5 */}
+                    {question.id === "5" && (
                       <div className="mt-6">
                         <SelectionSpanIndicator
                           servicesCount={servicesCount}
