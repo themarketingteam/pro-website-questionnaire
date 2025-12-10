@@ -754,10 +754,10 @@ export default function ProQuestionnaire() {
                 type="button"
                 onClick={handleSubmitClick}
                 disabled={!isFormValid() || isSubmitting}
-                className={`flex-1 py-6 text-sm font-semibold rounded shadow-lg transition-all flex items-center justify-center uppercase tracking-wide ${
+                className={`flex-1 py-4 text-sm font-bold rounded transition-all flex items-center justify-center uppercase tracking-wide ${
                   isFormValid() && !isSubmitting
-                    ? 'bg-[#90C944] hover:bg-[#7DB83A] text-white shadow-lg hover:shadow-xl'
-                    : 'bg-[#C1C6C8] text-[#566C75] cursor-not-allowed shadow-none'
+                    ? 'bg-[#8DB63C] hover:bg-[#7DA035] text-white'
+                    : 'bg-[#A9B3B7] text-white cursor-not-allowed'
                 }`}
               >
                 {isSubmitting ? (
@@ -766,22 +766,17 @@ export default function ProQuestionnaire() {
                     Submitting...
                   </>
                 ) : (
-                  <>
-                    <Send className="w-5 h-5 mr-2" />
-                    Submit Questionnaire
-                  </>
+                  'Submit Questionnaire'
                 )}
               </button>
 
-              <Button
+              <button
                 type="button"
-                variant="outline"
                 onClick={clearAll}
-                className="px-8 py-6 text-[#1E3950] border-[#C1C6C8] hover:bg-[#E8EBED] hover:border-[#A9AAAC] rounded transition-all uppercase text-sm tracking-wide"
+                className="px-12 py-4 bg-white text-[#4A5F8C] border-2 border-[#4A5F8C] hover:bg-[#F0F2F5] rounded transition-all uppercase text-sm font-bold tracking-wide"
               >
-                <RotateCcw className="w-5 h-5 mr-2" />
                 Clear All
-              </Button>
+              </button>
             </div>
           </div>
           </div>
