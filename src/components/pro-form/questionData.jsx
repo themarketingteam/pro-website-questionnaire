@@ -1,3 +1,4 @@
+
 // Pro Website Questionnaire Data
 export const SERVICE_OPTIONS_GROUPED = {
   "Managed IT Services": [
@@ -271,7 +272,7 @@ export const QUESTIONS = [
     section: "About Your Business",
     title: "What specific IT services and solutions do you provide?",
     why: "Your service selections directly determine which service pages are generated, how your navigation is structured, and which SEO opportunities are prioritized. This ensures the site focuses on what you actually sell and positions you correctly in the market.",
-    guidance: "Select the core services that represent your active offerings—not every service you've ever provided. Choose the areas where you have meaningful expertise or where you want to grow. You must choose between 3 and 10 items, and the combined total with Q5 and Q6 must fall between 8 and 15.",
+    guidance: "Select the core services that represent your active offerings—not every service you've ever provided. Choose the areas where you have meaningful expertise or where you want to grow. You must choose between 3 and 10 items, and the combined total with Q4 and Q5 must fall between 8 and 15.",
     type: "checkbox",
     options: SERVICE_OPTIONS,
     showOther: true,
@@ -284,7 +285,7 @@ export const QUESTIONS = [
     section: "About Your Business",
     title: "What industries do you specialize in supporting?",
     why: "Industry selection determines the Industry pages generated and helps us tailor messaging to the unique challenges of your target verticals. Industry alignment is one of the strongest differentiators for MSPs and is often a major factor in lead quality.",
-    guidance: "Select the industries where you have real experience or strategic intention. These should be industries you actively target or where you have case studies, strong knowledge, or repeat clients. Minimum of 1 and maximum of 5 selections. Total combined with Q4 and Q6 must be between 8 and 15.",
+    guidance: "Select the industries where you have real experience or strategic intention. These should be industries you actively target or where you have case studies, strong knowledge, or repeat clients. Minimum of 1 and maximum of 5 selections. Total combined with Q3, Q4, and Q5 must be between 8 and 15.",
     type: "checkbox",
     options: INDUSTRY_OPTIONS,
     showOther: true,
@@ -297,7 +298,7 @@ export const QUESTIONS = [
     section: "About Your Business",
     title: "What are your service cities or geological regions of service?",
     why: "Your geographic focus determines whether we generate location-specific SEO pages and how local or national your messaging should be. This affects local SEO, Google Business Profile optimization, and how we describe your service footprint throughout the site. Selecting specific cities or towns yields the best SEO results compared to broad selections like states or countries.",
-    guidance: "Select 1 to 5 validated locations using the search field. For optimal SEO performance, we strongly recommend choosing specific cities or towns rather than states or countries. Each validated location will count toward your total selection balance. Continents are not allowed. Must be between 1 and 5 validated entries. Combined total with Q4 and Q5 must be between 8 and 15.",
+    guidance: "Select 1 to 5 validated locations using the search field. For optimal SEO performance, we strongly recommend choosing specific cities or towns rather than states or countries. Each validated location will count toward your total selection balance. Continents are not allowed. Must be between 1 and 5 validated entries. Combined total with Q3, Q4, and Q5 must be between 8 and 15.",
     type: "multi_text",
     limits: { min: 1, max: 5 },
     isSpanQuestion: true,
@@ -515,7 +516,7 @@ export const QUESTIONS = [
     section: "About Your Target Clients",
     title: "Is there any additional information or requests that would help us write the content for your website?",
     why: "This final question captures details that may not fit neatly into other categories—such as special requirements, unique offerings, website restrictions, brand elements, or internal goals.",
-    guidance: "This question is specifically about content, **not design** preferences.\n\nShare any additional context, requirements, preferences, or business nuances you want reflected in the project. If anything from your current website must be preserved or avoided, include that information here.",
+    guidance: "This question is specifically about content, **not design** preferences.",
     type: "textarea",
     examples: { shortAnswer: "Please avoid using stock photos that resemble call centers. We prefer actual team imagery whenever possible." }
   }
