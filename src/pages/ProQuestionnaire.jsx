@@ -496,6 +496,7 @@ export default function ProQuestionnaire() {
             <TextareaQuestion 
               {...commonProps} 
               questionContext={`Question ${question.id}: ${question.title}`}
+              questionId={question.id}
             />
           </>
         );
