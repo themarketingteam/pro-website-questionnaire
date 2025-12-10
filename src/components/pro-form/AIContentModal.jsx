@@ -34,6 +34,32 @@ export default function AIContentModal({
     return hasMultipleQuestions && hasQuestionPrompts && isShort;
   };
 
+  // Helper to gather form context
+  const getFormContext = () => {
+    try {
+      const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+        const [key, value] = cookie.trim().split('=');
+        acc[key] = value;
+        return acc;
+      }, {});
+      
+      if (cookies['pro_questionnaire_responses']) {
+        const responses = JSON.parse(decodeURIComponent(cookies['pro_questionnaire_responses']));
+        return {
+          service_offerings: responses['3'] || [],
+          target_industries: responses['4'] || [],
+          additional_pages_list: responses['1.1'] || '',
+          company_description: responses['6'] || '',
+          ideal_client: responses['22'] || '',
+          client_size: responses['17'] || ''
+        };
+      }
+    } catch (e) {
+      console.error('Failed to parse form context:', e);
+    }
+    return {};
+  };
+
   const handleGenerate = async () => {
     if (!userInstruction.trim()) {
       toast.error('Please enter instructions');
@@ -42,29 +68,53 @@ export default function AIContentModal({
 
     setIsGenerating(true);
     setAiQuestions('');
+    let accumulatedContent = '';
     
     try {
-      const response = await base44.functions.invoke('generateAIContent', {
+      const formContext = getFormContext();
+      const response = await base44.functions.invoke('generateAIContentOpenAI', {
         userInstruction,
         questionContext,
-        draftContent
+        draftContent,
+        formContext
       });
 
-      if (response.data.error) {
-        throw new Error(response.data.error);
+      const reader = response.data.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          
+          const data = JSON.parse(line);
+          
+          if (data.error) {
+            throw new Error(data.error);
+          }
+          
+          if (data.content) {
+            accumulatedContent = data.content;
+            setDraftContent(data.content);
+          }
+          
+          if (data.done) {
+            if (data.isQuestions) {
+              setAiQuestions(accumulatedContent);
+              setDraftContent('');
+            }
+            setUserInstruction('');
+            toast.success('Content generated!');
+          }
+        }
       }
-
-      const { content, isQuestions } = response.data;
-
-      if (isQuestions) {
-        setAiQuestions(content);
-      } else {
-        setDraftContent(content);
-        setAiQuestions('');
-      }
-
-      setUserInstruction('');
-      toast.success('Content generated!');
     } catch (error) {
       console.error('❌ Generation error:', error);
       toast.error(error.message || 'Failed to generate content.');
