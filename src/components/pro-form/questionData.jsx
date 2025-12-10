@@ -353,7 +353,7 @@ export const QUESTIONS = [
     type: "checkbox",
     options: COMPANY_GOALS_OPTIONS,
     showOther: true,
-    limits: { max: 3 },
+    limits: { min: 1, max: 3 },
     examples: { selections: ["Increase recurring revenue", "Modernize marketing and brand image", "Improve client retention"] }
   },
   {
@@ -424,7 +424,7 @@ export const QUESTIONS = [
     type: "checkbox",
     options: WEBSITE_OBJECTIVES_OPTIONS,
     showOther: true,
-    limits: { max: 3 },
+    limits: { min: 1, max: 3 },
     examples: { selections: ["Generate qualified leads", "Strengthen credibility and authority", "Educate and build trust"] }
   },
   // Section: About Your Target Clients
@@ -457,7 +457,7 @@ export const QUESTIONS = [
     type: "checkbox",
     options: CLIENT_PROBLEMS_OPTIONS,
     showOther: true,
-    limits: { max: 3 },
+    limits: { min: 1, max: 3 },
     examples: { selections: ["Frequent downtime or outages", "Security incidents or data loss", "Lack of IT strategy or planning"] }
   },
   {
@@ -478,7 +478,7 @@ export const QUESTIONS = [
     type: "checkbox",
     options: CLIENT_OUTCOMES_OPTIONS,
     showOther: true,
-    limits: { max: 3 },
+    limits: { min: 1, max: 3 },
     examples: { selections: ["Reliable systems and less downtime", "Stronger cybersecurity posture", "Predictable monthly costs"] }
   },
   {
