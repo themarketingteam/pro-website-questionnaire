@@ -28,22 +28,11 @@ Deno.serve(async (req) => {
 
     console.log('📤 [Backend] Sending prompt to agent...');
 
-    // Send message via direct HTTP call since SDK addMessage has issues in backend
+    // Send message using SDK service role
     console.log('📤 [Backend] Sending message to agent...');
-    
-    const appId = Deno.env.get('BASE44_APP_ID');
-    const serviceRoleKey = Deno.env.get('BASE44_SERVICE_ROLE_KEY');
-    
-    await fetch(`https://base44.app/api/apps/${appId}/agents/conversations/${conversation.id}/messages`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${serviceRoleKey}`
-      },
-      body: JSON.stringify({
-        role: 'user',
-        content: prompt
-      })
+    await base44.asServiceRole.agents.addMessage(conversation.id, {
+      role: 'user',
+      content: prompt
     });
 
     // Poll for response since websocket subscriptions don't work in backend
