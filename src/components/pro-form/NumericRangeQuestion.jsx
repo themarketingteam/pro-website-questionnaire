@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Lock } from 'lucide-react';
+import { Lock, AlertCircle } from 'lucide-react';
 
 export default function NumericRangeQuestion({
   minValue = 1,
@@ -12,6 +12,7 @@ export default function NumericRangeQuestion({
   const [smallestInput, setSmallestInput] = useState(minValue.toString());
   const [largestInput, setLargestInput] = useState(maxValue.toString());
   const [isLocked, setIsLocked] = useState(false);
+  const [validationError, setValidationError] = useState('');
   const smallestTimerRef = useRef(null);
   const largestTimerRef = useRef(null);
 
@@ -50,6 +51,7 @@ export default function NumericRangeQuestion({
     const value = e.target.value;
     setSmallestInput(value);
     setIsLocked(false);
+    setValidationError('');
 
     // Clear any existing timer
     if (smallestTimerRef.current) {
@@ -76,6 +78,7 @@ export default function NumericRangeQuestion({
     const value = e.target.value;
     setLargestInput(value);
     setIsLocked(false);
+    setValidationError('');
 
     // Clear any existing timer
     if (largestTimerRef.current) {
@@ -103,6 +106,13 @@ export default function NumericRangeQuestion({
   };
 
   const handleLockIn = () => {
+    // Validate that largest is not smaller than smallest
+    if (largest <= 1000 && largest < smallest) {
+      setValidationError('The largest company size must be greater than or equal to the smallest company size.');
+      return;
+    }
+    
+    setValidationError('');
     const largestDisplay = largest > 1000 ? "1000+" : largest;
     const formattedValue = `${smallest}-${largestDisplay} employees`;
     onChange(formattedValue);
@@ -145,6 +155,13 @@ export default function NumericRangeQuestion({
         <span className="text-sm text-slate-600 mt-7">employees</span>
       </div>
       
+      {validationError && (
+        <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <span className="text-sm text-red-800">{validationError}</span>
+        </div>
+      )}
+
       <div className="flex items-center gap-3">
         <div className="flex-1 bg-[#E8F3FC] border border-[#1C82DE] rounded p-3">
           <span className="text-sm font-medium text-[#003865]">
