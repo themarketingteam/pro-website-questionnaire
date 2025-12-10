@@ -189,7 +189,7 @@ export default function MultiCertificationQuestion({ value = [], onChange, max =
                 </button>
               </div>
             ) : (
-              <label className="flex flex-col items-center justify-center w-full py-8 border-2 border-dashed border-slate-300 rounded cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors">
+              <label className="flex flex-col items-center justify-center w-full py-4 border-2 border-dashed border-slate-300 rounded cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors">
                 <div className="flex flex-col items-center">
                   {uploading[`${index}-image`] ? (
                     <>
@@ -198,7 +198,7 @@ export default function MultiCertificationQuestion({ value = [], onChange, max =
                     </>
                   ) : (
                     <>
-                      <Image className="w-6 h-6 text-slate-400 mb-2" />
+                      <Image className="w-5 h-5 text-slate-400 mb-1" />
                       <span className="text-sm text-slate-600">Click to upload image</span>
                     </>
                   )}
@@ -242,7 +242,7 @@ export default function MultiCertificationQuestion({ value = [], onChange, max =
               </div>
             )}
 
-            <label className="flex flex-col items-center justify-center w-full py-8 border-2 border-dashed border-slate-300 rounded cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors">
+            <label className="flex flex-col items-center justify-center w-full py-4 border-2 border-dashed border-slate-300 rounded cursor-pointer hover:border-slate-400 hover:bg-slate-50 transition-colors">
               <div className="flex flex-col items-center">
                 {uploading[`${index}-files`] ? (
                   <>
@@ -251,7 +251,7 @@ export default function MultiCertificationQuestion({ value = [], onChange, max =
                   </>
                 ) : (
                   <>
-                    <Upload className="w-6 h-6 text-slate-400 mb-2" />
+                    <Upload className="w-5 h-5 text-slate-400 mb-1" />
                     <span className="text-sm text-slate-600">Click to upload file</span>
                   </>
                 )}
