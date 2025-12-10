@@ -1,24 +1,40 @@
 import React, { useState } from 'react';
-import { Plus, X, Upload, FileText, Image } from 'lucide-react';
+import { Plus, X, Upload, FileText, Image, Check, Edit2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 
 export default function MultiCertificationQuestion({ value = [], onChange, max = 10 }) {
   const [uploading, setUploading] = useState({});
+  const [expandedIndex, setExpandedIndex] = useState(null);
 
   const addNewItem = () => {
     if (value.length >= max) return;
-    onChange([...value, { name: '', type: '', image: null, files: [] }]);
+    const newItem = { name: '', type: '', image: null, files: [], saved: false };
+    onChange([...value, newItem]);
+    setExpandedIndex(value.length);
   };
 
   const removeItem = (index) => {
     onChange(value.filter((_, i) => i !== index));
+    if (expandedIndex === index) setExpandedIndex(null);
   };
 
   const updateItem = (index, field, fieldValue) => {
     const updated = [...value];
-    updated[index] = { ...updated[index], [field]: fieldValue };
+    updated[index] = { ...updated[index], [field]: fieldValue, saved: false };
     onChange(updated);
+  };
+
+  const saveItem = (index) => {
+    if (!isItemComplete(value[index])) {
+      toast.error('Please complete required fields');
+      return;
+    }
+    const updated = [...value];
+    updated[index] = { ...updated[index], saved: true };
+    onChange(updated);
+    setExpandedIndex(null);
+    toast.success('Item saved');
   };
 
   const handleFileUpload = async (index, field, file) => {
@@ -56,18 +72,58 @@ export default function MultiCertificationQuestion({ value = [], onChange, max =
 
   return (
     <div className="space-y-4">
-      {value.map((item, index) => (
-        <div key={index} className="border-2 border-[#C1C6C8] rounded-lg p-6 space-y-4 bg-white">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-semibold text-[#122947]">Item {index + 1}</span>
-            <button
-              type="button"
-              onClick={() => removeItem(index)}
-              className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-600"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+      {value.map((item, index) => {
+        const isExpanded = expandedIndex === index || !item.saved;
+        
+        return (
+          <div key={index} className={`border-2 rounded-lg bg-white transition-all ${
+            item.saved ? 'border-green-500 bg-green-50' : 'border-[#C1C6C8]'
+          }`}>
+            {/* Collapsed View */}
+            {item.saved && !isExpanded && (
+              <div className="p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                    <Check className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-[#122947]">{item.name}</p>
+                    <p className="text-sm text-[#566C75] capitalize">{item.type}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedIndex(index)}
+                    className="px-4 py-2 bg-white border border-green-300 hover:bg-green-100 rounded-lg flex items-center gap-2 text-green-800 transition-colors"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(index)}
+                    className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-600"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Expanded View */}
+            {isExpanded && (
+              <div className="p-6 space-y-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-semibold text-[#122947]">Item {index + 1}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(index)}
+                    className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-600"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
 
           {/* Name */}
           <div>
@@ -203,21 +259,39 @@ export default function MultiCertificationQuestion({ value = [], onChange, max =
             </label>
           </div>
 
-          {!isItemComplete(item) && (
-            <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded p-2">
-              Please complete required fields (Name and Type) before adding another item.
-            </div>
-          )}
-        </div>
-      ))}
+                {!isItemComplete(item) && (
+                  <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded p-2">
+                    Please complete required fields (Name and Type) before saving.
+                  </div>
+                )}
+
+                {/* Save Item Button */}
+                <button
+                  type="button"
+                  onClick={() => saveItem(index)}
+                  disabled={!isItemComplete(item)}
+                  className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+                    isItemComplete(item)
+                      ? 'bg-green-600 hover:bg-green-700 text-white'
+                      : 'bg-[#C1C6C8] text-[#566C75] cursor-not-allowed'
+                  }`}
+                >
+                  <Check className="w-5 h-5" />
+                  Save Item
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {value.length < max && (
         <button
           type="button"
           onClick={addNewItem}
-          disabled={value.length > 0 && !isItemComplete(value[value.length - 1])}
+          disabled={value.length > 0 && !value[value.length - 1].saved}
           className={`w-full py-4 border-2 border-dashed rounded-lg flex items-center justify-center gap-2 transition-all ${
-            value.length > 0 && !isItemComplete(value[value.length - 1])
+            value.length > 0 && !value[value.length - 1].saved
               ? 'border-[#C1C6C8] text-[#A9AAAC] cursor-not-allowed'
               : 'border-[#1C82DE] text-[#1C82DE] hover:bg-blue-50 cursor-pointer'
           }`}

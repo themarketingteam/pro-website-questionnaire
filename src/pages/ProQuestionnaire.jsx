@@ -216,13 +216,9 @@ export default function ProQuestionnaire() {
 
       case 'multi_certification': {
         const items = Array.isArray(answer) ? answer : [];
-        const validItems = items.filter(item => 
-          item.name?.trim() && 
-          item.type && 
-          (item.image?.url || true)
-        );
+        const savedItems = items.filter(item => item.saved === true);
         const min = question.limits?.min || 0;
-        return validItems.length >= min;
+        return savedItems.length >= min;
       }
 
           case 'image_tagging':
