@@ -537,8 +537,19 @@ export const QUESTIONS = [
     section: "About Your Target Clients",
     title: "Is there any additional information or requests that would help us write the content for your website?",
     why: "This final question captures details that may not fit neatly into other categories—such as special requirements, unique offerings, website restrictions, brand elements, or internal goals.",
-    guidance: "This question is specifically about content, **not design** preferences.",
-    type: "textarea",
-    examples: { shortAnswer: "Please avoid using stock photos that resemble call centers. We prefer actual team imagery whenever possible." }
+    guidance: "Select 'Yes' if you have additional content instructions or information that would help us write better website copy. Select 'No' if you've covered everything.",
+    type: "yes_no",
+    examples: { yes: "Yes, I have additional content instructions.", no: "No, I've covered everything." },
+    conditionalChildren: [
+      {
+        id: "25.1",
+        title: "Please share your additional content instructions.",
+        why: "This helps us capture any special requirements, unique offerings, or content preferences that will improve the quality of your website copy.",
+        guidance: "Share any additional information about your business, special requirements, unique offerings, brand voice preferences, or content restrictions. This question is specifically about content, not design preferences.",
+        type: "textarea",
+        requiredIfParentYes: false,
+        examples: { shortAnswer: "Please avoid using stock photos that resemble call centers. We prefer actual team imagery whenever possible." }
+      }
+    ]
   }
 ];
