@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { base44 } from '@/api/base44Client';
-import { Sparkles, Loader2, CheckCircle } from 'lucide-react';
+import { Sparkles, Loader2, CheckCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function AIContentModal({ 
@@ -18,6 +18,7 @@ export default function AIContentModal({
   const [draftContent, setDraftContent] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCheckingGrammar, setIsCheckingGrammar] = useState(false);
+  const [aiQuestions, setAiQuestions] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -185,6 +186,22 @@ export default function AIContentModal({
               className="w-full"
             />
           </div>
+
+          {/* AI's Questions */}
+          {aiQuestions && (
+            <div className="space-y-2 p-4 bg-purple-50 border border-purple-200 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Info className="w-4 h-4 text-purple-600" />
+                <label className="text-sm font-semibold text-purple-900">AI's Questions</label>
+              </div>
+              <div className="text-sm text-purple-800 whitespace-pre-wrap leading-relaxed">
+                {aiQuestions}
+              </div>
+              <p className="text-xs text-purple-600 italic mt-2">
+                Answer these questions in the Draft Content field below, then click Generate again.
+              </p>
+            </div>
+          )}
 
           {/* Draft Content */}
           <div>
