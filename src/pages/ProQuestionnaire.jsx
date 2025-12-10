@@ -183,7 +183,18 @@ export default function ProQuestionnaire() {
         // If answer is "yes" and has conditional children, check those too
         if (hasValidAnswer && answer === 'yes' && question.conditionalChildren) {
           const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
-          const allChildrenComplete = requiredChildren.every(child => isQuestionComplete(child.id));
+          const allChildrenComplete = requiredChildren.every(child => {
+            const childQuestion = QUESTIONS.find(q => q.id === child.id);
+            if (!childQuestion) return false;
+
+            // Check if child has a valid answer regardless of touched status
+            const childAnswer = responses[child.id];
+            if (childQuestion.type === 'textarea') {
+              return childAnswer && childAnswer.trim().length > 0;
+            }
+            // For other types, use the standard validation
+            return isQuestionComplete(child.id);
+          });
           return allChildrenComplete;
         }
         return hasValidAnswer;
