@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { base44 } from '@/api/base44Client';
 import { Sparkles, Loader2, CheckCircle } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function AIContentModal({ 
   open, 
@@ -28,26 +29,27 @@ export default function AIContentModal({
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
-      // Create a conversation with the MSP Content Strategist agent
       const conversation = await base44.agents.createConversation({
         agent_name: 'msp_content_strategist',
         metadata: { source: 'pro_questionnaire' }
       });
 
-      // Construct the message with context
       const message = `Question Context: ${questionContext}\n\nUser Instruction: ${userInstruction}\n\nCurrent Draft:\n${draftContent || '(empty)'}`;
 
-      // Add message and wait for response
       await base44.agents.addMessage(conversation, {
         role: 'user',
         content: message
       });
 
-      // Subscribe to get the response
-      await new Promise((resolve) => {
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Response timeout'));
+        }, 60000); // 60 second timeout
+
         const unsubscribe = base44.agents.subscribeToConversation(conversation.id, (data) => {
           const lastMessage = data.messages[data.messages.length - 1];
           if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.streaming) {
+            clearTimeout(timeout);
             setDraftContent(lastMessage.content);
             setUserInstruction('');
             unsubscribe();
@@ -55,9 +57,11 @@ export default function AIContentModal({
           }
         });
       });
+
+      toast.success('Content generated successfully!');
     } catch (error) {
       console.error('Failed to generate content:', error);
-      alert('Failed to generate content. Please try again.');
+      toast.error('Failed to generate content. Please try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -78,19 +82,26 @@ export default function AIContentModal({
         content: message
       });
 
-      await new Promise((resolve) => {
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Response timeout'));
+        }, 60000);
+
         const unsubscribe = base44.agents.subscribeToConversation(conversation.id, (data) => {
           const lastMessage = data.messages[data.messages.length - 1];
           if (lastMessage && lastMessage.role === 'assistant' && !lastMessage.streaming) {
+            clearTimeout(timeout);
             setDraftContent(lastMessage.content);
             unsubscribe();
             resolve();
           }
         });
       });
+
+      toast.success('Grammar check complete!');
     } catch (error) {
       console.error('Failed to check grammar:', error);
-      alert('Failed to check grammar. Please try again.');
+      toast.error('Failed to check grammar. Please try again.');
     } finally {
       setIsCheckingGrammar(false);
     }
