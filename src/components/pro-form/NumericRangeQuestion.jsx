@@ -27,7 +27,7 @@ export default function NumericRangeQuestion({
         setSmallestInput(min.toString());
         
         if (maxStr.includes('+')) {
-          setLargest(1001);
+          setLargest(5001);
           setLargestInput('');
         } else {
           const max = parseInt(maxStr, 10);
@@ -98,8 +98,8 @@ export default function NumericRangeQuestion({
       const parsed = parseInt(value, 10);
       if (!isNaN(parsed)) {
         const clamped = Math.max(1, parsed);
-        if (clamped > 1000) {
-          setLargest(1001);
+        if (clamped > 5000) {
+          setLargest(5001);
         } else {
           setLargest(clamped);
         }
@@ -109,19 +109,19 @@ export default function NumericRangeQuestion({
 
   const handleLockIn = () => {
     // Validate that largest is not smaller than smallest
-    if (largest <= 1000 && largest < smallest) {
+    if (largest <= 5000 && largest < smallest) {
       setValidationError('The largest company size must be greater than or equal to the smallest company size.');
       return;
     }
     
     setValidationError('');
-    const largestDisplay = largest > 1000 ? "1000+" : largest;
+    const largestDisplay = largest > 5000 ? "5000+" : largest;
     const formattedValue = `${smallest}-${largestDisplay} employees`;
     onChange(formattedValue);
     setIsLocked(true);
   };
 
-  const largestDisplay = largest > 1000 ? "1000+" : largest;
+  const largestDisplay = largest > 5000 ? "5000+" : largest;
 
   return (
     <div className="space-y-4">
@@ -147,8 +147,8 @@ export default function NumericRangeQuestion({
           </label>
           <input
             type="text"
-            placeholder="1000+"
-            value={largest > 1000 ? '' : largestInput}
+            placeholder="5000+"
+            value={largest > 5000 ? '' : largestInput}
             onChange={handleLargestChange}
             className="w-full p-3 border border-[#C1C6C8] rounded focus:outline-none focus:ring-2 focus:ring-[#1C82DE] focus:border-transparent"
           />
