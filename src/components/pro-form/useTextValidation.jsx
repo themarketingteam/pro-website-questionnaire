@@ -127,7 +127,9 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
     // Check for spam patterns (for other questions)
     const spamDetected = detectSpam(text);
     if (spamDetected) {
-      const spamMessage = qId === '2.1' 
+      const spamMessage = qId === '9'
+        ? 'Please enter a valid description.'
+        : qId === '2.1' 
         ? 'Please enter a valid team description.'
         : qId === '1.1'
         ? 'Please provide a detailed description without repetition.'
@@ -143,7 +145,9 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
 
     // Check character count thresholds
     if (charCount < rules.errorThreshold) {
-      const errorMessage = qId === '2.1'
+      const errorMessage = qId === '9'
+        ? 'Please provide more detail. A solid description of your local differentiators requires at least 100 characters.'
+        : qId === '2.1'
         ? 'This introduction is too short. Please add at least one full sentence about your team\'s experience or focus.'
         : qId === '1.1'
         ? 'Please provide a detailed description (minimum 100 characters) without repetition.'
@@ -155,7 +159,9 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
         charCount
       });
     } else if (charCount < rules.warningThreshold) {
-      const warningMessage = qId === '2.1'
+      const warningMessage = qId === '9'
+        ? 'Your answer is a bit short. Detailed differentiators help us write better website copy. Aim for 200+ characters if possible.'
+        : qId === '2.1'
         ? 'This answer will work, but it\'s a bit brief. A great team intro usually highlights experience levels or certifications. Aim for 150+ characters.'
         : qId === '1.1'
         ? 'This answer is valid but short. For the best website copy, we recommend adding 2-3 specific examples of why clients choose you.'
@@ -184,6 +190,7 @@ function getValidationRules(questionId) {
     '1.1': { errorThreshold: 100, warningThreshold: 200 },
     '2.1': { errorThreshold: 50, warningThreshold: 150 },
     '6': { errorThreshold: 30, warningThreshold: 151, maxThreshold: 350 },
+    '9': { errorThreshold: 100, warningThreshold: 200 },
     '9': { errorThreshold: 100, warningThreshold: 200 },
     '13': { errorThreshold: 50, warningThreshold: 100 },
     '14': { errorThreshold: 30, warningThreshold: 75 },
