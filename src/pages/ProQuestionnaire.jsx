@@ -486,7 +486,16 @@ export default function ProQuestionnaire() {
         );
       
       case 'textarea':
-        return <TextareaQuestion {...commonProps} />;
+        return (
+          <>
+            {question.id === '25' && (
+              <div className="text-[#566C75] italic text-[15px] leading-relaxed mb-4">
+                This question is specifically about content, <strong>not design</strong> preferences.
+              </div>
+            )}
+            <TextareaQuestion {...commonProps} />
+          </>
+        );
       
       case 'multi_text':
         // Question 5 uses geographic validation
