@@ -609,6 +609,7 @@ export default function ProQuestionnaire() {
             hasAnswer={!!responses[child.id] || !!responses[`${child.id}_other`]}
             isComplete={isQuestionComplete(child.id)}
             wasTouched={touchedQuestions[child.id]}
+            isSubQuestion={true}
           >
             {renderQuestion(child)}
           </QuestionWrapper>
