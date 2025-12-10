@@ -27,46 +27,37 @@ export default function AIContentModal({
   }, [open, currentValue]);
 
   const handleGenerate = async () => {
+    if (!userInstruction.trim()) {
+      toast.error('Please enter instructions');
+      return;
+    }
+
     setIsGenerating(true);
     try {
-      console.log('Creating conversation...');
       const conversation = await base44.agents.createConversation({
         agent_name: 'msp_content_strategist',
         metadata: { source: 'pro_questionnaire' }
       });
-      console.log('Conversation created:', conversation.id);
 
       const prompt = draftContent 
         ? `${questionContext}\n\n${userInstruction}\n\nCurrent text:\n${draftContent}`
         : `${questionContext}\n\n${userInstruction}`;
 
-      console.log('Sending message:', prompt);
-      await base44.agents.addMessage(conversation, {
-        role: 'user',
-        content: prompt
-      });
-
+      // Subscribe BEFORE sending message to catch all updates
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-          console.error('Timeout reached');
-          reject(new Error('Response timeout after 60 seconds'));
-        }, 60000);
+          reject(new Error('Response timeout'));
+        }, 45000);
 
-        console.log('Subscribing to conversation...');
         const unsubscribe = base44.agents.subscribeToConversation(conversation.id, (data) => {
-          console.log('Subscription update:', data);
           const messages = data.messages || [];
           const lastMessage = messages[messages.length - 1];
           
-          console.log('Last message:', lastMessage);
-          
           if (lastMessage?.role === 'assistant') {
             const content = lastMessage.content || '';
-            console.log('Assistant content:', content, 'Streaming:', lastMessage.streaming);
             setDraftContent(content);
             
             if (lastMessage.streaming === false) {
-              console.log('Stream complete, resolving');
               clearTimeout(timeout);
               setUserInstruction('');
               unsubscribe();
@@ -74,6 +65,12 @@ export default function AIContentModal({
             }
           }
         });
+
+        // Send message after subscription is set up
+        base44.agents.addMessage(conversation, {
+          role: 'user',
+          content: prompt
+        }).catch(reject);
       });
 
       toast.success('Content generated!');
@@ -86,6 +83,11 @@ export default function AIContentModal({
   };
 
   const handleGrammarCheck = async () => {
+    if (!draftContent.trim()) {
+      toast.error('No content to check');
+      return;
+    }
+
     setIsCheckingGrammar(true);
     try {
       const conversation = await base44.agents.createConversation({
@@ -93,24 +95,18 @@ export default function AIContentModal({
         metadata: { source: 'pro_questionnaire_grammar' }
       });
 
-      await base44.agents.addMessage(conversation, {
-        role: 'user',
-        content: `Fix grammar and spelling only. Return the corrected text:\n\n${draftContent}`
-      });
-
       await new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
           reject(new Error('Response timeout'));
-        }, 60000);
+        }, 45000);
 
-        let lastContent = '';
         const unsubscribe = base44.agents.subscribeToConversation(conversation.id, (data) => {
           const messages = data.messages || [];
           const lastMessage = messages[messages.length - 1];
           
           if (lastMessage?.role === 'assistant') {
-            lastContent = lastMessage.content || '';
-            setDraftContent(lastContent);
+            const content = lastMessage.content || '';
+            setDraftContent(content);
             
             if (lastMessage.streaming === false) {
               clearTimeout(timeout);
@@ -119,6 +115,11 @@ export default function AIContentModal({
             }
           }
         });
+
+        base44.agents.addMessage(conversation, {
+          role: 'user',
+          content: `Fix grammar and spelling only. Return the corrected text:\n\n${draftContent}`
+        }).catch(reject);
       });
 
       toast.success('Grammar checked!');
