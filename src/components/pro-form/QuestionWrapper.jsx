@@ -39,21 +39,25 @@ export default function QuestionWrapper({
           {getStatusIcon()}
         </div>
       )}
-      <div className="flex items-start">
+      <div className="flex items-start gap-2">
+        <span className="text-lg font-semibold text-[#122947] flex-shrink-0">
+          {number}.
+        </span>
         <div 
-          className={`block flex-1 ${isCollapsible ? 'cursor-pointer' : ''}`}
+          className={`flex-1 ${isCollapsible ? 'cursor-pointer' : ''}`}
           onClick={isCollapsible ? onToggle : undefined}
+          style={{ marginRight: '30px' }}
         >
           <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold text-[#122947]">
-              {number}. {title}
+            <span className="text-lg font-semibold text-[#122947] flex-1">
+              {title}
               {required && <span className="text-red-500 ml-1">*</span>}
             </span>
             
             {(guidance || why || examples) && (
               <button
                 type="button"
-                className="w-6 h-6 rounded-full border border-[#C1C6C8] hover:border-[#1C82DE] hover:bg-[#E8F3FC] flex items-center justify-center text-[#566C75] hover:text-[#1C82DE] transition-all"
+                className="w-6 h-6 rounded-full border border-[#C1C6C8] hover:border-[#1C82DE] hover:bg-[#E8F3FC] flex items-center justify-center text-[#566C75] hover:text-[#1C82DE] transition-all flex-shrink-0"
                 aria-label="More information"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -67,7 +71,7 @@ export default function QuestionWrapper({
             {onReset && hasAnswer && isExpanded && (
               <button
                 type="button"
-                className="w-6 h-6 rounded-full border border-[#C1C6C8] hover:border-red-500 hover:bg-red-50 flex items-center justify-center text-[#566C75] hover:text-red-500 transition-all"
+                className="w-6 h-6 rounded-full border border-[#C1C6C8] hover:border-red-500 hover:bg-red-50 flex items-center justify-center text-[#566C75] hover:text-red-500 transition-all flex-shrink-0"
                 aria-label="Reset question"
                 title="Clear answer"
                 onClick={(e) => {
@@ -81,9 +85,9 @@ export default function QuestionWrapper({
             
             {isCollapsible && (
               isExpanded ? (
-                <ChevronUp className="w-5 h-5 text-[#566C75] ml-auto" />
+                <ChevronUp className="w-5 h-5 text-[#566C75] flex-shrink-0" />
               ) : (
-                <ChevronDown className="w-5 h-5 text-[#566C75] ml-auto" />
+                <ChevronDown className="w-5 h-5 text-[#566C75] flex-shrink-0" />
               )
             )}
           </div>
