@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -147,6 +147,9 @@ export default function AIContentModal({
             <Sparkles className="w-5 h-5 text-purple-600" />
             AI Content Assistant
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Generate AI-powered content for your questionnaire answers
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
