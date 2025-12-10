@@ -171,12 +171,22 @@ export default function ProQuestionnaire() {
     const question = QUESTIONS.find(q => q.id === questionId);
     if (!question) return false;
 
+    // Don't show complete until question is touched
+    if (!touchedQuestions[questionId]) return false;
+
     const answer = responses[questionId];
     const otherValue = responses[`${questionId}_other`];
 
     switch (question.type) {
       case 'yes_no':
-        return answer === 'yes' || answer === 'no';
+        const hasValidAnswer = answer === 'yes' || answer === 'no';
+        // If answer is "yes" and has conditional children, check those too
+        if (hasValidAnswer && answer === 'yes' && question.conditionalChildren) {
+          const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
+          const allChildrenComplete = requiredChildren.every(child => isQuestionComplete(child.id));
+          return allChildrenComplete;
+        }
+        return hasValidAnswer;
       
       case 'checkbox': {
         const selections = Array.isArray(answer) ? answer : [];
