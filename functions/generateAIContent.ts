@@ -30,7 +30,11 @@ Deno.serve(async (req) => {
 
     // Send message and poll for response
     console.log('📤 [Backend] Sending message to agent...');
-    await base44.asServiceRole.agents.addMessage(conversation, {
+    
+    // First fetch the full conversation object before adding message
+    const fullConversation = await base44.asServiceRole.agents.getConversation(conversation.id);
+    
+    await base44.asServiceRole.agents.addMessage(fullConversation, {
       role: 'user',
       content: prompt
     });
