@@ -72,14 +72,26 @@ export default function AIContentModal({
     
     try {
       const formContext = getFormContext();
-      const response = await base44.functions.invoke('generateAIContentOpenAI', {
-        userInstruction,
-        questionContext,
-        draftContent,
-        formContext
+      
+      // Use fetch directly for streaming
+      const response = await fetch('/api/functions/generateAIContentOpenAI', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userInstruction,
+          questionContext,
+          draftContent,
+          formContext
+        })
       });
 
-      const reader = response.data.getReader();
+      if (!response.ok) {
+        throw new Error('Failed to generate content');
+      }
+
+      const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
 
