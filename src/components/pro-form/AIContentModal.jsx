@@ -98,10 +98,13 @@ export default function AIContentModal({
         console.log('🌐 XHR request opened');
         
         let buffer = '';
+        let processedLength = 0;
         
-        xhr.onprogress = () => {
-          const newData = xhr.responseText.substring(buffer.length);
-          buffer = xhr.responseText;
+        const processResponse = (fullText) => {
+          const newData = fullText.substring(processedLength);
+          processedLength = fullText.length;
+          
+          if (!newData) return;
           
           console.log('📥 Received chunk:', newData);
           
@@ -140,8 +143,26 @@ export default function AIContentModal({
           }
         };
         
+        xhr.onreadystatechange = () => {
+          console.log('🔄 Ready state changed:', xhr.readyState);
+          if (xhr.readyState === 3 || xhr.readyState === 4) {
+            // readyState 3 = LOADING, 4 = DONE
+            processResponse(xhr.responseText);
+          }
+        };
+        
+        xhr.onprogress = () => {
+          console.log('📡 Progress event fired');
+          processResponse(xhr.responseText);
+        };
+        
         xhr.onload = () => {
           console.log('✅ XHR load complete, status:', xhr.status);
+          console.log('📄 Final response text:', xhr.responseText);
+          
+          // Process any remaining data
+          processResponse(xhr.responseText);
+          
           setIsGenerating(false);
           resolve();
         };
