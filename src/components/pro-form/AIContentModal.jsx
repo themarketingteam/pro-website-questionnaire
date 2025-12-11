@@ -123,17 +123,28 @@ export default function AIContentModal({
               
               if (data.content) {
                 accumulatedContent = data.content;
-                setDraftContent(data.content);
                 console.log('✍️ Content updated, length:', data.content.length);
+                
+                // Parse response based on prefix
+                if (data.content.startsWith('Need More Information: ')) {
+                  const questions = data.content.replace('Need More Information: ', '');
+                  setAiQuestions(questions);
+                  setDraftContent('');
+                  console.log('❓ Questions extracted:', questions);
+                } else if (data.content.startsWith('Response: ')) {
+                  const response = data.content.replace('Response: ', '');
+                  setDraftContent(response);
+                  setAiQuestions('');
+                  console.log('📝 Response content set');
+                } else {
+                  // Fallback: if no prefix, treat as response
+                  setDraftContent(data.content);
+                  setAiQuestions('');
+                }
               }
               
               if (data.done) {
                 console.log('✅ Generation complete');
-                if (data.isQuestions) {
-                  console.log('❓ Response identified as questions');
-                  setAiQuestions(accumulatedContent);
-                  setDraftContent('');
-                }
                 setUserInstruction('');
                 toast.success('Content generated!');
               }
