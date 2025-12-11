@@ -61,10 +61,17 @@ export default function AIContentModal({
   };
 
   const handleGenerate = async () => {
+    console.log('🚀 GENERATE BUTTON CLICKED');
+    
     if (!userInstruction.trim()) {
+      console.log('❌ No user instruction');
       toast.error('Please enter instructions');
       return;
     }
+
+    console.log('✅ User instruction:', userInstruction);
+    console.log('📝 Question context:', questionContext);
+    console.log('📄 Draft content:', draftContent);
 
     setIsGenerating(true);
     setAiQuestions('');
@@ -72,65 +79,96 @@ export default function AIContentModal({
     
     try {
       const formContext = getFormContext();
+      console.log('🔍 Form context gathered:', formContext);
       
-      // Use fetch directly for streaming
-      const response = await fetch('/api/functions/generateAIContentOpenAI', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userInstruction,
-          questionContext,
-          draftContent,
-          formContext
-        })
-      });
+      const payload = {
+        userInstruction,
+        questionContext,
+        draftContent,
+        formContext
+      };
+      console.log('📦 Full payload:', JSON.stringify(payload, null, 2));
 
-      if (!response.ok) {
-        throw new Error('Failed to generate content');
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-
-        for (const line of lines) {
-          if (!line.trim()) continue;
+      // Use XMLHttpRequest (Ajax) for streaming
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/functions/generateAIContentOpenAI', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        
+        console.log('🌐 XHR request opened');
+        
+        let buffer = '';
+        
+        xhr.onprogress = () => {
+          const newData = xhr.responseText.substring(buffer.length);
+          buffer = xhr.responseText;
           
-          const data = JSON.parse(line);
+          console.log('📥 Received chunk:', newData);
           
-          if (data.error) {
-            throw new Error(data.error);
-          }
-          
-          if (data.content) {
-            accumulatedContent = data.content;
-            setDraftContent(data.content);
-          }
-          
-          if (data.done) {
-            if (data.isQuestions) {
-              setAiQuestions(accumulatedContent);
-              setDraftContent('');
+          const lines = newData.split('\n');
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            
+            try {
+              const data = JSON.parse(line);
+              console.log('📊 Parsed data:', data);
+              
+              if (data.error) {
+                console.error('❌ Error in data:', data.error);
+                throw new Error(data.error);
+              }
+              
+              if (data.content) {
+                accumulatedContent = data.content;
+                setDraftContent(data.content);
+                console.log('✍️ Content updated, length:', data.content.length);
+              }
+              
+              if (data.done) {
+                console.log('✅ Generation complete');
+                if (data.isQuestions) {
+                  console.log('❓ Response identified as questions');
+                  setAiQuestions(accumulatedContent);
+                  setDraftContent('');
+                }
+                setUserInstruction('');
+                toast.success('Content generated!');
+              }
+            } catch (e) {
+              console.error('❌ Parse error:', e, 'Line:', line);
             }
-            setUserInstruction('');
-            toast.success('Content generated!');
           }
-        }
-      }
+        };
+        
+        xhr.onload = () => {
+          console.log('✅ XHR load complete, status:', xhr.status);
+          setIsGenerating(false);
+          resolve();
+        };
+        
+        xhr.onerror = (e) => {
+          console.error('❌ XHR error:', e);
+          toast.error('Network error occurred');
+          setIsGenerating(false);
+          reject(e);
+        };
+        
+        xhr.ontimeout = () => {
+          console.error('⏰ XHR timeout');
+          toast.error('Request timed out');
+          setIsGenerating(false);
+          reject(new Error('Timeout'));
+        };
+        
+        console.log('📤 Sending request...');
+        xhr.send(JSON.stringify(payload));
+        console.log('📤 Request sent!');
+      });
+      
     } catch (error) {
       console.error('❌ Generation error:', error);
+      console.error('❌ Error stack:', error.stack);
       toast.error(error.message || 'Failed to generate content.');
-    } finally {
       setIsGenerating(false);
     }
   };
