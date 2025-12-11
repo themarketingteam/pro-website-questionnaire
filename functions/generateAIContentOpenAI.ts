@@ -31,6 +31,8 @@ Deno.serve(async (req) => {
       })
     });
     const thread = await threadResponse.json();
+    console.log('🧵 Thread ID:', thread.id);
+    console.log('📝 Full Thread Response:', JSON.stringify(thread, null, 2));
 
     // Create a run with streaming
     const runResponse = await fetch(`https://api.openai.com/v1/threads/${thread.id}/runs`, {
@@ -45,6 +47,8 @@ Deno.serve(async (req) => {
         stream: true
       })
     });
+    console.log('🏃 Run created for thread:', thread.id);
+    console.log('🤖 Assistant ID:', assistantId);
 
     // Stream the response
     const stream = new ReadableStream({
