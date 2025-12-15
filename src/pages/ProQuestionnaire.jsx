@@ -335,11 +335,16 @@ export default function ProQuestionnaire() {
   const toggleQuestion = (questionId) => {
     setExpandedQuestions(prev => {
       const newState = { ...prev, [questionId]: !prev[questionId] };
-      // If expanding, mark as touched and set validation status to incomplete if empty
+      // If expanding, mark as touched and set validation status
       if (!prev[questionId]) {
         setTouchedQuestions(t => ({ ...t, [questionId]: true }));
         setValidationStatus(v => {
           if (v[questionId] === '') {
+            // For Yes/No questions with default "no", set as complete
+            const yesNoQuestions = ['1', '2', '12', '14', '23', '25'];
+            if (yesNoQuestions.includes(questionId) && responses[questionId] === 'no') {
+              return { ...v, [questionId]: 'complete' };
+            }
             return { ...v, [questionId]: 'incomplete' };
           }
           return v;
