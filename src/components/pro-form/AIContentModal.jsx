@@ -73,26 +73,17 @@ export default function AIContentModal({
   };
 
   const handleGenerate = async () => {
-    console.log('🚀 GENERATE BUTTON CLICKED');
-    
     if (!userInstruction.trim()) {
-      console.log('❌ No user instruction');
       toast.error('Please enter instructions');
       return;
     }
 
-    console.log('✅ User instruction:', userInstruction);
-    console.log('📝 Question context:', questionContext);
-    console.log('📄 Draft content:', draftContent);
-
     setIsGenerating(true);
     setAiQuestions('');
-    let accumulatedContent = '';
     
     try {
       const contextData = getFormContext();
-      console.log('🔍 Form context gathered:', contextData);
-
+      
       const payload = {
         userInstruction,
         questionContext,
@@ -100,120 +91,52 @@ export default function AIContentModal({
         businessName: contextData.businessName,
         jsonData: contextData.responses
       };
-      console.log('📦 Full payload:', JSON.stringify(payload, null, 2));
 
-      // Use XMLHttpRequest (Ajax) for streaming
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', '/api/functions/generateAIContentOpenAI', true);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        
-        console.log('🌐 XHR request opened');
-        
-        let buffer = '';
-        let processedLength = 0;
-        
-        const processResponse = (fullText) => {
-          const newData = fullText.substring(processedLength);
-          processedLength = fullText.length;
-          
-          if (!newData) return;
-          
-          console.log('📥 Received chunk:', newData);
-          
-          const lines = newData.split('\n');
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            
-            try {
-              const data = JSON.parse(line);
-              console.log('📊 Parsed data:', data);
-              
-              if (data.error) {
-                console.error('❌ Error in data:', data.error);
-                throw new Error(data.error);
-              }
-              
-              if (data.content) {
-                accumulatedContent = data.content;
-                console.log('✍️ Content updated, length:', data.content.length);
-                
-                // Parse response based on prefix
-                if (data.content.startsWith('Need More Information: ')) {
-                  const questions = data.content.replace('Need More Information: ', '');
-                  setAiQuestions(questions);
-                  setDraftContent('');
-                  console.log('❓ Questions extracted:', questions);
-                } else if (data.content.startsWith('Response: ')) {
-                  const response = data.content.replace('Response: ', '');
-                  setDraftContent(response);
-                  setAiQuestions('');
-                  console.log('📝 Response content set');
-                } else {
-                  // Fallback: if no prefix, treat as response
-                  setDraftContent(data.content);
-                  setAiQuestions('');
-                }
-              }
-              
-              if (data.done) {
-                console.log('✅ Generation complete');
-                setUserInstruction('');
-                toast.success('Content generated!');
-              }
-            } catch (e) {
-              console.error('❌ Parse error:', e, 'Line:', line);
-            }
-          }
-        };
-        
-        xhr.onreadystatechange = () => {
-          console.log('🔄 Ready state changed:', xhr.readyState);
-          if (xhr.readyState === 3 || xhr.readyState === 4) {
-            // readyState 3 = LOADING, 4 = DONE
-            processResponse(xhr.responseText);
-          }
-        };
-        
-        xhr.onprogress = () => {
-          console.log('📡 Progress event fired');
-          processResponse(xhr.responseText);
-        };
-        
-        xhr.onload = () => {
-          console.log('✅ XHR load complete, status:', xhr.status);
-          console.log('📄 Final response text:', xhr.responseText);
-          
-          // Process any remaining data
-          processResponse(xhr.responseText);
-          
-          setIsGenerating(false);
-          resolve();
-        };
-        
-        xhr.onerror = (e) => {
-          console.error('❌ XHR error:', e);
-          toast.error('Network error occurred');
-          setIsGenerating(false);
-          reject(e);
-        };
-        
-        xhr.ontimeout = () => {
-          console.error('⏰ XHR timeout');
-          toast.error('Request timed out');
-          setIsGenerating(false);
-          reject(new Error('Timeout'));
-        };
-        
-        console.log('📤 Sending request...');
-        xhr.send(JSON.stringify(payload));
-        console.log('📤 Request sent!');
+      // Simple POST request (waits until backend finishes polling)
+      const response = await fetch('/api/functions/generateAIContentOpenAI', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload)
       });
+
+      if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+      }
+
+      // Get the final JSON
+      const data = await response.json();
+
+      if (data.error) throw new Error(data.error);
+
+      // Process the Final Content
+      const fullText = data.content || '';
       
+      // Check for "Need More Information" protocol
+      if (fullText.startsWith('Need More Information: ')) {
+        const questions = fullText.replace('Need More Information: ', '');
+        setAiQuestions(questions);
+        setDraftContent('');
+      } 
+      else if (fullText.startsWith('Response: ')) {
+        const cleanText = fullText.replace('Response: ', '');
+        setDraftContent(cleanText);
+        setAiQuestions('');
+      } 
+      else {
+        // Fallback
+        setDraftContent(fullText);
+        setAiQuestions('');
+      }
+      
+      setUserInstruction('');
+      toast.success('Content generated!');
+
     } catch (error) {
-      console.error('❌ Generation error:', error);
-      console.error('❌ Error stack:', error.stack);
-      toast.error(error.message || 'Failed to generate content.');
+      console.error('Generation error:', error);
+      toast.error(error.message || 'Failed to generate content');
+    } finally {
       setIsGenerating(false);
     }
   };
