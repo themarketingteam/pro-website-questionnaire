@@ -19,7 +19,8 @@ export default function QuestionWrapper({
   isComplete = false,
   wasTouched = false,
   isSubQuestion = false,
-  validationStatus = 'neutral' // 'complete', 'needs_work', 'incomplete', 'neutral'
+  validationStatus = 'neutral', // 'complete', 'needs_work', 'incomplete', 'neutral'
+  showStatusIcon = false
 }) {
   const [showModal, setShowModal] = useState(false);
 
@@ -47,7 +48,7 @@ export default function QuestionWrapper({
 
   return (
     <div id={id} className={`space-y-4 ${isExpanded ? 'my-[5%]' : 'mb-[3%]'} relative`}>
-      {!isSubQuestion && (
+      {!isSubQuestion && showStatusIcon && (
         <div className="absolute -left-[43px] top-0">
           {getStatusIcon()}
         </div>

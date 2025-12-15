@@ -183,6 +183,9 @@ export default function ProQuestionnaire() {
     saveToStorage(newResponses);
     setShowAutoSave(prev => prev + 1);
     
+    // Mark as touched when user makes a change
+    setTouchedQuestions(prev => ({ ...prev, [questionId]: true }));
+    
     // Trigger validation update
     updateQuestionValidation(questionId, value, newResponses);
   };
@@ -919,6 +922,7 @@ export default function ProQuestionnaire() {
             wasTouched={touchedQuestions[child.id]}
             isSubQuestion={true}
             validationStatus={getQuestionValidationStatus(child.id)}
+            showStatusIcon={touchedQuestions[child.id]}
           >
             {renderQuestion(child)}
           </QuestionWrapper>
@@ -987,6 +991,7 @@ export default function ProQuestionnaire() {
                               isComplete={isQuestionComplete(q.id)}
                               wasTouched={touchedQuestions[q.id]}
                               validationStatus={getQuestionValidationStatus(q.id)}
+                              showStatusIcon={touchedQuestions[q.id]}
                             >
                               {renderQuestion(q)}
                             </QuestionWrapper>
