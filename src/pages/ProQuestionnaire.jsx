@@ -337,7 +337,7 @@ export default function ProQuestionnaire() {
         const hasContent = answer && answer.trim().length > 0;
         if (!hasContent) return false;
         // Check validation state - red means failing, yellow/green means passing
-        const validationStatus = validationStates[child.id];
+        const validationStatus = validationStates[questionId];
         return validationStatus !== 'red';
       }
       
@@ -391,6 +391,42 @@ export default function ProQuestionnaire() {
               default:
                 return false;
     }
+  };
+
+  const getQuestionValidationStatus = (questionId) => {
+    const question = QUESTIONS.find(q => q.id === questionId);
+    if (question?.type === 'textarea') {
+      const validationStatus = validationStates[questionId];
+      if (validationStatus === 'green') return 'complete';
+      if (validationStatus === 'yellow') return 'needs_work';
+      if (validationStatus === 'red') return 'incomplete';
+    }
+    // For yes/no with children
+    if (question?.type === 'yes_no' && question.conditionalChildren && responses[questionId] === 'yes') {
+      const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
+      let allComplete = true;
+      let anyNeedsWork = false;
+      
+      for (const child of requiredChildren) {
+        const childStatus = getQuestionValidationStatus(child.id);
+        if (childStatus === 'incomplete') {
+          allComplete = false;
+          break;
+        }
+        if (childStatus === 'needs_work') {
+          anyNeedsWork = true;
+        }
+      }
+      
+      if (!allComplete) return 'incomplete';
+      if (anyNeedsWork) return 'needs_work';
+      return 'complete';
+    }
+    
+    // Default completion check
+    if (isQuestionComplete(questionId)) return 'complete';
+    if (touchedQuestions[questionId]) return 'incomplete';
+    return 'neutral';
   };
 
   const getIncompleteQuestions = () => {
