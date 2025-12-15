@@ -64,6 +64,7 @@ export default function ProQuestionnaire() {
   const [allExpanded, setAllExpanded] = useState(false);
   const [showAutoSave, setShowAutoSave] = useState(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showClearAllModal, setShowClearAllModal] = useState(false);
 
   // Extract URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -231,11 +232,14 @@ export default function ProQuestionnaire() {
   };
 
   const clearAll = () => {
-    if (window.confirm('Are you sure you want to clear all responses? This cannot be undone.')) {
-      setResponses({});
-      document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-      toast.success('All responses cleared');
-    }
+    setShowClearAllModal(true);
+  };
+
+  const handleConfirmClearAll = () => {
+    setResponses({});
+    document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    toast.success('All responses cleared');
+    setShowClearAllModal(false);
   };
 
   const isQuestionComplete = (questionId) => {
@@ -925,6 +929,31 @@ export default function ProQuestionnaire() {
           initialBusinessName={businessNameParam}
           initialDomain={domainParam}
         />
+      )}
+
+      {showClearAllModal && (
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-[#122947] mb-4">Clear All Responses?</h3>
+            <p className="text-[#566C75] mb-6">
+              Are you sure? You will have to start over again.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleConfirmClearAll}
+                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Yes, Clear All
+              </button>
+              <button
+                onClick={() => setShowClearAllModal(false)}
+                className="flex-1 px-6 py-3 bg-[#C1C6C8] hover:bg-[#A9B3B7] text-white rounded-lg font-medium transition-colors"
+              >
+                No, Keep Form Info
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       </div>
       );
