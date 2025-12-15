@@ -1004,7 +1004,18 @@ export default function ProQuestionnaire() {
         return (
           <MultiGuaranteeQuestion
             value={responses[question.id] || []}
-            onChange={(val) => updateResponse(question.id, val)}
+            onChange={(val) => {
+              updateResponse(question.id, val);
+
+              // Special handling for question 14.1
+              if (question.id === '14.1') {
+                const validItems = Array.isArray(val) ? val.filter(item => 
+                  item.saved === true || (item.name?.trim() && item.type && (item.file || item.description?.trim()) && item.saved !== false)
+                ) : [];
+                const newStatus = validItems.length > 0 ? 'complete' : 'incomplete';
+                setValidationStatus(v => ({ ...v, '14': newStatus }));
+              }
+            }}
             max={question.limits?.max || 10}
           />
         );
