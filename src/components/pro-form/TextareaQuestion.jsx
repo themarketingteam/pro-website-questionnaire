@@ -9,9 +9,10 @@ export default function TextareaQuestion({
   rows = 6,
   questionContext = "General question",
   questionId = "",
+  debounceMs = 500,
   onValidationChange
 }) {
-  const validation = useTextValidation(value, questionId, 3000);
+  const validation = useTextValidation(value, questionId, debounceMs);
 
   // Report validation status to parent
   React.useEffect(() => {
