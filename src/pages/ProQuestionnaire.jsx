@@ -60,6 +60,7 @@ export default function ProQuestionnaire() {
   const [responses, setResponses] = useState({});
   const [expandedQuestions, setExpandedQuestions] = useState({});
   const [touchedQuestions, setTouchedQuestions] = useState({});
+  const [validationStates, setValidationStates] = useState({}); // Store validation status for each question
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allExpanded, setAllExpanded] = useState(false);
   const [showAutoSave, setShowAutoSave] = useState(0);
@@ -173,6 +174,10 @@ export default function ProQuestionnaire() {
     setResponses(newResponses);
     saveToStorage(newResponses);
     setShowAutoSave(prev => prev + 1);
+  };
+
+  const updateValidationState = (questionId, status) => {
+    setValidationStates(prev => ({ ...prev, [questionId]: status }));
   };
 
   const resetQuestion = (questionId) => {
@@ -328,8 +333,13 @@ export default function ProQuestionnaire() {
       case 'radio':
         return !!answer && (answer !== 'Other' || (otherValue && otherValue.trim()));
       
-      case 'textarea':
-        return answer && answer.trim().length > 0;
+      case 'textarea': {
+        const hasContent = answer && answer.trim().length > 0;
+        if (!hasContent) return false;
+        // Check validation state - red means failing, yellow/green means passing
+        const validationStatus = validationStates[child.id];
+        return validationStatus !== 'red';
+      }
       
       case 'multi_text': {
         const entries = Array.isArray(answer) ? answer : [];
@@ -629,6 +639,7 @@ export default function ProQuestionnaire() {
               {...commonProps} 
               questionContext={`Question ${question.id}: ${question.title}`}
               questionId={question.id}
+              onValidationChange={(status) => updateValidationState(question.id, status)}
             />
           </>
         );
@@ -772,6 +783,7 @@ export default function ProQuestionnaire() {
             isComplete={isQuestionComplete(child.id)}
             wasTouched={touchedQuestions[child.id]}
             isSubQuestion={true}
+            validationStatus={getQuestionValidationStatus(child.id)}
           >
             {renderQuestion(child)}
           </QuestionWrapper>
@@ -839,6 +851,7 @@ export default function ProQuestionnaire() {
                               hasAnswer={!!responses[q.id] || !!responses[`${q.id}_other`]}
                               isComplete={isQuestionComplete(q.id)}
                               wasTouched={touchedQuestions[q.id]}
+                              validationStatus={getQuestionValidationStatus(q.id)}
                             >
                               {renderQuestion(q)}
                             </QuestionWrapper>
@@ -881,6 +894,7 @@ export default function ProQuestionnaire() {
                       hasAnswer={!!responses[question.id] || !!responses[`${question.id}_other`]}
                       isComplete={isQuestionComplete(question.id)}
                       wasTouched={touchedQuestions[question.id]}
+                      validationStatus={getQuestionValidationStatus(question.id)}
                     >
                       {renderQuestion(question)}
                     </QuestionWrapper>

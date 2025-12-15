@@ -8,9 +8,17 @@ export default function TextareaQuestion({
   placeholder = "Enter your response...", 
   rows = 6,
   questionContext = "General question",
-  questionId = ""
+  questionId = "",
+  onValidationChange
 }) {
   const validation = useTextValidation(value, questionId, 3000);
+
+  // Report validation status to parent
+  React.useEffect(() => {
+    if (onValidationChange && validation.status !== 'neutral') {
+      onValidationChange(validation.status);
+    }
+  }, [validation.status, onValidationChange]);
 
   const getStatusIcon = () => {
     switch (validation.status) {

@@ -18,11 +18,24 @@ export default function QuestionWrapper({
   hasAnswer = false,
   isComplete = false,
   wasTouched = false,
-  isSubQuestion = false
+  isSubQuestion = false,
+  validationStatus = 'neutral' // 'complete', 'needs_work', 'incomplete', 'neutral'
 }) {
   const [showModal, setShowModal] = useState(false);
 
   const getStatusIcon = () => {
+    // Use validation status if provided
+    if (validationStatus === 'complete') {
+      return <CheckCircle2 className="w-6 h-6 text-green-600" />;
+    }
+    if (validationStatus === 'needs_work') {
+      return <AlertTriangle className="w-6 h-6 text-amber-500" />;
+    }
+    if (validationStatus === 'incomplete') {
+      return <AlertCircle className="w-6 h-6 text-red-600" />;
+    }
+    
+    // Fallback to old logic
     if (isComplete) {
       return <CheckCircle2 className="w-6 h-6 text-green-600" />;
     }
