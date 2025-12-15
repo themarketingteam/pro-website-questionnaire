@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { base44 } from '@/api/base44Client';
-import { Plus, X, Check, Upload, Loader2, ChevronDown, ChevronUp, File } from 'lucide-react';
+import { Plus, X, Check, Upload, Loader2, ChevronDown, ChevronUp, File, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
@@ -127,15 +127,17 @@ export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
         return (
           <div
             key={index}
-            className={`border rounded-lg transition-all ${
-              isSaved ? 'border-green-300 bg-green-50/30' : 'border-slate-300 bg-white'
+            className={`border-2 rounded-lg transition-all ${
+              isSaved ? 'border-green-500 bg-green-50' : 'border-slate-300 bg-white'
             }`}
           >
             {/* Header */}
             {isSaved ? (
               <div className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-3 flex-1">
-                  <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                    <Check className="w-5 h-5 text-white" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-slate-900 truncate">
                       {item.name || `Item ${index + 1}`}
@@ -153,6 +155,7 @@ export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
                     onClick={() => toggleExpand(index)}
                     className="px-4 py-2 text-sm bg-white border border-slate-300 hover:border-slate-400 hover:bg-slate-50 rounded-lg flex items-center gap-2 transition-colors text-slate-700 font-medium"
                   >
+                    <Edit className="w-4 h-4" />
                     Edit
                   </button>
                   <button
@@ -161,9 +164,9 @@ export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
                       e.stopPropagation();
                       handleRemoveItem(index);
                     }}
-                    className="p-1 hover:bg-red-100 rounded transition-colors"
+                    className="p-2 hover:bg-red-100 rounded transition-colors"
                   >
-                    <X className="w-4 h-4 text-red-600" />
+                    <X className="w-5 h-5 text-red-600" />
                   </button>
                 </div>
               </div>
