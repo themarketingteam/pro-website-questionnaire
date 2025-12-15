@@ -25,6 +25,7 @@ import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questi
 
 const COOKIE_NAME = 'pro_questionnaire_responses';
 const CREDENTIALS_COOKIE_NAME = 'pro_questionnaire_credentials';
+const VALIDATION_COOKIE_NAME = 'pro_questionnaire_validation';
 
 // Helper functions for credential management
 const setCredentialsCookie = (credentials) => {
@@ -128,6 +129,26 @@ export default function ProQuestionnaire() {
         console.error('Failed to parse saved responses:', e);
       }
     }
+
+    // Load validation status
+    let initialValidation = {
+      '1': '', '2': '', '3': '', '4': '', '5': '',
+      '6': '', '7': '', '8': '', '9': '', '10': '',
+      '11': '', '12': '', '13': '', '14': '', '15': '',
+      '16': '', '17': '', '18': '', '19': '', '20': '',
+      '21': '', '22': '', '23': '', '24': '', '25': '',
+      '1.1': '', '2.1': '', '2.2': '',
+      '12.1': '', '14.1': '', '23.1': '', '25.1': ''
+    };
+    if (cookies[VALIDATION_COOKIE_NAME]) {
+      try {
+        const savedValidation = JSON.parse(decodeURIComponent(cookies[VALIDATION_COOKIE_NAME]));
+        initialValidation = { ...initialValidation, ...savedValidation };
+      } catch (e) {
+        console.error('Failed to parse saved validation:', e);
+      }
+    }
+    setValidationStatus(initialValidation);
     
     // Validate Q18 data - if array is malformed or exceeds max, clear it
     let dataWasCleaned = false;
@@ -175,6 +196,15 @@ export default function ProQuestionnaire() {
     const expires = new Date();
     expires.setDate(expires.getDate() + 30);
     document.cookie = `${COOKIE_NAME}=${encodedData}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+  }, []);
+
+  // Save validation status to cookie
+  const saveValidationToStorage = useCallback((validation) => {
+    const jsonData = JSON.stringify(validation);
+    const encodedData = encodeURIComponent(jsonData);
+    const expires = new Date();
+    expires.setDate(expires.getDate() + 30);
+    document.cookie = `${VALIDATION_COOKIE_NAME}=${encodedData}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
   }, []);
 
   const updateResponse = (questionId, value) => {
@@ -241,6 +271,7 @@ export default function ProQuestionnaire() {
   const updateValidationState = (questionId, status) => {
     setValidationStatus(prev => {
       const newStatus = { ...prev, [questionId]: status };
+      saveValidationToStorage(newStatus);
 
       // Special handling for question 2.1
       if (questionId === '2.1') {
@@ -407,7 +438,11 @@ export default function ProQuestionnaire() {
     setShowAutoSave(prev => prev + 1);
     
     // Reset validation status to incomplete
-    setValidationStatus(v => ({ ...v, [questionId]: 'incomplete' }));
+    setValidationStatus(v => {
+      const newStatus = { ...v, [questionId]: 'incomplete' };
+      saveValidationToStorage(newStatus);
+      return newStatus;
+    });
   };
 
   const toggleQuestion = (questionId) => {
@@ -484,7 +519,7 @@ export default function ProQuestionnaire() {
     saveToStorage(defaultResponses);
 
     // Reset validation status to empty strings
-    setValidationStatus({
+    const resetValidation = {
       '1': '', '2': '', '3': '', '4': '', '5': '',
       '6': '', '7': '', '8': '', '9': '', '10': '',
       '11': '', '12': '', '13': '', '14': '', '15': '',
@@ -492,7 +527,9 @@ export default function ProQuestionnaire() {
       '21': '', '22': '', '23': '', '24': '', '25': '',
       '1.1': '', '2.1': '', '2.2': '',
       '12.1': '', '14.1': '', '23.1': '', '25.1': ''
-    });
+    };
+    setValidationStatus(resetValidation);
+    saveValidationToStorage(resetValidation);
 
     // Reset touched questions
     setTouchedQuestions({});
