@@ -199,42 +199,49 @@ export default function ProQuestionnaire() {
   const updateValidationState = (questionId, status) => {
     setValidationStatus(prev => {
       const newStatus = { ...prev, [questionId]: status };
-      
+
       // If this is a child question, update parent status
       const parentId = questionId.split('.')[0];
       if (questionId.includes('.') && parentId) {
-        updateParentValidation(parentId, newStatus);
+        // Calculate parent status based on all children
+        const question = QUESTIONS.find(q => q.id === parentId);
+        if (question?.conditionalChildren && responses[parentId] === 'yes') {
+          const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
+          if (requiredChildren.length > 0) {
+            let allComplete = true;
+            let anyNeedsWork = false;
+            let anyEmpty = false;
+
+            for (const child of requiredChildren) {
+              const childStatus = newStatus[child.id] || '';
+
+              // If status is empty, child hasn't been validated yet
+              if (childStatus === '') {
+                anyEmpty = true;
+                allComplete = false;
+                break;
+              }
+
+              if (childStatus === 'incomplete') {
+                allComplete = false;
+                break;
+              }
+
+              if (childStatus === 'needs_work') {
+                anyNeedsWork = true;
+              }
+            }
+
+            // Only update parent status if all children have been evaluated (not empty)
+            if (!anyEmpty) {
+              newStatus[parentId] = !allComplete ? 'incomplete' : anyNeedsWork ? 'needs_work' : 'complete';
+            }
+          }
+        }
       }
-      
+
       return newStatus;
     });
-  };
-
-  const updateParentValidation = (parentId, currentStatuses) => {
-    const question = QUESTIONS.find(q => q.id === parentId);
-    if (!question?.conditionalChildren || responses[parentId] !== 'yes') return;
-
-    const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
-    if (requiredChildren.length === 0) return;
-
-    let allComplete = true;
-    let anyNeedsWork = false;
-
-    for (const child of requiredChildren) {
-      const childStatus = currentStatuses[child.id] || 'incomplete';
-      if (childStatus === 'incomplete') {
-        allComplete = false;
-        break;
-      }
-      if (childStatus === 'needs_work') {
-        anyNeedsWork = true;
-      }
-    }
-
-    setValidationStatus(prev => ({
-      ...prev,
-      [parentId]: !allComplete ? 'incomplete' : anyNeedsWork ? 'needs_work' : 'complete'
-    }));
   };
 
   const updateQuestionValidation = (questionId, value, allResponses) => {
