@@ -60,7 +60,15 @@ export default function ProQuestionnaire() {
   const [responses, setResponses] = useState({});
   const [expandedQuestions, setExpandedQuestions] = useState({});
   const [touchedQuestions, setTouchedQuestions] = useState({});
-  const [validationStates, setValidationStates] = useState({}); // Store validation status for each question
+  const [validationStatus, setValidationStatus] = useState({
+    '1': 'incomplete', '2': 'incomplete', '3': 'incomplete', '4': 'incomplete', '5': 'incomplete',
+    '6': 'incomplete', '7': 'incomplete', '8': 'incomplete', '9': 'incomplete', '10': 'incomplete',
+    '11': 'incomplete', '12': 'incomplete', '13': 'incomplete', '14': 'incomplete', '15': 'incomplete',
+    '16': 'incomplete', '17': 'incomplete', '18': 'incomplete', '19': 'incomplete', '20': 'incomplete',
+    '21': 'incomplete', '22': 'incomplete', '23': 'incomplete', '24': 'incomplete', '25': 'incomplete',
+    '1.1': 'incomplete', '2.1': 'incomplete', '2.2': 'incomplete',
+    '12.1': 'incomplete', '14.1': 'incomplete', '23.1': 'incomplete', '25.1': 'incomplete'
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allExpanded, setAllExpanded] = useState(false);
   const [showAutoSave, setShowAutoSave] = useState(0);
@@ -174,10 +182,135 @@ export default function ProQuestionnaire() {
     setResponses(newResponses);
     saveToStorage(newResponses);
     setShowAutoSave(prev => prev + 1);
+    
+    // Trigger validation update
+    updateQuestionValidation(questionId, value, newResponses);
   };
 
   const updateValidationState = (questionId, status) => {
-    setValidationStates(prev => ({ ...prev, [questionId]: status }));
+    setValidationStatus(prev => {
+      const newStatus = { ...prev, [questionId]: status };
+      
+      // If this is a child question, update parent status
+      const parentId = questionId.split('.')[0];
+      if (questionId.includes('.') && parentId) {
+        updateParentValidation(parentId, newStatus);
+      }
+      
+      return newStatus;
+    });
+  };
+
+  const updateParentValidation = (parentId, currentStatuses) => {
+    const question = QUESTIONS.find(q => q.id === parentId);
+    if (!question?.conditionalChildren || responses[parentId] !== 'yes') return;
+
+    const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
+    if (requiredChildren.length === 0) return;
+
+    let allComplete = true;
+    let anyNeedsWork = false;
+
+    for (const child of requiredChildren) {
+      const childStatus = currentStatuses[child.id] || 'incomplete';
+      if (childStatus === 'incomplete') {
+        allComplete = false;
+        break;
+      }
+      if (childStatus === 'needs_work') {
+        anyNeedsWork = true;
+      }
+    }
+
+    setValidationStatus(prev => ({
+      ...prev,
+      [parentId]: !allComplete ? 'incomplete' : anyNeedsWork ? 'needs_work' : 'complete'
+    }));
+  };
+
+  const updateQuestionValidation = (questionId, value, allResponses) => {
+    const question = QUESTIONS.find(q => q.id === questionId);
+    if (!question) return;
+
+    let newStatus = 'incomplete';
+
+    switch (question.type) {
+      case 'yes_no':
+        if (value === 'yes' || value === 'no') {
+          newStatus = 'complete';
+          // If yes, check children
+          if (value === 'yes' && question.conditionalChildren) {
+            const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
+            if (requiredChildren.length > 0) {
+              // Parent status will be updated by children
+              newStatus = 'incomplete';
+            }
+          }
+        }
+        break;
+
+      case 'checkbox': {
+        const selections = Array.isArray(value) ? value : [];
+        const otherValue = allResponses[`${questionId}_other`];
+        let otherCount = 0;
+        if (otherValue) {
+          otherCount = Array.isArray(otherValue) 
+            ? otherValue.filter(v => v?.trim()).length 
+            : (otherValue.trim() ? 1 : 0);
+        }
+        const totalCount = selections.length + otherCount;
+        const min = question.limits?.min || 0;
+        const max = question.limits?.max || Infinity;
+        newStatus = (totalCount >= min && totalCount <= max) ? 'complete' : 'incomplete';
+        break;
+      }
+
+      case 'radio':
+        newStatus = (value && (value !== 'Other' || allResponses[`${questionId}_other`]?.trim())) 
+          ? 'complete' : 'incomplete';
+        break;
+
+      case 'multi_text': {
+        const entries = Array.isArray(value) ? value : [];
+        const min = question.limits?.min || 1;
+        newStatus = entries.length >= min ? 'complete' : 'incomplete';
+        break;
+      }
+
+      case 'numeric_range':
+        newStatus = (value && value.trim().length > 0) ? 'complete' : 'incomplete';
+        break;
+
+      case 'multi_certification':
+      case 'multi_guarantee': {
+        const items = Array.isArray(value) ? value : [];
+        const validItems = items.filter(item => {
+          if (question.type === 'multi_certification') {
+            return item.saved === true || (item.name?.trim() && item.type && item.saved !== false);
+          } else {
+            return item.saved === true || (item.name?.trim() && item.type && (item.file || item.description?.trim()) && item.saved !== false);
+          }
+        });
+        const min = question.limits?.min || 0;
+        newStatus = validItems.length >= min ? 'complete' : 'incomplete';
+        break;
+      }
+
+      case 'image_tagging':
+        newStatus = (value?.url && Array.isArray(value.tags) && value.tags.length > 0 && 
+                    value.tags.every(tag => tag.person?.name)) ? 'complete' : 'incomplete';
+        break;
+
+      case 'info_message':
+        newStatus = 'complete';
+        break;
+
+      // Textarea questions get validated by AI agent - don't set here
+      case 'textarea':
+        return;
+    }
+
+    setValidationStatus(prev => ({ ...prev, [questionId]: newStatus }));
   };
 
   const resetQuestion = (questionId) => {
@@ -334,11 +467,8 @@ export default function ProQuestionnaire() {
         return !!answer && (answer !== 'Other' || (otherValue && otherValue.trim()));
       
       case 'textarea': {
-        const hasContent = answer && answer.trim().length > 0;
-        if (!hasContent) return false;
-        // Check validation state - red means failing, yellow/green means passing
-        const validationStatus = validationStates[questionId];
-        return validationStatus !== 'red';
+        const status = validationStatus[questionId];
+        return status === 'complete' || status === 'needs_work';
       }
       
       case 'multi_text': {
@@ -394,39 +524,7 @@ export default function ProQuestionnaire() {
   };
 
   const getQuestionValidationStatus = (questionId) => {
-    const question = QUESTIONS.find(q => q.id === questionId);
-    if (question?.type === 'textarea') {
-      const validationStatus = validationStates[questionId];
-      if (validationStatus === 'green') return 'complete';
-      if (validationStatus === 'yellow') return 'needs_work';
-      if (validationStatus === 'red') return 'incomplete';
-    }
-    // For yes/no with children
-    if (question?.type === 'yes_no' && question.conditionalChildren && responses[questionId] === 'yes') {
-      const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
-      let allComplete = true;
-      let anyNeedsWork = false;
-      
-      for (const child of requiredChildren) {
-        const childStatus = getQuestionValidationStatus(child.id);
-        if (childStatus === 'incomplete') {
-          allComplete = false;
-          break;
-        }
-        if (childStatus === 'needs_work') {
-          anyNeedsWork = true;
-        }
-      }
-      
-      if (!allComplete) return 'incomplete';
-      if (anyNeedsWork) return 'needs_work';
-      return 'complete';
-    }
-    
-    // Default completion check
-    if (isQuestionComplete(questionId)) return 'complete';
-    if (touchedQuestions[questionId]) return 'incomplete';
-    return 'neutral';
+    return validationStatus[questionId] || 'neutral';
   };
 
   const getIncompleteQuestions = () => {

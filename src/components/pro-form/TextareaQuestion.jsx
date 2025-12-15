@@ -15,8 +15,15 @@ export default function TextareaQuestion({
 
   // Report validation status to parent
   React.useEffect(() => {
-    if (onValidationChange && validation.status !== 'neutral') {
-      onValidationChange(validation.status);
+    if (onValidationChange) {
+      // Map internal status to validation status
+      const statusMap = {
+        'green': 'complete',
+        'yellow': 'needs_work',
+        'red': 'incomplete',
+        'neutral': 'incomplete'
+      };
+      onValidationChange(statusMap[validation.status] || 'incomplete');
     }
   }, [validation.status, onValidationChange]);
 
