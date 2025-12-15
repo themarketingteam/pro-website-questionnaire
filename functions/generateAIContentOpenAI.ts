@@ -87,12 +87,8 @@ Deno.serve(async (req) => {
 
               try {
                 const parsed = JSON.parse(data);
-                console.log('📦 Event:', parsed.event);
-                
-                // Log the full parsed object to debug
-                if (parsed.event === 'thread.message.delta' || parsed.event === 'thread.message.created') {
-                  console.log('📋 Full delta data:', JSON.stringify(parsed.data));
-                }
+                console.log('📦 Raw object keys:', Object.keys(parsed).join(', '));
+                console.log('📦 Full parsed:', JSON.stringify(parsed).substring(0, 200));
                 
                 // Handle text deltas
                 if (parsed.event === 'thread.message.delta') {
@@ -104,13 +100,11 @@ Deno.serve(async (req) => {
                       content: fullContent, 
                       streaming: true 
                     }) + '\n'));
-                  } else {
-                    console.log('⚠️ Delta event but no text value');
                   }
                 }
                 
                 // Handle completion
-                if (parsed.event === 'thread.run.completed') {
+                if (parsed.event === 'thread.run.completed' || parsed.event === 'done') {
                   console.log('✅ Run completed, full content length:', fullContent.length);
                   
                   if (fullContent) {
@@ -122,7 +116,7 @@ Deno.serve(async (req) => {
                   }
                 }
               } catch (e) {
-                console.error('❌ Parse error:', e, 'Line:', data);
+                console.error('❌ Parse error:', e, 'Data:', data.substring(0, 100));
               }
             }
           }
