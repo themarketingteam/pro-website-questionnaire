@@ -118,6 +118,16 @@ export default function ProQuestionnaire() {
         console.error('Failed to parse saved responses:', e);
       }
     }
+    
+    // Validate Q18 data - if array is malformed or exceeds max, clear it
+    if (initialResponses['18'] && Array.isArray(initialResponses['18'])) {
+      if (initialResponses['18'].length > 3) {
+        console.warn('Q18 has invalid data, clearing it');
+        delete initialResponses['18'];
+        delete initialResponses['18_other'];
+      }
+    }
+    
     // Default Q1, Q2, Q12, Q14, Q23, and Q25 to "no" if not set
     if (!initialResponses['1']) initialResponses['1'] = 'no';
     if (!initialResponses['2']) initialResponses['2'] = 'no';
