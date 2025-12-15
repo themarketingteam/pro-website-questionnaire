@@ -186,23 +186,71 @@ export default function ProQuestionnaire() {
     // Mark as touched when user makes a change and set validation status to incomplete if empty
     setTouchedQuestions(prev => ({ ...prev, [questionId]: true }));
     setValidationStatus(v => {
-      if (v[questionId] === '') {
-        return { ...v, [questionId]: 'incomplete' };
+      const newStatus = { ...v };
+      if (newStatus[questionId] === '') {
+        newStatus[questionId] = 'incomplete';
       }
-      return v;
+
+      // Special handling for question 2.2
+      if (questionId === '2.2') {
+        const status2_1 = newStatus['2.1'] || '';
+        newStatus['2'] = calculateQuestion2Status(status2_1, value);
+      }
+
+      return newStatus;
     });
 
     // Trigger validation update
     updateQuestionValidation(questionId, value, newResponses);
   };
 
+  const calculateQuestion2Status = (status2_1, value2_2) => {
+    // Check 2.2 state
+    const hasImage = value2_2?.url ? true : false;
+    const hasTags = value2_2?.tags && Array.isArray(value2_2.tags) && 
+                    value2_2.tags.length > 0 && 
+                    value2_2.tags.every(tag => tag.person?.name);
+
+    // If 2.1 has not run or is incomplete
+    if (status2_1 === '' || status2_1 === 'incomplete') {
+      return 'incomplete';
+    }
+
+    // If 2.1 is needs_work
+    if (status2_1 === 'needs_work') {
+      if (!hasImage) {
+        return 'incomplete';
+      }
+      return 'needs_work';
+    }
+
+    // If 2.1 is complete
+    if (status2_1 === 'complete') {
+      if (!hasImage) {
+        return 'incomplete';
+      }
+      if (!hasTags) {
+        return 'needs_work';
+      }
+      return 'complete';
+    }
+
+    return 'incomplete';
+  };
+
   const updateValidationState = (questionId, status) => {
     setValidationStatus(prev => {
       const newStatus = { ...prev, [questionId]: status };
 
+      // Special handling for question 2.1
+      if (questionId === '2.1') {
+        const value2_2 = responses['2.2'];
+        newStatus['2'] = calculateQuestion2Status(status, value2_2);
+      }
+
       // If this is a child question, update parent status
       const parentId = questionId.split('.')[0];
-      if (questionId.includes('.') && parentId) {
+      if (questionId.includes('.') && parentId && parentId !== '2') {
         // Calculate parent status based on all children
         const question = QUESTIONS.find(q => q.id === parentId);
         if (question?.conditionalChildren && responses[parentId] === 'yes') {
