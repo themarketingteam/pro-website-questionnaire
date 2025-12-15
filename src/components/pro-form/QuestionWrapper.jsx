@@ -19,11 +19,17 @@ export default function QuestionWrapper({
   isComplete = false,
   wasTouched = false,
   isSubQuestion = false,
-  validationStatus = 'neutral' // 'complete', 'needs_work', 'incomplete', 'neutral'
+  validationStatus = 'neutral', // 'complete', 'needs_work', 'incomplete', 'neutral'
+  showStatusIcon = false
 }) {
   const [showModal, setShowModal] = useState(false);
 
   const getStatusIcon = () => {
+    // Don't show icon if validation status is empty
+    if (validationStatus === '') {
+      return <div className="w-6 h-6" />;
+    }
+
     // Use validation status if provided
     if (validationStatus === 'complete') {
       return <CheckCircle2 className="w-6 h-6 text-green-600" />;
@@ -34,20 +40,14 @@ export default function QuestionWrapper({
     if (validationStatus === 'incomplete') {
       return <AlertCircle className="w-6 h-6 text-red-600" />;
     }
-    
-    // Fallback to old logic
-    if (isComplete) {
-      return <CheckCircle2 className="w-6 h-6 text-green-600" />;
-    }
-    if (wasTouched && !isComplete) {
-      return <AlertCircle className="w-6 h-6 text-red-600" />;
-    }
+
+    // Fallback
     return <div className="w-6 h-6" />;
   };
 
   return (
     <div id={id} className={`space-y-4 ${isExpanded ? 'my-[5%]' : 'mb-[3%]'} relative`}>
-      {!isSubQuestion && (
+      {!isSubQuestion && showStatusIcon && (
         <div className="absolute -left-[43px] top-0">
           {getStatusIcon()}
         </div>

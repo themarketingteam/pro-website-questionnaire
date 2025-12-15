@@ -61,13 +61,13 @@ export default function ProQuestionnaire() {
   const [expandedQuestions, setExpandedQuestions] = useState({});
   const [touchedQuestions, setTouchedQuestions] = useState({});
   const [validationStatus, setValidationStatus] = useState({
-    '1': 'incomplete', '2': 'incomplete', '3': 'incomplete', '4': 'incomplete', '5': 'incomplete',
-    '6': 'incomplete', '7': 'incomplete', '8': 'incomplete', '9': 'incomplete', '10': 'incomplete',
-    '11': 'incomplete', '12': 'incomplete', '13': 'incomplete', '14': 'incomplete', '15': 'incomplete',
-    '16': 'incomplete', '17': 'incomplete', '18': 'incomplete', '19': 'incomplete', '20': 'incomplete',
-    '21': 'incomplete', '22': 'incomplete', '23': 'incomplete', '24': 'incomplete', '25': 'incomplete',
-    '1.1': 'incomplete', '2.1': 'incomplete', '2.2': 'incomplete',
-    '12.1': 'incomplete', '14.1': 'incomplete', '23.1': 'incomplete', '25.1': 'incomplete'
+    '1': '', '2': '', '3': '', '4': '', '5': '',
+    '6': '', '7': '', '8': '', '9': '', '10': '',
+    '11': '', '12': '', '13': '', '14': '', '15': '',
+    '16': '', '17': '', '18': '', '19': '', '20': '',
+    '21': '', '22': '', '23': '', '24': '', '25': '',
+    '1.1': '', '2.1': '', '2.2': '',
+    '12.1': '', '14.1': '', '23.1': '', '25.1': ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allExpanded, setAllExpanded] = useState(false);
@@ -182,7 +182,16 @@ export default function ProQuestionnaire() {
     setResponses(newResponses);
     saveToStorage(newResponses);
     setShowAutoSave(prev => prev + 1);
-    
+
+    // Mark as touched when user makes a change and set validation status to incomplete if empty
+    setTouchedQuestions(prev => ({ ...prev, [questionId]: true }));
+    setValidationStatus(v => {
+      if (v[questionId] === '') {
+        return { ...v, [questionId]: 'incomplete' };
+      }
+      return v;
+    });
+
     // Trigger validation update
     updateQuestionValidation(questionId, value, newResponses);
   };
@@ -326,9 +335,15 @@ export default function ProQuestionnaire() {
   const toggleQuestion = (questionId) => {
     setExpandedQuestions(prev => {
       const newState = { ...prev, [questionId]: !prev[questionId] };
-      // If expanding, mark as touched
+      // If expanding, mark as touched and set validation status to incomplete if empty
       if (!prev[questionId]) {
         setTouchedQuestions(t => ({ ...t, [questionId]: true }));
+        setValidationStatus(v => {
+          if (v[questionId] === '') {
+            return { ...v, [questionId]: 'incomplete' };
+          }
+          return v;
+        });
       }
       // If collapsing a parent with conditional children, collapse the children too
       const question = QUESTIONS.find(q => q.id === questionId);
@@ -919,6 +934,7 @@ export default function ProQuestionnaire() {
             wasTouched={touchedQuestions[child.id]}
             isSubQuestion={true}
             validationStatus={getQuestionValidationStatus(child.id)}
+            showStatusIcon={touchedQuestions[child.id]}
           >
             {renderQuestion(child)}
           </QuestionWrapper>
@@ -987,6 +1003,7 @@ export default function ProQuestionnaire() {
                               isComplete={isQuestionComplete(q.id)}
                               wasTouched={touchedQuestions[q.id]}
                               validationStatus={getQuestionValidationStatus(q.id)}
+                              showStatusIcon={touchedQuestions[q.id]}
                             >
                               {renderQuestion(q)}
                             </QuestionWrapper>
@@ -1030,6 +1047,7 @@ export default function ProQuestionnaire() {
                       isComplete={isQuestionComplete(question.id)}
                       wasTouched={touchedQuestions[question.id]}
                       validationStatus={getQuestionValidationStatus(question.id)}
+                      showStatusIcon={touchedQuestions[question.id]}
                     >
                       {renderQuestion(question)}
                     </QuestionWrapper>
