@@ -132,41 +132,77 @@ export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
             }`}
           >
             {/* Header */}
-            <div
-              className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50/50 transition-colors"
-              onClick={() => toggleExpand(index)}
-            >
-              <div className="flex items-center gap-3 flex-1">
-                {isSaved && <Check className="w-5 h-5 text-green-600 flex-shrink-0" />}
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium text-slate-900 truncate">
-                    {item.name || `Item ${index + 1}`}
-                  </div>
-                  {item.type && (
-                    <div className="text-sm text-slate-600">
-                      {item.type}
+            {isSaved ? (
+              <div className="flex items-center justify-between p-4">
+                <div className="flex items-center gap-3 flex-1">
+                  <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-slate-900 truncate">
+                      {item.name || `Item ${index + 1}`}
                     </div>
+                    {item.type && (
+                      <div className="text-sm text-slate-600">
+                        {item.type}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpand(index)}
+                    className="px-4 py-2 text-sm bg-white border border-slate-300 hover:border-slate-400 hover:bg-slate-50 rounded-lg flex items-center gap-2 transition-colors text-slate-700 font-medium"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveItem(index);
+                    }}
+                    className="p-1 hover:bg-red-100 rounded transition-colors"
+                  >
+                    <X className="w-4 h-4 text-red-600" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50/50 transition-colors"
+                onClick={() => toggleExpand(index)}
+              >
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium text-slate-900 truncate">
+                      {item.name || `Item ${index + 1}`}
+                    </div>
+                    {item.type && (
+                      <div className="text-sm text-slate-600">
+                        {item.type}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveItem(index);
+                    }}
+                    className="p-1 hover:bg-red-100 rounded transition-colors"
+                  >
+                    <X className="w-4 h-4 text-red-600" />
+                  </button>
+                  {isExpanded ? (
+                    <ChevronUp className="w-5 h-5 text-slate-400" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-slate-400" />
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleRemoveItem(index);
-                  }}
-                  className="p-1 hover:bg-red-100 rounded transition-colors"
-                >
-                  <X className="w-4 h-4 text-red-600" />
-                </button>
-                {isExpanded ? (
-                  <ChevronUp className="w-5 h-5 text-slate-400" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-slate-400" />
-                )}
-              </div>
-            </div>
+            )}
 
             {/* Expanded Content */}
             {isExpanded && (
