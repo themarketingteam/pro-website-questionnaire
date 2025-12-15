@@ -133,6 +133,14 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
 
   const triggerValidation = () => {
     if (value && value.trim().length > 0) {
+      // Cancel any pending debounced validation
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      // Clear the conversation to start fresh
+      conversationRef.current = null;
+      // Trigger immediate validation
       setManualTrigger(prev => prev + 1);
       validateText(value, questionId);
     }
