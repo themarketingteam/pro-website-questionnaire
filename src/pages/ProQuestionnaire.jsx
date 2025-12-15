@@ -392,6 +392,9 @@ export default function ProQuestionnaire() {
     setResponses(newResponses);
     saveToStorage(newResponses);
     setShowAutoSave(prev => prev + 1);
+    
+    // Reset validation status to incomplete
+    setValidationStatus(v => ({ ...v, [questionId]: 'incomplete' }));
   };
 
   const toggleQuestion = (questionId) => {
