@@ -366,37 +366,51 @@ export default function ProQuestionnaire() {
   };
 
   const transformResponsesToPayload = (responses, businessName, domain) => {
-    // Transform geographic areas - flatten structure, no wrapper
+    // Transform geographic areas with nested structure
     const geographicAreas = (responses['5'] || []).map((location, index) => ({
-      name: typeof location === 'string' ? location : (location.name || location.label || ''),
-      label: typeof location === 'string' ? location : (location.label || location.name || ''),
-      lat: location.lat != null ? String(location.lat) : '',
-      lon: location.lon != null ? String(location.lon) : '',
-      place_id: location.place_id || '',
-      source: "google",
-      primary: index === (responses['5_primary'] || 0)
+      geographic_area_meta: {
+        name: typeof location === 'string' ? location : (location.name || location.label || ''),
+        label: typeof location === 'string' ? location : (location.label || location.name || ''),
+        lat: location.lat != null ? String(location.lat) : '',
+        lon: location.lon != null ? String(location.lon) : '',
+        place_id: location.place_id || '',
+        source: "google",
+        primary: index === (responses['5_primary'] || 0)
+      }
     }));
 
-    // Transform certifications/partnerships - always return array
+    // Transform certifications/partnerships
     const certificationsPartnerships = responses['12'] === 'yes' && responses['12.1'] 
       ? (responses['12.1'] || []).map(item => ({
           cert_item_name: item.name || '',
           cert_item_type: item.type || '',
-          cert_item_image_url: item.image?.url || '',
+          cert_item_image_url: item.imageUrl || item.image?.url || '',
           cert_item_file_url: Array.isArray(item.files) && item.files.length > 0 ? item.files[0].url : ''
         }))
       : [];
 
-    // Transform team photo - always return object structure
+    // Transform team photo
     const teamPhoto = responses['2'] === 'yes' && responses['2.2']
-      ? responses['2.2']
-      : { url: '', name: '', type: '', tags: [] };
+      ? {
+          imageUrl: responses['2.2'].url || '',
+          taggedPeople: (responses['2.2'].tags || []).map(tag => ({
+            name: tag.person?.name || '',
+            position: tag.person?.position || '',
+            bio: tag.person?.bio || '',
+            x: tag.x || 0,
+            y: tag.y || 0
+          }))
+        }
+      : { imageUrl: '', taggedPeople: [] };
 
-    // Transform client frustrations to array
-    const clientFrustrations = responses['19'] 
-      ? (typeof responses['19'] === 'string' 
-          ? responses['19'].split(',').map(s => s.trim()).filter(s => s) 
-          : responses['19'])
+    // Transform service guarantee items
+    const serviceGuaranteeItems = responses['14'] === 'yes' && responses['14.1']
+      ? (responses['14.1'] || []).map(item => ({
+          guarantee_name: item.name || '',
+          guarantee_type: item.type || '',
+          guarantee_file_url: item.fileUrl || item.file?.url || '',
+          guarantee_description: item.description || ''
+        }))
       : [];
 
     return {
@@ -413,7 +427,6 @@ export default function ProQuestionnaire() {
         team_introduction: responses['2'] === 'yes' ? (responses['2.1'] || '') : '',
         team_photo_with_tags: teamPhoto,
         service_offerings: (responses['3'] || []).filter(s => !s.startsWith('CATEGORY:')),
-        service_offerings_categories: (responses['3'] || []).filter(s => s.startsWith('CATEGORY:')).map(s => s.replace('CATEGORY:', '')),
         service_offerings_other: responses['3_other'] || '',
         target_industries: responses['4'] || [],
         target_industries_other: responses['4_other'] || '',
@@ -430,14 +443,8 @@ export default function ProQuestionnaire() {
         brand_tone_other: responses['11_other'] || '',
         certifications_partnerships: certificationsPartnerships,
         sales_process: responses['13'] || '',
-        service_guarantees: responses['14'] === 'yes' && responses['14.1']
-          ? (responses['14.1'] || []).map(item => ({
-              guarantee_name: item.name || '',
-              guarantee_type: item.type || '',
-              guarantee_file_url: item.file?.url || '',
-              guarantee_description: item.description || ''
-            }))
-          : [],
+        service_guarantee: responses['14'] === 'yes',
+        service_guarantee_items: serviceGuaranteeItems,
         client_acquisition: responses['15'] || '',
         client_acquisition_other: responses['15_other'] || '',
         website_objectives: responses['16'] || [],
@@ -445,8 +452,7 @@ export default function ProQuestionnaire() {
         client_size: responses['17'] || '',
         client_challenges: responses['18'] || [],
         client_challenges_other: responses['18_other'] || '',
-        client_frustrations: clientFrustrations,
-        client_frustrations_other: responses['19_other'] || '',
+        client_frustrations: responses['19'] || '',
         client_outcomes: responses['20'] || [],
         client_outcomes_other: responses['20_other'] || '',
         value_description: responses['21'] || '',
@@ -464,22 +470,10 @@ export default function ProQuestionnaire() {
     setShowConfirmModal(false);
 
     try {
-      const user = await base44.auth.me();
-      
-      const submissionData = {
-        submission_status: 'submitted',
-        submitter_email: user?.email || '',
-        submitter_name: user?.full_name || '',
-        business_name: businessName,
-        domain: domain,
-        responses: responses,
-        submitted_at: new Date().toISOString()
-      };
-
-      await base44.entities.ProFormSubmission.create(submissionData);
-
-      // Transform payload for Zapier webhook
+      // Transform payload for both database and Zapier
       const transformedPayload = transformResponsesToPayload(responses, businessName, domain);
+
+      await base44.entities.ProFormSubmission.create(transformedPayload);
 
       // Send to Zapier webhook
       const hookID = import.meta.env.VITE_API_HOOK_ID || "23529934";
