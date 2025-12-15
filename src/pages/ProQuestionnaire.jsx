@@ -337,7 +337,8 @@ export default function ProQuestionnaire() {
       case 'multi_text': {
         const entries = Array.isArray(value) ? value : [];
         const min = question.limits?.min || 1;
-        newStatus = entries.length >= min ? 'complete' : 'incomplete';
+        const max = question.limits?.max || Infinity;
+        newStatus = (entries.length >= min && entries.length <= max) ? 'complete' : 'incomplete';
         break;
       }
 
