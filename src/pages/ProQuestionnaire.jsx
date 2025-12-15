@@ -120,11 +120,13 @@ export default function ProQuestionnaire() {
     }
     
     // Validate Q18 data - if array is malformed or exceeds max, clear it
+    let dataWasCleaned = false;
     if (initialResponses['18'] && Array.isArray(initialResponses['18'])) {
       if (initialResponses['18'].length > 3) {
         console.warn('Q18 has invalid data, clearing it');
         delete initialResponses['18'];
         delete initialResponses['18_other'];
+        dataWasCleaned = true;
       }
     }
     
@@ -136,6 +138,11 @@ export default function ProQuestionnaire() {
     if (!initialResponses['23']) initialResponses['23'] = 'no';
     if (!initialResponses['25']) initialResponses['25'] = 'no';
     setResponses(initialResponses);
+    
+    // Save cleaned data back to cookie if we cleaned anything
+    if (dataWasCleaned) {
+      saveToStorage(initialResponses);
+    }
     
     // Initialize all questions as collapsed
     const expanded = {};
@@ -243,25 +250,52 @@ export default function ProQuestionnaire() {
 
     switch (question.type) {
       case 'yes_no':
-        const hasValidAnswer = answer === 'yes' || answer === 'no';
-        // If answer is "yes" and has conditional children, check those too
-        if (hasValidAnswer && answer === 'yes' && question.conditionalChildren) {
-          const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
-          const allChildrenComplete = requiredChildren.every(child => {
-            const childQuestion = QUESTIONS.find(q => q.id === child.id);
-            if (!childQuestion) return false;
+      const hasValidAnswer = answer === 'yes' || answer === 'no';
+      // If answer is "yes" and has conditional children, check those too
+      if (hasValidAnswer && answer === 'yes' && question.conditionalChildren) {
+      const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
+      const allChildrenComplete = requiredChildren.every(child => {
+        const childQuestion = QUESTIONS.find(q => q.id === child.id);
+        if (!childQuestion) return false;
 
-            // Check if child has a valid answer regardless of touched status
-            const childAnswer = responses[child.id];
-            if (childQuestion.type === 'textarea') {
-              return childAnswer && childAnswer.trim().length > 0;
-            }
-            // For other types, use the standard validation
-            return isQuestionComplete(child.id);
-          });
-          return allChildrenComplete;
+        // Check child completion directly without requiring touched status
+        const childAnswer = responses[child.id];
+
+        switch (childQuestion.type) {
+          case 'textarea':
+            return childAnswer && childAnswer.trim().length > 0;
+
+          case 'multi_certification': {
+            const items = Array.isArray(childAnswer) ? childAnswer : [];
+            const validItems = items.filter(item => {
+              const isComplete = item.name?.trim() && item.type;
+              return item.saved === true || (isComplete && item.saved !== false);
+            });
+            const min = childQuestion.limits?.min || 0;
+            return validItems.length >= min;
+          }
+
+          case 'multi_guarantee': {
+            const items = Array.isArray(childAnswer) ? childAnswer : [];
+            const validItems = items.filter(item => {
+              const isComplete = item.name?.trim() && item.type && (item.file || item.description?.trim());
+              return item.saved === true || (isComplete && item.saved !== false);
+            });
+            const min = childQuestion.limits?.min || 0;
+            return validItems.length >= min;
+          }
+
+          case 'image_tagging':
+            return childAnswer && childAnswer.url && Array.isArray(childAnswer.tags) && 
+                   childAnswer.tags.length > 0 && childAnswer.tags.every(tag => tag.person?.name);
+
+          default:
+            return false;
         }
-        return hasValidAnswer;
+      });
+      return allChildrenComplete;
+      }
+      return hasValidAnswer;
       
       case 'checkbox': {
         const selections = Array.isArray(answer) ? answer : [];
