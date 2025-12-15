@@ -972,7 +972,11 @@ export default function ProQuestionnaire() {
                   const min = question.limits?.min || 1;
                   const max = question.limits?.max || 5;
                   const newStatus = (newLocations.length >= min && newLocations.length <= max) ? 'complete' : 'incomplete';
-                  setValidationStatus(v => ({ ...v, [question.id]: newStatus }));
+                  setValidationStatus(v => {
+                    const updated = { ...v, [question.id]: newStatus };
+                    saveValidationToStorage(updated);
+                    return updated;
+                  });
 
                   return newResponses;
                 });
@@ -1000,7 +1004,11 @@ export default function ProQuestionnaire() {
                   const min = question.limits?.min || 1;
                   const max = question.limits?.max || 5;
                   const newStatus = (newLocations.length >= min && newLocations.length <= max) ? 'complete' : 'incomplete';
-                  setValidationStatus(v => ({ ...v, [question.id]: newStatus }));
+                  setValidationStatus(v => {
+                    const updated = { ...v, [question.id]: newStatus };
+                    saveValidationToStorage(updated);
+                    return updated;
+                  });
 
                   return newResponses;
                 });
