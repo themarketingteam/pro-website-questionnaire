@@ -358,6 +358,12 @@ export default function ProQuestionnaire() {
         });
         const min = question.limits?.min || 0;
         newStatus = validItems.length >= min ? 'complete' : 'incomplete';
+
+        // Special handling for question 14.1
+        if (questionId === '14.1') {
+          const q14Status = validItems.length > 0 ? 'complete' : 'incomplete';
+          setValidationStatus(v => ({ ...v, '14': q14Status }));
+        }
         break;
       }
 
