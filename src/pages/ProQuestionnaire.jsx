@@ -236,8 +236,16 @@ export default function ProQuestionnaire() {
   };
 
   const handleConfirmClearAll = () => {
-    setResponses({});
-    document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+    const defaultResponses = {
+      '1': 'no',
+      '2': 'no',
+      '12': 'no',
+      '14': 'no',
+      '23': 'no',
+      '25': 'no'
+    };
+    setResponses(defaultResponses);
+    saveToStorage(defaultResponses);
     toast.success('All responses cleared');
     setShowClearAllModal(false);
   };
