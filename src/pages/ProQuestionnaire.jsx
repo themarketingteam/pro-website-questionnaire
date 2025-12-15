@@ -978,7 +978,18 @@ export default function ProQuestionnaire() {
         return (
           <MultiCertificationQuestion
             value={responses[question.id] || []}
-            onChange={(val) => updateResponse(question.id, val)}
+            onChange={(val) => {
+              updateResponse(question.id, val);
+
+              // Special handling for question 12.1
+              if (question.id === '12.1') {
+                const validItems = Array.isArray(val) ? val.filter(item => 
+                  item.saved === true || (item.name?.trim() && item.type && item.saved !== false)
+                ) : [];
+                const newStatus = validItems.length > 0 ? 'complete' : 'incomplete';
+                setValidationStatus(v => ({ ...v, '12': newStatus }));
+              }
+            }}
             max={question.limits?.max || 10}
           />
         );
