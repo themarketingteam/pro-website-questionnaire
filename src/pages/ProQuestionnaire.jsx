@@ -404,8 +404,39 @@ export default function ProQuestionnaire() {
     };
     setResponses(defaultResponses);
     saveToStorage(defaultResponses);
-    toast.success('All responses cleared');
+
+    // Reset validation status to empty strings
+    setValidationStatus({
+      '1': '', '2': '', '3': '', '4': '', '5': '',
+      '6': '', '7': '', '8': '', '9': '', '10': '',
+      '11': '', '12': '', '13': '', '14': '', '15': '',
+      '16': '', '17': '', '18': '', '19': '', '20': '',
+      '21': '', '22': '', '23': '', '24': '', '25': '',
+      '1.1': '', '2.1': '', '2.2': '',
+      '12.1': '', '14.1': '', '23.1': '', '25.1': ''
+    });
+
+    // Reset touched questions
+    setTouchedQuestions({});
+
+    // Collapse all questions
+    const collapsed = {};
+    QUESTIONS.forEach(q => {
+      collapsed[q.id] = false;
+      if (q.conditionalChildren) {
+        q.conditionalChildren.forEach(child => {
+          collapsed[child.id] = false;
+        });
+      }
+    });
+    setExpandedQuestions(collapsed);
+
     setShowClearAllModal(false);
+    toast.success('All responses cleared');
+
+    // Scroll to top and refresh
+    window.scrollTo(0, 0);
+    setTimeout(() => window.location.reload(), 100);
   };
 
   const isQuestionComplete = (questionId) => {
