@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, X, Upload, FileText, Image, Check, Edit2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, X, Upload, FileText, Image, Check, Edit, ChevronDown, ChevronUp } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 
@@ -77,7 +77,7 @@ export default function MultiCertificationQuestion({ value = [], onChange, max =
         
         return (
           <div key={index} className={`border-2 rounded-lg bg-white transition-all ${
-            item.saved ? 'border-green-500 bg-green-50' : 'border-[#C1C6C8]'
+           item.saved ? 'border-green-500 bg-green-50/30' : 'border-[#C1C6C8]'
           }`}>
             {/* Collapsed View */}
             {item.saved && !isExpanded && (
@@ -97,7 +97,7 @@ export default function MultiCertificationQuestion({ value = [], onChange, max =
                     onClick={() => setExpandedIndex(index)}
                     className="px-4 py-2 bg-white border border-green-300 hover:bg-green-100 rounded-lg flex items-center gap-2 text-green-800 transition-colors"
                   >
-                    <Edit2 className="w-4 h-4" />
+                    <Edit className="w-4 h-4" />
                     Edit
                   </button>
                   <button
