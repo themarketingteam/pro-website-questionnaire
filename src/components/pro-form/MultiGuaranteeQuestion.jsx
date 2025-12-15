@@ -128,7 +128,7 @@ export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
           <div
             key={index}
             className={`border-2 rounded-lg transition-all ${
-              isSaved ? 'border-green-500 bg-green-50/30' : 'border-slate-300 bg-white'
+              isSaved ? 'border-green-500 bg-white' : 'border-slate-300 bg-white'
             }`}
           >
             {/* Header */}
