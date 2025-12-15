@@ -1,5 +1,5 @@
-import React from 'react';
-import { AlertCircle, AlertTriangle, CheckCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { AlertCircle, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import { useTextValidation } from './useTextValidation';
 
 export default function TextareaQuestion({ 
@@ -12,7 +12,16 @@ export default function TextareaQuestion({
   debounceMs = 500,
   onValidationChange
 }) {
-  const validation = useTextValidation(value, questionId, debounceMs);
+  const [isManualValidating, setIsManualValidating] = useState(false);
+  const validation = useTextValidation(value, questionId, debounceMs, isManualValidating, setIsManualValidating);
+
+  const handleManualValidate = () => {
+    if (!value || value.trim().length === 0) return;
+    console.log(`🔘 [Q${questionId}] Manual validation triggered`);
+    setIsManualValidating(true);
+  };
+
+  const showValidateButton = value && value.trim().length > 0 && validation.status === 'neutral';
 
   // Report validation status to parent
   React.useEffect(() => {
@@ -69,13 +78,32 @@ export default function TextareaQuestion({
 
   return (
     <div className="space-y-2">
-      <textarea
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        rows={rows}
-        className={`w-full p-3 border rounded focus:outline-none focus:ring-2 focus:border-transparent resize-y min-h-[120px] transition-colors ${getStatusBorderClass()}`}
-      />
+      <div className="relative">
+        <textarea
+          value={value || ''}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          rows={rows}
+          className={`w-full p-3 border rounded focus:outline-none focus:ring-2 focus:border-transparent resize-y min-h-[120px] transition-colors ${getStatusBorderClass()}`}
+        />
+        {showValidateButton && (
+          <button
+            type="button"
+            onClick={handleManualValidate}
+            disabled={isManualValidating}
+            className="absolute top-3 right-3 px-4 py-2 bg-[#1C82DE] hover:bg-[#075DA7] text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+          >
+            {isManualValidating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Validating...
+              </>
+            ) : (
+              'Validate Now'
+            )}
+          </button>
+        )}
+      </div>
 
       {validation.status !== 'neutral' && validation.message && (
         <div className={`flex items-start gap-2 p-3 border rounded text-sm ${getStatusBgClass()}`}>
