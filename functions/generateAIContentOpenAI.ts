@@ -87,34 +87,42 @@ Deno.serve(async (req) => {
 
               try {
                 const parsed = JSON.parse(data);
-                console.log('📦 Parsed event:', parsed.event);
+                console.log('📦 Event:', parsed.event);
+                
+                // Log the full parsed object to debug
+                if (parsed.event === 'thread.message.delta' || parsed.event === 'thread.message.created') {
+                  console.log('📋 Full delta data:', JSON.stringify(parsed.data));
+                }
                 
                 // Handle text deltas
                 if (parsed.event === 'thread.message.delta') {
-                  const delta = parsed.data.delta.content?.[0]?.text?.value;
+                  const delta = parsed.data?.delta?.content?.[0]?.text?.value;
                   if (delta) {
                     fullContent += delta;
-                    console.log('📝 Content delta received, total length:', fullContent.length);
+                    console.log('✍️ Delta added, total length:', fullContent.length);
                     controller.enqueue(encoder.encode(JSON.stringify({ 
                       content: fullContent, 
                       streaming: true 
                     }) + '\n'));
+                  } else {
+                    console.log('⚠️ Delta event but no text value');
                   }
                 }
                 
                 // Handle completion
                 if (parsed.event === 'thread.run.completed') {
                   console.log('✅ Run completed, full content length:', fullContent.length);
-                  console.log('📄 Full content:', fullContent);
                   
-                  controller.enqueue(encoder.encode(JSON.stringify({ 
-                    content: fullContent,
-                    streaming: false,
-                    done: true
-                  }) + '\n'));
+                  if (fullContent) {
+                    controller.enqueue(encoder.encode(JSON.stringify({ 
+                      content: fullContent,
+                      streaming: false,
+                      done: true
+                    }) + '\n'));
+                  }
                 }
               } catch (e) {
-                console.error('❌ Parse error:', e);
+                console.error('❌ Parse error:', e, 'Line:', data);
               }
             }
           }
