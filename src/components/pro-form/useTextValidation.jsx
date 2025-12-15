@@ -27,9 +27,9 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
       return;
     }
 
-    // Start new timer
-    timerRef.current = setTimeout(() => {
-      validateText(value, questionId);
+    // Start new timer - call async function
+    timerRef.current = setTimeout(async () => {
+      await validateText(value, questionId);
     }, debounceMs);
 
     // Cleanup
@@ -42,32 +42,34 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
 
   const validateText = async (text, qId) => {
     try {
+      console.log(`🔍 Starting validation for Q${qId}`);
+      
       // Create or reuse conversation with AI validator
       if (!conversationRef.current) {
+        console.log('Creating new conversation with form_qa_validator agent');
         conversationRef.current = await base44.agents.createConversation({
           agent_name: 'form_qa_validator',
           metadata: { name: `Validation for Q${qId}` }
         });
+        console.log('Conversation created:', conversationRef.current.id);
       }
 
       const conversation = conversationRef.current;
 
-      // Send validation request to AI agent
-      await base44.agents.addMessage(conversation, {
-        role: 'user',
-        content: `Validate this answer for question_${qId.replace('.', '_')}:\n\n${text}`
-      });
-
-      // Subscribe to get the AI response
+      // Subscribe BEFORE sending message
+      let responseReceived = false;
       const unsubscribe = base44.agents.subscribeToConversation(conversation.id, (data) => {
         const lastMessage = data.messages[data.messages.length - 1];
+        console.log('Received message update:', lastMessage?.role, lastMessage?.content?.substring(0, 100));
         
-        if (lastMessage?.role === 'assistant' && lastMessage?.content) {
+        if (lastMessage?.role === 'assistant' && lastMessage?.content && !responseReceived) {
+          responseReceived = true;
           try {
             // Parse JSON response from AI
             const jsonMatch = lastMessage.content.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
               const result = JSON.parse(jsonMatch[0]);
+              console.log('Parsed validation result:', result);
               
               // Map validation_status to UI status
               const statusMap = {
@@ -86,7 +88,6 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
             }
           } catch (err) {
             console.error('Failed to parse AI validation response:', err);
-            // Fallback to neutral
             setValidationState({
               status: 'neutral',
               message: '',
@@ -97,10 +98,20 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
         }
       });
 
-      // Timeout after 10 seconds
+      // Send validation request to AI agent
+      console.log('Sending validation request for Q' + qId);
+      await base44.agents.addMessage(conversation, {
+        role: 'user',
+        content: `Validate this answer for question_${qId.replace('.', '_')}:\n\n${text}`
+      });
+
+      // Timeout after 15 seconds
       setTimeout(() => {
-        unsubscribe();
-      }, 10000);
+        if (!responseReceived) {
+          console.warn('Validation timeout - no response received');
+          unsubscribe();
+        }
+      }, 15000);
 
     } catch (error) {
       console.error('Validation error:', error);
