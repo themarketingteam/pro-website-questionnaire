@@ -896,9 +896,17 @@ export default function ProQuestionnaire() {
               onAdd={(location) => {
                 setResponses(prev => {
                   const current = prev[question.id] || [];
-                  const newResponses = { ...prev, [question.id]: [...current, location] };
+                  const newLocations = [...current, location];
+                  const newResponses = { ...prev, [question.id]: newLocations };
                   saveToStorage(newResponses);
                   setShowAutoSave(s => s + 1);
+
+                  // Update validation status
+                  const min = question.limits?.min || 1;
+                  const max = question.limits?.max || 5;
+                  const newStatus = (newLocations.length >= min && newLocations.length <= max) ? 'complete' : 'incomplete';
+                  setValidationStatus(v => ({ ...v, [question.id]: newStatus }));
+
                   return newResponses;
                 });
               }}
@@ -912,13 +920,21 @@ export default function ProQuestionnaire() {
                   } else if (index < primaryIndex) {
                     primaryIndex = primaryIndex - 1;
                   }
+                  const newLocations = current.filter((_, i) => i !== index);
                   const newResponses = { 
                     ...prev, 
-                    [question.id]: current.filter((_, i) => i !== index),
+                    [question.id]: newLocations,
                     '5_primary': primaryIndex
                   };
                   saveToStorage(newResponses);
                   setShowAutoSave(s => s + 1);
+
+                  // Update validation status
+                  const min = question.limits?.min || 1;
+                  const max = question.limits?.max || 5;
+                  const newStatus = (newLocations.length >= min && newLocations.length <= max) ? 'complete' : 'incomplete';
+                  setValidationStatus(v => ({ ...v, [question.id]: newStatus }));
+
                   return newResponses;
                 });
               }}
