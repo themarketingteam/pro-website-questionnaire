@@ -82,7 +82,7 @@ export default function TextareaQuestion({
             type="button"
             onClick={validation.triggerValidation}
             disabled={validation.isValidating}
-            className="absolute top-3 right-3 px-3 py-1.5 bg-[#1C82DE] hover:bg-[#075DA7] text-white text-xs rounded flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="absolute top-3 right-3 z-10 px-3 py-1.5 bg-[#1C82DE] hover:bg-[#075DA7] text-white text-xs font-medium rounded flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
             title="Validate now"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${validation.isValidating ? 'animate-spin' : ''}`} />
