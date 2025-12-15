@@ -42,22 +42,34 @@ export default function AIContentModal({
         acc[key] = value;
         return acc;
       }, {});
-      
+
+      // Get responses
+      let responses = {};
       if (cookies['pro_questionnaire_responses']) {
-        const responses = JSON.parse(decodeURIComponent(cookies['pro_questionnaire_responses']));
-        return {
+        responses = JSON.parse(decodeURIComponent(cookies['pro_questionnaire_responses']));
+      }
+
+      // Get credentials (for business name)
+      let credentials = {};
+      if (cookies['pro_questionnaire_credentials']) {
+        credentials = JSON.parse(decodeURIComponent(cookies['pro_questionnaire_credentials']));
+      }
+
+      return {
+        businessName: credentials.businessName || 'the business',
+        responses: {
           service_offerings: responses['3'] || [],
           target_industries: responses['4'] || [],
           additional_pages_list: responses['1.1'] || '',
           company_description: responses['6'] || '',
           ideal_client: responses['22'] || '',
           client_size: responses['17'] || ''
-        };
-      }
+        }
+      };
     } catch (e) {
       console.error('Failed to parse form context:', e);
     }
-    return {};
+    return { businessName: 'the business', responses: {} };
   };
 
   const handleGenerate = async () => {
@@ -78,14 +90,15 @@ export default function AIContentModal({
     let accumulatedContent = '';
     
     try {
-      const formContext = getFormContext();
-      console.log('🔍 Form context gathered:', formContext);
-      
+      const contextData = getFormContext();
+      console.log('🔍 Form context gathered:', contextData);
+
       const payload = {
         userInstruction,
         questionContext,
         draftContent,
-        formContext
+        businessName: contextData.businessName,
+        jsonData: contextData.responses
       };
       console.log('📦 Full payload:', JSON.stringify(payload, null, 2));
 

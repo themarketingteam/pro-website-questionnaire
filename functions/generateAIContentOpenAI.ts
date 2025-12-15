@@ -1,10 +1,10 @@
 Deno.serve(async (req) => {
   try {
-    const { userInstruction, questionContext, draftContent, formContext } = await req.json();
+    const { userInstruction, questionContext, draftContent, businessName, jsonData } = await req.json();
 
     console.log('🎯 Backend received request');
     console.log('📝 User instruction:', userInstruction);
-    console.log('📋 Question context:', questionContext);
+    console.log('🏢 Business name:', businessName);
 
     if (!userInstruction?.trim()) {
       console.log('❌ No user instruction provided');
@@ -17,48 +17,41 @@ Deno.serve(async (req) => {
     console.log('🔑 OpenAI Key exists:', !!openaiKey);
     console.log('🤖 Assistant ID:', assistantId);
 
-    // Build the prompt with context
-    let prompt = `${questionContext}\n\n${userInstruction}`;
-    if (draftContent) {
-      prompt += `\n\nCurrent text:\n${draftContent}`;
-    }
-    if (formContext) {
-      prompt += `\n\nForm Context:\n${JSON.stringify(formContext, null, 2)}`;
-    }
-    
-    console.log('📨 Full prompt:', prompt);
+    // Construct the single-request body
+    const openaiRequestBody = {
+      assistant_id: assistantId,
+      thread: {
+        messages: [
+          {
+            role: "user",
+            content: `Please process this intake form data for business: ${businessName}\n\nData: ${JSON.stringify(jsonData)}\n\nUser Request: ${userInstruction}\nContext: ${questionContext}\nCurrent Draft: ${draftContent || "None"}`
+          }
+        ]
+      },
+      stream: true,
+      instructions: "Process the provided intake form data and generate a comprehensive response based on the business requirements and metadata provided."
+    };
 
-    // Create a thread
-    const threadResponse = await fetch('https://api.openai.com/v1/threads', {
+    console.log('📨 Sending Create Thread & Run request to OpenAI...');
+
+    // Call the single endpoint
+    const runResponse = await fetch('https://api.openai.com/v1/threads/runs', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${openaiKey}`,
         'OpenAI-Beta': 'assistants=v2'
       },
-      body: JSON.stringify({
-        messages: [{ role: 'user', content: prompt }]
-      })
+      body: JSON.stringify(openaiRequestBody)
     });
-    const thread = await threadResponse.json();
-    console.log('🧵 Thread ID:', thread.id);
-    console.log('📝 Full Thread Response:', JSON.stringify(thread, null, 2));
 
-    // Create a run with streaming
-    const runResponse = await fetch(`https://api.openai.com/v1/threads/${thread.id}/runs`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiKey}`,
-        'OpenAI-Beta': 'assistants=v2'
-      },
-      body: JSON.stringify({
-        assistant_id: assistantId,
-        stream: true
-      })
-    });
-    console.log('🏃 Run created for thread:', thread.id);
-    console.log('🤖 Assistant ID:', assistantId);
+    if (!runResponse.ok) {
+      const err = await runResponse.text();
+      console.error('❌ OpenAI Error:', err);
+      throw new Error(`OpenAI API Error: ${runResponse.statusText}`);
+    }
+
+    console.log('✅ OpenAI request successful, streaming response...');
 
     // Stream the response
     const stream = new ReadableStream({
@@ -114,18 +107,10 @@ Deno.serve(async (req) => {
                   console.log('✅ Run completed, full content length:', fullContent.length);
                   console.log('📄 Full content:', fullContent);
                   
-                  const hasMultipleQuestions = (fullContent.match(/\?/g) || []).length >= 2;
-                  const hasQuestionPrompts = /could you|can you|do you|what|how|tell me more|help me/i.test(fullContent);
-                  const isShort = fullContent.length < 500;
-                  const isQuestions = hasMultipleQuestions && hasQuestionPrompts && isShort;
-                  
-                  console.log('❓ Is questions:', isQuestions);
-                  
                   controller.enqueue(encoder.encode(JSON.stringify({ 
                     content: fullContent,
                     streaming: false,
-                    done: true,
-                    isQuestions 
+                    done: true
                   }) + '\n'));
                 }
               } catch (e) {
