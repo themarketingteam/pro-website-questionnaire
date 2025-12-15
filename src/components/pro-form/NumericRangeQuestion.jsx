@@ -36,8 +36,16 @@ export default function NumericRangeQuestion({
         }
         setIsLocked(true);
       }
+    } else if (!value) {
+      // Reset to defaults when value is cleared
+      setSmallest(minValue);
+      setLargest(maxValue);
+      setSmallestInput(minValue.toString());
+      setLargestInput(maxValue.toString());
+      setIsLocked(false);
+      setValidationError('');
     }
-  }, []);
+  }, [value, minValue, maxValue]);
 
   // Cleanup timers on unmount
   useEffect(() => {
