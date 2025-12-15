@@ -5,13 +5,11 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
   const [validationState, setValidationState] = useState({
     status: 'neutral', // 'green', 'yellow', 'red', 'neutral'
     message: '',
-    charCount: 0,
-    isValidating: false
+    charCount: 0
   });
   
   const timerRef = useRef(null);
   const conversationRef = useRef(null);
-  const [manualTrigger, setManualTrigger] = useState(0);
 
   useEffect(() => {
     // Clear any existing timer
@@ -24,8 +22,7 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
       setValidationState({
         status: 'neutral',
         message: '',
-        charCount: 0,
-        isValidating: false
+        charCount: 0
       });
       return;
     }
@@ -41,10 +38,9 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
         clearTimeout(timerRef.current);
       }
     };
-  }, [value, questionId, debounceMs, manualTrigger]);
+  }, [value, questionId, debounceMs]);
 
   const validateText = async (text, qId) => {
-    setValidationState(prev => ({ ...prev, isValidating: true }));
     try {
       console.log(`🔍 Starting validation for Q${qId}`);
       
@@ -85,8 +81,7 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
               setValidationState({
                 status: statusMap[result.validation_status] || 'neutral',
                 message: result.user_message || '',
-                charCount: result.char_count || text.length,
-                isValidating: false
+                charCount: result.char_count || text.length
               });
               
               unsubscribe();
@@ -96,8 +91,7 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
             setValidationState({
               status: 'neutral',
               message: '',
-              charCount: text.length,
-              isValidating: false
+              charCount: text.length
             });
             unsubscribe();
           }
@@ -125,26 +119,10 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
       setValidationState({
         status: 'neutral',
         message: '',
-        charCount: text.length,
-        isValidating: false
+        charCount: text.length
       });
     }
   };
 
-  const triggerValidation = () => {
-    if (value && value.trim().length > 0) {
-      // Cancel any pending debounced validation
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-        timerRef.current = null;
-      }
-      // Clear the conversation to start fresh
-      conversationRef.current = null;
-      // Trigger immediate validation
-      setManualTrigger(prev => prev + 1);
-      validateText(value, questionId);
-    }
-  };
-
-  return { ...validationState, triggerValidation };
+  return validationState;
 }

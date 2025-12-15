@@ -248,14 +248,9 @@ export default function ProQuestionnaire() {
         newStatus['2'] = calculateQuestion2Status(status, value2_2);
       }
 
-      // Special handling for question 23.1
-      if (questionId === '23.1') {
-        newStatus['23'] = status;
-      }
-
       // If this is a child question, update parent status
       const parentId = questionId.split('.')[0];
-      if (questionId.includes('.') && parentId && parentId !== '2' && parentId !== '23') {
+      if (questionId.includes('.') && parentId && parentId !== '2') {
         // Calculate parent status based on all children
         const question = QUESTIONS.find(q => q.id === parentId);
         if (question?.conditionalChildren && responses[parentId] === 'yes') {
@@ -306,23 +301,13 @@ export default function ProQuestionnaire() {
     switch (question.type) {
       case 'yes_no':
         if (value === 'yes' || value === 'no') {
-          // Special handling for question 23
-          if (questionId === '23' && value === 'yes') {
-            const child23_1Status = validationStatus['23.1'] || '';
-            if (child23_1Status === 'complete' || child23_1Status === 'needs_work') {
-              newStatus = child23_1Status;
-            } else {
+          newStatus = 'complete';
+          // If yes, check children
+          if (value === 'yes' && question.conditionalChildren) {
+            const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
+            if (requiredChildren.length > 0) {
+              // Parent status will be updated by children
               newStatus = 'incomplete';
-            }
-          } else {
-            newStatus = 'complete';
-            // If yes, check children
-            if (value === 'yes' && question.conditionalChildren) {
-              const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
-              if (requiredChildren.length > 0) {
-                // Parent status will be updated by children
-                newStatus = 'incomplete';
-              }
             }
           }
         }

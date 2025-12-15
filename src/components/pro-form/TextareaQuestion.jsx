@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useTextValidation } from './useTextValidation';
 
 export default function TextareaQuestion({ 
@@ -69,27 +69,13 @@ export default function TextareaQuestion({
 
   return (
     <div className="space-y-2">
-      <div className="relative">
-        <textarea
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          rows={rows}
-          className={`w-full p-3 pr-28 border rounded focus:outline-none focus:ring-2 focus:border-transparent resize-y min-h-[120px] transition-colors ${getStatusBorderClass()}`}
-        />
-        {value && value.trim().length > 0 && (
-          <button
-            type="button"
-            onClick={validation.triggerValidation}
-            disabled={validation.isValidating}
-            className="absolute top-3 right-3 z-10 px-3 py-1.5 bg-[#1C82DE] hover:bg-[#075DA7] text-white text-xs font-medium rounded flex items-center gap-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-            title="Validate now"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${validation.isValidating ? 'animate-spin' : ''}`} />
-            {validation.isValidating ? 'Validating...' : 'Validate'}
-          </button>
-        )}
-      </div>
+      <textarea
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className={`w-full p-3 border rounded focus:outline-none focus:ring-2 focus:border-transparent resize-y min-h-[120px] transition-colors ${getStatusBorderClass()}`}
+      />
 
       {validation.status !== 'neutral' && validation.message && (
         <div className={`flex items-start gap-2 p-3 border rounded text-sm ${getStatusBgClass()}`}>
