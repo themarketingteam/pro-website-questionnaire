@@ -248,6 +248,11 @@ export default function ProQuestionnaire() {
         newStatus['2'] = calculateQuestion2Status(status, value2_2);
       }
 
+      // Special handling for question 23.1
+      if (questionId === '23.1') {
+        newStatus['23'] = status;
+      }
+
       // If this is a child question, update parent status
       const parentId = questionId.split('.')[0];
       if (questionId.includes('.') && parentId && parentId !== '2') {
@@ -308,6 +313,14 @@ export default function ProQuestionnaire() {
             if (requiredChildren.length > 0) {
               // Parent status will be updated by children
               newStatus = 'incomplete';
+              
+              // Special handling for Q23 - check if child 23.1 has validation status
+              if (questionId === '23') {
+                const child23_1Status = validationStatus['23.1'] || '';
+                if (child23_1Status && child23_1Status !== '') {
+                  newStatus = child23_1Status;
+                }
+              }
             }
           }
         }
