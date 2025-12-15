@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 
-export function useTextValidation(value, questionId, debounceMs = 3000) {
+export function useTextValidation(value, questionId, debounceMs = 3000, isManualValidating = false, setIsManualValidating = null) {
   const [validationState, setValidationState] = useState({
     status: 'neutral', // 'green', 'yellow', 'red', 'neutral'
     message: '',
@@ -10,6 +10,18 @@ export function useTextValidation(value, questionId, debounceMs = 3000) {
   
   const timerRef = useRef(null);
   const conversationRef = useRef(null);
+
+  // Manual validation trigger
+  useEffect(() => {
+    if (isManualValidating && value && value.trim().length > 0) {
+      console.log(`🔘 [Q${questionId}] Manual validation effect triggered`);
+      validateText(value, questionId).finally(() => {
+        if (setIsManualValidating) {
+          setIsManualValidating(false);
+        }
+      });
+    }
+  }, [isManualValidating]);
 
   useEffect(() => {
     // Clear any existing timer
