@@ -1035,6 +1035,7 @@ export default function ProQuestionnaire() {
                       isComplete={isQuestionComplete(question.id)}
                       wasTouched={touchedQuestions[question.id]}
                       validationStatus={getQuestionValidationStatus(question.id)}
+                      showStatusIcon={touchedQuestions[question.id]}
                     >
                       {renderQuestion(question)}
                     </QuestionWrapper>
