@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import { Sparkles, AlertCircle, AlertTriangle, CheckCircle } from 'lucide-react';
-import AIContentModal from './AIContentModal';
+import React from 'react';
+import { AlertCircle, AlertTriangle, CheckCircle } from 'lucide-react';
 import { useTextValidation } from './useTextValidation';
 
 export default function TextareaQuestion({ 
@@ -11,7 +10,6 @@ export default function TextareaQuestion({
   questionContext = "General question",
   questionId = ""
 }) {
-  const [showAIModal, setShowAIModal] = useState(false);
   const validation = useTextValidation(value, questionId, 3000);
 
   const getStatusIcon = () => {
@@ -55,15 +53,6 @@ export default function TextareaQuestion({
 
   return (
     <div className="space-y-2">
-      <button
-        type="button"
-        onClick={() => setShowAIModal(true)}
-        className="text-sm text-purple-600 hover:text-purple-700 flex items-center gap-1.5 transition-colors"
-      >
-        <Sparkles className="w-3.5 h-3.5" />
-        Generate with AI (Beta)
-      </button>
-
       <textarea
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
@@ -85,14 +74,6 @@ export default function TextareaQuestion({
           </div>
         </div>
       )}
-
-      <AIContentModal
-        open={showAIModal}
-        onClose={() => setShowAIModal(false)}
-        currentValue={value}
-        questionContext={questionContext}
-        onInject={onChange}
-      />
     </div>
   );
 }
