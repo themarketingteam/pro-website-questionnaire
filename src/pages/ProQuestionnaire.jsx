@@ -406,7 +406,11 @@ export default function ProQuestionnaire() {
         // Special handling for question 14.1
         if (questionId === '14.1') {
           const q14Status = validItems.length > 0 ? 'complete' : 'incomplete';
-          setValidationStatus(v => ({ ...v, '14': q14Status }));
+          setValidationStatus(v => {
+            const updated = { ...v, '14': q14Status };
+            saveValidationToStorage(updated);
+            return updated;
+          });
         }
         break;
       }
@@ -425,7 +429,11 @@ export default function ProQuestionnaire() {
         return;
     }
 
-    setValidationStatus(prev => ({ ...prev, [questionId]: newStatus }));
+    setValidationStatus(prev => {
+      const updated = { ...prev, [questionId]: newStatus };
+      saveValidationToStorage(updated);
+      return updated;
+    });
   };
 
   const resetQuestion = (questionId) => {
@@ -1046,7 +1054,11 @@ export default function ProQuestionnaire() {
                   item.saved === true || (item.name?.trim() && item.type && item.saved !== false)
                 ) : [];
                 const newStatus = validItems.length > 0 ? 'complete' : 'incomplete';
-                setValidationStatus(v => ({ ...v, '12': newStatus }));
+                setValidationStatus(v => {
+                  const updated = { ...v, '12': newStatus };
+                  saveValidationToStorage(updated);
+                  return updated;
+                });
               }
             }}
             max={question.limits?.max || 10}
@@ -1066,7 +1078,11 @@ export default function ProQuestionnaire() {
                   item.saved === true || (item.name?.trim() && item.type && (item.file || item.description?.trim()) && item.saved !== false)
                 ) : [];
                 const newStatus = validItems.length > 0 ? 'complete' : 'incomplete';
-                setValidationStatus(v => ({ ...v, '14': newStatus }));
+                setValidationStatus(v => {
+                  const updated = { ...v, '14': newStatus };
+                  saveValidationToStorage(updated);
+                  return updated;
+                });
               }
             }}
             max={question.limits?.max || 10}
