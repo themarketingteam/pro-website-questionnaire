@@ -851,7 +851,7 @@ export default function ProQuestionnaire() {
 
       // Send to Zapier webhook
       const hookID = import.meta.env.VITE_API_HOOK_ID || "23529934";
-      const hookKey = import.meta.env.VITE_API_HOOK_KEY || "uk2zhso";
+      const hookKey = import.meta.env.VITE_API_HOOK_KEY || "uas7p60";
       const webhookUrl = `https://hooks.zapier.com/hooks/catch/${hookID}/${hookKey}/`;
       
       await fetch(webhookUrl, {
