@@ -787,6 +787,19 @@ export default function ProQuestionnaire() {
         }))
       : [];
 
+    // Build additional_pages_list structure
+    const additionalPagesList = {
+      why_choose_us_page: {
+        generate_page: responses['1'] === 'yes',
+        why_choose_us_description: responses['1'] === 'yes' ? (responses['1.1'] || '') : ''
+      },
+      meet_the_team_page: {
+        generate_page: responses['2'] === 'yes',
+        team_introduction: responses['2'] === 'yes' ? (responses['2.1'] || '') : '',
+        team_photo_with_tags: teamPhoto
+      }
+    };
+
     return {
       metadata: {
         business_name: businessName,
@@ -795,11 +808,7 @@ export default function ProQuestionnaire() {
         service_type: "pro"
       },
       userdata: {
-        additional_pages_needed: responses['1'] === 'yes',
-        additional_pages_list: responses['1'] === 'yes' ? (responses['1.1'] || '') : '',
-        meet_the_team_page: responses['2'] === 'yes',
-        team_introduction: responses['2'] === 'yes' ? (responses['2.1'] || '') : '',
-        team_photo_with_tags: teamPhoto,
+        additional_pages_list: additionalPagesList,
         service_offerings: (responses['3'] || []).filter(s => !s.startsWith('CATEGORY:')),
         service_offerings_other: responses['3_other'] || '',
         target_industries: responses['4'] || [],
