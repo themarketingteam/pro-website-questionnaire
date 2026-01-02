@@ -31,7 +31,7 @@ export default function SelectionSpanIndicator({
           <p className="font-semibold">
             <span className="text-black">Selection Balance:</span>
             <span className={isValid ? 'text-[#6AA72F]' : isTooLow ? 'text-[#D37E00]' : 'text-red-800'}>
-              {' '}{total} / {minTotal}-{maxTotal}
+              {' '}{total} / {maxTotal} (minimum {minTotal})
             </span>
           </p>
           <p className={`text-sm mt-1 ${
