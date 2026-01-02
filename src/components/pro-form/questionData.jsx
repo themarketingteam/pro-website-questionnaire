@@ -306,7 +306,7 @@ export const QUESTIONS = [
     {
     id: "6",
     section: "About Your Business",
-    title: "How would you describe your company in one or two sentences?",
+    title: "In your own words, explain what your company does and who it helps, as if you were speaking to someone with no IT background.",
     why: "This concise description informs the top-level messaging for the homepage hero section, About page introduction, and metadata language. It helps establish your positioning and communicates your value in a high-level, client-friendly format.",
     guidance: "Provide a short summary that clearly states what your company does and who you serve. Focus on your specialization, geographic focus, or core differentiators. Avoid long lists or technical jargon—this should be polished, brand-ready language.",
     type: "textarea",
