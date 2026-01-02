@@ -30,7 +30,8 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
       setValidationState({
         status: 'neutral',
         message: '',
-        charCount: 0
+        charCount: 0,
+        expectedRange: null
       });
       lastValidatedValueRef.current = '';
     } else {
