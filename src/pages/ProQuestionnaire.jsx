@@ -188,7 +188,35 @@ export default function ProQuestionnaire() {
       }
     });
     setExpandedQuestions(expanded);
-  }, []);
+
+    // Mark questions with responses as touched and trigger validation
+    const touched = {};
+    Object.keys(initialResponses).forEach(key => {
+      if (!key.includes('_other') && !key.includes('_primary') && initialResponses[key]) {
+        touched[key] = true;
+        // For yes/no questions with "no", set as complete
+        const yesNoQuestions = ['1', '2', '12', '14', '23', '25'];
+        if (yesNoQuestions.includes(key) && initialResponses[key] === 'no') {
+          initialValidation[key] = 'complete';
+        }
+      }
+    });
+    setTouchedQuestions(touched);
+
+    // Update validation for all non-textarea questions with responses
+    QUESTIONS.forEach(q => {
+      if (initialResponses[q.id] && q.type !== 'textarea') {
+        updateQuestionValidation(q.id, initialResponses[q.id], initialResponses);
+      }
+      if (q.conditionalChildren) {
+        q.conditionalChildren.forEach(child => {
+          if (initialResponses[child.id] && child.type !== 'textarea') {
+            updateQuestionValidation(child.id, initialResponses[child.id], initialResponses);
+          }
+        });
+      }
+    });
+    }, []);
 
   // Auto-save to cookie
   const saveToStorage = useCallback((data) => {
