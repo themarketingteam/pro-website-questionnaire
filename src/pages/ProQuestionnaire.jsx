@@ -712,6 +712,11 @@ export default function ProQuestionnaire() {
   };
 
   const getQuestionValidationStatus = (questionId) => {
+    // If this is a yes/no question with answer "no", always return 'complete'
+    const question = QUESTIONS.find(q => q.id === questionId);
+    if (question?.type === 'yes_no' && responses[questionId] === 'no') {
+      return 'complete';
+    }
     return validationStatus[questionId] || 'neutral';
   };
 
