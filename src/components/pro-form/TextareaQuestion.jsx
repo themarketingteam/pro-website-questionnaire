@@ -21,8 +21,6 @@ export default function TextareaQuestion({
     setIsManualValidating(true);
   };
 
-  const showValidateButton = value && value.trim().length > 0 && validation.status === 'neutral';
-
   // Report validation status to parent
   React.useEffect(() => {
     if (onValidationChange) {
