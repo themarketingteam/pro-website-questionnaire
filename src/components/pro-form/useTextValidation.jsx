@@ -8,10 +8,7 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
     charCount: 0
   });
   
-  const timerRef = useRef(null);
-  const conversationRef = useRef(null);
-
-  // Manual validation trigger
+  // Manual validation trigger - ONLY validation method now
   useEffect(() => {
     if (isManualValidating && value && value.trim().length > 0) {
       console.log(`🔘 [Q${questionId}] Manual validation effect triggered`);
@@ -23,34 +20,21 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
     }
   }, [isManualValidating]);
 
+  // Update char count on value change, but don't auto-validate
   useEffect(() => {
-    // Clear any existing timer
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-    }
-
-    // Don't validate empty inputs
     if (!value || value.trim().length === 0) {
       setValidationState({
         status: 'neutral',
         message: '',
         charCount: 0
       });
-      return;
+    } else {
+      setValidationState(prev => ({
+        ...prev,
+        charCount: value.length
+      }));
     }
-
-    // Start new timer - call async function
-    timerRef.current = setTimeout(async () => {
-      await validateText(value, questionId);
-    }, debounceMs);
-
-    // Cleanup
-    return () => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-    };
-  }, [value, questionId, debounceMs]);
+  }, [value]);
 
   const validateText = async (text, qId) => {
     try {
