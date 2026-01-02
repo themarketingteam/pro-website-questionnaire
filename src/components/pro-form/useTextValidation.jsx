@@ -84,7 +84,8 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
       setValidationState({
         status: statusMap[result.status] || 'neutral',
         message: result.message || '',
-        charCount: result.characterCount || text.length
+        charCount: result.characterCount || text.length,
+        expectedRange: result.expectedRange || null
       });
 
       // Update last validated value
