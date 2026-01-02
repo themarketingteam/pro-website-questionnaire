@@ -84,6 +84,9 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
         charCount: result.characterCount || text.length
       });
 
+      // Update last validated value
+      lastValidatedValueRef.current = text;
+
     } catch (error) {
       console.error(`❌ [Q${qId}] Validation error:`, error);
       console.error(`❌ [Q${qId}] Error details:`, {
