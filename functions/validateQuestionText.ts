@@ -19,6 +19,60 @@ const VALIDATION_INSTRUCTIONS = {
       "Minimum 100 characters, ideal 150-300 characters"
     ]
   },
+  question_6: {
+    field: "Company Description and History",
+    criteria: [
+      "Provides clear overview of the company and its history",
+      "Includes founding story, mission, or key milestones",
+      "Professional tone appropriate for business audience",
+      "Minimum 100 characters, ideal 150-400 characters"
+    ]
+  },
+  question_9: {
+    field: "What Makes You Different",
+    criteria: [
+      "Clearly articulates unique differentiators from competitors",
+      "Specific examples of what sets the company apart",
+      "Focuses on tangible benefits and value",
+      "Minimum 100 characters, ideal 150-300 characters"
+    ]
+  },
+  question_13: {
+    field: "Sales Process and Client Onboarding",
+    criteria: [
+      "Describes clear steps in the sales and onboarding process",
+      "Explains what clients can expect when engaging",
+      "Professional and reassuring tone",
+      "Minimum 100 characters, ideal 150-400 characters"
+    ]
+  },
+  question_19: {
+    field: "Client Frustrations and Pain Points",
+    criteria: [
+      "Identifies specific frustrations ideal clients experience",
+      "Shows understanding of client challenges",
+      "Professional and empathetic tone",
+      "Minimum 80 characters, ideal 120-300 characters"
+    ]
+  },
+  question_21: {
+    field: "How You Deliver Value",
+    criteria: [
+      "Clearly explains the value delivery process",
+      "Includes specific examples of client benefits",
+      "Professional and results-focused tone",
+      "Minimum 100 characters, ideal 150-350 characters"
+    ]
+  },
+  question_22: {
+    field: "Ideal Client Profile",
+    criteria: [
+      "Provides detailed description of ideal client characteristics",
+      "Includes specific attributes like size, industry, needs",
+      "Professional and targeted tone",
+      "Minimum 80 characters, ideal 120-300 characters"
+    ]
+  },
   question_23_1: {
     field: "Avoided Client Types",
     criteria: [
