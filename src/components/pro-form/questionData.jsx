@@ -310,7 +310,7 @@ export const QUESTIONS = [
     why: "This concise description informs the top-level messaging for the homepage hero section, About page introduction, and metadata language. It helps establish your positioning and communicates your value in a high-level, client-friendly format.",
     guidance: "Provide a short summary that clearly states what your company does and who you serve. Focus on your specialization, geographic focus, or core differentiators. Avoid long lists or technical jargon—this should be polished, brand-ready language.",
     type: "textarea",
-    examples: { shortAnswer: "We are a cybersecurity-driven Managed IT Provider supporting small and mid-sized professional firms throughout the Midwest." }
+    examples: { shortAnswer: "Our company helps small and mid-sized businesses take the stress out of their technology so they can focus on running their business. We work with companies that rely on computers, email, and the internet every day but don't have the time or expertise to manage those systems themselves. We handle things like keeping their devices secure, making sure their data is backed up, fixing issues when something breaks, and helping their teams work more efficiently. Our goal is to be a reliable partner that prevents problems before they happen and explains everything in a clear, non-technical way." }
     },
     {
     id: "7",
