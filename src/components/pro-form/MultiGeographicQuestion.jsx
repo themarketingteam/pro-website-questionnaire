@@ -133,8 +133,8 @@ export default function MultiGeographicQuestion({
           isCity: isCity
         };
 
-        // Check if already added using current selectedLocations
-        if (selectedLocations.some(loc => loc.place_id === meta.place_id)) {
+        // Check if already added using ref to avoid stale closure
+        if (selectedLocationsRef.current.some(loc => loc.place_id === meta.place_id)) {
           alert("This location has already been added.");
           setCurrentInput("");
           return;
