@@ -601,6 +601,12 @@ export default function ProQuestionnaire() {
       if (hasValidAnswer && answer === 'yes' && question.conditionalChildren) {
       const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
       const allChildrenComplete = requiredChildren.every(child => {
+        // Check validation status first for child questions
+        const childStatus = validationStatus[child.id];
+        if (childStatus === 'complete' || childStatus === 'needs_work') {
+          return true;
+        }
+
         const childQuestion = QUESTIONS.find(q => q.id === child.id);
         if (!childQuestion) return false;
 
