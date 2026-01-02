@@ -21,6 +21,7 @@ import InfoMessageQuestion from '@/components/pro-form/InfoMessageQuestion';
 import SelectionSpanIndicator from '@/components/pro-form/SelectionSpanIndicator';
 import AutoSaveIndicator from '@/components/pro-form/AutoSaveIndicator';
 import ConfirmModal from '@/components/pro-form/ConfirmModal';
+import ValidationGuide from '@/components/pro-form/ValidationGuide';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 
 const COOKIE_NAME = 'pro_questionnaire_responses';
@@ -1331,10 +1332,12 @@ export default function ProQuestionnaire() {
               >
                 Clear All
               </button>
-            </div>
-          </div>
-          </div>
-      </main>
+              </div>
+              </div>
+
+              <ValidationGuide />
+              </div>
+              </main>
 
       <AutoSaveIndicator show={showAutoSave} />
 

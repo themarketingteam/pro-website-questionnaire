@@ -32,13 +32,25 @@ export default function QuestionWrapper({
 
     // Use validation status if provided
     if (validationStatus === 'complete') {
-      return <CheckCircle2 className="w-6 h-6 text-green-600" />;
+      return (
+        <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center">
+          <CheckCircle2 className="w-5 h-5 text-white" />
+        </div>
+      );
     }
     if (validationStatus === 'needs_work') {
-      return <AlertTriangle className="w-6 h-6 text-amber-500" />;
+      return (
+        <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center">
+          <AlertTriangle className="w-5 h-5 text-white" />
+        </div>
+      );
     }
     if (validationStatus === 'incomplete') {
-      return <AlertCircle className="w-6 h-6 text-red-600" />;
+      return (
+        <div className="w-8 h-8 rounded bg-red-500 flex items-center justify-center">
+          <AlertCircle className="w-5 h-5 text-white" />
+        </div>
+      );
     }
 
     // Fallback
