@@ -393,7 +393,7 @@ export const QUESTIONS = [
     why: "This allows us to construct a clear, client-friendly process section that explains exactly how prospects move from consultation to onboarding. It increases transparency and helps build trust.",
     guidance: "Describe the workflow a client experiences—typically 3–5 steps. Examples include consultation, assessment, proposal, onboarding, and ongoing support. If your process includes guarantees or follow-ups, include those details as well.",
     type: "textarea",
-    examples: { shortAnswer: "Discovery call → Network assessment → Proposal → Kickoff meeting → 30-day onboarding and optimization" }
+    examples: { shortAnswer: "Our process starts with a discovery call to understand the client's business and goals. We then perform a technical assessment, present a tailored proposal, and hold a kickoff meeting. Once approved, we complete onboarding over 30 days, optimizing systems, security, and workflows." }
   },
   {
     id: "14",
