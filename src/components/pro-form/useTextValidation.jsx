@@ -20,7 +20,10 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
     }
   }, [isManualValidating]);
 
-  // Update char count on value change, but don't auto-validate
+  // Track the last validated value
+  const lastValidatedValueRef = useRef(value);
+
+  // Update char count on value change, reset validation if content changes
   useEffect(() => {
     if (!value || value.trim().length === 0) {
       setValidationState({
@@ -28,11 +31,22 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
         message: '',
         charCount: 0
       });
+      lastValidatedValueRef.current = '';
     } else {
-      setValidationState(prev => ({
-        ...prev,
-        charCount: value.length
-      }));
+      // If value changed from last validated value, reset to neutral
+      if (lastValidatedValueRef.current && value !== lastValidatedValueRef.current) {
+        setValidationState({
+          status: 'neutral',
+          message: '',
+          charCount: value.length
+        });
+      } else {
+        // Just update char count without changing status
+        setValidationState(prev => ({
+          ...prev,
+          charCount: value.length
+        }));
+      }
     }
   }, [value]);
 
