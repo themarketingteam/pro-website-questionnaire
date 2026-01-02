@@ -1214,7 +1214,7 @@ export default function ProQuestionnaire() {
             <section key={sectionName} className="space-y-8">
               <div className="pb-6 border-b-2 border-[#1E6BA8]">
                 <h2 className="text-2xl font-bold text-[#1E6BA8]">
-                  Section {sectionIndex + 1}: {sectionName}
+                  {sectionName}
                 </h2>
               </div>
 
