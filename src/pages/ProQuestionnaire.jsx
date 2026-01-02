@@ -189,33 +189,44 @@ export default function ProQuestionnaire() {
     });
     setExpandedQuestions(expanded);
 
-    // Mark questions with responses as touched and trigger validation
-    const touched = {};
-    Object.keys(initialResponses).forEach(key => {
-      if (!key.includes('_other') && !key.includes('_primary') && initialResponses[key]) {
-        touched[key] = true;
-        // For yes/no questions with "no", set as complete
-        const yesNoQuestions = ['1', '2', '12', '14', '23', '25'];
-        if (yesNoQuestions.includes(key) && initialResponses[key] === 'no') {
-          initialValidation[key] = 'complete';
-        }
+    // Check if there's any actual user data (beyond defaults)
+    const defaultKeys = ['1', '2', '12', '14', '23', '25'];
+    const hasUserData = Object.keys(initialResponses).some(key => {
+      if (defaultKeys.includes(key) && initialResponses[key] === 'no') {
+        return false; // Default value doesn't count
       }
+      return true;
     });
-    setTouchedQuestions(touched);
 
-    // Update validation for all non-textarea questions with responses
-    QUESTIONS.forEach(q => {
-      if (initialResponses[q.id] && q.type !== 'textarea') {
-        updateQuestionValidation(q.id, initialResponses[q.id], initialResponses);
-      }
-      if (q.conditionalChildren) {
-        q.conditionalChildren.forEach(child => {
-          if (initialResponses[child.id] && child.type !== 'textarea') {
-            updateQuestionValidation(child.id, initialResponses[child.id], initialResponses);
+    // Only mark questions as touched and trigger validation if there's real user data
+    if (hasUserData) {
+      const touched = {};
+      Object.keys(initialResponses).forEach(key => {
+        if (!key.includes('_other') && !key.includes('_primary') && initialResponses[key]) {
+          touched[key] = true;
+          // For yes/no questions with "no", set as complete
+          const yesNoQuestions = ['1', '2', '12', '14', '23', '25'];
+          if (yesNoQuestions.includes(key) && initialResponses[key] === 'no') {
+            initialValidation[key] = 'complete';
           }
-        });
-      }
-    });
+        }
+      });
+      setTouchedQuestions(touched);
+
+      // Update validation for all non-textarea questions with responses
+      QUESTIONS.forEach(q => {
+        if (initialResponses[q.id] && q.type !== 'textarea') {
+          updateQuestionValidation(q.id, initialResponses[q.id], initialResponses);
+        }
+        if (q.conditionalChildren) {
+          q.conditionalChildren.forEach(child => {
+            if (initialResponses[child.id] && child.type !== 'textarea') {
+              updateQuestionValidation(child.id, initialResponses[child.id], initialResponses);
+            }
+          });
+        }
+      });
+    }
     }, []);
 
   // Auto-save to cookie
