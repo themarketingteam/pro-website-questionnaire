@@ -24,16 +24,30 @@ Deno.serve(async (req) => {
     let validationResult = null;
     let responseComplete = false;
 
+    // Send message first
+    await base44.asServiceRole.agents.addMessage(conversation, {
+      role: 'user',
+      content: `Validate this answer for ${questionContext}:\n\n${text}`
+    });
+
+    // Then subscribe to get the response
     const unsubscribe = base44.asServiceRole.agents.subscribeToConversation(
       conversation.id,
       (data) => {
         const lastMessage = data.messages[data.messages.length - 1];
         if (lastMessage?.role === 'assistant' && lastMessage.content) {
           try {
-            const parsed = JSON.parse(lastMessage.content);
-            if (parsed.status && parsed.message) {
-              validationResult = parsed;
-              responseComplete = true;
+            // Try to extract JSON from the response
+            const jsonMatch = lastMessage.content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              const parsed = JSON.parse(jsonMatch[0]);
+              if (parsed.validation_status && parsed.user_message) {
+                validationResult = {
+                  status: parsed.validation_status,
+                  message: parsed.user_message
+                };
+                responseComplete = true;
+              }
             }
           } catch (e) {
             // Not JSON yet, keep waiting
@@ -41,11 +55,6 @@ Deno.serve(async (req) => {
         }
       }
     );
-
-    await base44.asServiceRole.agents.addMessage(conversation, {
-      role: 'user',
-      content: text
-    });
 
     // Wait for response (max 30 seconds)
     const maxWait = 30000;
