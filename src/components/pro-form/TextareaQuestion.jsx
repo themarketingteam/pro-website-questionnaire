@@ -98,23 +98,21 @@ export default function TextareaQuestion({
         </div>
       )}
 
-      {showValidateButton && (
-        <button
-          type="button"
-          onClick={handleManualValidate}
-          disabled={isManualValidating}
-          className="px-4 py-2 bg-[#1C82DE] hover:bg-[#075DA7] text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-        >
-          {isManualValidating ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              Validating...
-            </>
-          ) : (
-            'Validate Now'
-          )}
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={handleManualValidate}
+        disabled={isManualValidating || !value || value.trim().length === 0}
+        className="px-4 py-2 bg-[#1C82DE] hover:bg-[#075DA7] text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+      >
+        {isManualValidating ? (
+          <>
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Validating...
+          </>
+        ) : (
+          'Validate Now'
+        )}
+      </button>
     </div>
   );
 }
