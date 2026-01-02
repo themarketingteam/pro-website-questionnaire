@@ -338,13 +338,27 @@ export default function ProQuestionnaire() {
       case 'yes_no':
         if (value === 'yes' || value === 'no') {
           newStatus = 'complete';
+
+          // If switching to 'no', clear children validation statuses
+          if (value === 'no' && question.conditionalChildren) {
+            setValidationStatus(prev => {
+              const updated = { ...prev, [questionId]: 'complete' };
+              question.conditionalChildren.forEach(child => {
+                updated[child.id] = '';
+              });
+              saveValidationToStorage(updated);
+              return updated;
+            });
+            return; // Exit early since we've already updated validation
+          }
+
           // If yes, check children
           if (value === 'yes' && question.conditionalChildren) {
             const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
             if (requiredChildren.length > 0) {
               // Parent status will be updated by children
               newStatus = 'incomplete';
-              
+
               // Special handling for Q23 - check if child 23.1 has validation status
               if (questionId === '23') {
                 const child23_1Status = validationStatus['23.1'] || '';
