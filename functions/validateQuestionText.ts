@@ -1,8 +1,46 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
+import OpenAI from 'npm:openai';
+
+const VALIDATION_INSTRUCTIONS = {
+  question_1_1: {
+    field: "Why Choose Us Description",
+    criteria: [
+      "Clearly articulates unique value propositions and differentiators",
+      "Includes specific, tangible benefits for clients",
+      "Professional tone appropriate for B2B MSP audience",
+      "Minimum 100 characters, ideal 150-300 characters"
+    ]
+  },
+  question_2_1: {
+    field: "Team Introduction",
+    criteria: [
+      "Professional and welcoming tone",
+      "Highlights team expertise, values, or culture",
+      "Creates connection with potential clients",
+      "Minimum 100 characters, ideal 150-300 characters"
+    ]
+  },
+  question_23_1: {
+    field: "Avoided Client Types",
+    criteria: [
+      "Clearly describes client types or situations to avoid",
+      "Professional and tactful phrasing",
+      "Provides specific, actionable criteria",
+      "Minimum 50 characters"
+    ]
+  },
+  question_25_1: {
+    field: "Additional Notes",
+    criteria: [
+      "Provides clear, specific content guidance",
+      "Focuses on content needs, not design preferences",
+      "Actionable for content creation team",
+      "Minimum 30 characters"
+    ]
+  }
+};
 
 Deno.serve(async (req) => {
   try {
-    const base44 = createClientFromRequest(req);
     const { text, questionContext } = await req.json();
 
     if (!text || !questionContext) {
@@ -11,71 +49,55 @@ Deno.serve(async (req) => {
       }, { status: 400 });
     }
 
-    // Use service role to create conversation (no user auth required)
-    let conversation = await base44.asServiceRole.agents.createConversation({
-      agent_name: 'form_qa_validator',
-      metadata: {
-        question: questionContext,
-        timestamp: new Date().toISOString()
-      }
+    const openai = new OpenAI({
+      apiKey: Deno.env.get('OPENAI_KEY')
     });
 
-    // Add message and get validation result
-    let validationResult = null;
-    let responseComplete = false;
-
-    // Subscribe first
-    const unsubscribe = base44.asServiceRole.agents.subscribeToConversation(
-      conversation.id,
-      (data) => {
-        if (!data || !data.messages || data.messages.length === 0) return;
-        
-        const lastMessage = data.messages[data.messages.length - 1];
-        if (lastMessage?.role === 'assistant' && lastMessage.content) {
-          try {
-            // Try to extract JSON from the response
-            const jsonMatch = lastMessage.content.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-              const parsed = JSON.parse(jsonMatch[0]);
-              if (parsed.validation_status && parsed.user_message) {
-                validationResult = {
-                  status: parsed.validation_status,
-                  message: parsed.user_message
-                };
-                responseComplete = true;
-              }
-            }
-          } catch (e) {
-            // Not JSON yet, keep waiting
-          }
-        }
-      }
-    );
-
-    // Send message after subscribing
-    conversation = await base44.asServiceRole.agents.addMessage(conversation, {
-      role: 'user',
-      content: `Validate this answer for ${questionContext}:\n\n${text}`
-    });
-
-    // Wait for response (max 30 seconds)
-    const maxWait = 30000;
-    const startTime = Date.now();
-    while (!responseComplete && (Date.now() - startTime) < maxWait) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-
-    unsubscribe();
-
-    if (!validationResult) {
+    const instructions = VALIDATION_INSTRUCTIONS[questionContext];
+    if (!instructions) {
       return Response.json({ 
-        error: 'Validation timeout or incomplete response' 
-      }, { status: 500 });
+        error: 'Unknown question context' 
+      }, { status: 400 });
     }
+
+    const prompt = `You are a form validation assistant. Validate the following answer for the "${instructions.field}" field.
+
+Criteria:
+${instructions.criteria.map((c, i) => `${i + 1}. ${c}`).join('\n')}
+
+User's answer:
+"${text}"
+
+Character count: ${text.length}
+
+Respond with ONLY a JSON object (no markdown, no extra text) in this exact format:
+{
+  "validation_status": "complete" | "needs_work" | "incomplete",
+  "user_message": "Brief feedback message for the user (1-2 sentences max)"
+}
+
+Use "complete" if it meets all criteria well, "needs_work" if it's acceptable but could be improved, "incomplete" if it fails to meet minimum requirements.`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.3,
+      max_tokens: 150
+    });
+
+    const content = response.choices[0].message.content.trim();
+    
+    // Extract JSON from response
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('Invalid response format from AI');
+    }
+
+    const result = JSON.parse(jsonMatch[0]);
 
     return Response.json({
-      status: validationResult.status,
-      message: validationResult.message,
+      status: result.validation_status,
+      message: result.user_message,
       characterCount: text.length
     });
 
