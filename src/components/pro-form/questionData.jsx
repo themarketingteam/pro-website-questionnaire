@@ -490,7 +490,7 @@ export const QUESTIONS = [
     why: "This question provides real client language that can shape testimonials, trust-building statements, and tone. Using your clients' own words significantly boosts authenticity and conversion rates.",
     guidance: "List actual phrases you've heard from satisfied clients—comments about reliability, responsiveness, friendliness, expertise, accountability, or peace of mind. Provide direct quotes if possible. These will be incorporated into voice-of-customer copy.",
     type: "textarea",
-    examples: { shortAnswer: "Responsive, proactive, and easy to work with—clients often say they trust us because we communicate clearly and never leave them guessing." }
+    examples: { shortAnswer: "Clients often describe us as reliable, proactive, and easy to work with. They value our fast response times, clear communication, and ability to explain complex issues in plain language. Many say they trust us to prevent problems, not just react to them." }
   },
   {
     id: "22",
