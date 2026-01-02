@@ -102,7 +102,8 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
       setValidationState({
         status: 'neutral',
         message: '',
-        charCount: text.length
+        charCount: text.length,
+        expectedRange: null
       });
     }
   };
