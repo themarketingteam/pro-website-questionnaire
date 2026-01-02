@@ -57,7 +57,13 @@ export default function MultiGeographicQuestion({
   }, []);
 
   useEffect(() => {
-    if (!isScriptLoaded || !inputRef.current || autocompleteRef.current || loadError) return;
+    if (!isScriptLoaded || !inputRef.current || loadError) return;
+
+    // Clean up existing autocomplete instance
+    if (autocompleteRef.current) {
+      window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      autocompleteRef.current = null;
+    }
 
     try {
       const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
@@ -121,7 +127,7 @@ export default function MultiGeographicQuestion({
           isCity: isCity
         };
 
-        // Check if already added
+        // Check if already added using current selectedLocations
         if (selectedLocations.some(loc => loc.place_id === meta.place_id)) {
           alert("This location has already been added.");
           setCurrentInput("");
@@ -137,6 +143,13 @@ export default function MultiGeographicQuestion({
       console.warn("Error initializing Google Places:", error);
       setLoadError(true);
     }
+
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      if (autocompleteRef.current) {
+        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      }
+    };
   }, [isScriptLoaded, onAdd, selectedLocations, loadError]);
 
   const canAddMore = selectedLocations.length < maxLocations;
