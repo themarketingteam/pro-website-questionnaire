@@ -1,5 +1,4 @@
 import React from 'react';
-import { AlertCircle, AlertTriangle, CheckCircle } from 'lucide-react';
 
 export default function ValidationGuide() {
   return (
@@ -8,9 +7,11 @@ export default function ValidationGuide() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Green - Complete */}
         <div className="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <div className="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <CheckCircle className="w-5 h-5 text-white" />
-          </div>
+          <img 
+            src="https://img.icons8.com/?size=100&id=ZBQJIdqe73bi&format=png&color=22C55E" 
+            alt="Complete" 
+            className="w-8 h-8 flex-shrink-0 mt-0.5" 
+          />
           <div>
             <h4 className="font-semibold text-green-900 mb-1">Complete</h4>
             <p className="text-sm text-green-700">
@@ -21,9 +22,11 @@ export default function ValidationGuide() {
 
         {/* Yellow - Needs Work */}
         <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-          <div className="w-8 h-8 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <AlertTriangle className="w-5 h-5 text-white" />
-          </div>
+          <img 
+            src="https://img.icons8.com/?size=100&id=lwhK4j4bx2Zx&format=png&color=F59E0B" 
+            alt="Needs Improvement" 
+            className="w-8 h-8 flex-shrink-0 mt-0.5" 
+          />
           <div>
             <h4 className="font-semibold text-amber-900 mb-1">Needs Improvement</h4>
             <p className="text-sm text-amber-700">
@@ -34,9 +37,11 @@ export default function ValidationGuide() {
 
         {/* Red - Incomplete */}
         <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <div className="w-8 h-8 rounded bg-red-500 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <AlertCircle className="w-5 h-5 text-white" />
-          </div>
+          <img 
+            src="https://img.icons8.com/?size=100&id=iQ230Rs1gOvf&format=png&color=DC2626" 
+            alt="Incomplete" 
+            className="w-8 h-8 flex-shrink-0 mt-0.5" 
+          />
           <div>
             <h4 className="font-semibold text-red-900 mb-1">Incomplete</h4>
             <p className="text-sm text-red-700">
