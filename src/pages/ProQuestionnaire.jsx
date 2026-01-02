@@ -614,7 +614,22 @@ export default function ProQuestionnaire() {
   };
 
   const isQuestionComplete = (questionId) => {
-    const question = QUESTIONS.find(q => q.id === questionId);
+    // First try to find in main questions
+    let question = QUESTIONS.find(q => q.id === questionId);
+    
+    // If not found, search in conditional children
+    if (!question) {
+      for (const parentQ of QUESTIONS) {
+        if (parentQ.conditionalChildren) {
+          const childQ = parentQ.conditionalChildren.find(c => c.id === questionId);
+          if (childQ) {
+            question = childQ;
+            break;
+          }
+        }
+      }
+    }
+    
     if (!question) return false;
 
     // Check validation status first - if it exists and is complete/needs_work, question is complete
