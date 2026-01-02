@@ -34,6 +34,8 @@ Deno.serve(async (req) => {
     const unsubscribe = base44.asServiceRole.agents.subscribeToConversation(
       conversation.id,
       (data) => {
+        if (!data || !data.messages || data.messages.length === 0) return;
+        
         const lastMessage = data.messages[data.messages.length - 1];
         if (lastMessage?.role === 'assistant' && lastMessage.content) {
           try {
