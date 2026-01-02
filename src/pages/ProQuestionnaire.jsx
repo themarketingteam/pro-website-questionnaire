@@ -577,6 +577,12 @@ export default function ProQuestionnaire() {
     const question = QUESTIONS.find(q => q.id === questionId);
     if (!question) return false;
 
+    // Check validation status first - if it exists and is complete/needs_work, question is complete
+    const status = validationStatus[questionId];
+    if (status === 'complete' || status === 'needs_work') {
+      return true;
+    }
+
     // Don't show complete until question is touched
     if (!touchedQuestions[questionId]) return false;
 
