@@ -10,10 +10,22 @@ export default function TextareaQuestion({
   questionContext = "General question",
   questionId = "",
   debounceMs = 500,
-  onValidationChange
+  onValidationChange,
+  currentValidationStatus = 'neutral'
 }) {
   const [isManualValidating, setIsManualValidating] = useState(false);
-  const validation = useTextValidation(value, questionId, debounceMs, isManualValidating, setIsManualValidating);
+  
+  // Map parent validation status to internal status
+  const statusMap = {
+    'complete': 'green',
+    'needs_work': 'yellow',
+    'incomplete': 'red',
+    'neutral': 'neutral',
+    '': 'neutral'
+  };
+  const initialStatus = statusMap[currentValidationStatus] || 'neutral';
+  
+  const validation = useTextValidation(value, questionId, debounceMs, isManualValidating, setIsManualValidating, initialStatus);
 
   const handleManualValidate = () => {
     if (!value || value.trim().length === 0) return;
