@@ -338,19 +338,6 @@ export default function ProQuestionnaire() {
       case 'yes_no':
         if (value === 'yes' || value === 'no') {
           newStatus = 'complete';
-          
-          // If switching to "no", reset child questions' validation
-          if (value === 'no' && question.conditionalChildren) {
-            setValidationStatus(prev => {
-              const updated = { ...prev };
-              question.conditionalChildren.forEach(child => {
-                updated[child.id] = '';
-              });
-              saveValidationToStorage(updated);
-              return updated;
-            });
-          }
-          
           // If yes, check children
           if (value === 'yes' && question.conditionalChildren) {
             const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
