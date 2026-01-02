@@ -153,10 +153,26 @@ Use "complete" if it meets all criteria well, "needs_work" if it's acceptable bu
 
     const result = JSON.parse(jsonMatch[0]);
 
+    // Extract expected range from criteria
+    const rangeCriteria = instructions.criteria.find(c => c.includes('characters'));
+    let expectedRange = null;
+    if (rangeCriteria) {
+      const rangeMatch = rangeCriteria.match(/(\d+)-(\d+)\s*characters/);
+      if (rangeMatch) {
+        expectedRange = `${rangeMatch[1]}-${rangeMatch[2]}`;
+      } else {
+        const minMatch = rangeCriteria.match(/Minimum\s+(\d+)\s*characters/i);
+        if (minMatch) {
+          expectedRange = `${minMatch[1]}+`;
+        }
+      }
+    }
+
     return Response.json({
       status: result.validation_status,
       message: result.user_message,
-      characterCount: text.length
+      characterCount: text.length,
+      expectedRange: expectedRange
     });
 
   } catch (error) {
