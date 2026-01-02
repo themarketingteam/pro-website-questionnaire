@@ -76,6 +76,7 @@ export default function ProQuestionnaire() {
   const [showAutoSave, setShowAutoSave] = useState(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showClearAllModal, setShowClearAllModal] = useState(false);
+  const [showIncompleteList, setShowIncompleteList] = useState(false);
 
   // Extract URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -757,11 +758,10 @@ export default function ProQuestionnaire() {
 
   const handleSubmitClick = () => {
     if (!isFormValid()) {
-      const incomplete = getIncompleteQuestions();
-      const message = `Please complete all required fields:\n\n${incomplete.join('\n')}`;
-      alert(message);
+      setShowIncompleteList(true);
       return;
     }
+    setShowIncompleteList(false);
     setShowConfirmModal(true);
   };
 
@@ -1314,11 +1314,11 @@ export default function ProQuestionnaire() {
               <button
                 type="button"
                 onClick={handleSubmitClick}
-                disabled={!isFormValid() || isSubmitting}
+                disabled={isSubmitting}
                 className={`flex-1 py-4 text-sm font-bold rounded transition-all flex items-center justify-center uppercase tracking-wide ${
-                  isFormValid() && !isSubmitting
-                    ? 'bg-[#8DB63C] hover:bg-[#7DA035] text-white'
-                    : 'bg-[#A9B3B7] text-white cursor-not-allowed'
+                  isSubmitting
+                    ? 'bg-[#A9B3B7] text-white cursor-not-allowed'
+                    : 'bg-[#8DB63C] hover:bg-[#7DA035] text-white'
                 }`}
               >
                 {isSubmitting ? (
@@ -1338,8 +1338,27 @@ export default function ProQuestionnaire() {
               >
                 Clear All
               </button>
+            </div>
+
+            {showIncompleteList && !isFormValid() && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-red-900 mb-2">Please complete the following questions:</h4>
+                    <ul className="space-y-1 text-sm text-red-800">
+                      {getIncompleteQuestions().map((q, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-red-600">•</span>
+                          <span>{q}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
               </div>
-              </div>
+            )}
+          </div>
 
               <ValidationGuide />
               </div>
