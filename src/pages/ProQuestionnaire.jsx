@@ -977,6 +977,7 @@ export default function ProQuestionnaire() {
               questionId={question.id}
               debounceMs={250}
               onValidationChange={(status) => updateValidationState(question.id, status)}
+              currentValidationStatus={validationStatus[question.id]}
             />
           </>
         );
