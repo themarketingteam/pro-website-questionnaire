@@ -12,7 +12,7 @@ Deno.serve(async (req) => {
     }
 
     // Use service role to create conversation (no user auth required)
-    const conversation = await base44.asServiceRole.agents.createConversation({
+    let conversation = await base44.asServiceRole.agents.createConversation({
       agent_name: 'form_qa_validator',
       metadata: {
         question: questionContext,
@@ -24,13 +24,7 @@ Deno.serve(async (req) => {
     let validationResult = null;
     let responseComplete = false;
 
-    // Send message first
-    await base44.asServiceRole.agents.addMessage(conversation, {
-      role: 'user',
-      content: `Validate this answer for ${questionContext}:\n\n${text}`
-    });
-
-    // Then subscribe to get the response
+    // Subscribe first
     const unsubscribe = base44.asServiceRole.agents.subscribeToConversation(
       conversation.id,
       (data) => {
@@ -57,6 +51,12 @@ Deno.serve(async (req) => {
         }
       }
     );
+
+    // Send message after subscribing
+    conversation = await base44.asServiceRole.agents.addMessage(conversation, {
+      role: 'user',
+      content: `Validate this answer for ${questionContext}:\n\n${text}`
+    });
 
     // Wait for response (max 30 seconds)
     const maxWait = 30000;
