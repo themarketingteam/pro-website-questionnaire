@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 
-export function useTextValidation(value, questionId, debounceMs = 3000, isManualValidating = false, setIsManualValidating = null) {
+export function useTextValidation(value, questionId, debounceMs = 3000, isManualValidating = false, setIsManualValidating = null, initialStatus = 'neutral') {
   const [validationState, setValidationState] = useState({
-    status: 'neutral', // 'green', 'yellow', 'red', 'neutral'
+    status: initialStatus, // 'green', 'yellow', 'red', 'neutral'
     message: '',
     charCount: 0
   });
