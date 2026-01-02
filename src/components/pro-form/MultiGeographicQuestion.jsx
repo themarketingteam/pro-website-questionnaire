@@ -13,9 +13,15 @@ export default function MultiGeographicQuestion({
 }) {
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
+  const selectedLocationsRef = useRef(selectedLocations);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [currentInput, setCurrentInput] = useState("");
+
+  // Keep selectedLocationsRef in sync
+  useEffect(() => {
+    selectedLocationsRef.current = selectedLocations;
+  }, [selectedLocations]);
 
   useEffect(() => {
     if (window.google && window.google.maps && window.google.maps.places) {
