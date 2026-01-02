@@ -273,9 +273,17 @@ export default function ProQuestionnaire() {
       // If this is a child question, update parent status
       const parentId = questionId.split('.')[0];
       if (questionId.includes('.') && parentId && parentId !== '2') {
-        // Calculate parent status based on all children
+        // Check if parent is set to "no" - if so, don't update parent status
+        const parentAnswer = responses[parentId];
+        if (parentAnswer === 'no') {
+          // Parent is "no", so it should remain 'complete'
+          newStatus[parentId] = 'complete';
+          return newStatus;
+        }
+
+        // Calculate parent status based on all children only if parent is "yes"
         const question = QUESTIONS.find(q => q.id === parentId);
-        if (question?.conditionalChildren && responses[parentId] === 'yes') {
+        if (question?.conditionalChildren && parentAnswer === 'yes') {
           const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
           if (requiredChildren.length > 0) {
             let allComplete = true;
