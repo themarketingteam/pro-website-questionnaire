@@ -77,33 +77,14 @@ export default function TextareaQuestion({
   };
 
   return (
-    <div className="space-y-2">
-      <div className="relative">
-        <textarea
-          value={value || ''}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          rows={rows}
-          className={`w-full p-3 border rounded focus:outline-none focus:ring-2 focus:border-transparent resize-y min-h-[120px] transition-colors ${getStatusBorderClass()}`}
-        />
-        {showValidateButton && (
-          <button
-            type="button"
-            onClick={handleManualValidate}
-            disabled={isManualValidating}
-            className="absolute top-3 right-3 px-4 py-2 bg-[#1C82DE] hover:bg-[#075DA7] text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-          >
-            {isManualValidating ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Validating...
-              </>
-            ) : (
-              'Validate Now'
-            )}
-          </button>
-        )}
-      </div>
+    <div className="space-y-3">
+      <textarea
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={rows}
+        className={`w-full p-3 border rounded focus:outline-none focus:ring-2 focus:border-transparent resize-y min-h-[120px] transition-colors ${getStatusBorderClass()}`}
+      />
 
       {validation.status !== 'neutral' && validation.message && (
         <div className={`flex items-start gap-2 p-3 border rounded text-sm ${getStatusBgClass()}`}>
@@ -117,6 +98,24 @@ export default function TextareaQuestion({
             )}
           </div>
         </div>
+      )}
+
+      {showValidateButton && (
+        <button
+          type="button"
+          onClick={handleManualValidate}
+          disabled={isManualValidating}
+          className="px-4 py-2 bg-[#1C82DE] hover:bg-[#075DA7] text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+        >
+          {isManualValidating ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Validating...
+            </>
+          ) : (
+            'Validate Now'
+          )}
+        </button>
       )}
     </div>
   );
