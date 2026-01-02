@@ -30,15 +30,15 @@ export default function QuestionWrapper({
       return <div className="w-6 h-6" />;
     }
 
-    // Use validation status if provided
+    // Use validation status if provided - key prop forces animation replay on status change
     if (validationStatus === 'complete') {
-      return <img src="https://img.icons8.com/?size=100&id=ZBQJIdqe73bi&format=png&color=22C55E" alt="Complete" className="w-7 h-7" />;
+      return <img key={`complete-${number}`} src="https://img.icons8.com/?size=100&id=ZBQJIdqe73bi&format=gif&color=22C55E" alt="Complete" className="w-7 h-7" />;
     }
     if (validationStatus === 'needs_work') {
-      return <img src="https://img.icons8.com/?size=100&id=lwhK4j4bx2Zx&format=png&color=F59E0B" alt="Needs Work" className="w-7 h-7" />;
+      return <img key={`needs-work-${number}`} src="https://img.icons8.com/?size=100&id=lwhK4j4bx2Zx&format=gif&color=F59E0B" alt="Needs Work" className="w-7 h-7" />;
     }
     if (validationStatus === 'incomplete') {
-      return <img src="https://img.icons8.com/?size=100&id=iQ230Rs1gOvf&format=png&color=DC2626" alt="Incomplete" className="w-7 h-7" />;
+      return <img key={`incomplete-${number}`} src="https://img.icons8.com/?size=100&id=iQ230Rs1gOvf&format=gif&color=DC2626" alt="Incomplete" className="w-7 h-7" />;
     }
 
     // Fallback
