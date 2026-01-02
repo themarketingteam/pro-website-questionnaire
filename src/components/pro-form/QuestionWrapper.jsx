@@ -32,13 +32,25 @@ export default function QuestionWrapper({
 
     // Use validation status if provided
     if (validationStatus === 'complete') {
-      return <img src="https://img.icons8.com/?size=100&id=ZBQJIdqe73bi&format=png&color=22C55E" alt="Complete" className="w-7 h-7" />;
+      return (
+        <div className="w-7 h-7 rounded-full bg-green-500 flex items-center justify-center">
+          <img src="https://img.icons8.com/?size=100&id=ZBQJIdqe73bi&format=png&color=FFFFFF" alt="Complete" className="w-5 h-5" />
+        </div>
+      );
     }
     if (validationStatus === 'needs_work') {
-      return <img src="https://img.icons8.com/?size=100&id=lwhK4j4bx2Zx&format=png&color=F59E0B" alt="Needs Work" className="w-7 h-7" />;
+      return (
+        <div className="w-7 h-7 rounded-full bg-amber-500 flex items-center justify-center">
+          <img src="https://img.icons8.com/?size=100&id=lwhK4j4bx2Zx&format=png&color=FFFFFF" alt="Needs Work" className="w-5 h-5" />
+        </div>
+      );
     }
     if (validationStatus === 'incomplete') {
-      return <img src="https://img.icons8.com/?size=100&id=iQ230Rs1gOvf&format=png&color=DC2626" alt="Incomplete" className="w-7 h-7" />;
+      return (
+        <div className="w-7 h-7 rounded bg-red-500 flex items-center justify-center">
+          <img src="https://img.icons8.com/?size=100&id=iQ230Rs1gOvf&format=png&color=FFFFFF" alt="Incomplete" className="w-5 h-5" />
+        </div>
+      );
     }
 
     // Fallback
