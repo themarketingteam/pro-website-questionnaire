@@ -709,7 +709,12 @@ export default function ProQuestionnaire() {
       
       case 'textarea': {
         const status = validationStatus[questionId];
-        return status === 'complete' || status === 'needs_work';
+        // If validation status is set and complete/needs_work, return true
+        if (status === 'complete' || status === 'needs_work') {
+          return true;
+        }
+        // Fallback: check if there's text content (for cases where validation status wasn't saved)
+        return answer && answer.trim().length > 0;
       }
       
       case 'multi_text': {
