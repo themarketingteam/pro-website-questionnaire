@@ -40,7 +40,8 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
         setValidationState({
           status: 'neutral',
           message: '',
-          charCount: value.length
+          charCount: value.length,
+          expectedRange: null
         });
       } else {
         // Just update char count without changing status
