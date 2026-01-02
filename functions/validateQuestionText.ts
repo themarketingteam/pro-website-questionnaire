@@ -132,6 +132,8 @@ Respond with ONLY a JSON object (no markdown, no extra text) in this exact forma
   "user_message": "Brief feedback message for the user (1-2 sentences max)"
 }
 
+IMPORTANT: If the answer is outside the expected character range (too short or too long), include the expected range in your message (e.g., "Your answer is too short. Please provide at least 100 characters (currently ${text.length}).").
+
 Use "complete" if it meets all criteria well, "needs_work" if it's acceptable but could be improved, "incomplete" if it fails to meet minimum requirements.`;
 
     const response = await openai.chat.completions.create({
