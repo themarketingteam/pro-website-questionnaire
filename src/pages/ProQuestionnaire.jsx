@@ -213,22 +213,8 @@ export default function ProQuestionnaire() {
     saveToStorage(newResponses);
     setShowAutoSave(prev => prev + 1);
 
-    // Mark as touched when user makes a change and set validation status to incomplete if empty
+    // Mark as touched when user makes a change
     setTouchedQuestions(prev => ({ ...prev, [questionId]: true }));
-    setValidationStatus(v => {
-      const newStatus = { ...v };
-      if (newStatus[questionId] === '') {
-        newStatus[questionId] = 'incomplete';
-      }
-
-      // Special handling for question 2.2
-      if (questionId === '2.2') {
-        const status2_1 = newStatus['2.1'] || '';
-        newStatus['2'] = calculateQuestion2Status(status2_1, value);
-      }
-
-      return newStatus;
-    });
 
     // Trigger validation update
     updateQuestionValidation(questionId, value, newResponses);
@@ -336,24 +322,26 @@ export default function ProQuestionnaire() {
 
     switch (question.type) {
       case 'yes_no':
-        if (value === 'yes' || value === 'no') {
-          newStatus = 'complete';
-
-          // If switching to 'no', clear children validation statuses
-          if (value === 'no' && question.conditionalChildren) {
-            setValidationStatus(prev => {
-              const updated = { ...prev, [questionId]: 'complete' };
+        // If answer is 'no', always mark as complete immediately
+        if (value === 'no') {
+          setValidationStatus(prev => {
+            const updated = { ...prev, [questionId]: 'complete' };
+            // Clear children validation statuses
+            if (question.conditionalChildren) {
               question.conditionalChildren.forEach(child => {
                 updated[child.id] = '';
               });
-              saveValidationToStorage(updated);
-              return updated;
-            });
-            return; // Exit early since we've already updated validation
-          }
+            }
+            saveValidationToStorage(updated);
+            return updated;
+          });
+          return; // Exit early
+        }
 
-          // If yes, check children
-          if (value === 'yes' && question.conditionalChildren) {
+        // If answer is 'yes', check children
+        if (value === 'yes') {
+          newStatus = 'complete';
+          if (question.conditionalChildren) {
             const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
             if (requiredChildren.length > 0) {
               // Parent status will be updated by children
@@ -589,6 +577,10 @@ export default function ProQuestionnaire() {
     switch (question.type) {
       case 'yes_no':
       const hasValidAnswer = answer === 'yes' || answer === 'no';
+
+      // If answer is "no", it's always complete
+      if (answer === 'no') return true;
+
       // If answer is "yes" and has conditional children, check those too
       if (hasValidAnswer && answer === 'yes' && question.conditionalChildren) {
       const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
