@@ -22,10 +22,12 @@ const VALIDATION_INSTRUCTIONS = {
   question_6: {
     field: "Company Description and History",
     criteria: [
-      "Provides clear overview of the company and its history",
-      "Includes founding story, mission, or key milestones",
-      "Professional tone appropriate for business audience",
-      "Minimum 100 characters, ideal 150-400 characters"
+      "Clearly states WHAT the company does and WHO it helps",
+      "Written in plain language suitable for non-technical audience",
+      "Not overly vague or generic",
+      "Not overly technical or jargon-heavy",
+      "Minimum 50 characters, ideal 100-250 characters",
+      "Note: Founding story, mission, and milestones are optional enrichment - do not penalize if missing"
     ]
   },
   question_9: {
