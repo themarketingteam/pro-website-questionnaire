@@ -5,7 +5,8 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
   const [validationState, setValidationState] = useState({
     status: initialStatus, // 'green', 'yellow', 'red', 'neutral'
     message: '',
-    charCount: 0
+    charCount: 0,
+    expectedRange: null
   });
   
   // Manual validation trigger - ONLY validation method now
