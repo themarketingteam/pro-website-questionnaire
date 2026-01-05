@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useNavigate } from 'react-router-dom';
-import { createPageUrl } from './utils';
+import { createPageUrl } from 'utils';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Send, RotateCcw, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
@@ -61,7 +60,6 @@ const getCredentialsCookie = () => {
 export const getStoredCredentials = getCredentialsCookie;
 
 export default function ProQuestionnaire() {
-  const navigate = useNavigate();
   const [responses, setResponses] = useState({});
   const [expandedQuestions, setExpandedQuestions] = useState({});
   const [touchedQuestions, setTouchedQuestions] = useState({});
