@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
+import { useNavigate } from 'react-router-dom';
+import { createPageUrl } from './utils';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Send, RotateCcw, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
@@ -59,6 +61,7 @@ const getCredentialsCookie = () => {
 export const getStoredCredentials = getCredentialsCookie;
 
 export default function ProQuestionnaire() {
+  const navigate = useNavigate();
   const [responses, setResponses] = useState({});
   const [expandedQuestions, setExpandedQuestions] = useState({});
   const [touchedQuestions, setTouchedQuestions] = useState({});
@@ -962,14 +965,17 @@ export default function ProQuestionnaire() {
 
       toast.success('Questionnaire submitted successfully!');
       document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-      setResponses({});
-    } catch (error) {
+      document.cookie = `${VALIDATION_COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+
+      // Navigate to thank you page with business name
+      const thankYouUrl = createPageUrl('ThankYou') + `?businessName=${encodeURIComponent(businessName)}`;
+      window.location.href = thankYouUrl;
+      } catch (error) {
       console.error('Submission error:', error);
       toast.error('Failed to submit. Please try again.');
-    } finally {
       setIsSubmitting(false);
-    }
-  };
+      }
+      };
 
   // Calculate span totals
   const otherServices = responses['3_other'];
