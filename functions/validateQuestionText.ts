@@ -7,7 +7,7 @@ const VALIDATION_INSTRUCTIONS = {
       "Clearly articulates unique value propositions and differentiators",
       "Includes specific, tangible benefits for clients",
       "Professional tone appropriate for B2B MSP audience",
-      "Minimum 100 characters, ideal 150-300 characters"
+      "Minimum 100 characters, ideal 150-1200 characters, warning above 1200, maximum 1400 characters"
     ]
   },
   question_2_1: {
@@ -16,7 +16,7 @@ const VALIDATION_INSTRUCTIONS = {
       "Professional and welcoming tone",
       "Highlights team expertise, values, or culture",
       "Creates connection with potential clients",
-      "Minimum 100 characters, ideal 150-300 characters"
+      "Minimum 100 characters, ideal 150-1200 characters, warning above 1200, maximum 1400 characters"
     ]
   },
   question_6: {
@@ -26,7 +26,7 @@ const VALIDATION_INSTRUCTIONS = {
       "Written in plain language suitable for non-technical audience",
       "Not overly vague or generic",
       "Not overly technical or jargon-heavy",
-      "Minimum 50 characters, ideal 100-250 characters",
+      "Minimum 50 characters, ideal 100-1200 characters, warning above 1200, maximum 1400 characters",
       "Note: Founding story, mission, and milestones are optional enrichment - do not penalize if missing"
     ]
   },
@@ -36,7 +36,7 @@ const VALIDATION_INSTRUCTIONS = {
       "Clearly articulates unique differentiators from competitors",
       "Specific examples of what sets the company apart",
       "Focuses on tangible benefits and value",
-      "Minimum 100 characters, ideal 150-300 characters"
+      "Minimum 100 characters, ideal 150-1200 characters, warning above 1200, maximum 1400 characters"
     ]
   },
   question_13: {
@@ -45,7 +45,7 @@ const VALIDATION_INSTRUCTIONS = {
       "Describes clear steps in the sales and onboarding process",
       "Explains what clients can expect when engaging",
       "Professional and reassuring tone",
-      "Minimum 100 characters, ideal 150-400 characters"
+      "Minimum 100 characters, ideal 150-1200 characters, warning above 1200, maximum 1400 characters"
     ]
   },
   question_19: {
@@ -54,7 +54,7 @@ const VALIDATION_INSTRUCTIONS = {
       "Identifies specific frustrations ideal clients experience",
       "Shows understanding of client challenges",
       "Professional and empathetic tone",
-      "Minimum 80 characters, ideal 120-300 characters"
+      "Minimum 80 characters, ideal 120-1200 characters, warning above 1200, maximum 1400 characters"
     ]
   },
   question_21: {
@@ -63,7 +63,7 @@ const VALIDATION_INSTRUCTIONS = {
       "Clearly explains the value delivery process",
       "Includes specific examples of client benefits",
       "Professional and results-focused tone",
-      "Minimum 100 characters, ideal 150-350 characters"
+      "Minimum 100 characters, ideal 150-1200 characters, warning above 1200, maximum 1400 characters"
     ]
   },
   question_22: {
@@ -72,7 +72,7 @@ const VALIDATION_INSTRUCTIONS = {
       "Provides detailed description of ideal client characteristics",
       "Includes specific attributes like size, industry, needs",
       "Professional and targeted tone",
-      "Minimum 80 characters, ideal 120-300 characters"
+      "Minimum 80 characters, ideal 120-1200 characters, warning above 1200, maximum 1400 characters"
     ]
   },
   question_23_1: {
@@ -81,7 +81,7 @@ const VALIDATION_INSTRUCTIONS = {
       "Clearly describes client types or situations to avoid",
       "Professional and tactful phrasing",
       "Provides specific, actionable criteria",
-      "Minimum 50 characters"
+      "Minimum 50 characters, maximum 1400 characters"
     ]
   },
   question_25_1: {
@@ -90,7 +90,7 @@ const VALIDATION_INSTRUCTIONS = {
       "Provides clear, specific content guidance",
       "Focuses on content needs, not design preferences",
       "Actionable for content creation team",
-      "Minimum 30 characters"
+      "Minimum 30 characters, maximum 1400 characters"
     ]
   }
 };
