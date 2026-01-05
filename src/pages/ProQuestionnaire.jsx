@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
-import { createPageUrl } from 'utils';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2, Send, RotateCcw, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
@@ -966,8 +965,7 @@ export default function ProQuestionnaire() {
       document.cookie = `${VALIDATION_COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
 
       // Navigate to thank you page with business name
-      const thankYouUrl = createPageUrl('ThankYou') + `?businessName=${encodeURIComponent(businessName)}`;
-      window.location.href = thankYouUrl;
+      window.location.href = `/ThankYou?businessName=${encodeURIComponent(businessName)}`;
       } catch (error) {
       console.error('Submission error:', error);
       toast.error('Failed to submit. Please try again.');
