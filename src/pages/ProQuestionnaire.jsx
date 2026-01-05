@@ -229,23 +229,36 @@ export default function ProQuestionnaire() {
     }
     }, []);
 
-  // Auto-save to cookie
+  // Debounced auto-save to cookie (saves after 500ms of no changes)
   const saveToStorage = useCallback((data) => {
-    const jsonData = JSON.stringify(data);
-    const encodedData = encodeURIComponent(jsonData);
-    // Set cookie to expire in 30 days
-    const expires = new Date();
-    expires.setDate(expires.getDate() + 30);
-    document.cookie = `${COOKIE_NAME}=${encodedData}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+    // Clear existing timeout
+    if (window.saveToStorageTimeout) {
+      clearTimeout(window.saveToStorageTimeout);
+    }
+    
+    // Set new timeout
+    window.saveToStorageTimeout = setTimeout(() => {
+      const jsonData = JSON.stringify(data);
+      const encodedData = encodeURIComponent(jsonData);
+      const expires = new Date();
+      expires.setDate(expires.getDate() + 30);
+      document.cookie = `${COOKIE_NAME}=${encodedData}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+    }, 500);
   }, []);
 
-  // Save validation status to cookie
+  // Debounced save validation status to cookie
   const saveValidationToStorage = useCallback((validation) => {
-    const jsonData = JSON.stringify(validation);
-    const encodedData = encodeURIComponent(jsonData);
-    const expires = new Date();
-    expires.setDate(expires.getDate() + 30);
-    document.cookie = `${VALIDATION_COOKIE_NAME}=${encodedData}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+    if (window.saveValidationTimeout) {
+      clearTimeout(window.saveValidationTimeout);
+    }
+    
+    window.saveValidationTimeout = setTimeout(() => {
+      const jsonData = JSON.stringify(validation);
+      const encodedData = encodeURIComponent(jsonData);
+      const expires = new Date();
+      expires.setDate(expires.getDate() + 30);
+      document.cookie = `${VALIDATION_COOKIE_NAME}=${encodedData}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+    }, 500);
   }, []);
 
   const updateResponse = (questionId, value) => {
