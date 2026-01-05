@@ -261,18 +261,20 @@ export default function ProQuestionnaire() {
     }, 500);
   }, []);
 
-  const updateResponse = (questionId, value) => {
-    const newResponses = { ...responses, [questionId]: value };
-    setResponses(newResponses);
-    saveToStorage(newResponses);
+  const updateResponse = useCallback((questionId, value) => {
+    setResponses(prev => {
+      const newResponses = { ...prev, [questionId]: value };
+      saveToStorage(newResponses);
+      
+      // Trigger validation update (debounced internally for textareas)
+      updateQuestionValidation(questionId, value, newResponses);
+      
+      return newResponses;
+    });
+    
     setShowAutoSave(prev => prev + 1);
-
-    // Mark as touched when user makes a change
     setTouchedQuestions(prev => ({ ...prev, [questionId]: true }));
-
-    // Trigger validation update
-    updateQuestionValidation(questionId, value, newResponses);
-  };
+  }, [saveToStorage]);
 
   const calculateQuestion2Status = (status2_1, value2_2) => {
     // Check 2.2 state
