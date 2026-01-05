@@ -944,8 +944,16 @@ export default function ProQuestionnaire() {
     setShowConfirmModal(false);
 
     try {
+      // Debug: Log responses before transform
+      console.log('📋 Raw responses before transform:', responses);
+      console.log('👤 Business Name:', businessName);
+      console.log('🌐 Domain:', domain);
+      
       // Transform payload for both database and Zapier
       const transformedPayload = transformResponsesToPayload(responses, businessName, domain);
+      
+      // Debug: Log transformed payload
+      console.log('✅ Transformed Payload:', JSON.stringify(transformedPayload, null, 2));
 
       await base44.entities.ProFormSubmission.create(transformedPayload);
 
