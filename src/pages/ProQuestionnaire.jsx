@@ -81,9 +81,7 @@ export default function ProQuestionnaire() {
   // Extract URL parameters
   const urlParams = new URLSearchParams(window.location.search);
   const businessNameParam = urlParams.get('businessName') || '';
-  const domainSL = urlParams.get('domainSL') || '';
-  const domainTL = urlParams.get('domainTL') || '';
-  const domainParam = domainSL && domainTL ? `${domainSL}.${domainTL}` : '';
+  const domainParam = urlParams.get('domainName') || '';
   
   // Extract and store credentials from URL
   useEffect(() => {
