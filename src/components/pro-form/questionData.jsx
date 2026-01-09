@@ -364,6 +364,7 @@ export const QUESTIONS = [
     guidance: "Choose the voice that best aligns with how you want prospects to perceive you. If your company culture is casual and friendly, select a conversational voice. If you serve regulated industries, a more authoritative tone may be appropriate.",
     type: "radio",
     options: BRAND_VOICE_OPTIONS,
+    showOther: true,
     examples: { selection: "Professional and authoritative" }
   },
   {
