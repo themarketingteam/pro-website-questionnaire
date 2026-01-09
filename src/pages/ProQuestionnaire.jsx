@@ -22,6 +22,7 @@ import InfoMessageQuestion from '@/components/pro-form/InfoMessageQuestion';
 import SelectionSpanIndicator from '@/components/pro-form/SelectionSpanIndicator';
 import AutoSaveIndicator from '@/components/pro-form/AutoSaveIndicator';
 import ConfirmModal from '@/components/pro-form/ConfirmModal';
+import ThankYouModal from '@/components/pro-form/ThankYouModal';
 import ValidationGuide from '@/components/pro-form/ValidationGuide';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 
@@ -76,6 +77,8 @@ export default function ProQuestionnaire() {
   const [allExpanded, setAllExpanded] = useState(false);
   const [showAutoSave, setShowAutoSave] = useState(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showThankYouModal, setShowThankYouModal] = useState(false);
+  const [submittedBusinessName, setSubmittedBusinessName] = useState('');
   const [showClearAllModal, setShowClearAllModal] = useState(false);
   const [showIncompleteList, setShowIncompleteList] = useState(false);
 
@@ -986,14 +989,16 @@ export default function ProQuestionnaire() {
       document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
       document.cookie = `${VALIDATION_COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
 
-      // Navigate to thank you page with business name
-      window.location.href = createPageUrl(`ThankYou?businessName=${encodeURIComponent(businessName)}`);
-      } catch (error) {
+      // Show thank you modal instead of navigating
+      setSubmittedBusinessName(businessName);
+      setShowThankYouModal(true);
+      setIsSubmitting(false);
+    } catch (error) {
       console.error('Submission error:', error);
       toast.error('Failed to submit. Please try again.');
       setIsSubmitting(false);
-      }
-      };
+    }
+  };
 
   // Calculate span totals
   const otherServices = responses['3_other'];
@@ -1463,6 +1468,10 @@ export default function ProQuestionnaire() {
           initialBusinessName={businessNameParam}
           initialDomain={domainParam}
         />
+      )}
+
+      {showThankYouModal && (
+        <ThankYouModal businessName={submittedBusinessName} />
       )}
 
       {showClearAllModal && (
