@@ -342,7 +342,7 @@ export const QUESTIONS = [
     why: "This is the foundation of your competitive positioning and is used on multiple pages: Home, About, Why Choose Us (if selected), and several service pages. It also guides SEO value statements, trust blocks, and conversion-focused copy.",
     guidance: "Describe the key differentiators that your ideal client would care about most. Examples include rapid response times, process discipline, compliance expertise, cybersecurity maturity, unique onboarding workflows, or customer experience philosophies. Be specific—avoid generic statements like 'we care more.'",
     type: "textarea",
-    examples: { shortAnswer: "We document every workflow, provide a 10-minute response guarantee, and offer a dedicated vCIO for strategic planning and quarterly reviews." }
+    examples: { shortAnswer: "What sets us apart is our disciplined, process-driven approach combined with unusually fast and personal service. Every workflow we manage is fully documented, which means issues are resolved consistently and efficiently without relying on tribal knowledge. We back this up with a 10-minute response guarantee, so clients are never left wondering when help will arrive. In addition, each client is assigned a dedicated vCIO who provides strategic guidance, budgeting support, and quarterly reviews to ensure technology decisions align with business goals, compliance needs, and long-term growth." }
   },
   {
     id: "10",
@@ -393,7 +393,7 @@ export const QUESTIONS = [
     why: "This allows us to construct a clear, client-friendly process section that explains exactly how prospects move from consultation to onboarding. It increases transparency and helps build trust.",
     guidance: "Describe the workflow a client experiences—typically 3–5 steps. Examples include consultation, assessment, proposal, onboarding, and ongoing support. If your process includes guarantees or follow-ups, include those details as well.",
     type: "textarea",
-    examples: { shortAnswer: "Our process starts with a discovery call to understand the client's business and goals. We then perform a technical assessment, present a tailored proposal, and hold a kickoff meeting. Once approved, we complete onboarding over 30 days, optimizing systems, security, and workflows." }
+    examples: { shortAnswer: "Our process begins with an initial discovery call to understand the client's business, goals, and pain points. This is followed by a comprehensive technical assessment covering infrastructure, security, compliance, and workflows. We then present a tailored proposal outlining recommendations, timelines, and expectations. Once approved, we hold a kickoff meeting and complete onboarding over approximately 30 days. During onboarding, we document systems, optimize configurations, implement security improvements, and ensure a smooth transition with minimal disruption to daily operations." }
   },
   {
     id: "14",
@@ -469,7 +469,7 @@ export const QUESTIONS = [
     why: "Understanding client frustrations helps create empathetic messaging that connects emotionally with prospects. It improves the resonance of your brand voice and is used to position your MSP as the solution to their negative past experiences.",
     guidance: "Write the common frustrations prospects share during sales calls or onboarding. Examples include poor responsiveness from previous providers, confusing communication, lack of transparency, or reactive-only IT support. Provide real language whenever possible.",
     type: "textarea",
-    examples: { shortAnswer: "Clients often tell us their previous MSP took days to respond, lacked a clear process, and provided little visibility into what was actually being done." }
+    examples: { shortAnswer: "Many of our clients come to us frustrated by their previous MSP experiences. They commonly report slow response times, unclear escalation paths, and a lack of transparency around what work was actually being performed. Clients often felt reactive support was the norm, with problems recurring instead of being permanently resolved. Others express frustration with poor communication, technical jargon without explanation, and no clear roadmap for improving security or reliability. These pain points are typically what drive clients to seek a more proactive, accountable IT partner." }
   },
   {
     id: "20",
@@ -490,7 +490,7 @@ export const QUESTIONS = [
     why: "This question provides real client language that can shape testimonials, trust-building statements, and tone. Using your clients' own words significantly boosts authenticity and conversion rates.",
     guidance: "List actual phrases you've heard from satisfied clients—comments about reliability, responsiveness, friendliness, expertise, accountability, or peace of mind. Provide direct quotes if possible. These will be incorporated into voice-of-customer copy.",
     type: "textarea",
-    examples: { shortAnswer: "Clients often describe us as reliable, proactive, and easy to work with. They value our fast response times, clear communication, and ability to explain complex issues in plain language. Many say they trust us to prevent problems, not just react to them." }
+    examples: { shortAnswer: "Clients frequently describe us as reliable, proactive, and easy to work with. They value our fast response times, consistent follow-through, and clear communication that avoids unnecessary technical jargon. Many clients say they appreciate knowing exactly what is being done and why, rather than feeling kept in the dark. We are often described as a trusted partner rather than just a vendor, with clients highlighting our ability to prevent issues, improve stability, and help them make confident technology decisions that support their business." }
   },
   {
     id: "22",
@@ -499,7 +499,7 @@ export const QUESTIONS = [
     why: "This distills your ICP into a short statement that shapes your overall brand targeting strategy. It influences the site's tone, messaging, and which benefits are emphasized most prominently.",
     guidance: "Summarize the key traits of your ideal client—include their industry, size, IT maturity, personality traits, or business needs. This should be a clear and concise statement that reflects who you're trying to attract long-term.",
     type: "textarea",
-    examples: { shortAnswer: "Our ideal clients are 25–100 employee professional firms who value proactive IT strategy, compliance support, and consistent partnership." }
+    examples: { shortAnswer: "Our ideal clients are professional service organizations with approximately 25–100 employees that rely heavily on technology for daily operations. They value proactive IT management, strong security and compliance practices, clear communication, and a long-term partnership focused on stability, efficiency, and strategic planning rather than break-fix support." }
   },
   {
     id: "23",
@@ -517,7 +517,7 @@ export const QUESTIONS = [
         guidance: "List any industries, business sizes, or client patterns that you prefer not to target. Be honest—if certain clients drain resources or don't align with your expertise, we use this information to avoid attracting them.",
         type: "textarea",
         requiredIfParentYes: false,
-        examples: { shortAnswer: "We avoid restaurants, retail stores, and micro-businesses under 5 employees." }
+        examples: { shortAnswer: "We typically do not serve restaurants, retail stores, or very small businesses with fewer than five employees. These environments often require highly transactional, on-demand support models or point-of-sale–centric systems that fall outside our proactive, standardized service framework. Our services are designed for organizations that benefit from structured processes, long-term planning, and consistent technology management rather than short-term or ad-hoc support needs." }
       }
     ]
   },
@@ -548,7 +548,7 @@ export const QUESTIONS = [
         guidance: "Share any additional information about your business, special requirements, unique offerings, brand voice preferences, or content restrictions. This question is specifically about content, not design preferences.",
         type: "textarea",
         requiredIfParentYes: false,
-        examples: { shortAnswer: "Please avoid using stock photos that resemble call centers. We prefer actual team imagery whenever possible." }
+        examples: { shortAnswer: "We prefer authentic, professional imagery that reflects our real team, office environment, and client interactions whenever possible. Please avoid generic stock photos that resemble call centers or overly staged IT environments. Ideal imagery includes our staff collaborating, working with clients, or engaging in real-world scenarios that convey trust, approachability, and professionalism. The goal is to present a genuine, human representation of our company rather than a generic or outsourced appearance." }
       }
     ]
   }
