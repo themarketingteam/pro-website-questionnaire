@@ -969,9 +969,8 @@ export default function ProQuestionnaire() {
       // Transform payload for both database and Zapier
       const transformedPayload = transformResponsesToPayload(responses, businessName, domain);
       
-      // Debug: Log payload before sending
-      console.log('📤 Payload being sent to endpoint:', transformedPayload);
-      console.log('📤 Payload JSON:', JSON.stringify(transformedPayload, null, 2));
+      // Debug: Log transformed payload
+      console.log('✅ Transformed Payload:', JSON.stringify(transformedPayload, null, 2));
 
       await base44.entities.ProFormSubmission.create(transformedPayload);
 
@@ -1077,6 +1076,7 @@ export default function ProQuestionnaire() {
               {...commonProps} 
               questionContext={`Question ${question.id}: ${question.title}`}
               questionId={question.id}
+              debounceMs={250}
               onValidationChange={(status) => updateValidationState(question.id, status)}
               currentValidationStatus={validationStatus[question.id]}
             />
