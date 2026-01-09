@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import { useTextValidation } from './useTextValidation';
 
@@ -9,13 +9,11 @@ export default function TextareaQuestion({
   rows = 6,
   questionContext = "General question",
   questionId = "",
-  debounceMs = 8000,
   onValidationChange,
   currentValidationStatus = 'neutral'
 }) {
   const [isManualValidating, setIsManualValidating] = useState(false);
   const [localValue, setLocalValue] = useState(value || '');
-  const debounceTimeoutRef = useRef(null);
   
   // Map parent validation status to internal status
   const statusMap = {
@@ -27,48 +25,24 @@ export default function TextareaQuestion({
   };
   const initialStatus = statusMap[currentValidationStatus] || 'neutral';
   
-  const validation = useTextValidation(value, questionId, 250, isManualValidating, setIsManualValidating, initialStatus);
+  const validation = useTextValidation(localValue, questionId, 250, isManualValidating, setIsManualValidating, initialStatus);
 
   // Sync local value when value prop changes externally
   useEffect(() => {
     setLocalValue(value || '');
   }, [value]);
 
-  // Debounced save handler
-  const handleTextChange = (newValue) => {
-    setLocalValue(newValue);
-    
-    // Clear existing timeout
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-    
-    // Set new timeout for 8 seconds
-    debounceTimeoutRef.current = setTimeout(() => {
-      console.log(`💾 [Q${questionId}] Auto-saving after 8 seconds of inactivity`);
-      onChange(newValue);
-    }, 8000);
-  };
-
-  // Cleanup on unmount
+  // Save after validation completes
   useEffect(() => {
-    return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-    };
-  }, []);
+    if (!isManualValidating && validation.status !== 'neutral' && localValue !== value) {
+      console.log(`💾 [Q${questionId}] Saving after validation complete`);
+      onChange(localValue);
+    }
+  }, [isManualValidating, validation.status]);
 
   const handleManualValidate = () => {
     if (!localValue || localValue.trim().length === 0) return;
     console.log(`🔘 [Q${questionId}] Manual validation triggered`);
-    
-    // Save immediately before validating
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
-    onChange(localValue);
-    
     setIsManualValidating(true);
   };
 
