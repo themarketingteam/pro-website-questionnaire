@@ -1,12 +1,12 @@
 import Home from './pages/Home';
-import ProQuestionnaire from './pages/ProQuestionnaire';
 import ThankYou from './pages/ThankYou';
+import ProQuestionnaire from './pages/ProQuestionnaire';
 
 
 export const PAGES = {
     "Home": Home,
-    "ProQuestionnaire": ProQuestionnaire,
     "ThankYou": ThankYou,
+    "ProQuestionnaire": ProQuestionnaire,
 }
 
 export const pagesConfig = {

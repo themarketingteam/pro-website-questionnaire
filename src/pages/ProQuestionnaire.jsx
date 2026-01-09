@@ -972,31 +972,42 @@ export default function ProQuestionnaire() {
       // Debug: Log transformed payload
       console.log('✅ Transformed Payload:', JSON.stringify(transformedPayload, null, 2));
 
+      // Save to database
       await base44.entities.ProFormSubmission.create(transformedPayload);
+      console.log('✅ Saved to database');
 
-      // Send to Zapier webhook
-      const hookID = import.meta.env.VITE_API_HOOK_ID || "23529934";
-      const hookKey = import.meta.env.VITE_API_HOOK_KEY || "uas7p60";
-      const webhookUrl = `https://hooks.zapier.com/hooks/catch/${hookID}/${hookKey}/`;
-      
-      await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(transformedPayload)
-      });
+      // Send to Zapier webhook (non-blocking - don't fail if this fails)
+      try {
+        const hookID = import.meta.env.VITE_API_HOOK_ID || "23529934";
+        const hookKey = import.meta.env.VITE_API_HOOK_KEY || "uas7p60";
+        const webhookUrl = `https://hooks.zapier.com/hooks/catch/${hookID}/${hookKey}/`;
+        
+        await fetch(webhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(transformedPayload)
+        });
+        console.log('✅ Sent to Zapier');
+      } catch (zapierError) {
+        console.warn('⚠️ Zapier webhook failed (non-critical):', zapierError);
+      }
 
-      toast.success('Questionnaire submitted successfully!');
+      // Clear cookies
       document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
       document.cookie = `${VALIDATION_COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
 
-      // Show thank you modal instead of navigating
+      // Show success message and thank you modal
+      toast.success('Questionnaire submitted successfully!');
       setSubmittedBusinessName(businessName);
-      setShowThankYouModal(true);
       setIsSubmitting(false);
+      setShowThankYouModal(true);
+      
+      console.log('✅ Showing thank you modal for:', businessName);
     } catch (error) {
-      console.error('Submission error:', error);
+      console.error('❌ Submission error:', error);
       toast.error('Failed to submit. Please try again.');
       setIsSubmitting(false);
+      setShowConfirmModal(true); // Reopen the modal so user can try again
     }
   };
 
