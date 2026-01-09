@@ -36,13 +36,16 @@ export default function RadioQuestion({ options, value, onChange, showOther = fa
         <div className="bg-gray-50 border border-[#C1C6C8] rounded p-4 transition-all">
           <label className="block">
             <span className="font-semibold text-[#122947] text-sm">Other (please specify):</span>
+            <p className="text-xs text-[#566C75] mt-1">Add custom services not listed above (up to 3 entries). Each counts toward your selection limit.</p>
             <input
               type="text"
-              placeholder="Enter your option..."
+              placeholder="Enter your custom brand voice..."
               className="w-full mt-3 p-3 border border-[#C1C6C8] rounded focus:outline-none focus:ring-2 focus:ring-[#1C82DE] focus:border-transparent"
               value={otherValue}
-              onChange={(e) => onOtherChange(e.target.value)}
-              onFocus={() => onChange('Other')}
+              onChange={(e) => {
+                onOtherChange(e.target.value);
+                onChange(e.target.value || 'Other');
+              }}
             />
           </label>
         </div>
