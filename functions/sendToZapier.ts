@@ -1,24 +1,25 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.6';
-
 Deno.serve(async (req) => {
-  try {
-    const base44 = createClientFromRequest(req);
-    
-    // Verify user is authenticated
-    const user = await base44.auth.me();
-    if (!user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  };
 
+  // Handle OPTIONS preflight request
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  try {
     // Get the payload from the request
     const payload = await req.json();
     
     console.log('📡 Received payload to forward to Zapier');
     console.log('📦 Payload size:', JSON.stringify(payload).length, 'bytes');
 
-    // Get Zapier webhook URL from environment
-    const hookID = Deno.env.get('VITE_API_HOOK_ID') || '23529934';
-    const hookKey = Deno.env.get('VITE_API_HOOK_KEY') || 'uas7p60';
+    // Get Zapier webhook URL
+    const hookID = '23529934';
+    const hookKey = 'uas7p60';
     const webhookUrl = `https://hooks.zapier.com/hooks/catch/${hookID}/${hookKey}/`;
     
     console.log('📡 Forwarding to Zapier webhook:', webhookUrl);
@@ -38,12 +39,18 @@ Deno.serve(async (req) => {
 
     if (!zapierResponse.ok) {
       console.error('❌ Zapier webhook failed');
+      console.error('❌ Status:', zapierResponse.status);
+      console.error('❌ Response:', responseText);
+      
       return Response.json({
         success: false,
         error: 'Zapier webhook failed',
-        status: zapierResponse.status,
-        response: responseText,
-      }, { status: zapierResponse.status });
+        zapierStatus: zapierResponse.status,
+        zapierBody: responseText,
+      }, { 
+        status: 502,
+        headers: corsHeaders 
+      });
     }
 
     console.log('✅ Successfully forwarded to Zapier');
@@ -51,13 +58,20 @@ Deno.serve(async (req) => {
       success: true,
       message: 'Data sent to Zapier successfully',
       zapierResponse: responseText,
-    });
+    }, { headers: corsHeaders });
 
   } catch (error) {
     console.error('❌ Error in sendToZapier function:', error);
+    console.error('❌ Error message:', error.message);
+    console.error('❌ Error stack:', error.stack);
+    
     return Response.json({
       success: false,
       error: error.message,
-    }, { status: 500 });
+      stack: error.stack,
+    }, { 
+      status: 500,
+      headers: corsHeaders 
+    });
   }
 });
