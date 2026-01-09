@@ -975,20 +975,37 @@ export default function ProQuestionnaire() {
       await base44.entities.ProFormSubmission.create(transformedPayload);
       console.log('✅ Saved to database');
 
-      // Send to Zapier webhook (non-blocking - don't fail if this fails)
+      // Send to Zapier webhook
       try {
         const hookID = import.meta.env.VITE_API_HOOK_ID || "23529934";
         const hookKey = import.meta.env.VITE_API_HOOK_KEY || "uas7p60";
         const webhookUrl = `https://hooks.zapier.com/hooks/catch/${hookID}/${hookKey}/`;
         
-        await fetch(webhookUrl, {
+        console.log('📡 Sending to webhook:', webhookUrl);
+        console.log('📦 Payload size:', JSON.stringify(transformedPayload).length, 'bytes');
+        
+        const webhookResponse = await fetch(webhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(transformedPayload)
         });
-        console.log('✅ Sent to Zapier');
+        
+        console.log('📡 Webhook response status:', webhookResponse.status);
+        const responseText = await webhookResponse.text();
+        console.log('📡 Webhook response body:', responseText);
+        
+        if (!webhookResponse.ok) {
+          console.error('❌ Webhook failed with status:', webhookResponse.status);
+          throw new Error(`Webhook returned ${webhookResponse.status}: ${responseText}`);
+        }
+        
+        console.log('✅ Successfully sent to webhook');
       } catch (zapierError) {
-        console.warn('⚠️ Zapier webhook failed (non-critical):', zapierError);
+        console.error('❌ Zapier webhook error:', zapierError);
+        console.error('❌ Error details:', {
+          message: zapierError.message,
+          stack: zapierError.stack
+        });
       }
 
       // Clear cookies
