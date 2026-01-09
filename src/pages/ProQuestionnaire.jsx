@@ -1076,7 +1076,6 @@ export default function ProQuestionnaire() {
               {...commonProps} 
               questionContext={`Question ${question.id}: ${question.title}`}
               questionId={question.id}
-              debounceMs={250}
               onValidationChange={(status) => updateValidationState(question.id, status)}
               currentValidationStatus={validationStatus[question.id]}
             />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import { useTextValidation } from './useTextValidation';
 
@@ -9,11 +9,13 @@ export default function TextareaQuestion({
   rows = 6,
   questionContext = "General question",
   questionId = "",
-  debounceMs = 500,
+  debounceMs = 8000,
   onValidationChange,
   currentValidationStatus = 'neutral'
 }) {
   const [isManualValidating, setIsManualValidating] = useState(false);
+  const [localValue, setLocalValue] = useState(value || '');
+  const debounceTimeoutRef = useRef(null);
   
   // Map parent validation status to internal status
   const statusMap = {
@@ -25,11 +27,48 @@ export default function TextareaQuestion({
   };
   const initialStatus = statusMap[currentValidationStatus] || 'neutral';
   
-  const validation = useTextValidation(value, questionId, debounceMs, isManualValidating, setIsManualValidating, initialStatus);
+  const validation = useTextValidation(value, questionId, 250, isManualValidating, setIsManualValidating, initialStatus);
+
+  // Sync local value when value prop changes externally
+  useEffect(() => {
+    setLocalValue(value || '');
+  }, [value]);
+
+  // Debounced save handler
+  const handleTextChange = (newValue) => {
+    setLocalValue(newValue);
+    
+    // Clear existing timeout
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    
+    // Set new timeout for 8 seconds
+    debounceTimeoutRef.current = setTimeout(() => {
+      console.log(`💾 [Q${questionId}] Auto-saving after 8 seconds of inactivity`);
+      onChange(newValue);
+    }, 8000);
+  };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleManualValidate = () => {
-    if (!value || value.trim().length === 0) return;
+    if (!localValue || localValue.trim().length === 0) return;
     console.log(`🔘 [Q${questionId}] Manual validation triggered`);
+    
+    // Save immediately before validating
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    onChange(localValue);
+    
     setIsManualValidating(true);
   };
 
@@ -89,8 +128,8 @@ export default function TextareaQuestion({
   return (
     <div className="space-y-3">
       <textarea
-        value={value || ''}
-        onChange={(e) => onChange(e.target.value)}
+        value={localValue}
+        onChange={(e) => handleTextChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
         className={`w-full p-3 border rounded focus:outline-none focus:ring-2 focus:border-transparent resize-y min-h-[120px] transition-colors ${getStatusBorderClass()}`}
@@ -114,7 +153,7 @@ export default function TextareaQuestion({
       <button
         type="button"
         onClick={handleManualValidate}
-        disabled={isManualValidating || !value || value.trim().length === 0}
+        disabled={isManualValidating || !localValue || localValue.trim().length === 0}
         className="px-4 py-2 bg-[#1C82DE] hover:bg-[#075DA7] text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
       >
         {isManualValidating ? (
