@@ -975,31 +975,20 @@ export default function ProQuestionnaire() {
       await base44.entities.ProFormSubmission.create(transformedPayload);
       console.log('✅ Saved to database');
 
-      // Send to Zapier webhook
+      // Send to Zapier via backend function (bypasses CORS)
       try {
-        const hookID = import.meta.env.VITE_API_HOOK_ID || "23529934";
-        const hookKey = import.meta.env.VITE_API_HOOK_KEY || "uas7p60";
-        const webhookUrl = `https://hooks.zapier.com/hooks/catch/${hookID}/${hookKey}/`;
-        
-        console.log('📡 Sending to webhook:', webhookUrl);
+        console.log('📡 Sending to Zapier via backend function');
         console.log('📦 Payload size:', JSON.stringify(transformedPayload).length, 'bytes');
         
-        const webhookResponse = await fetch(webhookUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(transformedPayload)
-        });
+        const zapierResult = await base44.functions.invoke('sendToZapier', transformedPayload);
         
-        console.log('📡 Webhook response status:', webhookResponse.status);
-        const responseText = await webhookResponse.text();
-        console.log('📡 Webhook response body:', responseText);
+        console.log('📡 Backend function response:', zapierResult.data);
         
-        if (!webhookResponse.ok) {
-          console.error('❌ Webhook failed with status:', webhookResponse.status);
-          throw new Error(`Webhook returned ${webhookResponse.status}: ${responseText}`);
+        if (zapierResult.data.success) {
+          console.log('✅ Successfully sent to Zapier');
+        } else {
+          console.error('❌ Zapier webhook failed:', zapierResult.data.error);
         }
-        
-        console.log('✅ Successfully sent to webhook');
       } catch (zapierError) {
         console.error('❌ Zapier webhook error:', zapierError);
         console.error('❌ Error details:', {
