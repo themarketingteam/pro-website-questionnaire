@@ -74,7 +74,7 @@ export default function MultiGeographicQuestion({
     try {
       const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
         types: ["(regions)"],
-        fields: ["place_id", "formatted_address", "geometry", "name"]
+        fields: ["place_id", "formatted_address", "geometry", "name", "address_components"]
       });
 
       autocomplete.addListener("place_changed", () => {
@@ -156,9 +156,21 @@ export default function MultiGeographicQuestion({
         window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
       }
     };
-  }, [isScriptLoaded, onAdd, selectedLocations, loadError]);
+  }, [isScriptLoaded, loadError]);
 
   const canAddMore = selectedLocations.length < maxLocations;
+
+  // Move US states list to top level to avoid recreation
+  const US_STATES = [
+    'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 
+    'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 
+    'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 
+    'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 
+    'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 
+    'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 
+    'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 
+    'Wisconsin', 'Wyoming'
+  ];
 
   return (
     <div className="space-y-4">
@@ -242,20 +254,9 @@ export default function MultiGeographicQuestion({
               </div>
               
               {(() => {
-                const usStates = [
-                  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 
-                  'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 
-                  'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 
-                  'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 
-                  'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 
-                  'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 
-                  'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 
-                  'Wisconsin', 'Wyoming'
-                ];
-
                 const locationName = location.name || location.label || '';
                 const hasCounty = locationName.toLowerCase().includes('county');
-                const hasState = usStates.some(state => locationName.includes(state));
+                const hasState = US_STATES.some(state => locationName.includes(state));
                 const showCheckbox = !hasCounty && !hasState;
 
                 return showCheckbox ? (
@@ -276,13 +277,17 @@ export default function MultiGeographicQuestion({
                           originalLabel: location.originalLabel || baseName
                         };
 
-                        // Replace the location at this index
+                        // Efficiently update just this location
                         const newLocations = [...selectedLocations];
                         newLocations[index] = updatedLocation;
-
-                        // Clear and re-add all
-                        selectedLocations.forEach((_, i) => onRemove(0));
-                        newLocations.forEach(loc => onAdd(loc));
+                        
+                        // Clear all and batch add to trigger single state update
+                        Promise.resolve().then(() => {
+                          for (let i = selectedLocations.length - 1; i >= 0; i--) {
+                            onRemove(i);
+                          }
+                          newLocations.forEach(loc => onAdd(loc));
+                        });
                       }}
                       className="w-4 h-4 rounded border-green-400 text-green-600 focus:ring-green-500"
                     />
