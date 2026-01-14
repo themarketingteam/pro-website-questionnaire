@@ -260,17 +260,13 @@ export default function ProQuestionnaire() {
       case 'yes_no':
         // If answer is 'no', always mark as complete immediately
         if (value === 'no') {
-          setValidationStatus(prev => {
-            const updated = { ...prev, [questionId]: 'complete' };
-            // Clear children validation statuses
-            if (question.conditionalChildren) {
-              question.conditionalChildren.forEach(child => {
-                updated[child.id] = '';
-              });
-            }
-            saveValidationToStorage(updated);
-            return updated;
-          });
+          dispatch(setValidationStatus({ questionId, status: 'complete' }));
+          // Clear children validation statuses
+          if (question.conditionalChildren) {
+            question.conditionalChildren.forEach(child => {
+              dispatch(setValidationStatus({ questionId: child.id, status: '' }));
+            });
+          }
           return; // Exit early
         }
 
@@ -344,11 +340,7 @@ export default function ProQuestionnaire() {
         // Special handling for question 14.1
         if (questionId === '14.1') {
           const q14Status = validItems.length > 0 ? 'complete' : 'incomplete';
-          setValidationStatus(v => {
-            const updated = { ...v, '14': q14Status };
-            saveValidationToStorage(updated);
-            return updated;
-          });
+          dispatch(setValidationStatus({ questionId: '14', status: q14Status }));
         }
         break;
       }
@@ -367,57 +359,40 @@ export default function ProQuestionnaire() {
         return;
     }
 
-    setValidationStatus(prev => {
-      const updated = { ...prev, [questionId]: newStatus };
-      saveValidationToStorage(updated);
-      return updated;
-    });
+    dispatch(setValidationStatus({ questionId, status: newStatus }));
   };
 
   const resetQuestion = (questionId) => {
-    const newResponses = { ...responses };
-    delete newResponses[questionId];
-    delete newResponses[`${questionId}_other`];
-    delete newResponses[`${questionId}_primary`];
-    setResponses(newResponses);
-    saveToStorage(newResponses);
+    dispatch(deleteResponse(questionId));
     setShowAutoSave(prev => prev + 1);
-    
-    // Reset validation status to incomplete
-    setValidationStatus(v => {
-      const newStatus = { ...v, [questionId]: 'incomplete' };
-      saveValidationToStorage(newStatus);
-      return newStatus;
-    });
+    dispatch(setValidationStatus({ questionId, status: 'incomplete' }));
   };
 
   const toggleQuestion = (questionId) => {
-    setExpandedQuestions(prev => {
-      const newState = { ...prev, [questionId]: !prev[questionId] };
-      // If expanding, mark as touched and set validation status
-      if (!prev[questionId]) {
-        setTouchedQuestions(t => ({ ...t, [questionId]: true }));
-        setValidationStatus(v => {
-          if (v[questionId] === '') {
-            // For Yes/No questions with default "no", set as complete
-            const yesNoQuestions = ['1', '2', '12', '14', '23', '25'];
-            if (yesNoQuestions.includes(questionId) && responses[questionId] === 'no') {
-              return { ...v, [questionId]: 'complete' };
-            }
-            return { ...v, [questionId]: 'incomplete' };
-          }
-          return v;
-        });
+    const isCurrentlyExpanded = expandedQuestions[questionId];
+    dispatch(setExpandedQuestion({ questionId, expanded: !isCurrentlyExpanded }));
+    
+    // If expanding, mark as touched and set validation status
+    if (!isCurrentlyExpanded) {
+      dispatch(setTouchedQuestion({ questionId, touched: true }));
+      if (validationStatus[questionId] === '') {
+        // For Yes/No questions with default "no", set as complete
+        const yesNoQuestions = ['1', '2', '12', '14', '23', '25'];
+        if (yesNoQuestions.includes(questionId) && responses[questionId] === 'no') {
+          dispatch(setValidationStatus({ questionId, status: 'complete' }));
+        } else {
+          dispatch(setValidationStatus({ questionId, status: 'incomplete' }));
+        }
       }
-      // If collapsing a parent with conditional children, collapse the children too
-      const question = QUESTIONS.find(q => q.id === questionId);
-      if (question?.conditionalChildren && prev[questionId]) {
-        question.conditionalChildren.forEach(child => {
-          newState[child.id] = false;
-        });
-      }
-      return newState;
-    });
+    }
+    
+    // If collapsing a parent with conditional children, collapse the children too
+    const question = QUESTIONS.find(q => q.id === questionId);
+    if (question?.conditionalChildren && isCurrentlyExpanded) {
+      question.conditionalChildren.forEach(child => {
+        dispatch(setExpandedQuestion({ questionId: child.id, expanded: false }));
+      });
+    }
   };
 
   const expandAll = () => {
@@ -430,7 +405,7 @@ export default function ProQuestionnaire() {
         });
       }
     });
-    setExpandedQuestions(expanded);
+    dispatch(setAllExpanded(expanded));
     setAllExpanded(true);
   };
 
@@ -444,7 +419,7 @@ export default function ProQuestionnaire() {
         });
       }
     });
-    setExpandedQuestions(collapsed);
+    dispatch(setAllExpanded(collapsed));
     setAllExpanded(false);
   };
 
@@ -453,33 +428,8 @@ export default function ProQuestionnaire() {
   };
 
   const handleConfirmClearAll = () => {
-    const defaultResponses = {
-      '1': 'no',
-      '2': 'no',
-      '12': 'no',
-      '14': 'no',
-      '23': 'no',
-      '25': 'no'
-    };
-    setResponses(defaultResponses);
-    saveToStorage(defaultResponses);
-
-    // Reset validation status to empty strings
-    const resetValidation = {
-      '1': '', '2': '', '3': '', '4': '', '5': '',
-      '6': '', '7': '', '8': '', '9': '', '10': '',
-      '11': '', '12': '', '13': '', '14': '', '15': '',
-      '16': '', '17': '', '18': '', '19': '', '20': '',
-      '21': '', '22': '', '23': '', '24': '', '25': '',
-      '1.1': '', '2.1': '', '2.2': '',
-      '12.1': '', '14.1': '', '23.1': '', '25.1': ''
-    };
-    setValidationStatus(resetValidation);
-    saveValidationToStorage(resetValidation);
-
-    // Reset touched questions
-    setTouchedQuestions({});
-
+    dispatch(resetForm());
+    
     // Collapse all questions
     const collapsed = {};
     QUESTIONS.forEach(q => {
@@ -490,7 +440,7 @@ export default function ProQuestionnaire() {
         });
       }
     });
-    setExpandedQuestions(collapsed);
+    dispatch(setAllExpanded(collapsed));
 
     setShowClearAllModal(false);
     toast.success('All responses cleared');
@@ -867,9 +817,8 @@ export default function ProQuestionnaire() {
         });
       }
 
-      // Clear cookies
-      document.cookie = `${COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-      document.cookie = `${VALIDATION_COOKIE_NAME}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      // Clear Redux store
+      dispatch(resetForm());
 
       // Show success message and thank you modal
       toast.success('Questionnaire submitted successfully!');
@@ -977,65 +926,40 @@ export default function ProQuestionnaire() {
               selectedLocations={responses[question.id] || []}
               primaryIndex={responses['5_primary'] || 0}
               onAdd={(location) => {
-                setResponses(prev => {
-                  const current = prev[question.id] || [];
-                  const newLocations = [...current, location];
-                  const newResponses = { ...prev, [question.id]: newLocations };
-                  saveToStorage(newResponses);
-                  setShowAutoSave(s => s + 1);
+                const current = responses[question.id] || [];
+                const newLocations = [...current, location];
+                dispatch(setResponse({ questionId: question.id, value: newLocations }));
+                setShowAutoSave(s => s + 1);
 
-                  // Update validation status
-                  const min = question.limits?.min || 1;
-                  const max = question.limits?.max || 5;
-                  const newStatus = (newLocations.length >= min && newLocations.length <= max) ? 'complete' : 'incomplete';
-                  setValidationStatus(v => {
-                    const updated = { ...v, [question.id]: newStatus };
-                    saveValidationToStorage(updated);
-                    return updated;
-                  });
-
-                  return newResponses;
-                });
+                // Update validation status
+                const min = question.limits?.min || 1;
+                const max = question.limits?.max || 5;
+                const newStatus = (newLocations.length >= min && newLocations.length <= max) ? 'complete' : 'incomplete';
+                dispatch(setValidationStatus({ questionId: question.id, status: newStatus }));
               }}
               onRemove={(index) => {
-                setResponses(prev => {
-                  const current = prev[question.id] || [];
-                  let primaryIndex = prev['5_primary'] || 0;
-                  // Adjust primary index if we're removing it or something before it
-                  if (index === primaryIndex) {
-                    primaryIndex = 0; // Reset to first
-                  } else if (index < primaryIndex) {
-                    primaryIndex = primaryIndex - 1;
-                  }
-                  const newLocations = current.filter((_, i) => i !== index);
-                  const newResponses = { 
-                    ...prev, 
-                    [question.id]: newLocations,
-                    '5_primary': primaryIndex
-                  };
-                  saveToStorage(newResponses);
-                  setShowAutoSave(s => s + 1);
+                const current = responses[question.id] || [];
+                let primaryIndex = responses['5_primary'] || 0;
+                // Adjust primary index if we're removing it or something before it
+                if (index === primaryIndex) {
+                  primaryIndex = 0;
+                } else if (index < primaryIndex) {
+                  primaryIndex = primaryIndex - 1;
+                }
+                const newLocations = current.filter((_, i) => i !== index);
+                dispatch(setResponse({ questionId: question.id, value: newLocations }));
+                dispatch(setResponse({ questionId: '5_primary', value: primaryIndex }));
+                setShowAutoSave(s => s + 1);
 
-                  // Update validation status
-                  const min = question.limits?.min || 1;
-                  const max = question.limits?.max || 5;
-                  const newStatus = (newLocations.length >= min && newLocations.length <= max) ? 'complete' : 'incomplete';
-                  setValidationStatus(v => {
-                    const updated = { ...v, [question.id]: newStatus };
-                    saveValidationToStorage(updated);
-                    return updated;
-                  });
-
-                  return newResponses;
-                });
+                // Update validation status
+                const min = question.limits?.min || 1;
+                const max = question.limits?.max || 5;
+                const newStatus = (newLocations.length >= min && newLocations.length <= max) ? 'complete' : 'incomplete';
+                dispatch(setValidationStatus({ questionId: question.id, status: newStatus }));
               }}
               onSetPrimary={(index) => {
-                setResponses(prev => {
-                  const newResponses = { ...prev, '5_primary': index };
-                  saveToStorage(newResponses);
-                  setShowAutoSave(s => s + 1);
-                  return newResponses;
-                });
+                dispatch(setResponse({ questionId: '5_primary', value: index }));
+                setShowAutoSave(s => s + 1);
               }}
               maxLocations={question.limits?.max || 5}
             />
@@ -1078,11 +1002,7 @@ export default function ProQuestionnaire() {
                   item.saved === true || (item.name?.trim() && item.type && item.saved !== false)
                 ) : [];
                 const newStatus = validItems.length > 0 ? 'complete' : 'incomplete';
-                setValidationStatus(v => {
-                  const updated = { ...v, '12': newStatus };
-                  saveValidationToStorage(updated);
-                  return updated;
-                });
+                dispatch(setValidationStatus({ questionId: '12', status: newStatus }));
               }
             }}
             max={question.limits?.max || 10}
@@ -1102,11 +1022,7 @@ export default function ProQuestionnaire() {
                   item.saved === true || (item.name?.trim() && item.type && (item.file || item.description?.trim()) && item.saved !== false)
                 ) : [];
                 const newStatus = validItems.length > 0 ? 'complete' : 'incomplete';
-                setValidationStatus(v => {
-                  const updated = { ...v, '14': newStatus };
-                  saveValidationToStorage(updated);
-                  return updated;
-                });
+                dispatch(setValidationStatus({ questionId: '14', status: newStatus }));
               }
             }}
             max={question.limits?.max || 10}
@@ -1126,7 +1042,7 @@ export default function ProQuestionnaire() {
                           q12Element.scrollIntoView({ behavior: 'smooth', block: 'center' });
                           // Expand question 12 after a brief delay
                           setTimeout(() => {
-                            setExpandedQuestions(prev => ({ ...prev, '12': true }));
+                            dispatch(setExpandedQuestion({ questionId: '12', expanded: true }));
                           }, 500);
                         }
                       }}
