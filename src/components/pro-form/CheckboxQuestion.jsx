@@ -12,7 +12,8 @@ export default function CheckboxQuestion({
   otherValue = '',
   onOtherChange,
   columns = 2,
-  allowCategorySelection = false
+  allowCategorySelection = false,
+  externalDisabled = false
 }) {
   const [showModal, setShowModal] = React.useState(false);
   const [modalCategory, setModalCategory] = React.useState('');
@@ -78,11 +79,12 @@ export default function CheckboxQuestion({
   const totalSelections = value.length + otherEntriesCount;
 
   const isDisabled = (option) => {
+    if (externalDisabled && !value.includes(option)) return true;
     if (!max) return false;
     return totalSelections >= max && !value.includes(option);
   };
 
-  const canAddMoreOther = !max || totalSelections < max;
+  const canAddMoreOther = !externalDisabled && (!max || totalSelections < max);
 
   return (
     <div className="space-y-4">

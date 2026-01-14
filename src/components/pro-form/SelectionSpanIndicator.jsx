@@ -6,7 +6,7 @@ export default function SelectionSpanIndicator({
   industriesCount, 
   regionsCount,
   minTotal = 8,
-  maxTotal = 20
+  maxTotal = 25
 }) {
   const total = servicesCount + industriesCount + regionsCount;
   const isValid = total >= minTotal && total <= maxTotal;

@@ -9,7 +9,8 @@ export default function MultiGeographicQuestion({
   onAdd,
   onRemove,
   onSetPrimary,
-  maxLocations = 5
+  maxLocations = 5,
+  externalDisabled = false
 }) {
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);

@@ -60,6 +60,17 @@ export default function ProQuestionnaire() {
   const urlParams = new URLSearchParams(window.location.search);
   const businessNameParam = urlParams.get('businessName') || '';
   const domainParam = urlParams.get('domainName') || '';
+
+  // Calculate span totals for Q3-Q5
+  const otherServices = responses['3_other'];
+  const otherServicesCount = Array.isArray(otherServices) 
+    ? otherServices.filter(v => v?.trim()).length 
+    : (otherServices?.trim() ? 1 : 0);
+  const servicesCount = (responses['3'] || []).length + otherServicesCount;
+  const industriesCount = (responses['4'] || []).length + (responses['4_other'] ? 1 : 0);
+  const regionsCount = Array.isArray(responses['5']) ? responses['5'].length : 0;
+  const totalSelections = servicesCount + industriesCount + regionsCount;
+  const isSpanLimitReached = totalSelections >= 25;
   
   // Extract and store credentials from URL
   useEffect(() => {
@@ -841,15 +852,7 @@ export default function ProQuestionnaire() {
     }
   };
 
-  // Calculate span totals
-  const otherServices = responses['3_other'];
-  const otherServicesCount = Array.isArray(otherServices) 
-    ? otherServices.filter(v => v?.trim()).length 
-    : (otherServices?.trim() ? 1 : 0);
-  const servicesCount = (responses['3'] || []).length + otherServicesCount;
-  const industriesCount = (responses['4'] || []).length + (responses['4_other'] ? 1 : 0);
-  const regionsCount = Array.isArray(responses['5']) ? responses['5'].length : 0;
-  const totalSelections = servicesCount + industriesCount + regionsCount;
+
 
   // Determine background color based on selection balance
   const getSpanBackgroundClass = () => {
@@ -891,6 +894,7 @@ export default function ProQuestionnaire() {
             onOtherChange={(val) => updateResponse(`${question.id}_other`, val)}
             columns={question.id === "3" ? 3 : 2}
             allowCategorySelection={question.id === "3"}
+            externalDisabled={isSpanLimitReached && (question.id === "3" || question.id === "4")}
           />
         );
       
@@ -968,6 +972,7 @@ export default function ProQuestionnaire() {
                 setShowAutoSave(s => s + 1);
               }}
               maxLocations={question.limits?.max || 5}
+              externalDisabled={isSpanLimitReached}
             />
           );
         }
