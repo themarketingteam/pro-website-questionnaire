@@ -6,7 +6,18 @@ import { store, persistor } from './store/store';
 export default function ReduxProvider({ children }) {
   return (
     <Provider store={store}>
-      <PersistGate loading={null} persistor={persistor}>
+      <PersistGate 
+        loading={
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-gray-600">Loading saved data...</div>
+          </div>
+        } 
+        persistor={persistor}
+        onBeforeLift={() => {
+          // Log when rehydration completes
+          console.log('✅ Redux state rehydrated from localStorage');
+        }}
+      >
         {children}
       </PersistGate>
     </Provider>

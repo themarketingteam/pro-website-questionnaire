@@ -1,3 +1,4 @@
+
 import { configureStore } from '@reduxjs/toolkit';
 import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
 import storage from 'redux-persist/lib/storage'; // defaults to localStorage
@@ -7,7 +8,11 @@ const persistConfig = {
   key: 'pro-questionnaire-root',
   version: 1,
   storage,
-  whitelist: ['responses', 'validationStatus', 'touchedQuestions', 'expandedQuestions', 'credentials']
+  whitelist: ['responses', 'validationStatus', 'touchedQuestions', 'expandedQuestions', 'credentials'],
+  // Ensure nested objects are properly serialized
+  serialize: true,
+  // Add debug logging
+  debug: false
 };
 
 const persistedReducer = persistReducer(persistConfig, formReducer);

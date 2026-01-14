@@ -115,27 +115,32 @@ export default function ProQuestionnaire() {
       return true;
     });
 
-    // Only mark questions as touched and trigger validation if there's real user data
+    // Only revalidate if there's user data AND validation status is empty
     if (hasUserData) {
       Object.keys(responses).forEach(key => {
         if (!key.includes('_other') && !key.includes('_primary') && responses[key]) {
-          dispatch(setTouchedQuestion({ questionId: key, touched: true }));
-          // For yes/no questions with "no", set as complete
+          // Mark as touched if not already
+          if (!touchedQuestions[key]) {
+            dispatch(setTouchedQuestion({ questionId: key, touched: true }));
+          }
+          
+          // For yes/no questions with "no", ensure they're marked complete
           const yesNoQuestions = ['1', '2', '12', '14', '23', '25'];
-          if (yesNoQuestions.includes(key) && responses[key] === 'no') {
+          if (yesNoQuestions.includes(key) && responses[key] === 'no' && !validationStatus[key]) {
             dispatch(setValidationStatus({ questionId: key, status: 'complete' }));
           }
         }
       });
 
-      // Update validation for all non-textarea questions with responses
+      // Only update validation for questions that don't already have a validation status
+      // This preserves persisted validation statuses (including AI validation for textareas)
       QUESTIONS.forEach(q => {
-        if (responses[q.id] && q.type !== 'textarea') {
+        if (responses[q.id] && q.type !== 'textarea' && !validationStatus[q.id]) {
           updateQuestionValidation(q.id, responses[q.id], responses);
         }
         if (q.conditionalChildren) {
           q.conditionalChildren.forEach(child => {
-            if (responses[child.id] && child.type !== 'textarea') {
+            if (responses[child.id] && child.type !== 'textarea' && !validationStatus[child.id]) {
               updateQuestionValidation(child.id, responses[child.id], responses);
             }
           });
