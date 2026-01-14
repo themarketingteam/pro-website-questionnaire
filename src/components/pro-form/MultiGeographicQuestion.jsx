@@ -277,17 +277,9 @@ export default function MultiGeographicQuestion({
                           originalLabel: location.originalLabel || baseName
                         };
 
-                        // Efficiently update just this location
-                        const newLocations = [...selectedLocations];
-                        newLocations[index] = updatedLocation;
-                        
-                        // Clear all and batch add to trigger single state update
-                        Promise.resolve().then(() => {
-                          for (let i = selectedLocations.length - 1; i >= 0; i--) {
-                            onRemove(i);
-                          }
-                          newLocations.forEach(loc => onAdd(loc));
-                        });
+                        // Direct state update - much more efficient
+                        onRemove(index);
+                        onAdd(updatedLocation);
                       }}
                       className="w-4 h-4 rounded border-green-400 text-green-600 focus:ring-green-500"
                     />

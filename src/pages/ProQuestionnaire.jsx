@@ -231,7 +231,7 @@ export default function ProQuestionnaire() {
     }
     }, []);
 
-  // Debounced auto-save to cookie (saves after 500ms of no changes)
+  // Debounced auto-save to cookie (saves after 10 seconds of no changes)
   const saveToStorage = useCallback((data) => {
     // Clear existing timeout
     if (window.saveToStorageTimeout) {
@@ -245,7 +245,7 @@ export default function ProQuestionnaire() {
       const expires = new Date();
       expires.setDate(expires.getDate() + 30);
       document.cookie = `${COOKIE_NAME}=${encodedData}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
-    }, 500);
+    }, 10000);
   }, []);
 
   // Debounced save validation status to cookie
@@ -260,7 +260,7 @@ export default function ProQuestionnaire() {
       const expires = new Date();
       expires.setDate(expires.getDate() + 30);
       document.cookie = `${VALIDATION_COOKIE_NAME}=${encodedData}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
-    }, 500);
+    }, 10000);
   }, []);
 
   const updateResponse = useCallback((questionId, value) => {
