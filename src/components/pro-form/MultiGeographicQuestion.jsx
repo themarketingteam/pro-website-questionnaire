@@ -293,7 +293,7 @@ export default function MultiGeographicQuestion({
         </div>
       )}
 
-      {canAddMore && (
+      {canAddMore && !externalDisabled && (
         <>
           <div className="relative">
             <input
@@ -322,9 +322,12 @@ export default function MultiGeographicQuestion({
         </>
       )}
 
-      {!canAddMore && (
+      {(!canAddMore || externalDisabled) && (
         <div className="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
-          Maximum of {maxLocations} locations reached. Remove a location to add another.
+          {externalDisabled 
+            ? 'Selection limit of 25 reached across Services, Industries, and Locations. Remove selections to add more.'
+            : `Maximum of ${maxLocations} locations reached. Remove a location to add another.`
+          }
         </div>
       )}
     </div>
