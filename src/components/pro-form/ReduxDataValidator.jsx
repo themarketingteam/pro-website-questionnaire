@@ -3,6 +3,10 @@ import { useSelector } from 'react-redux';
 import { CheckCircle2, AlertCircle, Database } from 'lucide-react';
 
 export default function ReduxDataValidator() {
+  // Check if redux-data=true is in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const isEnabled = urlParams.get('redux-data') === 'true';
+  
   const [isVisible, setIsVisible] = useState(false);
   const [validationResults, setValidationResults] = useState(null);
   
@@ -11,6 +15,11 @@ export default function ReduxDataValidator() {
   const touchedQuestions = useSelector((state) => state.form.touchedQuestions);
   const expandedQuestions = useSelector((state) => state.form.expandedQuestions);
   const credentials = useSelector((state) => state.form.credentials);
+  
+  // Don't render anything if not enabled via URL parameter
+  if (!isEnabled) {
+    return null;
+  }
 
   useEffect(() => {
     // Listen for Ctrl+Shift+V to toggle validator
