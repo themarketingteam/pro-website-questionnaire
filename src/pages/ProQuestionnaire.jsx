@@ -1,4 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { 
+  setResponse, 
+  setValidationStatus, 
+  setMultipleValidationStatus,
+  setTouchedQuestion, 
+  setExpandedQuestion, 
+  setAllExpanded,
+  setCredentials,
+  resetForm,
+  deleteResponse,
+  initializeExpandedQuestions
+} from '@/components/store/formSlice';
 import { base44 } from '@/api/base44Client';
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -26,53 +39,13 @@ import ThankYouModal from '@/components/pro-form/ThankYouModal';
 import ValidationGuide from '@/components/pro-form/ValidationGuide';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 
-const COOKIE_NAME = 'pro_questionnaire_responses';
-const CREDENTIALS_COOKIE_NAME = 'pro_questionnaire_credentials';
-const VALIDATION_COOKIE_NAME = 'pro_questionnaire_validation';
-
-// Helper functions for credential management
-const setCredentialsCookie = (credentials) => {
-  const jsonData = JSON.stringify(credentials);
-  const encodedData = encodeURIComponent(jsonData);
-  const expires = new Date();
-  expires.setDate(expires.getDate() + 30);
-  document.cookie = `${CREDENTIALS_COOKIE_NAME}=${encodedData}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
-};
-
-const getCredentialsCookie = () => {
-  const cookies = document.cookie.split(';').reduce((acc, cookie) => {
-    const [key, value] = cookie.trim().split('=');
-    acc[key] = value;
-    return acc;
-  }, {});
-  
-  if (cookies[CREDENTIALS_COOKIE_NAME]) {
-    try {
-      return JSON.parse(decodeURIComponent(cookies[CREDENTIALS_COOKIE_NAME]));
-    } catch (e) {
-      console.error('Failed to parse credentials:', e);
-      return {};
-    }
-  }
-  return {};
-};
-
-// Export helper to access credentials from anywhere
-export const getStoredCredentials = getCredentialsCookie;
-
 export default function ProQuestionnaire() {
-  const [responses, setResponses] = useState({});
-  const [expandedQuestions, setExpandedQuestions] = useState({});
-  const [touchedQuestions, setTouchedQuestions] = useState({});
-  const [validationStatus, setValidationStatus] = useState({
-    '1': '', '2': '', '3': '', '4': '', '5': '',
-    '6': '', '7': '', '8': '', '9': '', '10': '',
-    '11': '', '12': '', '13': '', '14': '', '15': '',
-    '16': '', '17': '', '18': '', '19': '', '20': '',
-    '21': '', '22': '', '23': '', '24': '', '25': '',
-    '1.1': '', '2.1': '', '2.2': '',
-    '12.1': '', '14.1': '', '23.1': '', '25.1': ''
-  });
+  const dispatch = useDispatch();
+  const responses = useSelector((state) => state.form.responses);
+  const validationStatus = useSelector((state) => state.form.validationStatus);
+  const touchedQuestions = useSelector((state) => state.form.touchedQuestions);
+  const expandedQuestions = useSelector((state) => state.form.expandedQuestions);
+  const credentials = useSelector((state) => state.form.credentials);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allExpanded, setAllExpanded] = useState(false);
   const [showAutoSave, setShowAutoSave] = useState(0);
@@ -89,22 +62,21 @@ export default function ProQuestionnaire() {
   
   // Extract and store credentials from URL
   useEffect(() => {
-    const credentials = {
+    const creds = {
       businessName: businessNameParam,
       domain: domainParam,
       userId: urlParams.get('userId') || '',
       userEmail: urlParams.get('userEmail') || '',
       userName: urlParams.get('userName') || '',
-      accessToken: urlParams.get('accessToken') || '',
-      // Add any other credential fields you need
+      accessToken: urlParams.get('accessToken') || ''
     };
     
     // Only store if at least one credential field is present
-    if (Object.values(credentials).some(val => val)) {
-      setCredentialsCookie(credentials);
-      console.log('✅ Credentials stored in cookie:', credentials);
+    if (Object.values(creds).some(val => val)) {
+      dispatch(setCredentials(creds));
+      console.log('✅ Credentials stored in Redux:', creds);
     }
-  }, [businessNameParam, domainParam]);
+  }, [businessNameParam, domainParam, dispatch]);
 
   // Set document title and favicon
   useEffect(() => {
@@ -117,166 +89,72 @@ export default function ProQuestionnaire() {
     document.head.appendChild(link);
   }, []);
 
-  // Load from cookie on mount
+  // Initialize expanded questions on mount
   useEffect(() => {
-    const cookies = document.cookie.split(';').reduce((acc, cookie) => {
-      const [key, value] = cookie.trim().split('=');
-      acc[key] = value;
-      return acc;
-    }, {});
-    
-    let initialResponses = {};
-    if (cookies[COOKIE_NAME]) {
-      try {
-        initialResponses = JSON.parse(decodeURIComponent(cookies[COOKIE_NAME]));
-      } catch (e) {
-        console.error('Failed to parse saved responses:', e);
-      }
+    // Only initialize if not already initialized
+    if (Object.keys(expandedQuestions).length === 0) {
+      const expanded = {};
+      QUESTIONS.forEach(q => {
+        expanded[q.id] = false;
+        if (q.conditionalChildren) {
+          q.conditionalChildren.forEach(child => {
+            expanded[child.id] = false;
+          });
+        }
+      });
+      dispatch(initializeExpandedQuestions(expanded));
     }
-
-    // Load validation status
-    let initialValidation = {
-      '1': '', '2': '', '3': '', '4': '', '5': '',
-      '6': '', '7': '', '8': '', '9': '', '10': '',
-      '11': '', '12': '', '13': '', '14': '', '15': '',
-      '16': '', '17': '', '18': '', '19': '', '20': '',
-      '21': '', '22': '', '23': '', '24': '', '25': '',
-      '1.1': '', '2.1': '', '2.2': '',
-      '12.1': '', '14.1': '', '23.1': '', '25.1': ''
-    };
-    if (cookies[VALIDATION_COOKIE_NAME]) {
-      try {
-        const savedValidation = JSON.parse(decodeURIComponent(cookies[VALIDATION_COOKIE_NAME]));
-        initialValidation = { ...initialValidation, ...savedValidation };
-      } catch (e) {
-        console.error('Failed to parse saved validation:', e);
-      }
-    }
-    setValidationStatus(initialValidation);
-    
-    // Validate Q18 data - if array is malformed or exceeds max, clear it
-    let dataWasCleaned = false;
-    if (initialResponses['18'] && Array.isArray(initialResponses['18'])) {
-      if (initialResponses['18'].length > 3) {
-        console.warn('Q18 has invalid data, clearing it');
-        delete initialResponses['18'];
-        delete initialResponses['18_other'];
-        dataWasCleaned = true;
-      }
-    }
-    
-    // Default Q1, Q2, Q12, Q14, Q23, and Q25 to "no" if not set
-    if (!initialResponses['1']) initialResponses['1'] = 'no';
-    if (!initialResponses['2']) initialResponses['2'] = 'no';
-    if (!initialResponses['12']) initialResponses['12'] = 'no';
-    if (!initialResponses['14']) initialResponses['14'] = 'no';
-    if (!initialResponses['23']) initialResponses['23'] = 'no';
-    if (!initialResponses['25']) initialResponses['25'] = 'no';
-    setResponses(initialResponses);
-    
-    // Save cleaned data back to cookie if we cleaned anything
-    if (dataWasCleaned) {
-      saveToStorage(initialResponses);
-    }
-    
-    // Initialize all questions as collapsed
-    const expanded = {};
-    QUESTIONS.forEach(q => {
-      expanded[q.id] = false;
-      if (q.conditionalChildren) {
-        q.conditionalChildren.forEach(child => {
-          expanded[child.id] = false;
-        });
-      }
-    });
-    setExpandedQuestions(expanded);
 
     // Check if there's any actual user data (beyond defaults)
     const defaultKeys = ['1', '2', '12', '14', '23', '25'];
-    const hasUserData = Object.keys(initialResponses).some(key => {
-      if (defaultKeys.includes(key) && initialResponses[key] === 'no') {
-        return false; // Default value doesn't count
+    const hasUserData = Object.keys(responses).some(key => {
+      if (defaultKeys.includes(key) && responses[key] === 'no') {
+        return false;
       }
       return true;
     });
 
     // Only mark questions as touched and trigger validation if there's real user data
     if (hasUserData) {
-      const touched = {};
-      Object.keys(initialResponses).forEach(key => {
-        if (!key.includes('_other') && !key.includes('_primary') && initialResponses[key]) {
-          touched[key] = true;
+      Object.keys(responses).forEach(key => {
+        if (!key.includes('_other') && !key.includes('_primary') && responses[key]) {
+          dispatch(setTouchedQuestion({ questionId: key, touched: true }));
           // For yes/no questions with "no", set as complete
           const yesNoQuestions = ['1', '2', '12', '14', '23', '25'];
-          if (yesNoQuestions.includes(key) && initialResponses[key] === 'no') {
-            initialValidation[key] = 'complete';
+          if (yesNoQuestions.includes(key) && responses[key] === 'no') {
+            dispatch(setValidationStatus({ questionId: key, status: 'complete' }));
           }
         }
       });
-      setTouchedQuestions(touched);
 
       // Update validation for all non-textarea questions with responses
       QUESTIONS.forEach(q => {
-        if (initialResponses[q.id] && q.type !== 'textarea') {
-          updateQuestionValidation(q.id, initialResponses[q.id], initialResponses);
+        if (responses[q.id] && q.type !== 'textarea') {
+          updateQuestionValidation(q.id, responses[q.id], responses);
         }
         if (q.conditionalChildren) {
           q.conditionalChildren.forEach(child => {
-            if (initialResponses[child.id] && child.type !== 'textarea') {
-              updateQuestionValidation(child.id, initialResponses[child.id], initialResponses);
+            if (responses[child.id] && child.type !== 'textarea') {
+              updateQuestionValidation(child.id, responses[child.id], responses);
             }
           });
         }
       });
     }
-    }, []);
-
-  // Debounced auto-save to cookie (saves after 10 seconds of no changes)
-  const saveToStorage = useCallback((data) => {
-    // Clear existing timeout
-    if (window.saveToStorageTimeout) {
-      clearTimeout(window.saveToStorageTimeout);
-    }
-    
-    // Set new timeout
-    window.saveToStorageTimeout = setTimeout(() => {
-      const jsonData = JSON.stringify(data);
-      const encodedData = encodeURIComponent(jsonData);
-      const expires = new Date();
-      expires.setDate(expires.getDate() + 30);
-      document.cookie = `${COOKIE_NAME}=${encodedData}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
-    }, 10000);
   }, []);
 
-  // Debounced save validation status to cookie
-  const saveValidationToStorage = useCallback((validation) => {
-    if (window.saveValidationTimeout) {
-      clearTimeout(window.saveValidationTimeout);
-    }
-    
-    window.saveValidationTimeout = setTimeout(() => {
-      const jsonData = JSON.stringify(validation);
-      const encodedData = encodeURIComponent(jsonData);
-      const expires = new Date();
-      expires.setDate(expires.getDate() + 30);
-      document.cookie = `${VALIDATION_COOKIE_NAME}=${encodedData}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
-    }, 10000);
-  }, []);
+  // No more cookie saving - Redux persist handles everything automatically
 
   const updateResponse = useCallback((questionId, value) => {
-    setResponses(prev => {
-      const newResponses = { ...prev, [questionId]: value };
-      saveToStorage(newResponses);
-      
-      // Trigger validation update (debounced internally for textareas)
-      updateQuestionValidation(questionId, value, newResponses);
-      
-      return newResponses;
-    });
+    dispatch(setResponse({ questionId, value }));
+    
+    // Trigger validation update
+    const newResponses = { ...responses, [questionId]: value };
+    updateQuestionValidation(questionId, value, newResponses);
     
     setShowAutoSave(prev => prev + 1);
-    setTouchedQuestions(prev => ({ ...prev, [questionId]: true }));
-  }, [saveToStorage]);
+    dispatch(setTouchedQuestion({ questionId, touched: true }));
+  }, [dispatch, responses]);
 
   const calculateQuestion2Status = (status2_1, value2_2) => {
     // Check 2.2 state
@@ -313,71 +191,63 @@ export default function ProQuestionnaire() {
   };
 
   const updateValidationState = (questionId, status) => {
-    setValidationStatus(prev => {
-      const newStatus = { ...prev, [questionId]: status };
-      saveValidationToStorage(newStatus);
+    dispatch(setValidationStatus({ questionId, status }));
 
-      // Special handling for question 2.1
-      if (questionId === '2.1') {
-        const value2_2 = responses['2.2'];
-        newStatus['2'] = calculateQuestion2Status(status, value2_2);
+    // Build new status object for calculations
+    const newStatus = { ...validationStatus, [questionId]: status };
+
+    // Special handling for question 2.1
+    if (questionId === '2.1') {
+      const value2_2 = responses['2.2'];
+      const q2Status = calculateQuestion2Status(status, value2_2);
+      dispatch(setValidationStatus({ questionId: '2', status: q2Status }));
+    }
+
+    // Special handling for question 23.1
+    if (questionId === '23.1') {
+      dispatch(setValidationStatus({ questionId: '23', status }));
+    }
+
+    // If this is a child question, update parent status
+    const parentId = questionId.split('.')[0];
+    if (questionId.includes('.') && parentId && parentId !== '2') {
+      const parentAnswer = responses[parentId];
+      if (parentAnswer === 'no') {
+        dispatch(setValidationStatus({ questionId: parentId, status: 'complete' }));
+        return;
       }
 
-      // Special handling for question 23.1
-      if (questionId === '23.1') {
-        newStatus['23'] = status;
-      }
+      const question = QUESTIONS.find(q => q.id === parentId);
+      if (question?.conditionalChildren && parentAnswer === 'yes') {
+        const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
+        if (requiredChildren.length > 0) {
+          let allComplete = true;
+          let anyNeedsWork = false;
+          let anyEmpty = false;
 
-      // If this is a child question, update parent status
-      const parentId = questionId.split('.')[0];
-      if (questionId.includes('.') && parentId && parentId !== '2') {
-        // Check if parent is set to "no" - if so, don't update parent status
-        const parentAnswer = responses[parentId];
-        if (parentAnswer === 'no') {
-          // Parent is "no", so it should remain 'complete'
-          newStatus[parentId] = 'complete';
-          return newStatus;
-        }
-
-        // Calculate parent status based on all children only if parent is "yes"
-        const question = QUESTIONS.find(q => q.id === parentId);
-        if (question?.conditionalChildren && parentAnswer === 'yes') {
-          const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
-          if (requiredChildren.length > 0) {
-            let allComplete = true;
-            let anyNeedsWork = false;
-            let anyEmpty = false;
-
-            for (const child of requiredChildren) {
-              const childStatus = newStatus[child.id] || '';
-
-              // If status is empty, child hasn't been validated yet
-              if (childStatus === '') {
-                anyEmpty = true;
-                allComplete = false;
-                break;
-              }
-
-              if (childStatus === 'incomplete') {
-                allComplete = false;
-                break;
-              }
-
-              if (childStatus === 'needs_work') {
-                anyNeedsWork = true;
-              }
+          for (const child of requiredChildren) {
+            const childStatus = newStatus[child.id] || '';
+            if (childStatus === '') {
+              anyEmpty = true;
+              allComplete = false;
+              break;
             }
-
-            // Only update parent status if all children have been evaluated (not empty)
-            if (!anyEmpty) {
-              newStatus[parentId] = !allComplete ? 'incomplete' : anyNeedsWork ? 'needs_work' : 'complete';
+            if (childStatus === 'incomplete') {
+              allComplete = false;
+              break;
             }
+            if (childStatus === 'needs_work') {
+              anyNeedsWork = true;
+            }
+          }
+
+          if (!anyEmpty) {
+            const parentStatus = !allComplete ? 'incomplete' : anyNeedsWork ? 'needs_work' : 'complete';
+            dispatch(setValidationStatus({ questionId: parentId, status: parentStatus }));
           }
         }
       }
-
-      return newStatus;
-    });
+    }
   };
 
   const updateQuestionValidation = (questionId, value, allResponses) => {
