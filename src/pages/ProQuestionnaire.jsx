@@ -37,6 +37,7 @@ import AutoSaveIndicator from '@/components/pro-form/AutoSaveIndicator';
 import ConfirmModal from '@/components/pro-form/ConfirmModal';
 import ThankYouModal from '@/components/pro-form/ThankYouModal';
 import ValidationGuide from '@/components/pro-form/ValidationGuide';
+import ReduxDataValidator from '@/components/pro-form/ReduxDataValidator';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 
 export default function ProQuestionnaire() {
@@ -1261,6 +1262,7 @@ export default function ProQuestionnaire() {
               </main>
 
       <AutoSaveIndicator show={showAutoSave} />
+      <ReduxDataValidator />
 
       {showConfirmModal && (
         <ConfirmModal
