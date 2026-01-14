@@ -7,6 +7,7 @@ export default function MultiGeographicQuestion({
   selectedLocations = [],
   primaryIndex = 0,
   onAdd,
+  onUpdate,
   onRemove,
   onSetPrimary,
   maxLocations = 5,
@@ -278,9 +279,8 @@ export default function MultiGeographicQuestion({
                           originalLabel: location.originalLabel || baseName
                         };
 
-                        // Direct state update - much more efficient
-                        onRemove(index);
-                        onAdd(updatedLocation);
+                        // Update in place instead of remove+add
+                        onUpdate(index, updatedLocation);
                       }}
                       className="w-4 h-4 rounded border-green-400 text-green-600 focus:ring-green-500"
                     />

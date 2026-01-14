@@ -947,6 +947,13 @@ export default function ProQuestionnaire() {
                 const newStatus = (newLocations.length >= min && newLocations.length <= max) ? 'complete' : 'incomplete';
                 dispatch(setValidationStatus({ questionId: question.id, status: newStatus }));
               }}
+              onUpdate={(index, updatedLocation) => {
+                const current = responses[question.id] || [];
+                const newLocations = [...current];
+                newLocations[index] = updatedLocation;
+                dispatch(setResponse({ questionId: question.id, value: newLocations }));
+                setShowAutoSave(s => s + 1);
+              }}
               onRemove={(index) => {
                 const current = responses[question.id] || [];
                 let primaryIndex = responses['5_primary'] || 0;
