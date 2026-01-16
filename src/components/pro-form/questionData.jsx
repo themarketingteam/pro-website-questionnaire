@@ -228,11 +228,12 @@ export const QUESTIONS = [
       },
       {
         id: "1.2",
-        title: "Certifications, Awards, and Partnerships",
+        title: "Add your certifications, accolades, awards, or partnerships",
         why: "These elements are powerful trust signals for your Why Choose Us page. They establish credibility and authority, helping differentiate you from competitors.",
-        guidance: "📌 You'll be able to add your certifications, awards, and partnerships in detail when you reach Question 12. There, you can upload logos, images, and supporting documents for each credential. This will help strengthen both your Why Choose Us page and your overall site credibility.",
-        type: "info_message",
-        requiredIfParentYes: false
+        guidance: "For each item, provide the name, type, and optionally include images or supporting documentation. These entries are shared with Question 12.1, so any changes here will be reflected there and vice versa.",
+        type: "multi_certification",
+        requiredIfParentYes: false,
+        limits: { min: 0, max: 10 }
       }
     ]
   },

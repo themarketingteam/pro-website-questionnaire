@@ -176,6 +176,14 @@ export default function ProQuestionnaire() {
   const updateResponse = useCallback((questionId, value) => {
     dispatch(setResponse({ questionId, value }));
     
+    // Mirror Q1 and Q12 yes/no responses
+    if (questionId === '1' || questionId === '12') {
+      const mirrorId = questionId === '1' ? '12' : '1';
+      if (responses[mirrorId] !== value) {
+        dispatch(setResponse({ questionId: mirrorId, value }));
+      }
+    }
+    
     // Trigger validation update
     const newResponses = { ...responses, [questionId]: value };
     updateQuestionValidation(questionId, value, newResponses);
@@ -1021,12 +1029,14 @@ export default function ProQuestionnaire() {
       case 'multi_certification':
         return (
           <MultiCertificationQuestion
-            value={responses[question.id] || []}
+            value={responses['12.1'] || []}
             onChange={(val) => {
-              updateResponse(question.id, val);
+              // Always update the shared 12.1 data array
+              dispatch(setResponse({ questionId: '12.1', value: val }));
+              setShowAutoSave(prev => prev + 1);
 
-              // Special handling for question 12.1
-              if (question.id === '12.1') {
+              // Update validation for Q12 if it's answered "yes"
+              if (responses['12'] === 'yes') {
                 const validItems = Array.isArray(val) ? val.filter(item => 
                   item.saved === true || (item.name?.trim() && item.type && item.saved !== false)
                 ) : [];
