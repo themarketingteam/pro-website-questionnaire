@@ -501,8 +501,8 @@ export default function ProQuestionnaire() {
       case 'yes_no':
       const hasValidAnswer = answer === 'yes' || answer === 'no';
 
-      // If answer is "no", it's always complete
-      if (answer === 'no') return true;
+      // If answer is "no" AND question was touched, it's complete
+      if (answer === 'no' && touchedQuestions[questionId]) return true;
 
       // If answer is "yes" and has conditional children, check those too
       if (hasValidAnswer && answer === 'yes' && question.conditionalChildren) {
@@ -638,11 +638,6 @@ export default function ProQuestionnaire() {
   };
 
   const getQuestionValidationStatus = (questionId) => {
-    // If this is a yes/no question with answer "no", always return 'complete'
-    const question = QUESTIONS.find(q => q.id === questionId);
-    if (question?.type === 'yes_no' && responses[questionId] === 'no') {
-      return 'complete';
-    }
     return validationStatus[questionId] || 'neutral';
   };
 
