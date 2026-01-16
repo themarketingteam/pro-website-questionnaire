@@ -118,14 +118,8 @@ export default function ProQuestionnaire() {
         }
       }
 
-      // Check if there's any actual user data (beyond defaults)
-      const defaultKeys = ['1', '2', '12', '14', '23', '25'];
-      const hasUserData = Object.keys(responses).some(key => {
-        if (defaultKeys.includes(key) && responses[key] === 'no') {
-          return false;
-        }
-        return true;
-      });
+      // Check if there's any actual user data
+      const hasUserData = Object.keys(responses).length > 0;
 
       // Only revalidate if there's user data
       if (hasUserData) {
@@ -134,12 +128,6 @@ export default function ProQuestionnaire() {
             // Mark as touched if not already
             if (!touchedQuestions[key] && setTouchedQuestion) {
               dispatch(setTouchedQuestion({ questionId: key, touched: true }));
-            }
-            
-            // For yes/no questions with "no", ensure they're marked complete
-            const yesNoQuestions = ['1', '2', '12', '14', '23', '25'];
-            if (yesNoQuestions.includes(key) && responses[key] === 'no' && !validationStatus[key] && setValidationStatus) {
-              dispatch(setValidationStatus({ questionId: key, status: 'complete' }));
             }
           }
         });
