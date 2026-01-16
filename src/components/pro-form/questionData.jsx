@@ -242,7 +242,7 @@ export const QUESTIONS = [
             guidance: "For each item, provide the name, type, and optionally include images or supporting documentation. These entries are shared with Question 12.1, so any changes here will be reflected there and vice versa.",
             type: "multi_certification",
             requiredIfParentYes: false,
-            limits: { min: 0, max: 10 }
+            limits: { min: 0, max: 20 }
           }
         ]
       }
@@ -395,7 +395,7 @@ export const QUESTIONS = [
         guidance: "For each item, provide the name, type, and optionally include images or supporting documentation.",
         type: "multi_certification",
         requiredIfParentYes: true,
-        limits: { min: 1, max: 10 }
+        limits: { min: 1, max: 20 }
       }
     ]
   },

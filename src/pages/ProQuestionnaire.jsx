@@ -1053,7 +1053,7 @@ export default function ProQuestionnaire() {
                 dispatch(setValidationStatus({ questionId: '1.2', status: newStatus }));
               }
             }}
-            max={question.limits?.max || 10}
+            max={question.limits?.max || 20}
           />
         );
 
