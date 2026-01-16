@@ -176,9 +176,9 @@ export default function ProQuestionnaire() {
   const updateResponse = useCallback((questionId, value) => {
     dispatch(setResponse({ questionId, value }));
     
-    // Mirror Q1 and Q12 yes/no responses
-    if (questionId === '1' || questionId === '12') {
-      const mirrorId = questionId === '1' ? '12' : '1';
+    // Mirror Q1.2 and Q12 yes/no responses
+    if (questionId === '1.2' || questionId === '12') {
+      const mirrorId = questionId === '1.2' ? '12' : '1.2';
       if (responses[mirrorId] !== value) {
         dispatch(setResponse({ questionId: mirrorId, value }));
       }
@@ -1031,7 +1031,7 @@ export default function ProQuestionnaire() {
           <MultiCertificationQuestion
             value={responses['12.1'] || []}
             onChange={(val) => {
-              // Always update the shared 12.1 data array
+              // Always update the shared 12.1 data array (shared between 1.2.1 and 12.1)
               dispatch(setResponse({ questionId: '12.1', value: val }));
               setShowAutoSave(prev => prev + 1);
 
@@ -1042,6 +1042,15 @@ export default function ProQuestionnaire() {
                 ) : [];
                 const newStatus = validItems.length > 0 ? 'complete' : 'incomplete';
                 dispatch(setValidationStatus({ questionId: '12', status: newStatus }));
+              }
+
+              // Update validation for Q1.2 if it's answered "yes"
+              if (responses['1.2'] === 'yes') {
+                const validItems = Array.isArray(val) ? val.filter(item => 
+                  item.saved === true || (item.name?.trim() && item.type && item.saved !== false)
+                ) : [];
+                const newStatus = validItems.length > 0 ? 'complete' : 'incomplete';
+                dispatch(setValidationStatus({ questionId: '1.2', status: newStatus }));
               }
             }}
             max={question.limits?.max || 10}
