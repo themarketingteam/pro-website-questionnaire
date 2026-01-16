@@ -125,7 +125,7 @@ export default function ProQuestionnaire() {
       return true;
     });
 
-    // Only revalidate if there's user data AND validation status is empty
+    // Only revalidate if there's user data
     if (hasUserData) {
       Object.keys(responses).forEach(key => {
         if (!key.includes('_other') && !key.includes('_primary') && responses[key]) {
@@ -144,17 +144,23 @@ export default function ProQuestionnaire() {
 
       // Only update validation for questions that don't already have a validation status
       // This preserves persisted validation statuses (including AI validation for textareas)
+      const questionsToValidate = [];
       QUESTIONS.forEach(q => {
         if (responses[q.id] && q.type !== 'textarea' && !validationStatus[q.id]) {
-          updateQuestionValidation(q.id, responses[q.id], responses);
+          questionsToValidate.push({ id: q.id, value: responses[q.id] });
         }
         if (q.conditionalChildren) {
           q.conditionalChildren.forEach(child => {
             if (responses[child.id] && child.type !== 'textarea' && !validationStatus[child.id]) {
-              updateQuestionValidation(child.id, responses[child.id], responses);
+              questionsToValidate.push({ id: child.id, value: responses[child.id] });
             }
           });
         }
+      });
+
+      // Validate all questions in a single batch
+      questionsToValidate.forEach(({ id, value }) => {
+        updateQuestionValidation(id, value, responses);
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
