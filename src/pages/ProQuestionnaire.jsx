@@ -400,13 +400,7 @@ export default function ProQuestionnaire() {
     if (!isCurrentlyExpanded) {
       dispatch(setTouchedQuestion({ questionId, touched: true }));
       if (validationStatus[questionId] === '') {
-        // For Yes/No questions with default "no", set as complete
-        const yesNoQuestions = ['1', '2', '12', '14', '23', '25'];
-        if (yesNoQuestions.includes(questionId) && responses[questionId] === 'no') {
-          dispatch(setValidationStatus({ questionId, status: 'complete' }));
-        } else {
-          dispatch(setValidationStatus({ questionId, status: 'incomplete' }));
-        }
+        dispatch(setValidationStatus({ questionId, status: 'incomplete' }));
       }
     }
     
