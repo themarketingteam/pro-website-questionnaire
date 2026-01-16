@@ -157,7 +157,7 @@ export default function ProQuestionnaire() {
         }
       });
     }
-  }, []);
+  }, [dispatch, responses, validationStatus, touchedQuestions, expandedQuestions]);
 
   // No more cookie saving - Redux persist handles everything automatically
 
