@@ -47,7 +47,6 @@ export default function ProQuestionnaire() {
   const expandedQuestions = useSelector((state) => state.form.expandedQuestions);
   const credentials = useSelector((state) => state.form.credentials);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [allExpanded, setAllExpanded] = useState(false);
   const [showAutoSave, setShowAutoSave] = useState(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showThankYouModal, setShowThankYouModal] = useState(false);
@@ -435,7 +434,6 @@ export default function ProQuestionnaire() {
       }
     });
     dispatch(setAllExpanded(expanded));
-    setAllExpanded(true);
   };
 
   const collapseAll = () => {
@@ -449,7 +447,6 @@ export default function ProQuestionnaire() {
       }
     });
     dispatch(setAllExpanded(collapsed));
-    setAllExpanded(false);
   };
 
   const clearAll = () => {
