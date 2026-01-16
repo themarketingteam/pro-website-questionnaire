@@ -19,6 +19,8 @@ export default function MultiGeographicQuestion({
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [currentInput, setCurrentInput] = useState("");
+  const [manualInput, setManualInput] = useState("");
+  const [showManualEntry, setShowManualEntry] = useState(false);
 
   // Keep selectedLocationsRef in sync
   useEffect(() => {
@@ -158,9 +160,39 @@ export default function MultiGeographicQuestion({
         window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
       }
     };
-  }, [isScriptLoaded, loadError]);
+  }, [isScriptLoaded, loadError, selectedLocations.length]);
 
   const canAddMore = selectedLocations.length < maxLocations;
+
+  const handleManualAdd = () => {
+    if (!manualInput.trim()) return;
+    
+    // Check for duplicates
+    if (selectedLocationsRef.current.some(loc => 
+      (loc.name || loc.label || '').toLowerCase() === manualInput.trim().toLowerCase()
+    )) {
+      alert("This location has already been added.");
+      setManualInput("");
+      return;
+    }
+
+    const meta = {
+      name: manualInput.trim(),
+      label: manualInput.trim(),
+      lat: null,
+      lon: null,
+      place_id: `manual-${Date.now()}`,
+      source: "manual",
+      originalName: manualInput.trim(),
+      originalLabel: manualInput.trim(),
+      isGreaterArea: false,
+      isCity: false
+    };
+
+    onAdd(meta);
+    setManualInput("");
+    setShowManualEntry(false);
+  };
 
   // Move US states list to top level to avoid recreation
   const US_STATES = [
@@ -295,28 +327,65 @@ export default function MultiGeographicQuestion({
 
       {canAddMore && !externalDisabled && (
         <>
-          <div className="relative">
-            <input
-              ref={inputRef}
-              type="text"
-              placeholder="e.g., Nashville, TN or Davidson County, TN"
-              value={currentInput}
-              onChange={(e) => setCurrentInput(e.target.value)}
-              autoComplete="off"
-              className="w-full p-4 pr-12 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-          </div>
+          {!loadError ? (
+            <>
+              <div className="relative">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  placeholder="e.g., Nashville, TN or Davidson County, TN"
+                  value={currentInput}
+                  onChange={(e) => setCurrentInput(e.target.value)}
+                  autoComplete="off"
+                  className="w-full p-4 pr-12 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+              </div>
 
-          {isScriptLoaded && !loadError && (
-            <div className="text-sm text-slate-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
-              💡 Start typing a city or region name, then select from the dropdown. Each validated location counts toward your selection balance.
-            </div>
-          )}
+              {isScriptLoaded && (
+                <div className="space-y-2">
+                  <div className="text-sm text-slate-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    💡 Start typing a city or region name, then select from the dropdown. Each validated location counts toward your selection balance.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowManualEntry(!showManualEntry)}
+                    className="text-sm text-blue-600 hover:text-blue-700 underline"
+                  >
+                    {showManualEntry ? 'Hide manual entry' : 'Can\'t find your location? Add manually'}
+                  </button>
+                </div>
+              )}
+            </>
+          ) : null}
 
-          {loadError && (
-            <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
-              ⚠️ Location search unavailable. Please contact support to add locations manually.
+          {(loadError || showManualEntry) && (
+            <div className="space-y-3">
+              <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                ⚠️ Location search unavailable. Use manual entry below.
+              </div>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter location manually (e.g., Nashville, TN)"
+                  value={manualInput}
+                  onChange={(e) => setManualInput(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleManualAdd()}
+                  className="flex-1 p-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <button
+                  type="button"
+                  onClick={handleManualAdd}
+                  disabled={!manualInput.trim()}
+                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-colors flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add
+                </button>
+              </div>
+              <div className="text-xs text-slate-500">
+                Manually entered locations will be saved as-is without validation.
+              </div>
             </div>
           )}
         </>
