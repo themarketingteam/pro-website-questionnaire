@@ -1110,27 +1110,29 @@ export default function ProQuestionnaire() {
     return (
       <div className="mt-6 ml-6 pl-6 border-l-2 border-blue-200 space-y-8">
         {parent.conditionalChildren.map((child, idx) => (
-          <QuestionWrapper
-            key={child.id}
-            number={child.id}
-            title={child.title}
-            guidance={child.guidance}
-            why={child.why}
-            examples={child.examples}
-            isCollapsible={true}
-            isExpanded={expandedQuestions[child.id]}
-            onToggle={() => toggleQuestion(child.id)}
-            required={child.requiredIfParentYes}
-            onReset={() => resetQuestion(child.id)}
-            hasAnswer={!!responses[child.id] || !!responses[`${child.id}_other`]}
-            isComplete={isQuestionComplete(child.id)}
-            wasTouched={touchedQuestions[child.id]}
-            isSubQuestion={true}
-            validationStatus={getQuestionValidationStatus(child.id)}
-            showStatusIcon={touchedQuestions[child.id]}
-          >
-            {renderQuestion(child)}
-          </QuestionWrapper>
+          <React.Fragment key={child.id}>
+            <QuestionWrapper
+              number={child.id}
+              title={child.title}
+              guidance={child.guidance}
+              why={child.why}
+              examples={child.examples}
+              isCollapsible={true}
+              isExpanded={expandedQuestions[child.id]}
+              onToggle={() => toggleQuestion(child.id)}
+              required={child.requiredIfParentYes}
+              onReset={() => resetQuestion(child.id)}
+              hasAnswer={!!responses[child.id] || !!responses[`${child.id}_other`]}
+              isComplete={isQuestionComplete(child.id)}
+              wasTouched={touchedQuestions[child.id]}
+              isSubQuestion={true}
+              validationStatus={getQuestionValidationStatus(child.id)}
+              showStatusIcon={touchedQuestions[child.id]}
+            >
+              {renderQuestion(child)}
+            </QuestionWrapper>
+            {renderConditionalChildren(child)}
+          </React.Fragment>
         ))}
       </div>
     );
