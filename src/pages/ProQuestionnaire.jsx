@@ -755,7 +755,9 @@ export default function ProQuestionnaire() {
       userdata: {
         additional_pages_list: additionalPagesList,
         service_offerings: (responses['3'] || []).filter(s => !s.startsWith('CATEGORY:')),
-        service_offerings_other: responses['3_other'] || '',
+        service_offerings_other: Array.isArray(responses['3_other']) 
+          ? responses['3_other'].filter(v => v?.trim()).join(', ') 
+          : (responses['3_other'] || ''),
         target_industries: responses['4'] || [],
         target_industries_other: responses['4_other'] || '',
         geographic_areas: geographicAreas,
