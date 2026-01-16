@@ -53,9 +53,11 @@ export default function QuestionWrapper({
         </div>
       )}
       <div className="flex items-start gap-2">
-        <span className="text-lg font-semibold text-[#122947] flex-shrink-0">
-          {number}.
-        </span>
+        {number && (
+          <span className="text-lg font-semibold text-[#122947] flex-shrink-0">
+            {number}.
+          </span>
+        )}
         <div 
           className={`flex-1 ${isCollapsible ? 'cursor-pointer' : ''}`}
           onClick={isCollapsible ? onToggle : undefined}
