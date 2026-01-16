@@ -429,7 +429,7 @@ export default function ProQuestionnaire() {
       expanded[q.id] = true;
       if (q.conditionalChildren) {
         q.conditionalChildren.forEach(child => {
-          expanded[child.id] = true;
+          expanded[child.id] = false;
         });
       }
     });
