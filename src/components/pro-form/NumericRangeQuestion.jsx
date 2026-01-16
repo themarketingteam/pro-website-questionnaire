@@ -189,7 +189,7 @@ export default function NumericRangeQuestion({
           }`}
         >
           <Lock className="w-4 h-4" />
-          {isLocked ? 'Locked' : 'Lock In'}
+          {isLocked ? 'Confirmed' : 'Confirm'}
         </button>
       </div>
     </div>
