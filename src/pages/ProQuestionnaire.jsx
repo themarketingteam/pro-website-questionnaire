@@ -157,7 +157,8 @@ export default function ProQuestionnaire() {
         }
       });
     }
-  }, [dispatch, responses, validationStatus, touchedQuestions, expandedQuestions]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // No more cookie saving - Redux persist handles everything automatically
 
