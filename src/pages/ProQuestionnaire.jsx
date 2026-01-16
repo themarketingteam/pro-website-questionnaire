@@ -102,66 +102,72 @@ export default function ProQuestionnaire() {
 
   // Initialize expanded questions on mount
   useEffect(() => {
-    // Only initialize if not already initialized
-    if (Object.keys(expandedQuestions).length === 0) {
-      const expanded = {};
-      QUESTIONS.forEach(q => {
-        expanded[q.id] = false;
-        if (q.conditionalChildren) {
-          q.conditionalChildren.forEach(child => {
-            expanded[child.id] = false;
-          });
+    try {
+      // Only initialize if not already initialized
+      if (Object.keys(expandedQuestions).length === 0) {
+        const expanded = {};
+        QUESTIONS.forEach(q => {
+          expanded[q.id] = false;
+          if (q.conditionalChildren) {
+            q.conditionalChildren.forEach(child => {
+              expanded[child.id] = false;
+            });
+          }
+        });
+        if (initializeExpandedQuestions) {
+          dispatch(initializeExpandedQuestions(expanded));
         }
-      });
-      dispatch(initializeExpandedQuestions(expanded));
-    }
-
-    // Check if there's any actual user data (beyond defaults)
-    const defaultKeys = ['1', '2', '12', '14', '23', '25'];
-    const hasUserData = Object.keys(responses).some(key => {
-      if (defaultKeys.includes(key) && responses[key] === 'no') {
-        return false;
       }
-      return true;
-    });
 
-    // Only revalidate if there's user data
-    if (hasUserData) {
-      Object.keys(responses).forEach(key => {
-        if (!key.includes('_other') && !key.includes('_primary') && responses[key]) {
-          // Mark as touched if not already
-          if (!touchedQuestions[key]) {
-            dispatch(setTouchedQuestion({ questionId: key, touched: true }));
-          }
-          
-          // For yes/no questions with "no", ensure they're marked complete
-          const yesNoQuestions = ['1', '2', '12', '14', '23', '25'];
-          if (yesNoQuestions.includes(key) && responses[key] === 'no' && !validationStatus[key]) {
-            dispatch(setValidationStatus({ questionId: key, status: 'complete' }));
-          }
+      // Check if there's any actual user data (beyond defaults)
+      const defaultKeys = ['1', '2', '12', '14', '23', '25'];
+      const hasUserData = Object.keys(responses).some(key => {
+        if (defaultKeys.includes(key) && responses[key] === 'no') {
+          return false;
         }
+        return true;
       });
 
-      // Only update validation for questions that don't already have a validation status
-      // This preserves persisted validation statuses (including AI validation for textareas)
-      const questionsToValidate = [];
-      QUESTIONS.forEach(q => {
-        if (responses[q.id] && q.type !== 'textarea' && !validationStatus[q.id]) {
-          questionsToValidate.push({ id: q.id, value: responses[q.id] });
-        }
-        if (q.conditionalChildren) {
-          q.conditionalChildren.forEach(child => {
-            if (responses[child.id] && child.type !== 'textarea' && !validationStatus[child.id]) {
-              questionsToValidate.push({ id: child.id, value: responses[child.id] });
+      // Only revalidate if there's user data
+      if (hasUserData) {
+        Object.keys(responses).forEach(key => {
+          if (!key.includes('_other') && !key.includes('_primary') && responses[key]) {
+            // Mark as touched if not already
+            if (!touchedQuestions[key] && setTouchedQuestion) {
+              dispatch(setTouchedQuestion({ questionId: key, touched: true }));
             }
-          });
-        }
-      });
+            
+            // For yes/no questions with "no", ensure they're marked complete
+            const yesNoQuestions = ['1', '2', '12', '14', '23', '25'];
+            if (yesNoQuestions.includes(key) && responses[key] === 'no' && !validationStatus[key] && setValidationStatus) {
+              dispatch(setValidationStatus({ questionId: key, status: 'complete' }));
+            }
+          }
+        });
 
-      // Validate all questions in a single batch
-      questionsToValidate.forEach(({ id, value }) => {
-        updateQuestionValidation(id, value, responses);
-      });
+        // Only update validation for questions that don't already have a validation status
+        // This preserves persisted validation statuses (including AI validation for textareas)
+        const questionsToValidate = [];
+        QUESTIONS.forEach(q => {
+          if (responses[q.id] && q.type !== 'textarea' && !validationStatus[q.id]) {
+            questionsToValidate.push({ id: q.id, value: responses[q.id] });
+          }
+          if (q.conditionalChildren) {
+            q.conditionalChildren.forEach(child => {
+              if (responses[child.id] && child.type !== 'textarea' && !validationStatus[child.id]) {
+                questionsToValidate.push({ id: child.id, value: responses[child.id] });
+              }
+            });
+          }
+        });
+
+        // Validate all questions in a single batch
+        questionsToValidate.forEach(({ id, value }) => {
+          updateQuestionValidation(id, value, responses);
+        });
+      }
+    } catch (error) {
+      console.error('Error in initialization useEffect:', error);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
