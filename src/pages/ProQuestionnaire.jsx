@@ -3,7 +3,6 @@ import { useSelector, useDispatch } from 'react-redux';
 import { 
   setResponse, 
   setValidationStatus, 
-  setMultipleValidationStatus,
   setTouchedQuestion, 
   setExpandedQuestion, 
   setAllExpanded,
