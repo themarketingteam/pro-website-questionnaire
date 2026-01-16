@@ -53,6 +53,8 @@ export default function ProQuestionnaire() {
   const [submittedBusinessName, setSubmittedBusinessName] = useState('');
   const [showClearAllModal, setShowClearAllModal] = useState(false);
   const [showIncompleteList, setShowIncompleteList] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [validatingQuestions, setValidatingQuestions] = useState([]);
 
   // Extract URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -669,11 +671,94 @@ export default function ProQuestionnaire() {
     return getIncompleteQuestions().length === 0;
   };
 
-  const handleSubmitClick = () => {
+  const getQuestionsNeedingValidation = () => {
+    const needsValidation = [];
+    
+    // Check all textarea questions
+    QUESTIONS.forEach(q => {
+      if (q.type === 'textarea' && responses[q.id]) {
+        const status = validationStatus[q.id];
+        if (!status || status === '' || status === 'incomplete') {
+          needsValidation.push(q.id);
+        }
+      }
+      
+      // Check conditional children
+      if (q.conditionalChildren && responses[q.id] === 'yes') {
+        q.conditionalChildren.forEach(child => {
+          if (child.type === 'textarea' && responses[child.id]) {
+            const status = validationStatus[child.id];
+            if (!status || status === '' || status === 'incomplete') {
+              needsValidation.push(child.id);
+            }
+          }
+        });
+      }
+    });
+    
+    return needsValidation;
+  };
+
+  const runFinalValidations = async () => {
+    const questionsToValidate = getQuestionsNeedingValidation();
+    
+    if (questionsToValidate.length === 0) {
+      return true;
+    }
+    
+    setIsValidating(true);
+    setValidatingQuestions(questionsToValidate);
+    
+    try {
+      // Run all validations in parallel
+      const validationPromises = questionsToValidate.map(async (qId) => {
+        const question = QUESTIONS.find(q => q.id === qId) || 
+                         QUESTIONS.flatMap(q => q.conditionalChildren || []).find(c => c.id === qId);
+        
+        try {
+          const result = await base44.functions.invoke('validateQuestionText', {
+            question_context: `Question ${qId}: ${question?.title}`,
+            user_answer: responses[qId]
+          });
+          
+          const status = result.data?.validation_status || 'needs_work';
+          dispatch(setValidationStatus({ questionId: qId, status }));
+          
+          return { qId, status };
+        } catch (error) {
+          console.error(`Validation error for Q${qId}:`, error);
+          dispatch(setValidationStatus({ questionId: qId, status: 'needs_work' }));
+          return { qId, status: 'needs_work' };
+        }
+      });
+      
+      await Promise.all(validationPromises);
+      setIsValidating(false);
+      setValidatingQuestions([]);
+      return true;
+    } catch (error) {
+      console.error('Final validation error:', error);
+      setIsValidating(false);
+      setValidatingQuestions([]);
+      toast.error('Validation error occurred. Please check your answers.');
+      return false;
+    }
+  };
+
+  const handleSubmitClick = async () => {
+    // Run final validations first
+    const validationSuccess = await runFinalValidations();
+    
+    if (!validationSuccess) {
+      return;
+    }
+    
+    // After validation, check if form is complete
     if (!isFormValid()) {
       setShowIncompleteList(true);
       return;
     }
+    
     setShowIncompleteList(false);
     setShowConfirmModal(true);
   };
@@ -1237,9 +1322,9 @@ export default function ProQuestionnaire() {
               <button
                 type="button"
                 onClick={handleSubmitClick}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isValidating}
                 className={`flex-1 py-4 text-sm font-bold rounded transition-all flex items-center justify-center uppercase tracking-wide ${
-                  isSubmitting
+                  isSubmitting || isValidating
                     ? 'bg-[#A9B3B7] text-white cursor-not-allowed'
                     : 'bg-[#8DB63C] hover:bg-[#7DA035] text-white'
                 }`}
@@ -1248,6 +1333,11 @@ export default function ProQuestionnaire() {
                   <>
                     <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                     Submitting...
+                  </>
+                ) : isValidating ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                    Validating {validatingQuestions.length} question{validatingQuestions.length !== 1 ? 's' : ''}...
                   </>
                 ) : (
                   'Submit Questionnaire'
