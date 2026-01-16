@@ -1112,7 +1112,7 @@ export default function ProQuestionnaire() {
         {parent.conditionalChildren.map((child, idx) => (
           <React.Fragment key={child.id}>
             <QuestionWrapper
-              number={child.id}
+              number={child.id === '1.2.1' ? '' : child.id}
               title={child.title}
               guidance={child.guidance}
               why={child.why}

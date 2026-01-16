@@ -241,8 +241,8 @@ export const QUESTIONS = [
             why: "Adding specific details helps us showcase your credentials effectively on your Why Choose Us page.",
             guidance: "For each item, provide the name, type, and optionally include images or supporting documentation. These entries are shared with Question 12.1, so any changes here will be reflected there and vice versa.",
             type: "multi_certification",
-            requiredIfParentYes: true,
-            limits: { min: 1, max: 10 }
+            requiredIfParentYes: false,
+            limits: { min: 0, max: 10 }
           }
         ]
       }
