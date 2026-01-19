@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function RadioQuestion({ options, value, onChange, showOther = false, otherValue = '', onOtherChange }) {
+export default function RadioQuestion({ options, value, onChange, showOther = false, otherValue = '', onOtherChange, otherPlaceholder = 'Please specify...' }) {
   return (
     <div className="space-y-2.5">
       {options.map((option) => (
@@ -39,7 +39,7 @@ export default function RadioQuestion({ options, value, onChange, showOther = fa
             <p className="text-xs text-[#566C75] mt-1">Add custom services not listed above (up to 3 entries). Each counts toward your selection limit.</p>
             <input
               type="text"
-              placeholder="Enter your custom brand voice..."
+              placeholder={otherPlaceholder}
               className="w-full mt-3 p-3 border border-[#C1C6C8] rounded focus:outline-none focus:ring-2 focus:ring-[#1C82DE] focus:border-transparent"
               value={otherValue}
               onChange={(e) => {

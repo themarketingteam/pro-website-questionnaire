@@ -980,6 +980,18 @@ export default function ProQuestionnaire() {
         );
       
       case 'radio':
+        // Set context-specific placeholders for "Other" inputs
+        let otherPlaceholder = 'Please specify...';
+        if (question.id === '15') {
+          otherPlaceholder = 'Enter how your clients find you...';
+        } else if (question.id === '24') {
+          otherPlaceholder = 'What action would you like client\'s to take on your website...';
+        } else if (question.id === '11') {
+          otherPlaceholder = 'Enter your custom brand voice...';
+        } else if (question.id === '7') {
+          otherPlaceholder = 'Enter your delivery model...';
+        }
+
         return (
           <RadioQuestion
             options={question.options}
@@ -987,6 +999,7 @@ export default function ProQuestionnaire() {
             showOther={question.showOther}
             otherValue={responses[`${question.id}_other`] || ''}
             onOtherChange={(val) => updateResponse(`${question.id}_other`, val)}
+            otherPlaceholder={otherPlaceholder}
           />
         );
       
