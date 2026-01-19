@@ -36,10 +36,10 @@ export default function ValidationGuideCollapsible() {
       </button>
 
       {isExpanded && (
-        <div className="px-6 pb-6 pt-2 border-t border-[#C1C6C8] animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="px-6 pb-6 pt-4 border-t border-[#C1C6C8] animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Green - Complete */}
-            <div className="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-start gap-3 p-5 bg-green-50 border border-green-200 rounded-lg">
               <img 
                 src="https://img.icons8.com/?size=100&id=ZBQJIdqe73bi&format=png&color=22C55E" 
                 alt="Complete" 
@@ -54,7 +54,7 @@ export default function ValidationGuideCollapsible() {
             </div>
 
             {/* Yellow - Passing (Needs Work) */}
-            <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-start gap-3 p-5 bg-amber-50 border border-amber-200 rounded-lg">
               <img 
                 src="https://img.icons8.com/?size=100&id=lwhK4j4bx2Zx&format=png&color=F59E0B" 
                 alt="Passing" 
@@ -69,7 +69,7 @@ export default function ValidationGuideCollapsible() {
             </div>
 
             {/* Red - Incomplete */}
-            <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start gap-3 p-5 bg-red-50 border border-red-200 rounded-lg">
               <img 
                 src="https://img.icons8.com/?size=100&id=iQ230Rs1gOvf&format=png&color=DC2626" 
                 alt="Incomplete" 
