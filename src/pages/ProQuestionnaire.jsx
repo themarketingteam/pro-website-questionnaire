@@ -36,6 +36,7 @@ import AutoSaveIndicator from '@/components/pro-form/AutoSaveIndicator';
 import ConfirmModal from '@/components/pro-form/ConfirmModal';
 import ThankYouModal from '@/components/pro-form/ThankYouModal';
 import ValidationGuide from '@/components/pro-form/ValidationGuide';
+import ValidationGuideCollapsible from '@/components/pro-form/ValidationGuideCollapsible';
 import ReduxDataValidator from '@/components/pro-form/ReduxDataValidator';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 
@@ -1218,6 +1219,9 @@ export default function ProQuestionnaire() {
       <FormHeader />
       
       <main className="max-w-4xl mx-auto px-6 py-12 pl-16">
+        {/* Validation Status Guide - Collapsible */}
+        <ValidationGuideCollapsible />
+
         {/* Expand/Collapse Controls */}
         <div className="flex gap-3 mb-8">
           <button
