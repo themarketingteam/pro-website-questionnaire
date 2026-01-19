@@ -16,8 +16,11 @@ export default function MultiGeographicQuestion({
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
   const selectedLocationsRef = useRef(selectedLocations);
+  const retryCountRef = useRef(0);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [currentInput, setCurrentInput] = useState("");
   const [manualInput, setManualInput] = useState("");
   const [showManualEntry, setShowManualEntry] = useState(false);
@@ -27,43 +30,104 @@ export default function MultiGeographicQuestion({
     selectedLocationsRef.current = selectedLocations;
   }, [selectedLocations]);
 
+  const loadGoogleMapsScript = (retryCount = 0) => {
+    const maxRetries = 3;
+    const apiKey = TEMP_API_KEY || window.ENV?.GOOGLE_PLACES_API_KEY || import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
+    
+    if (!apiKey) {
+      setLoadError(true);
+      setErrorMessage("API key not configured");
+      setIsLoading(false);
+      return;
+    }
+
+    // Remove any existing failed scripts
+    const existingScripts = document.querySelectorAll('script[src*="maps.googleapis.com"]');
+    existingScripts.forEach(script => {
+      if (script.dataset.failed === 'true') {
+        script.remove();
+      }
+    });
+
+    const script = document.createElement("script");
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGooglePlaces`;
+    script.async = true;
+    script.defer = true;
+    
+    // Set timeout for loading
+    const timeout = setTimeout(() => {
+      if (!isScriptLoaded) {
+        script.dataset.failed = 'true';
+        if (retryCount < maxRetries) {
+          console.log(`Google Maps timeout, retrying... (${retryCount + 1}/${maxRetries})`);
+          retryCountRef.current = retryCount + 1;
+          loadGoogleMapsScript(retryCount + 1);
+        } else {
+          setLoadError(true);
+          setErrorMessage("Connection timeout. Please check your internet connection.");
+          setIsLoading(false);
+        }
+      }
+    }, 10000); // 10 second timeout
+
+    window.initGooglePlaces = () => {
+      clearTimeout(timeout);
+      if (window.google && window.google.maps && window.google.maps.places) {
+        setIsScriptLoaded(true);
+        setIsLoading(false);
+        setLoadError(false);
+        retryCountRef.current = 0;
+      } else {
+        if (retryCount < maxRetries) {
+          retryCountRef.current = retryCount + 1;
+          loadGoogleMapsScript(retryCount + 1);
+        } else {
+          setLoadError(true);
+          setErrorMessage("Failed to initialize Google Places");
+          setIsLoading(false);
+        }
+      }
+    };
+
+    script.onerror = () => {
+      clearTimeout(timeout);
+      script.dataset.failed = 'true';
+      if (retryCount < maxRetries) {
+        console.log(`Google Maps load error, retrying... (${retryCount + 1}/${maxRetries})`);
+        retryCountRef.current = retryCount + 1;
+        setTimeout(() => loadGoogleMapsScript(retryCount + 1), 1000 * (retryCount + 1));
+      } else {
+        setLoadError(true);
+        setErrorMessage("Location search blocked. This may be due to an ad blocker or network restriction.");
+        setIsLoading(false);
+      }
+    };
+
+    document.head.appendChild(script);
+  };
+
   useEffect(() => {
     if (window.google && window.google.maps && window.google.maps.places) {
       setIsScriptLoaded(true);
+      setIsLoading(false);
       return;
     }
 
     const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
-    if (existingScript) {
-      existingScript.addEventListener('load', () => setIsScriptLoaded(true));
-      existingScript.addEventListener('error', () => setLoadError(true));
+    if (existingScript && !existingScript.dataset.failed) {
+      const checkExisting = () => {
+        if (window.google && window.google.maps && window.google.maps.places) {
+          setIsScriptLoaded(true);
+          setIsLoading(false);
+        } else {
+          setTimeout(checkExisting, 500);
+        }
+      };
+      checkExisting();
       return;
     }
 
-    const apiKey = TEMP_API_KEY || window.ENV?.GOOGLE_PLACES_API_KEY || import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
-    
-    if (!apiKey) {
-      console.warn("Google Places API key not configured");
-      setLoadError(true);
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      if (window.google && window.google.maps && window.google.maps.places) {
-        setIsScriptLoaded(true);
-      } else {
-        setLoadError(true);
-      }
-    };
-    script.onerror = () => {
-      setLoadError(true);
-      console.warn("Failed to load Google Maps - users can still type manually");
-    };
-    document.head.appendChild(script);
+    loadGoogleMapsScript(0);
   }, []);
 
   useEffect(() => {
@@ -192,6 +256,14 @@ export default function MultiGeographicQuestion({
     onAdd(meta);
     setManualInput("");
     setShowManualEntry(false);
+  };
+
+  const handleRetry = () => {
+    setLoadError(false);
+    setIsLoading(true);
+    setErrorMessage("");
+    retryCountRef.current = 0;
+    loadGoogleMapsScript(0);
   };
 
   // Move US states list to top level to avoid recreation
@@ -327,7 +399,19 @@ export default function MultiGeographicQuestion({
 
       {canAddMore && !externalDisabled && (
         <>
-          {!loadError ? (
+          {isLoading && !isScriptLoaded && (
+            <div className="text-center py-8">
+              <div className="inline-flex items-center gap-3 text-blue-600">
+                <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="text-sm font-medium">Loading location search...</span>
+              </div>
+            </div>
+          )}
+
+          {!loadError && isScriptLoaded && (
             <>
               <div className="relative">
                 <input
@@ -342,22 +426,61 @@ export default function MultiGeographicQuestion({
                 <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
               </div>
 
-              {isScriptLoaded && (
-                <div className="space-y-2">
-                  <div className="text-sm text-slate-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    💡 Start typing a city or region name, then select from the dropdown. Each validated location counts toward your selection balance.
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowManualEntry(!showManualEntry)}
-                    className="text-sm text-blue-600 hover:text-blue-700 underline"
-                  >
-                    {showManualEntry ? 'Hide manual entry' : 'Can\'t find your location? Add manually'}
-                  </button>
+              <div className="space-y-2">
+                <div className="text-sm text-slate-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  💡 Start typing a city or region name, then select from the dropdown. Each validated location counts toward your selection balance.
                 </div>
-              )}
+                <button
+                  type="button"
+                  onClick={() => setShowManualEntry(!showManualEntry)}
+                  className="text-sm text-blue-600 hover:text-blue-700 underline"
+                >
+                  {showManualEntry ? 'Hide manual entry' : 'Can\'t find your location? Add manually'}
+                </button>
+              </div>
             </>
-          ) : null}
+          )}
+
+          {loadError && (
+            <div className="space-y-4">
+              <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-6 h-6 rounded-full bg-amber-400 flex items-center justify-center text-white font-bold text-sm">!</div>
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-amber-900 mb-1">Location Search Unavailable</h4>
+                    <p className="text-sm text-amber-800 mb-3">{errorMessage}</p>
+                    <div className="text-xs text-amber-700 space-y-1 mb-3">
+                      <p><strong>Common fixes:</strong></p>
+                      <ul className="list-disc list-inside ml-2 space-y-0.5">
+                        <li>Disable ad blockers for this site</li>
+                        <li>Check your internet connection</li>
+                        <li>Try a different browser</li>
+                        <li>Disable browser extensions temporarily</li>
+                      </ul>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRetry}
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium rounded-lg transition-colors"
+                    >
+                      Try Again
+                    </button>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <p className="text-sm text-blue-800 font-medium mb-2">Or add locations manually:</p>
+                <button
+                  type="button"
+                  onClick={() => setShowManualEntry(true)}
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium underline"
+                >
+                  Switch to manual entry
+                </button>
+              </div>
+            </div>
+          )}
 
           {(loadError || showManualEntry) && (
             <div className="space-y-3">
