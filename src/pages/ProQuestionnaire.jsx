@@ -839,7 +839,9 @@ export default function ProQuestionnaire() {
           ? responses['3_other'].filter(v => v?.trim()).join(', ') 
           : (responses['3_other'] || ''),
         target_industries: responses['4'] || [],
-        target_industries_other: responses['4_other'] || '',
+        target_industries_other: Array.isArray(responses['4_other'])
+          ? responses['4_other'].filter(v => v?.trim()).join(', ')
+          : (responses['4_other'] || ''),
         geographic_areas: geographicAreas,
         company_description: responses['6'] || '',
         delivery_model: responses['7'] || '',
@@ -861,10 +863,14 @@ export default function ProQuestionnaire() {
         website_objectives_other: responses['16_other'] || '',
         client_size: responses['17'] || '',
         client_challenges: responses['18'] || [],
-        client_challenges_other: responses['18_other'] || '',
+        client_challenges_other: Array.isArray(responses['18_other'])
+          ? responses['18_other'].filter(v => v?.trim()).join(', ')
+          : (responses['18_other'] || ''),
         client_frustrations: responses['19'] || '',
         client_outcomes: responses['20'] || [],
-        client_outcomes_other: responses['20_other'] || '',
+        client_outcomes_other: Array.isArray(responses['20_other'])
+          ? responses['20_other'].filter(v => v?.trim()).join(', ')
+          : (responses['20_other'] || ''),
         value_description: responses['21'] || '',
         ideal_client: responses['22'] || '',
         avoided_clients: responses['23'] === 'yes' ? (responses['23.1'] || '') : '',
