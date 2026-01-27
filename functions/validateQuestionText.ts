@@ -153,17 +153,24 @@ Use "complete" if it meets all criteria well, "needs_work" if it's acceptable bu
 
     const result = JSON.parse(jsonMatch[0]);
 
-    // Extract expected range from criteria
+    // Extract expected range from criteria (find "ideal" range)
     const rangeCriteria = instructions.criteria.find(c => c.includes('characters'));
     let expectedRange = null;
     if (rangeCriteria) {
-      const rangeMatch = rangeCriteria.match(/(\d+)-(\d+)\s*characters/);
-      if (rangeMatch) {
-        expectedRange = `${rangeMatch[1]}-${rangeMatch[2]}`;
+      // Look for "ideal X-Y characters" pattern first
+      const idealMatch = rangeCriteria.match(/ideal\s+(\d+)-(\d+)\s*characters/i);
+      if (idealMatch) {
+        expectedRange = `${idealMatch[1]}-${idealMatch[2]}`;
       } else {
-        const minMatch = rangeCriteria.match(/Minimum\s+(\d+)\s*characters/i);
-        if (minMatch) {
-          expectedRange = `${minMatch[1]}+`;
+        // Fallback to other patterns
+        const rangeMatch = rangeCriteria.match(/(\d+)-(\d+)\s*characters/);
+        if (rangeMatch) {
+          expectedRange = `${rangeMatch[1]}-${rangeMatch[2]}`;
+        } else {
+          const minMatch = rangeCriteria.match(/Minimum\s+(\d+)\s*characters/i);
+          if (minMatch) {
+            expectedRange = `${minMatch[1]}+`;
+          }
         }
       }
     }
