@@ -72,14 +72,14 @@ export default function QuestionWrapper({
             {(guidance || why || examples) && (
               <button
                 type="button"
-                className="w-6 h-6 rounded-full border border-[#C1C6C8] hover:border-[#1C82DE] hover:bg-[#E8F3FC] flex items-center justify-center text-[#566C75] hover:text-[#1C82DE] transition-all flex-shrink-0"
+                className="w-8 h-8 rounded-full bg-[#5B8AC4] hover:bg-[#4A7AB3] flex items-center justify-center text-white transition-all flex-shrink-0 shadow-sm"
                 aria-label="More information"
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowModal(true);
                 }}
               >
-                <Info className="w-3.5 h-3.5" />
+                <HelpCircle className="w-5 h-5" />
               </button>
             )}
             
