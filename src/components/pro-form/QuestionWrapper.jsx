@@ -74,7 +74,7 @@ export default function QuestionWrapper({
                 type="button"
                 className="w-8 h-8 rounded-full bg-[#5B8AC4] hover:bg-[#4A7AB3] flex items-center justify-center text-white transition-all flex-shrink-0 shadow-sm"
                 aria-label="More information"
-                title="helper info"
+                title="Helper Info"
                 onClick={(e) => {
                   e.stopPropagation();
                   setShowModal(true);
