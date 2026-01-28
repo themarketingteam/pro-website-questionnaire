@@ -153,33 +153,47 @@ Use "complete" if it meets all criteria well, "needs_work" if it's acceptable bu
 
     const result = JSON.parse(jsonMatch[0]);
 
-    // Extract expected range from criteria (find "ideal" range)
+    // Extract min, ideal, and max ranges from criteria
     const rangeCriteria = instructions.criteria.find(c => c.includes('characters'));
-    let expectedRange = null;
+    let minCharCount = null;
+    let idealMin = null;
+    let idealMax = null;
+    let maxCharCount = null;
+    
     if (rangeCriteria) {
-      // Look for "ideal X-Y characters" pattern first
+      // Extract minimum
+      const minMatch = rangeCriteria.match(/[Mm]inimum\s+(\d+)\s*characters/);
+      if (minMatch) minCharCount = parseInt(minMatch[1]);
+      
+      // Extract ideal range
       const idealMatch = rangeCriteria.match(/ideal\s+(\d+)-(\d+)\s*characters/i);
       if (idealMatch) {
-        expectedRange = `${idealMatch[1]}-${idealMatch[2]}`;
-      } else {
-        // Fallback to other patterns
-        const rangeMatch = rangeCriteria.match(/(\d+)-(\d+)\s*characters/);
-        if (rangeMatch) {
-          expectedRange = `${rangeMatch[1]}-${rangeMatch[2]}`;
-        } else {
-          const minMatch = rangeCriteria.match(/Minimum\s+(\d+)\s*characters/i);
-          if (minMatch) {
-            expectedRange = `${minMatch[1]}+`;
-          }
-        }
+        idealMin = parseInt(idealMatch[1]);
+        idealMax = parseInt(idealMatch[2]);
       }
+      
+      // Extract maximum
+      const maxMatch = rangeCriteria.match(/maximum\s+(\d+)\s*characters/i);
+      if (maxMatch) maxCharCount = parseInt(maxMatch[1]);
+    }
+
+    // Determine appropriate message based on character count
+    let rangeMessage = null;
+    const currentCount = text.length;
+    
+    if (minCharCount && currentCount < minCharCount) {
+      rangeMessage = `Character Count: ${currentCount} • Minimum Character Count Allowed: ${minCharCount}`;
+    } else if (maxCharCount && currentCount > maxCharCount) {
+      rangeMessage = `Character Count: ${currentCount} • Maximum Character Count Allowed: ${maxCharCount}`;
+    } else if (idealMin && idealMax) {
+      rangeMessage = `Character Count: ${currentCount} • Ideal Range: ${idealMin}-${idealMax}`;
     }
 
     return Response.json({
       status: result.validation_status,
       message: result.user_message,
       characterCount: text.length,
-      expectedRange: expectedRange
+      expectedRange: rangeMessage
     });
 
   } catch (error) {
