@@ -89,7 +89,7 @@ export default function QuestionWrapper({
                 type="button"
                 className="w-6 h-6 rounded-full border border-[#C1C6C8] hover:border-red-500 hover:bg-red-50 flex items-center justify-center text-[#566C75] hover:text-red-500 transition-all flex-shrink-0"
                 aria-label="Reset question"
-                title="Clear answer"
+                title="Clear Answer"
                 onClick={(e) => {
                   e.stopPropagation();
                   onReset();
