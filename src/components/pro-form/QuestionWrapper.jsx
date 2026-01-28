@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, Info, RotateCcw, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
+import { ChevronDown, ChevronUp, HelpCircle, RotateCcw, CheckCircle2, AlertCircle, AlertTriangle } from 'lucide-react';
 import QuestionHelpModal from './QuestionHelpModal';
 
 export default function QuestionWrapper({ 
