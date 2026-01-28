@@ -55,7 +55,7 @@ export default function ValidationGuideCollapsible() {
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
