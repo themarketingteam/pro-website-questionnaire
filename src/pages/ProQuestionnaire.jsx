@@ -930,6 +930,8 @@ export default function ProQuestionnaire() {
       // Show success message and thank you modal
       toast.success('Questionnaire submitted successfully!');
       setSubmittedBusinessName(businessName);
+      setSubmittedDomain(domain);
+      setSubmittedFormData(responses);
       setIsSubmitting(false);
       setShowThankYouModal(true);
       
@@ -1416,7 +1418,11 @@ export default function ProQuestionnaire() {
       )}
 
       {showThankYouModal && (
-        <ThankYouModal businessName={submittedBusinessName} />
+        <ThankYouModal 
+          businessName={submittedBusinessName} 
+          domain={submittedDomain}
+          formData={submittedFormData}
+        />
       )}
 
       {showClearAllModal && (
