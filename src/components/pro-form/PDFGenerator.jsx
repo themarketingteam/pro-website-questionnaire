@@ -133,8 +133,8 @@ export const generatePDF = async (formData, businessName, domain) => {
     questions.forEach((q) => {
       const isChild = q.isChild;
       const marginLeft = isChild ? '30px' : '0';
-      const borderLeft = isChild ? '3px solid #3b82f6' : 'none';
-      const paddingLeft = isChild ? '15px' : '0';
+      const borderLeft = isChild ? '3px solid #3b82f6' : '4px solid #1e3a8a';
+      const paddingLeft = isChild ? '15px' : '15px';
 
       htmlContent += `
         <div style="background: #f8fafc; border-radius: 8px; padding: 15px; margin-bottom: 12px; margin-left: ${marginLeft}; border-left: ${borderLeft}; padding-left: ${paddingLeft};">
