@@ -1,7 +1,10 @@
-import React, { useEffect } from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { CheckCircle2, Download, Loader2 } from 'lucide-react';
+import { generatePDF } from './PDFGenerator';
+import { toast } from 'sonner';
 
-export default function ThankYouModal({ businessName }) {
+export default function ThankYouModal({ businessName, domain, formData }) {
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   // Set document title and prevent body scroll
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -9,6 +12,23 @@ export default function ThankYouModal({ businessName }) {
       document.body.style.overflow = 'unset';
     };
   }, []);
+
+  const handleDownloadPDF = async () => {
+    setIsGeneratingPDF(true);
+    try {
+      const result = await generatePDF(formData, businessName, domain);
+      if (result.success) {
+        toast.success(`PDF downloaded: ${result.filename}`);
+      } else {
+        toast.error('Failed to generate PDF. Please try again.');
+      }
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      toast.error('An error occurred while generating the PDF.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-gradient-to-b from-gray-100 to-white z-50 flex items-center justify-center p-6">
@@ -26,6 +46,27 @@ export default function ThankYouModal({ businessName }) {
           <p className="text-lg text-gray-600">
             We've received your questionnaire for <span className="font-semibold text-gray-900">{businessName}</span>
           </p>
+        </div>
+
+        {/* Download PDF Button */}
+        <div>
+          <button
+            onClick={handleDownloadPDF}
+            disabled={isGeneratingPDF}
+            className="inline-flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold rounded-lg transition-colors shadow-lg hover:shadow-xl disabled:cursor-not-allowed"
+          >
+            {isGeneratingPDF ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Generating PDF...
+              </>
+            ) : (
+              <>
+                <Download className="w-5 h-5" />
+                Download Your Responses (PDF)
+              </>
+            )}
+          </button>
         </div>
 
         {/* What Happens Next Card */}

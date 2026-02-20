@@ -52,6 +52,8 @@ export default function ProQuestionnaire() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showThankYouModal, setShowThankYouModal] = useState(false);
   const [submittedBusinessName, setSubmittedBusinessName] = useState('');
+  const [submittedDomain, setSubmittedDomain] = useState('');
+  const [submittedFormData, setSubmittedFormData] = useState({});
   const [showClearAllModal, setShowClearAllModal] = useState(false);
   const [showIncompleteList, setShowIncompleteList] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
