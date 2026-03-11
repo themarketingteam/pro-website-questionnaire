@@ -170,7 +170,7 @@ export default function ConfirmModal({
                 <input
                   type="text"
                   value={domain}
-                  onChange={(e) => setDomain(e.target.value)}
+                  onChange={(e) => setDomain(cleanDomain(e.target.value))}
                   placeholder="example.com"
                   className={`w-full p-3 border ${getDomainBorderColor()} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors`}
                 />
