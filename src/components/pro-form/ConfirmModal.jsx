@@ -17,18 +17,10 @@ export default function ConfirmModal({
   initialBusinessName = '', 
   initialDomain = '' 
 }) {
-  const cleanDomain = (value) => {
-    let cleaned = value.trim();
-    cleaned = cleaned.replace(/^https?:\/\//i, '');
-    cleaned = cleaned.replace(/^www\./i, '');
-    return cleaned;
-  };
-
   const [businessName, setBusinessName] = useState(initialBusinessName);
-  const [domain, setDomain] = useState(cleanDomain(initialDomain));
+  const [domain, setDomain] = useState(initialDomain);
 
-  const isDomainValid = isValidDomain(domain);
-  const isFormValid = businessName.trim().length > 0 && isDomainValid;
+  const isFormValid = businessName.trim().length > 0 && domain.trim().length > 0;
 
   // Prevent body scroll
   useEffect(() => {
