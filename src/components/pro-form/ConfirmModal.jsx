@@ -99,10 +99,7 @@ export default function ConfirmModal({
     return acc;
   }, {});
 
-  const getDomainBorderColor = () => {
-    if (domain.trim().length === 0) return 'border-slate-300';
-    return isDomainValid ? 'border-green-500' : 'border-red-500';
-  };
+
 
   return (
     <div 
