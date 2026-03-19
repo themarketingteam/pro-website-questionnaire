@@ -141,36 +141,13 @@ export default function ConfirmModal({
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Domain <span className="text-red-500">*</span>
               </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={domain}
-                  onChange={(e) => setDomain(e.target.value)}
-                  placeholder="example.com"
-                  className={`w-full p-3 border ${getDomainBorderColor()} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors`}
-                />
-                {domain.trim().length > 0 && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    {isDomainValid ? (
-                      <Check className="w-5 h-5 text-green-500" />
-                    ) : (
-                      <AlertCircle className="w-5 h-5 text-red-500" />
-                    )}
-                  </div>
-                )}
-              </div>
-              {domain.trim().length > 0 && (
-                <p className={`text-sm mt-2 ${isDomainValid ? 'text-green-600' : 'text-red-600'}`}>
-                  {isDomainValid ? (
-                    <span className="flex items-center gap-1">
-                      <Check className="w-4 h-4" />
-                      Valid domain format
-                    </span>
-                  ) : (
-                    "Please enter a valid domain without http://, https://, or www. (e.g., example.com or support.example.com)"
-                  )}
-                </p>
-              )}
+              <input
+                type="text"
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+                placeholder="example.com or https://example.com"
+                className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              />
             </div>
           </div>
 
