@@ -62,7 +62,11 @@ export default function ProQuestionnaire() {
   // Extract URL parameters
   const urlParams = new URLSearchParams(window.location.search);
   const businessNameParam = urlParams.get('businessName') || '';
-  const domainParam = urlParams.get('domainName') || '';
+  const rawDomainParam = urlParams.get('domainName') || '';
+  const domainParam = rawDomainParam
+    .replace(/^https?:\/\//i, '')
+    .replace(/^www\./i, '')
+    .replace(/\/+$/, '');
 
   // Calculate span totals for Q3-Q5
   const otherServices = responses['3_other'];
