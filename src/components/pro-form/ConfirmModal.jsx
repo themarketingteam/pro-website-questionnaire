@@ -2,26 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { X, Check, AlertCircle } from 'lucide-react';
 import { QUESTIONS } from './questionData';
 
-const isValidDomain = (domainStr) => {
-  const trimmed = domainStr.trim();
-  if (trimmed.length === 0) return false;
-
-  // Reject http:// or https://
-  if (trimmed.toLowerCase().startsWith('http://') ||
-      trimmed.toLowerCase().startsWith('https://')) return false;
-
-  // Reject www.
-  if (trimmed.toLowerCase().startsWith('www.')) return false;
-
-  // Reject subdirectories (contains /)
-  if (trimmed.includes('/')) return false;
-
-  // Must contain at least one dot, no spaces
-  if (!trimmed.includes('.') || trimmed.includes(' ')) return false;
-
-  // Regex: alphanumeric, hyphens, dots, valid TLD
-  const domainRegex = /^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*(\.[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*)*\.[a-zA-Z]{2,}$/;
-  return domainRegex.test(trimmed);
+const cleanDomainForSubmission = (domainStr) => {
+  let cleaned = domainStr.trim();
+  cleaned = cleaned.replace(/^https?:\/\//i, '');
+  cleaned = cleaned.replace(/^www\./i, '');
+  cleaned = cleaned.replace(/\/+$/, '');
+  return cleaned;
 };
 
 export default function ConfirmModal({ 
