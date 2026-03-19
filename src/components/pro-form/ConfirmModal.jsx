@@ -183,7 +183,7 @@ export default function ConfirmModal({
             Go Back & Edit
           </button>
           <button
-            onClick={() => onConfirm(businessName, domain)}
+            onClick={() => onConfirm(businessName, cleanDomainForSubmission(domain))}
             disabled={!isFormValid}
             className={`flex-1 px-6 py-3 font-medium rounded-lg transition-colors ${
               isFormValid
