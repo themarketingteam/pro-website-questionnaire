@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, AlertCircle } from 'lucide-react';
+import { X } from 'lucide-react';
 import { QUESTIONS } from './questionData';
 
 const cleanDomainForSubmission = (domainStr) => {
