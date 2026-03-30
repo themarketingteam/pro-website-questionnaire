@@ -888,64 +888,48 @@ export default function ProQuestionnaire() {
   };
 
   const handleConfirmSubmit = async (businessName, domain) => {
-    setIsSubmitting(true);
-    setShowConfirmModal(false);
+    // NOTE: Do NOT close the modal or set isSubmitting here.
+    // The modal manages its own submission state and will re-throw on failure
+    // so it can show an inline error without losing user input.
+    console.log('📤 [handleConfirmSubmit] Submission started for:', businessName);
 
+    // Transform payload for both database and Zapier
+    const transformedPayload = transformResponsesToPayload(responses, businessName, domain);
+    
+    console.log('==========================================');
+    console.log('📤 FORM SUBMISSION - COMPLETE JSON PAYLOAD');
+    console.log('==========================================');
+    console.log(JSON.stringify(transformedPayload, null, 2));
+    console.log('==========================================');
+
+    // Save to database — let errors throw so modal catches them
+    await base44.entities.ProFormSubmission.create(transformedPayload);
+    console.log('✅ Saved to database');
+
+    // Send to Zapier — non-fatal, log but don't throw
     try {
-      // Transform payload for both database and Zapier
-      const transformedPayload = transformResponsesToPayload(responses, businessName, domain);
-      
-      // Log complete JSON payload that will be submitted
-      console.log('==========================================');
-      console.log('📤 FORM SUBMISSION - COMPLETE JSON PAYLOAD');
-      console.log('==========================================');
-      console.log(JSON.stringify(transformedPayload, null, 2));
-      console.log('==========================================');
-
-      // Save to database
-      await base44.entities.ProFormSubmission.create(transformedPayload);
-      console.log('✅ Saved to database');
-
-      // Send to Zapier via backend function (bypasses CORS)
-      try {
-        console.log('📡 Sending to Zapier via backend function');
-        console.log('📦 Payload size:', JSON.stringify(transformedPayload).length, 'bytes');
-        
-        const zapierResult = await base44.functions.invoke('sendToZapier', transformedPayload);
-        
-        console.log('📡 Backend function response:', zapierResult.data);
-        
-        if (zapierResult.data.success) {
-          console.log('✅ Successfully sent to Zapier');
-        } else {
-          console.error('❌ Zapier webhook failed:', zapierResult.data.error);
-        }
-      } catch (zapierError) {
-        console.error('❌ Zapier webhook error:', zapierError);
-        console.error('❌ Error details:', {
-          message: zapierError.message,
-          stack: zapierError.stack
-        });
+      console.log('📡 Sending to Zapier via backend function');
+      const zapierResult = await base44.functions.invoke('sendToZapier', transformedPayload);
+      console.log('📡 Backend function response:', zapierResult.data);
+      if (zapierResult.data?.success) {
+        console.log('✅ Successfully sent to Zapier');
+      } else {
+        console.error('❌ Zapier webhook failed:', zapierResult.data?.error);
       }
-
-      // Clear Redux store
-      dispatch(resetForm());
-
-      // Show success message and thank you modal
-      toast.success('Questionnaire submitted successfully!');
-      setSubmittedBusinessName(businessName);
-      setSubmittedDomain(domain);
-      setSubmittedFormData(responses);
-      setIsSubmitting(false);
-      setShowThankYouModal(true);
-      
-      console.log('✅ Showing thank you modal for:', businessName);
-    } catch (error) {
-      console.error('❌ Submission error:', error);
-      toast.error('Failed to submit. Please try again.');
-      setIsSubmitting(false);
-      setShowConfirmModal(true); // Reopen the modal so user can try again
+    } catch (zapierError) {
+      // Non-fatal: log but don't fail the submission
+      console.error('❌ Zapier webhook error (non-fatal):', zapierError.message);
     }
+
+    // Success — clear store, close modal, show thank you
+    dispatch(resetForm());
+    toast.success('Questionnaire submitted successfully!');
+    setSubmittedBusinessName(businessName);
+    setSubmittedDomain(domain);
+    setSubmittedFormData(responses);
+    setShowConfirmModal(false);
+    setShowThankYouModal(true);
+    console.log('✅ Submission complete for:', businessName);
   };
 
 

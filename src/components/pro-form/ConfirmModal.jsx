@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Download, Loader2 } from 'lucide-react';
 import { QUESTIONS } from './questionData';
 import { generatePDF } from './PDFGenerator';
@@ -22,6 +22,11 @@ export default function ConfirmModal({
   const [businessName, setBusinessName] = useState(initialBusinessName);
   const [domain, setDomain] = useState(initialDomain);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const businessNameRef = useRef(null);
+  const domainRef = useRef(null);
 
   const handleDownloadPDF = async () => {
     if (!businessName.trim()) {
@@ -43,6 +48,47 @@ export default function ConfirmModal({
     }
   };
 
+  const validate = () => {
+    const errors = {};
+    if (!businessName.trim()) errors.businessName = 'Business name is required.';
+    if (!domain.trim()) errors.domain = 'Domain is required.';
+    return errors;
+  };
+
+  const handleSubmit = async () => {
+    // Guard: block if already submitting (prevents double-click / Enter race)
+    if (isSubmitting) {
+      console.warn('[ConfirmModal] Submit blocked — already submitting.');
+      return;
+    }
+
+    // Validate fields inline
+    const errors = validate();
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      // Focus first invalid field
+      if (errors.businessName) businessNameRef.current?.focus();
+      else if (errors.domain) domainRef.current?.focus();
+      return;
+    }
+
+    setFieldErrors({});
+    setSubmitError('');
+    setIsSubmitting(true);
+    console.log('[ConfirmModal] Submission started for:', businessName);
+
+    try {
+      await onConfirm(businessName, cleanDomainForSubmission(domain));
+      // onConfirm handles its own success state (shows ThankYou modal)
+      // We don't close/reset here — the parent controls that
+    } catch (err) {
+      console.error('[ConfirmModal] Submission failed:', err);
+      setSubmitError("We couldn't submit your form right now. Please review your entries and try again.");
+      setIsSubmitting(false);
+      // Preserve all input — do NOT reset state
+    }
+  };
+
   const isFormValid = businessName.trim().length > 0 && domain.trim().length > 0;
 
   // Prevent body scroll
@@ -53,17 +99,17 @@ export default function ConfirmModal({
     };
   }, []);
 
-  // Handle escape key
+  // Escape key: block if submitting to prevent accidental dismiss mid-flight
   useEffect(() => {
     const handleEscape = (e) => {
-      if (e.key === 'Escape') onCancel();
+      if (e.key === 'Escape' && !isSubmitting) onCancel();
     };
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
-  }, [onCancel]);
+  }, [onCancel, isSubmitting]);
 
   const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) onCancel();
+    if (e.target === e.currentTarget && !isSubmitting) onCancel();
   };
 
   const formatAnswer = (questionId, answer, otherValue) => {
@@ -148,29 +194,47 @@ export default function ConfirmModal({
             <h3 className="font-semibold text-blue-900 text-lg">Business Information</h3>
             
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor="modal-business-name" className="block text-sm font-medium text-slate-700 mb-2">
                 Business Name <span className="text-red-500">*</span>
               </label>
               <input
+                id="modal-business-name"
+                ref={businessNameRef}
                 type="text"
                 value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
+                onChange={(e) => { setBusinessName(e.target.value); setFieldErrors(prev => ({ ...prev, businessName: '' })); }}
                 placeholder="Enter your business name"
-                className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                autoComplete="organization"
+                disabled={isSubmitting}
+                aria-invalid={!!fieldErrors.businessName}
+                aria-describedby={fieldErrors.businessName ? 'error-business-name' : undefined}
+                className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-60 ${fieldErrors.businessName ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
               />
+              {fieldErrors.businessName && (
+                <p id="error-business-name" className="mt-1 text-sm text-red-600" role="alert">{fieldErrors.businessName}</p>
+              )}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label htmlFor="modal-domain" className="block text-sm font-medium text-slate-700 mb-2">
                 Domain <span className="text-red-500">*</span>
               </label>
               <input
+                id="modal-domain"
+                ref={domainRef}
                 type="text"
                 value={domain}
-                onChange={(e) => setDomain(e.target.value)}
+                onChange={(e) => { setDomain(e.target.value); setFieldErrors(prev => ({ ...prev, domain: '' })); }}
                 placeholder="example.com or https://example.com"
-                className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                autoComplete="url"
+                disabled={isSubmitting}
+                aria-invalid={!!fieldErrors.domain}
+                aria-describedby={fieldErrors.domain ? 'error-domain' : undefined}
+                className={`w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors disabled:opacity-60 ${fieldErrors.domain ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
               />
+              {fieldErrors.domain && (
+                <p id="error-domain" className="mt-1 text-sm text-red-600" role="alert">{fieldErrors.domain}</p>
+              )}
             </div>
           </div>
 
@@ -198,35 +262,50 @@ export default function ConfirmModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 flex gap-3">
-          <button
-            onClick={onCancel}
-            className="flex-1 px-6 py-3 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
-          >
-            Go Back & Edit
-          </button>
-          <button
-            onClick={handleDownloadPDF}
-            disabled={isGeneratingPDF}
-            className="px-6 py-3 border border-blue-500 text-blue-600 font-medium rounded-lg hover:bg-blue-50 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isGeneratingPDF ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
-            ) : (
-              <><Download className="w-4 h-4" /> Download PDF</>
-            )}
-          </button>
-          <button
-            onClick={() => onConfirm(businessName, cleanDomainForSubmission(domain))}
-            disabled={!isFormValid}
-            className={`flex-1 px-6 py-3 font-medium rounded-lg transition-colors ${
-              isFormValid
-                ? 'bg-green-600 hover:bg-green-700 text-white'
-                : 'bg-slate-300 text-slate-500 cursor-not-allowed'
-            }`}
-          >
-            Confirm & Submit
-          </button>
+        <div className="px-6 py-4 border-t border-slate-200 space-y-3">
+          {submitError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-2" role="alert" aria-live="assertive">
+              {submitError}
+            </p>
+          )}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              disabled={isSubmitting}
+              className="flex-1 px-6 py-3 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Go Back & Edit
+            </button>
+            <button
+              type="button"
+              onClick={handleDownloadPDF}
+              disabled={isGeneratingPDF || isSubmitting}
+              className="px-6 py-3 border border-blue-500 text-blue-600 font-medium rounded-lg hover:bg-blue-50 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isGeneratingPDF ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
+              ) : (
+                <><Download className="w-4 h-4" /> Download PDF</>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className={`flex-1 px-6 py-3 font-medium rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                isSubmitting
+                  ? 'bg-green-400 text-white cursor-not-allowed'
+                  : 'bg-green-600 hover:bg-green-700 text-white'
+              }`}
+            >
+              {isSubmitting ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Submitting...</>
+              ) : (
+                'Confirm & Submit'
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
