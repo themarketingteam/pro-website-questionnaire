@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Download, Loader2 } from 'lucide-react';
 import { QUESTIONS } from './questionData';
+import { generatePDF } from './PDFGenerator';
+import { toast } from 'sonner';
 
 const cleanDomainForSubmission = (domainStr) => {
   let cleaned = domainStr.trim();
@@ -19,6 +21,27 @@ export default function ConfirmModal({
 }) {
   const [businessName, setBusinessName] = useState(initialBusinessName);
   const [domain, setDomain] = useState(initialDomain);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    if (!businessName.trim()) {
+      toast.error('Please enter a business name before downloading.');
+      return;
+    }
+    setIsGeneratingPDF(true);
+    try {
+      const result = await generatePDF(formData, businessName, cleanDomainForSubmission(domain));
+      if (result.success) {
+        toast.success(`PDF downloaded: ${result.filename}`);
+      } else {
+        toast.error('Failed to generate PDF. Please try again.');
+      }
+    } catch (error) {
+      toast.error('An error occurred while generating the PDF.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
 
   const isFormValid = businessName.trim().length > 0 && domain.trim().length > 0;
 
@@ -181,6 +204,17 @@ export default function ConfirmModal({
             className="flex-1 px-6 py-3 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
           >
             Go Back & Edit
+          </button>
+          <button
+            onClick={handleDownloadPDF}
+            disabled={isGeneratingPDF}
+            className="px-6 py-3 border border-blue-500 text-blue-600 font-medium rounded-lg hover:bg-blue-50 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isGeneratingPDF ? (
+              <><Loader2 className="w-4 h-4 animate-spin" /> Generating...</>
+            ) : (
+              <><Download className="w-4 h-4" /> Download PDF</>
+            )}
           </button>
           <button
             onClick={() => onConfirm(businessName, cleanDomainForSubmission(domain))}
