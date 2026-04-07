@@ -840,7 +840,13 @@ export default function ProQuestionnaire() {
       },
       userdata: {
         additional_pages_list: additionalPagesList,
-        service_offerings: (responses['3'] || []).filter(s => !s.startsWith('CATEGORY:')),
+        service_offerings: (responses['3'] || []).flatMap(s => {
+          if (s.startsWith('CATEGORY:')) {
+            const categoryName = s.replace('CATEGORY:', '');
+            return SERVICE_OPTIONS_GROUPED[categoryName] || [];
+          }
+          return [s];
+        }),
         service_offerings_other: Array.isArray(responses['3_other']) 
           ? responses['3_other'].filter(v => v?.trim()).join(', ') 
           : (responses['3_other'] || ''),
