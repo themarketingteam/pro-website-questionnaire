@@ -1222,23 +1222,23 @@ export default function ProQuestionnaire() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <FormHeader />
       
-      <main className="max-w-4xl mx-auto px-6 py-12 pl-16">
+      <main className="max-w-4xl mx-auto px-4 md:px-6 py-8 md:py-12 md:pl-16">
         {/* Validation Status Guide - Collapsible */}
         <ValidationGuideCollapsible />
 
         {/* Expand/Collapse Controls */}
-        <div className="flex gap-3 mb-8">
+        <div className="flex gap-3 mb-6 md:mb-8">
           <button
             type="button"
             onClick={expandAll}
-            className="px-6 py-3 bg-[#5B8AC4] hover:bg-[#4A7AB3] text-white font-bold rounded transition-colors text-sm uppercase"
+            className="flex-1 md:flex-none px-4 md:px-6 py-3 bg-[#5B8AC4] hover:bg-[#4A7AB3] active:bg-[#3A6AA3] text-white font-bold rounded transition-colors text-sm uppercase min-h-[44px]"
           >
             Expand All
           </button>
           <button
             type="button"
             onClick={collapseAll}
-            className="px-6 py-3 bg-[#6B7780] hover:bg-[#5A666F] text-white font-bold rounded transition-colors text-sm uppercase"
+            className="flex-1 md:flex-none px-4 md:px-6 py-3 bg-[#6B7780] hover:bg-[#5A666F] active:bg-[#4A5660] text-white font-bold rounded transition-colors text-sm uppercase min-h-[44px]"
           >
             Collapse All
           </button>
@@ -1339,15 +1339,15 @@ export default function ProQuestionnaire() {
 
           {/* Submit Section */}
           <div className="pt-8 border-t-2 border-[#C1C6C8]">
-            <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <button
                 type="button"
                 onClick={handleSubmitClick}
                 disabled={isSubmitting || isValidating}
-                className={`flex-1 py-4 text-sm font-bold rounded transition-all flex items-center justify-center uppercase tracking-wide ${
+                className={`flex-1 py-4 text-sm font-bold rounded transition-all flex items-center justify-center uppercase tracking-wide min-h-[52px] ${
                   isSubmitting || isValidating
                     ? 'bg-[#A9B3B7] text-white cursor-not-allowed'
-                    : 'bg-[#8DB63C] hover:bg-[#7DA035] text-white'
+                    : 'bg-[#8DB63C] hover:bg-[#7DA035] active:bg-[#6D9030] text-white'
                 }`}
               >
                 {isSubmitting ? (
@@ -1368,7 +1368,7 @@ export default function ProQuestionnaire() {
               <button
                 type="button"
                 onClick={clearAll}
-                className="px-12 py-4 bg-white text-[#4A5F8C] border-2 border-[#4A5F8C] hover:bg-[#F0F2F5] rounded transition-all uppercase text-sm font-bold tracking-wide"
+                className="w-full sm:w-auto px-8 sm:px-12 py-4 bg-white text-[#4A5F8C] border-2 border-[#4A5F8C] hover:bg-[#F0F2F5] active:bg-[#E0E4EC] rounded transition-all uppercase text-sm font-bold tracking-wide min-h-[52px]"
               >
                 Clear All
               </button>

@@ -134,7 +134,7 @@ export default function CheckboxQuestion({
                   </div>
                 )}
                 
-                <div className={columns === 3 ? 'grid grid-cols-1 md:grid-cols-3 gap-2' : 'grid grid-cols-1 md:grid-cols-2 gap-2'}>
+                <div className={columns === 3 ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2' : 'grid grid-cols-1 sm:grid-cols-2 gap-2'}>
                   {groupOptions.map((option) => {
                     const optionDisabled = isDisabled(option) || individualOptionsDisabled;
                     
@@ -142,7 +142,7 @@ export default function CheckboxQuestion({
                       <div 
                         key={option}
                         onClick={() => !optionDisabled && handleToggle(option)}
-                        className={`flex items-center gap-3 p-3 border rounded cursor-pointer transition-all ${
+                        className={`flex items-center gap-3 p-3 min-h-[44px] border rounded cursor-pointer transition-all ${
                           value.includes(option)
                             ? 'border-[#1C82DE] bg-[#E8F3FC] ring-2 ring-[#1C82DE]/20'
                             : optionDisabled
@@ -171,12 +171,12 @@ export default function CheckboxQuestion({
           })}
         </div>
       ) : (
-        <div className={columns === 3 ? 'grid grid-cols-1 md:grid-cols-3 gap-2.5' : 'grid grid-cols-1 md:grid-cols-2 gap-2.5'}>
+        <div className={columns === 3 ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5' : 'grid grid-cols-1 sm:grid-cols-2 gap-2.5'}>
           {options.map((option) => (
             <div 
               key={option}
               onClick={() => !isDisabled(option) && handleToggle(option)}
-              className={`flex items-center gap-3 p-4 border rounded cursor-pointer transition-all ${
+              className={`flex items-center gap-3 p-4 min-h-[44px] border rounded cursor-pointer transition-all ${
                 value.includes(option)
                   ? 'border-[#1C82DE] bg-[#E8F3FC] ring-2 ring-[#1C82DE]/20'
                   : isDisabled(option)

@@ -44,7 +44,7 @@ export default function SelectionSpanIndicator({
               : `Remove ${total - maxTotal} selection${total - maxTotal > 1 ? 's' : ''} to stay within limits.`
             }
           </p>
-          <div className="flex gap-4 mt-3 text-sm">
+          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-sm">
             <span className="text-[#566C75]">
               Services: <strong className="text-[#122947]">{servicesCount}</strong>
             </span>

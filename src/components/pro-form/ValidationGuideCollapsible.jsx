@@ -2,15 +2,15 @@ import React from 'react';
 
 export default function ValidationGuideCollapsible() {
   return (
-    <div className="mb-8 bg-white border border-[#C1C6C8] rounded-lg overflow-hidden">
-      <div className="px-6 py-4 border-b border-[#C1C6C8]">
+    <div className="mb-6 md:mb-8 bg-white border border-[#C1C6C8] rounded-lg overflow-hidden">
+      <div className="px-4 md:px-6 py-3 md:py-4 border-b border-[#C1C6C8]">
         <h3 className="text-base font-bold text-[#122947]">Validation Status Guide</h3>
       </div>
 
-      <div className="px-6 pb-6 pt-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="px-4 md:px-6 pb-4 md:pb-6 pt-3 md:pt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-6">
             {/* Green - Complete */}
-            <div className="flex items-start gap-3 p-5 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-start gap-3 p-3 md:p-5 bg-green-50 border border-green-200 rounded-lg">
               <img 
                 src="https://img.icons8.com/?size=100&id=ZBQJIdqe73bi&format=png&color=22C55E" 
                 alt="Complete" 
@@ -25,7 +25,7 @@ export default function ValidationGuideCollapsible() {
             </div>
 
             {/* Yellow - Passing (Needs Work) */}
-            <div className="flex items-start gap-3 p-5 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-start gap-3 p-3 md:p-5 bg-amber-50 border border-amber-200 rounded-lg">
               <img 
                 src="https://img.icons8.com/?size=100&id=lwhK4j4bx2Zx&format=png&color=F59E0B" 
                 alt="Passing" 
@@ -40,7 +40,7 @@ export default function ValidationGuideCollapsible() {
             </div>
 
             {/* Red - Incomplete */}
-            <div className="flex items-start gap-3 p-5 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start gap-3 p-3 md:p-5 bg-red-50 border border-red-200 rounded-lg">
               <img 
                 src="https://img.icons8.com/?size=100&id=iQ230Rs1gOvf&format=png&color=DC2626" 
                 alt="Incomplete" 
