@@ -9,6 +9,7 @@ import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
+import AdminSubmitIntake from './pages/AdminSubmitIntake';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -60,6 +61,12 @@ const AuthenticatedApp = () => {
           }
         />
       ))}
+      {/* Temporary admin utility route for one-click submission */}
+      <Route path="/admin/submit-intake" element={
+        <LayoutWrapper currentPageName={"admin/submit-intake"}>
+          {React.createElement(require('./pages/AdminSubmitIntake.jsx').default)}
+        </LayoutWrapper>
+      } />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );
