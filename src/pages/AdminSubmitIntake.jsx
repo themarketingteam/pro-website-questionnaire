@@ -218,6 +218,18 @@ export default function AdminSubmitIntake() {
       const res = await base44.entities.ProFormSubmission.create(payload);
       setSubmittedId(res?.id || res?.data?.id || null);
       toast.success('Submission saved');
+
+      // Also forward to Zapier (non-fatal, like main form)
+      try {
+        const zapRes = await base44.functions.invoke('sendToZapier', payload);
+        if (zapRes?.data?.success) {
+          console.log('✅ Sent to Zapier successfully');
+        } else {
+          console.warn('⚠️ Zapier send returned non-success', zapRes?.data);
+        }
+      } catch (zErr) {
+        console.error('❌ Zapier send failed (non-fatal):', zErr?.message || zErr);
+      }
     } catch (e) {
       toast.error(e?.message || 'Submission failed');
     } finally {
