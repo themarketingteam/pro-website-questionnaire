@@ -1,3 +1,4 @@
+import React from 'react'
 import './App.css'
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -64,7 +65,7 @@ const AuthenticatedApp = () => {
       {/* Temporary admin utility route for one-click submission */}
       <Route path="/admin/submit-intake" element={
         <LayoutWrapper currentPageName={"admin/submit-intake"}>
-          {React.createElement(require('./pages/AdminSubmitIntake.jsx').default)}
+          <AdminSubmitIntake />
         </LayoutWrapper>
       } />
       <Route path="*" element={<PageNotFound />} />
