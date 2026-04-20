@@ -236,7 +236,7 @@ export default function ProQuestionnaire() {
       dispatch(setValidationStatus({ questionId: '23', status }));
     }
 
-    // If this is a child question, update parent status
+    // If this is a child question, update parent status using required-children only
     const parentId = questionId.split('.')[0];
     if (questionId.includes('.') && parentId && parentId !== '2') {
       const parentAnswer = responses[parentId];
@@ -273,6 +273,9 @@ export default function ProQuestionnaire() {
             const parentStatus = !allComplete ? 'incomplete' : anyNeedsWork ? 'needs_work' : 'complete';
             dispatch(setValidationStatus({ questionId: parentId, status: parentStatus }));
           }
+        } else {
+          // No required children: parent can be complete when answered yes
+          dispatch(setValidationStatus({ questionId: parentId, status: 'complete' }));
         }
       }
     }
@@ -298,20 +301,23 @@ export default function ProQuestionnaire() {
           return; // Exit early
         }
 
-        // If answer is 'yes', check children
+        // If answer is 'yes', check required children only
         if (value === 'yes') {
           newStatus = 'complete';
           if (question.conditionalChildren) {
             const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
             if (requiredChildren.length > 0) {
-              // Parent status will be updated by children
+              // Parent status will be updated by required children completeness
               newStatus = 'incomplete';
 
-              // Special handling for Q23 - check if child 23.1 has validation status
+              // Preserve prior behavior for Q23 if present but only when it is marked required (it is optional by default)
               if (questionId === '23') {
-                const child23_1Status = validationStatus['23.1'] || '';
-                if (child23_1Status && child23_1Status !== '') {
-                  newStatus = child23_1Status;
+                const child23 = question.conditionalChildren.find(c => c.id === '23.1');
+                if (child23?.requiredIfParentYes) {
+                  const child23_1Status = validationStatus['23.1'] || '';
+                  if (child23_1Status && child23_1Status !== '') {
+                    newStatus = child23_1Status;
+                  }
                 }
               }
             }
@@ -641,27 +647,34 @@ export default function ProQuestionnaire() {
     return validationStatus[questionId] || 'neutral';
   };
 
-  // Helper: should a question be considered for incomplete list
-  const shouldIncludeInIncomplete = (qid) => {
+  // Shared completion helpers
+  const isQuestionActive = (qid) => {
+    if (!isChildQuestion(qid)) return true; // top-level always active
+    const parent = getParentQuestionByChildId(QUESTIONS, qid);
+    if (!parent) return false;
+    return responses[parent.id] === 'yes';
+  };
+
+  const isQuestionRequiredNow = (qid) => {
     const q = getQuestionById(QUESTIONS, qid);
     if (!q) return false;
-
-    // Never include info_message in incomplete gating
-    if (q.type === 'info_message') return false;
-
-    // If it's a child, only include when:
-    // 1) parent is answered 'yes'
-    // 2) child is effectively active/visible (same as 1 for this schema)
-    // 3) child is semantically completable (exclude info_message handled above)
-    // 4) child is required when parent is yes
+    if (q.type === 'info_message') return false; // never required
     if (isChildQuestion(qid)) {
-      const parent = getParentQuestionByChildId(QUESTIONS, qid);
-      if (!parent) return false;
-      const parentYes = responses[parent.id] === 'yes';
-      if (!parentYes) return false; // inactive children skipped
-      if (q.requiredIfParentYes !== true) return false; // optional children skipped
+      return q.requiredIfParentYes === true && isQuestionActive(qid);
     }
+    // Parents/top-level are required by default
+    return true;
+  };
 
+  const shouldParticipateInCompletion = (qid) => {
+    const q = getQuestionById(QUESTIONS, qid);
+    if (!q) return false;
+    if (q.type === 'info_message') return false;
+    if (isChildQuestion(qid)) {
+      // Only required, active children participate
+      return isQuestionRequiredNow(qid);
+    }
+    // Parents always participate
     return true;
   };
 
@@ -672,7 +685,7 @@ export default function ProQuestionnaire() {
       const question = getQuestionById(QUESTIONS, qid);
       if (!question) return;
 
-      if (!shouldIncludeInIncomplete(qid)) return;
+      if (!shouldParticipateInCompletion(qid)) return;
 
       if (!isQuestionComplete(qid)) {
         incomplete.push(`Q${qid}: ${question.title}`);
