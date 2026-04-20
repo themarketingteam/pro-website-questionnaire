@@ -22,7 +22,26 @@ export function normalizePersistedState(state) {
   next.touchedQuestions = { ...(state.touchedQuestions || {}) };
   next.expandedQuestions = { ...(state.expandedQuestions || {}) };
 
-  // 1) Legacy certification migration (run BEFORE unknown-key cleanup)
+  // Dev-only guardrails: capture pre-state and define self-checks to prevent regression of migration order
+  const __pre = {
+    responses: { ...(state.responses || {}) },
+  };
+  const __isDev = (() => {
+    try {
+      // Prefer Vite env flag; also allow URL opt-in for manual checks
+      const byEnv = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV;
+      const byUrl = typeof window !== 'undefined' && /(?:redux-data|norm-debug)=true/.test(window.location.search || '');
+      return !!(byEnv || byUrl);
+    } catch (_) { return false; }
+  })();
+  const __shallowEqual = (a, b) => {
+    try { return JSON.stringify(a) === JSON.stringify(b); } catch { return a === b; }
+  };
+
+  // STAGE 1 — Pre-cleanup legacy certification migration
+  // IMPORTANT: Question 1.2.1 was removed from the active schema, so unknown-key cleanup would delete
+  // responses['1.2.1'] before we could use it. We must migrate into canonical 12/12.1 first, then strip
+  // legacy mirrors. This order protects against accidental reordering in future edits.
   const legacyCertList = next.responses?.['1.2.1'];
   const canonicalCertList = next.responses?.['12.1'];
   if (Array.isArray(legacyCertList) && legacyCertList.length > 0) {
@@ -45,7 +64,7 @@ export function normalizePersistedState(state) {
     if (legacyId in next.expandedQuestions) delete next.expandedQuestions[legacyId];
   });
 
-  // 2) Remove unknown keys across slices (after migration)
+  // STAGE 2 — Schema cleanup: remove unknown keys across slices (after migration)
   Object.keys(next.responses).forEach((k) => {
     if (!allowedResponseKeys.has(k)) delete next.responses[k];
   });
@@ -64,7 +83,7 @@ export function normalizePersistedState(state) {
   const getOptions = (id) => getQuestionById(QUESTIONS, id)?.options || [];
   const getShowOther = (id) => !!getQuestionById(QUESTIONS, id)?.showOther;
 
-  // 2) Normalize values per type
+  // STAGE 3 — Type/value normalization by schema
   knownIds.forEach((id) => {
     const type = getType(id);
     if (!type) return;
@@ -169,6 +188,46 @@ export function normalizePersistedState(state) {
   Object.keys(next.validationStatus).forEach((k) => {
     if (!knownIds.has(k)) delete next.validationStatus[k];
   });
+
+  // Dev-only self-checks to ensure migration happened before cleanup and canonical preservation
+  if (__isDev) {
+    try {
+      const hadLegacyList = Array.isArray(__pre.responses['1.2.1']) && __pre.responses['1.2.1'].length > 0;
+      const hadLegacyYesNo = __pre.responses['1.2'] === 'yes' || __pre.responses['1.2'] === 'no';
+      const preCanonListEmpty = !Array.isArray(__pre.responses['12.1']) || __pre.responses['12.1'].length === 0;
+      const preCanonYesNoEmpty = !(__pre.responses['12'] === 'yes' || __pre.responses['12'] === 'no');
+
+      if (hadLegacyList && preCanonListEmpty) {
+        if (!(Array.isArray(next.responses['12.1']) && next.responses['12.1'].length > 0)) {
+          console.warn('[normalizePersistedState][guard] Expected legacy 1.2.1 to migrate into 12.1, but 12.1 is empty.');
+        }
+        if ('1.2.1' in next.responses) {
+          console.warn('[normalizePersistedState][guard] Legacy key 1.2.1 survived post-migration cleanup.');
+        }
+      }
+      if (hadLegacyYesNo && preCanonYesNoEmpty) {
+        if (!(next.responses['12'] === 'yes' || next.responses['12'] === 'no')) {
+          console.warn('[normalizePersistedState][guard] Expected legacy 1.2 to migrate into 12.');
+        }
+        if ('1.2' in next.responses) {
+          console.warn('[normalizePersistedState][guard] Legacy key 1.2 survived post-migration cleanup.');
+        }
+      }
+      // Canonical preservation when already populated
+      if (Array.isArray(__pre.responses['12.1']) && __pre.responses['12.1'].length > 0 && '1.2.1' in (__pre.responses)) {
+        if (!__shallowEqual(next.responses['12.1'], __pre.responses['12.1'])) {
+          console.warn('[normalizePersistedState][guard] Canonical 12.1 changed despite being pre-populated (should be preserved).');
+        }
+      }
+      if ((__pre.responses['12'] === 'yes' || __pre.responses['12'] === 'no') && '1.2' in (__pre.responses)) {
+        if (next.responses['12'] !== __pre.responses['12']) {
+          console.warn('[normalizePersistedState][guard] Canonical 12 changed despite being pre-populated (should be preserved).');
+        }
+      }
+    } catch (e) {
+      // Never break production behavior
+    }
+  }
 
   return next;
 }
