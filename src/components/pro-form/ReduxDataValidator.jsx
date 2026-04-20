@@ -16,11 +16,6 @@ export default function ReduxDataValidator() {
   const expandedQuestions = useSelector((state) => state.form.expandedQuestions);
   const credentials = useSelector((state) => state.form.credentials);
   
-  // Don't render anything if not enabled via URL parameter
-  if (!isEnabled) {
-    return null;
-  }
-
   useEffect(() => {
     // Listen for Ctrl+Shift+V to toggle validator
     const handleKeyDown = (e) => {
@@ -180,6 +175,10 @@ export default function ReduxDataValidator() {
     }
     console.log('========================================');
   };
+
+  if (!isEnabled) {
+    return null;
+  }
 
   if (!isVisible) {
     return (

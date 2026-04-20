@@ -963,8 +963,12 @@ export default function ProQuestionnaire() {
     };
 
     switch (question.type) {
-      case 'yes_no':
-        return <YesNoQuestion {...commonProps} />;
+      case 'yes_no': {
+        const sanitizedId = String(question.id).replace(/\./g, '_');
+        const groupName = `yes_no_${sanitizedId}`;
+        const inputIdBase = `q_${sanitizedId}`;
+        return <YesNoQuestion {...commonProps} groupName={groupName} inputIdBase={inputIdBase} />;
+      }
       
       case 'checkbox':
         return (
