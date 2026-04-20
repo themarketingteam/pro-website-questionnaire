@@ -228,23 +228,12 @@ export const QUESTIONS = [
       },
       {
         id: "1.2",
-        title: "Do you have any certifications, awards, or partnerships that you would like to highlight?",
-        why: "These elements are powerful trust signals for your Why Choose Us page. They establish credibility and authority, helping differentiate you from competitors.",
-        guidance: "Select 'Yes' if you have certifications, vendor partnerships, awards, or other credentials to showcase on your Why Choose Us page.",
-        type: "yes_no",
+        title: "Certifications, awards, and partnerships",
+        type: "info_message",
         requiredIfParentYes: false,
-        examples: { yes: "Yes, we have certifications or awards to highlight.", no: "No, we do not have any to highlight." },
-        conditionalChildren: [
-          {
-            id: "1.2.1",
-            title: "Add your certifications, accolades, awards, or partnerships",
-            why: "Adding specific details helps us showcase your credentials effectively on your Why Choose Us page.",
-            guidance: "For each item, provide the name, type, and optionally include images or supporting documentation. These entries are shared with Question 12.1, so any changes here will be reflected there and vice versa.",
-            type: "multi_certification",
-            requiredIfParentYes: false,
-            limits: { min: 0, max: 20 }
-          }
-        ]
+        textBefore: "Certifications, awards, and partnerships are collected later in ",
+        linkLabel: "Question 12",
+        textAfter: ". Anything entered there will automatically be reused on the Why Choose Us page if applicable."
       }
     ]
   },

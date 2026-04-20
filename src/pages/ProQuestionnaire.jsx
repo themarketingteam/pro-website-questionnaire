@@ -173,13 +173,7 @@ export default function ProQuestionnaire() {
   const updateResponse = useCallback((questionId, value) => {
     dispatch(setResponse({ questionId, value }));
     
-    // Mirror Q1.2 and Q12 yes/no responses
-    if (questionId === '1.2' || questionId === '12') {
-      const mirrorId = questionId === '1.2' ? '12' : '1.2';
-      if (responses[mirrorId] !== value) {
-        dispatch(setResponse({ questionId: mirrorId, value }));
-      }
-    }
+
     
     // Trigger validation update
     const newResponses = { ...responses, [questionId]: value };
@@ -1140,14 +1134,7 @@ export default function ProQuestionnaire() {
                 dispatch(setValidationStatus({ questionId: '12', status: newStatus }));
               }
 
-              // Update validation for Q1.2 if it's answered "yes"
-              if (responses['1.2'] === 'yes') {
-                const validItems = Array.isArray(val) ? val.filter(item => 
-                  item.saved === true || (item.name?.trim() && item.type && item.saved !== false)
-                ) : [];
-                const newStatus = validItems.length > 0 ? 'complete' : 'incomplete';
-                dispatch(setValidationStatus({ questionId: '1.2', status: newStatus }));
-              }
+
             }}
             max={question.limits?.max || 20}
           />
@@ -1178,13 +1165,13 @@ export default function ProQuestionnaire() {
 
                   case 'info_message':
                     return <InfoMessageQuestion 
-                      guidance={question.guidance}
+                      textBefore={question.textBefore || question.guidance}
+                      linkLabel={question.linkLabel || 'Question 12'}
+                      textAfter={question.textAfter}
                       onLinkClick={() => {
-                        // Scroll to question 12
                         const q12Element = document.getElementById('question-12');
                         if (q12Element) {
                           q12Element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          // Expand question 12 after a brief delay
                           setTimeout(() => {
                             dispatch(setExpandedQuestion({ questionId: '12', expanded: true }));
                           }, 500);
