@@ -1119,22 +1119,19 @@ export default function ProQuestionnaire() {
       case 'multi_certification':
         return (
           <MultiCertificationQuestion
-            value={responses['12.1'] || []}
+            value={responses[question.id] || []}
             onChange={(val) => {
-              // Always update the shared 12.1 data array (shared between 1.2.1 and 12.1)
-              dispatch(setResponse({ questionId: '12.1', value: val }));
+              dispatch(setResponse({ questionId: question.id, value: val }));
               setShowAutoSave(prev => prev + 1);
 
-              // Update validation for Q12 if it's answered "yes"
-              if (responses['12'] === 'yes') {
+              // Update validation for Q12 if this is the canonical certifications question
+              if (question.id === '12.1' && responses['12'] === 'yes') {
                 const validItems = Array.isArray(val) ? val.filter(item => 
                   item.saved === true || (item.name?.trim() && item.type && item.saved !== false)
                 ) : [];
                 const newStatus = validItems.length > 0 ? 'complete' : 'incomplete';
                 dispatch(setValidationStatus({ questionId: '12', status: newStatus }));
               }
-
-
             }}
             max={question.limits?.max || 20}
           />
@@ -1195,7 +1192,7 @@ export default function ProQuestionnaire() {
         {parent.conditionalChildren.map((child, idx) => (
           <React.Fragment key={child.id}>
             <QuestionWrapper
-              number={child.id === '1.2.1' ? '' : child.id}
+              number={child.id}
               title={child.title}
               guidance={child.guidance}
               why={child.why}
