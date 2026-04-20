@@ -1,5 +1,3 @@
-import React from 'react';
-
 export default function YesNoQuestion({ value, onChange, groupName, inputIdBase }) {
   // If value is undefined/null, don't default to 'no' - let user choose
   const hasValue = value === 'yes' || value === 'no';

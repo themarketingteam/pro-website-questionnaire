@@ -224,7 +224,7 @@ export function normalizePersistedState(state) {
           console.warn('[normalizePersistedState][guard] Canonical 12 changed despite being pre-populated (should be preserved).');
         }
       }
-    } catch (e) {
+    } catch {
       // Never break production behavior
     }
   }

@@ -1,5 +1,3 @@
-import React from 'react';
-
 function slugify(text = '') {
   return String(text).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 }
