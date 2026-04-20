@@ -340,10 +340,13 @@ export default function ProQuestionnaire() {
         break;
       }
 
-      case 'radio':
-        newStatus = (value && (value !== 'Other' || allResponses[`${questionId}_other`]?.trim())) 
+      case 'radio': {
+        const inOptions = Array.isArray(question.options) && question.options.includes(value);
+        const isOtherSelected = value === 'Other' || (question.showOther && value && !inOptions);
+        newStatus = (value && (isOtherSelected ? (allResponses[`${questionId}_other`]?.trim()) : true))
           ? 'complete' : 'incomplete';
         break;
+      }
 
       case 'multi_text': {
         const entries = Array.isArray(value) ? value : [];
@@ -581,8 +584,11 @@ export default function ProQuestionnaire() {
         return totalCount >= min && totalCount <= max;
       }
       
-      case 'radio':
-        return !!answer && (answer !== 'Other' || (otherValue && otherValue.trim()));
+      case 'radio': {
+        const inOptions = Array.isArray(question.options) && question.options.includes(answer);
+        const isOtherSelected = answer === 'Other' || (question.showOther && answer && !inOptions);
+        return !!answer && (isOtherSelected ? (otherValue && otherValue.trim()) : true);
+      }
       
       case 'textarea': {
         const status = validationStatus[questionId];
@@ -988,18 +994,21 @@ export default function ProQuestionnaire() {
           />
         );
       
-      case 'radio':
+      case 'radio': {
         // Set context-specific placeholders for "Other" inputs
         let otherPlaceholder = 'Please specify...';
         if (question.id === '15') {
           otherPlaceholder = 'Enter how your clients find you...';
         } else if (question.id === '24') {
-          otherPlaceholder = 'What action would you like client\'s to take on your website...';
+          otherPlaceholder = "What action would you like client's to take on your website...";
         } else if (question.id === '11') {
           otherPlaceholder = 'Enter your custom brand voice...';
         } else if (question.id === '7') {
           otherPlaceholder = 'Enter your delivery model...';
         }
+        const sanitizedId = String(question.id).replace(/\./g, '_');
+        const groupName = `radio_${sanitizedId}`;
+        const inputIdBase = `radio_${sanitizedId}`;
 
         return (
           <RadioQuestion
@@ -1009,8 +1018,11 @@ export default function ProQuestionnaire() {
             otherValue={responses[`${question.id}_other`] || ''}
             onOtherChange={(val) => updateResponse(`${question.id}_other`, val)}
             otherPlaceholder={otherPlaceholder}
+            groupName={groupName}
+            inputIdBase={inputIdBase}
           />
         );
+      }
       
       case 'textarea':
         return (
