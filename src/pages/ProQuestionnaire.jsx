@@ -39,6 +39,7 @@ import ValidationGuide from '@/components/pro-form/ValidationGuide';
 import ValidationGuideCollapsible from '@/components/pro-form/ValidationGuideCollapsible';
 import ReduxDataValidator from '@/components/pro-form/ReduxDataValidator';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
+import { getQuestionById, getParentQuestionByChildId, getAllQuestionIds, isChildQuestion } from '@/components/pro-form/questionUtils';
 
 export default function ProQuestionnaire() {
   const dispatch = useDispatch();
@@ -244,7 +245,7 @@ export default function ProQuestionnaire() {
         return;
       }
 
-      const question = QUESTIONS.find(q => q.id === parentId);
+      const question = getQuestionById(QUESTIONS, parentId);
       if (question?.conditionalChildren && parentAnswer === 'yes') {
         const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
         if (requiredChildren.length > 0) {
@@ -278,7 +279,7 @@ export default function ProQuestionnaire() {
   };
 
   const updateQuestionValidation = (questionId, value, allResponses) => {
-    const question = QUESTIONS.find(q => q.id === questionId);
+    const question = getQuestionById(QUESTIONS, questionId);
     if (!question) return;
 
     let newStatus = 'incomplete';
@@ -473,22 +474,7 @@ export default function ProQuestionnaire() {
   };
 
   const isQuestionComplete = (questionId) => {
-    // First try to find in main questions
-    let question = QUESTIONS.find(q => q.id === questionId);
-    
-    // If not found, search in conditional children
-    if (!question) {
-      for (const parentQ of QUESTIONS) {
-        if (parentQ.conditionalChildren) {
-          const childQ = parentQ.conditionalChildren.find(c => c.id === questionId);
-          if (childQ) {
-            question = childQ;
-            break;
-          }
-        }
-      }
-    }
-    
+    const question = getQuestionById(QUESTIONS, questionId);
     if (!question) return false;
 
     // Check validation status first - if it exists and is complete/needs_work, question is complete
@@ -520,7 +506,7 @@ export default function ProQuestionnaire() {
           return true;
         }
 
-        const childQuestion = QUESTIONS.find(q => q.id === child.id);
+        const childQuestion = getQuestionById(QUESTIONS, child.id);
         if (!childQuestion) return false;
 
         // Check child completion directly without requiring touched status
@@ -652,25 +638,19 @@ export default function ProQuestionnaire() {
 
   const getIncompleteQuestions = () => {
     const incomplete = [];
-    for (let i = 1; i <= 25; i++) {
-      const questionId = i.toString();
-      const question = QUESTIONS.find(q => q.id === questionId);
-
-      if (!question) continue;
-
-      if (!isQuestionComplete(questionId)) {
-        incomplete.push(`Q${questionId}: ${question.title}`);
+    const allIds = getAllQuestionIds(QUESTIONS);
+    allIds.forEach((qid) => {
+      const question = getQuestionById(QUESTIONS, qid);
+      if (!question) return;
+      // Skip child questions if parent is not actively 'yes'
+      if (isChildQuestion(qid)) {
+        const parent = getParentQuestionByChildId(QUESTIONS, qid);
+        if (!parent || responses[parent.id] !== 'yes') return;
       }
-
-      // Check conditional children if parent is 'yes'
-      if (question.conditionalChildren && responses[questionId] === 'yes') {
-        for (const child of question.conditionalChildren) {
-          if (child.requiredIfParentYes && !isQuestionComplete(child.id)) {
-            incomplete.push(`Q${child.id}: ${child.title}`);
-          }
-        }
+      if (!isQuestionComplete(qid)) {
+        incomplete.push(`Q${qid}: ${question.title}`);
       }
-    }
+    });
     return incomplete;
   };
 
@@ -719,8 +699,7 @@ export default function ProQuestionnaire() {
     try {
       // Run all validations in parallel
       const validationPromises = questionsToValidate.map(async (qId) => {
-        const question = QUESTIONS.find(q => q.id === qId) || 
-                         QUESTIONS.flatMap(q => q.conditionalChildren || []).find(c => c.id === qId);
+        const question = getQuestionById(QUESTIONS, qId);
         
         try {
           const result = await base44.functions.invoke('validateQuestionText', {
