@@ -1,5 +1,5 @@
 import { QUESTIONS } from '@/components/pro-form/questionData';
-import { getAllQuestionIds, getQuestionById, getParentQuestionByChildId, isChildQuestion } from '@/components/pro-form/questionUtils';
+import { getAllQuestionIds, getQuestionById } from '@/components/pro-form/questionUtils';
 
 function uniqArray(arr) {
   return Array.from(new Set(arr || []));

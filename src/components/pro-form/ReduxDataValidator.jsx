@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { CheckCircle2, AlertCircle, Database } from 'lucide-react';
 import { QUESTIONS } from '@/components/pro-form/questionData';
-import { getAllQuestionIds, getQuestionById, getParentQuestionByChildId, isChildQuestion } from '@/components/pro-form/questionUtils';
+import { getAllQuestionIds, getQuestionById } from '@/components/pro-form/questionUtils';
 
 export default function ReduxDataValidator() {
   // Check if redux-data=true is in URL
