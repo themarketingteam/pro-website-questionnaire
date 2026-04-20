@@ -172,14 +172,26 @@ export default function ProQuestionnaire() {
   // No more cookie saving - Redux persist handles everything automatically
 
   const updateResponse = useCallback((questionId, value) => {
+    // Persist the field change first
     dispatch(setResponse({ questionId, value }));
-    
 
-    
-    // Trigger validation update
+    // Prepare merged snapshot for validation logic
     const newResponses = { ...responses, [questionId]: value };
-    updateQuestionValidation(questionId, value, newResponses);
-    
+
+    // If an auxiliary `_other` field changed, also revalidate the owning base question
+    if (questionId.endsWith('_other')) {
+      const baseId = questionId.slice(0, -6);
+      const baseVal = newResponses[baseId];
+      // Re-run validation for the base question (radio logic checks `${baseId}_other` itself)
+      updateQuestionValidation(baseId, baseVal, newResponses);
+      // Mark the base question as touched so icons/lists reflect the latest state immediately
+      dispatch(setTouchedQuestion({ questionId: baseId, touched: true }));
+    } else {
+      // Regular path: validate the changed question
+      updateQuestionValidation(questionId, value, newResponses);
+    }
+
+    // UI feedback + touched state for the specific control that changed
     setShowAutoSave(prev => prev + 1);
     dispatch(setTouchedQuestion({ questionId, touched: true }));
   }, [dispatch, responses]);
