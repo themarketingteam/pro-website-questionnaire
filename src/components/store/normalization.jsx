@@ -22,7 +22,30 @@ export function normalizePersistedState(state) {
   next.touchedQuestions = { ...(state.touchedQuestions || {}) };
   next.expandedQuestions = { ...(state.expandedQuestions || {}) };
 
-  // 1) Remove unknown keys across slices
+  // 1) Legacy certification migration (run BEFORE unknown-key cleanup)
+  const legacyCertList = next.responses?.['1.2.1'];
+  const canonicalCertList = next.responses?.['12.1'];
+  if (Array.isArray(legacyCertList) && legacyCertList.length > 0) {
+    if (!Array.isArray(canonicalCertList) || canonicalCertList.length === 0) {
+      next.responses['12.1'] = legacyCertList;
+    }
+  }
+  const legacyCertYesNo = next.responses?.['1.2'];
+  const canonicalYesNo = next.responses?.['12'];
+  if (legacyCertYesNo === 'yes' || legacyCertYesNo === 'no') {
+    if (canonicalYesNo !== 'yes' && canonicalYesNo !== 'no') {
+      next.responses['12'] = legacyCertYesNo;
+    }
+  }
+  // Remove legacy mirror fields post-migration across all slices
+  ['1.2', '1.2.1'].forEach((legacyId) => {
+    if (legacyId in next.responses) delete next.responses[legacyId];
+    if (legacyId in next.validationStatus) delete next.validationStatus[legacyId];
+    if (legacyId in next.touchedQuestions) delete next.touchedQuestions[legacyId];
+    if (legacyId in next.expandedQuestions) delete next.expandedQuestions[legacyId];
+  });
+
+  // 2) Remove unknown keys across slices (after migration)
   Object.keys(next.responses).forEach((k) => {
     if (!allowedResponseKeys.has(k)) delete next.responses[k];
   });
@@ -140,24 +163,6 @@ export function normalizePersistedState(state) {
         }
       });
     }
-  });
-
-  // 7) Legacy certification migration (prefer canonical)
-  const legacyCertList = next.responses['1.2.1'];
-  const canonicalCertList = next.responses['12.1'];
-  if ((Array.isArray(legacyCertList) && legacyCertList.length > 0) && (!Array.isArray(canonicalCertList) || canonicalCertList.length === 0)) {
-    next.responses['12.1'] = legacyCertList;
-  }
-  const legacyCertYesNo = next.responses['1.2'];
-  if ((legacyCertYesNo === 'yes' || legacyCertYesNo === 'no') && (next.responses['12'] !== 'yes' && next.responses['12'] !== 'no')) {
-    next.responses['12'] = legacyCertYesNo;
-  }
-  // Remove legacy mirror fields and any related statuses/expansion/touched
-  ['1.2', '1.2.1'].forEach((legacyId) => {
-    delete next.responses[legacyId];
-    delete next.validationStatus[legacyId];
-    delete next.touchedQuestions[legacyId];
-    delete next.expandedQuestions[legacyId];
   });
 
   // Finally, ensure child keys present in slices are only for known child ids
