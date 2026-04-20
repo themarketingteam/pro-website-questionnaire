@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { CheckCircle2, AlertCircle, Database } from 'lucide-react';
+import { QUESTIONS } from '@/components/pro-form/questionData';
+import { getAllQuestionIds, getQuestionById, getParentQuestionByChildId, isChildQuestion } from '@/components/pro-form/questionUtils';
 
 export default function ReduxDataValidator() {
   // Check if redux-data=true is in URL
@@ -16,19 +18,25 @@ export default function ReduxDataValidator() {
   const expandedQuestions = useSelector((state) => state.form.expandedQuestions);
   const credentials = useSelector((state) => state.form.credentials);
   
+  // Global hotkey — stable listener; actual validation runs in the reactive effect below
   useEffect(() => {
-    // Listen for Ctrl+Shift+V to toggle validator
     const handleKeyDown = (e) => {
+      if (!isEnabled) return;
       if (e.ctrlKey && e.shiftKey && e.key === 'V') {
         e.preventDefault();
         setIsVisible(prev => !prev);
-        runValidation();
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [responses, validationStatus, touchedQuestions, expandedQuestions, credentials]);
+  }, [isEnabled]);
+
+  // When panel is visible or data changes, (re)run validation using latest state
+  useEffect(() => {
+    if (isEnabled && isVisible) {
+      runValidation();
+    }
+  }, [isEnabled, isVisible, responses, validationStatus, touchedQuestions, expandedQuestions, credentials]);
 
   const runValidation = () => {
     const results = {
@@ -143,6 +151,87 @@ export default function ReduxDataValidator() {
       details: questionTypeChecks.length > 0 ? questionTypeChecks.join(', ') : 'No complex question data yet'
     });
 
+    // New hardening checks
+    const allIds = getAllQuestionIds(QUESTIONS);
+
+    // A) Radio main values validity (invalid if not in options and not 'Other')
+    const invalidRadios = [];
+    allIds.forEach((id) => {
+      const q = getQuestionById(QUESTIONS, id);
+      if (!q || q.type !== 'radio') return;
+      const val = responses?.[id];
+      if (val == null || val === '') return; // empty not flagged here
+      const opts = q.options || [];
+      const showOther = !!q.showOther;
+      const isValid = opts.includes(val) || (showOther && val === 'Other');
+      if (!isValid) invalidRadios.push(`Q${id}='${String(val)}'`);
+    });
+    results.checks.push({
+      name: 'Radio Main Values Valid',
+      passed: invalidRadios.length === 0,
+      details: invalidRadios.length === 0 ? 'All radio values valid' : `Invalid radios: ${invalidRadios.join(', ')}`
+    });
+
+    // B) Hidden child questions must not have active validation
+    const hiddenValidated = [];
+    QUESTIONS.forEach((parent) => {
+      if (!Array.isArray(parent.conditionalChildren)) return;
+      const parentVal = responses?.[parent.id];
+      if (parentVal === 'yes') return;
+      parent.conditionalChildren.forEach((child) => {
+        const vs = validationStatus?.[child.id];
+        if (vs && vs !== '') hiddenValidated.push(child.id);
+      });
+    });
+    results.checks.push({
+      name: 'Hidden Children Have No Active Validation',
+      passed: hiddenValidated.length === 0,
+      details: hiddenValidated.length === 0 ? 'OK' : `Has active status: ${hiddenValidated.join(', ')}`
+    });
+
+    // C) Legacy certification mirrors absent
+    const legacyFieldsPresent = [];
+    ['1.2', '1.2.1'].forEach((k) => {
+      if (responses && Object.prototype.hasOwnProperty.call(responses, k)) legacyFieldsPresent.push(`responses.${k}`);
+      if (validationStatus && Object.prototype.hasOwnProperty.call(validationStatus, k)) legacyFieldsPresent.push(`validationStatus.${k}`);
+      if (touchedQuestions && Object.prototype.hasOwnProperty.call(touchedQuestions, k)) legacyFieldsPresent.push(`touchedQuestions.${k}`);
+      if (expandedQuestions && Object.prototype.hasOwnProperty.call(expandedQuestions, k)) legacyFieldsPresent.push(`expandedQuestions.${k}`);
+    });
+    results.checks.push({
+      name: 'Legacy Certification Fields Removed',
+      passed: legacyFieldsPresent.length === 0,
+      details: legacyFieldsPresent.length === 0 ? 'No legacy fields present' : `Found: ${legacyFieldsPresent.join(', ')}`
+    });
+
+    // D) Shared radio names across different question containers (DOM scan)
+    const sharedRadioNames = (() => {
+      try {
+        const radios = Array.from(document.querySelectorAll('input[type="radio"]'));
+        const map = new Map(); // name -> Set(containerId)
+        radios.forEach((el) => {
+          const name = el.getAttribute('name') || '';
+          const container = el.closest('[id^="question-"]');
+          const containerId = container?.id || 'unknown';
+          if (!map.has(name)) map.set(name, new Set());
+          map.get(name).add(containerId);
+        });
+        const offenders = [];
+        map.forEach((set, name) => {
+          if (set.size > 1) offenders.push(name);
+        });
+        // Also flag any default 'radio' name usage
+        if (Array.from(map.keys()).includes('radio')) offenders.push('radio');
+        return offenders;
+      } catch (e) {
+        return [];
+      }
+    })();
+    results.checks.push({
+      name: 'No Shared Radio Group Names',
+      passed: sharedRadioNames.length === 0,
+      details: sharedRadioNames.length === 0 ? 'All radio groups isolated' : `Shared names: ${sharedRadioNames.join(', ')}`
+    });
+
     setValidationResults(results);
 
     // Log detailed results to console
@@ -185,7 +274,6 @@ export default function ReduxDataValidator() {
       <button
         onClick={() => {
           setIsVisible(true);
-          runValidation();
         }}
         className="fixed bottom-4 right-4 z-[9999] p-3 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg transition-all"
         title="Data Validator (Ctrl+Shift+V)"
@@ -195,7 +283,7 @@ export default function ReduxDataValidator() {
     );
   }
 
-  const allPassed = validationResults?.checks.every(c => c.passed) ?? false;
+  const allPassed = validationResults?.checks?.every(c => c.passed) ?? false;
 
   return (
     <div className="fixed bottom-4 right-4 z-[9999] bg-white rounded-xl shadow-2xl border-2 border-purple-200 max-w-md w-full max-h-[600px] overflow-auto">
