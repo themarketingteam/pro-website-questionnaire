@@ -1,14 +1,20 @@
-
 import { configureStore } from '@reduxjs/toolkit';
-import { persistStore, persistReducer, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
+import { persistStore, persistReducer, createMigrate, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
 import storage from 'redux-persist/lib/storage'; // defaults to localStorage
 import formReducer from './formSlice';
 
+import { normalizePersistedState } from './normalization';
+
+const migrations = {
+  2: (state) => normalizePersistedState(state),
+};
+
 const persistConfig = {
   key: 'pro-questionnaire-root',
-  version: 1,
+  version: 2,
   storage,
   whitelist: ['responses', 'validationStatus', 'touchedQuestions', 'expandedQuestions', 'credentials'],
+  migrate: createMigrate(migrations, { debug: false }),
   // Ensure nested objects are properly serialized
   serialize: true,
   // Add debug logging
