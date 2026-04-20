@@ -477,6 +477,11 @@ export default function ProQuestionnaire() {
     const question = getQuestionById(QUESTIONS, questionId);
     if (!question) return false;
 
+    // Info messages are non-blocking and always considered complete
+    if (question.type === 'info_message') {
+      return true;
+    }
+
     // Check validation status first - if it exists and is complete/needs_work, question is complete
     const status = validationStatus[questionId];
     if (status === 'complete' || status === 'needs_work') {
@@ -636,23 +641,46 @@ export default function ProQuestionnaire() {
     return validationStatus[questionId] || 'neutral';
   };
 
+  // Helper: should a question be considered for incomplete list
+  const shouldIncludeInIncomplete = (qid) => {
+    const q = getQuestionById(QUESTIONS, qid);
+    if (!q) return false;
+
+    // Never include info_message in incomplete gating
+    if (q.type === 'info_message') return false;
+
+    // If it's a child, only include when:
+    // 1) parent is answered 'yes'
+    // 2) child is effectively active/visible (same as 1 for this schema)
+    // 3) child is semantically completable (exclude info_message handled above)
+    // 4) child is required when parent is yes
+    if (isChildQuestion(qid)) {
+      const parent = getParentQuestionByChildId(QUESTIONS, qid);
+      if (!parent) return false;
+      const parentYes = responses[parent.id] === 'yes';
+      if (!parentYes) return false; // inactive children skipped
+      if (q.requiredIfParentYes !== true) return false; // optional children skipped
+    }
+
+    return true;
+  };
+
   const getIncompleteQuestions = () => {
     const incomplete = [];
     const allIds = getAllQuestionIds(QUESTIONS);
     allIds.forEach((qid) => {
       const question = getQuestionById(QUESTIONS, qid);
       if (!question) return;
-      // Skip child questions if parent is not actively 'yes'
-      if (isChildQuestion(qid)) {
-        const parent = getParentQuestionByChildId(QUESTIONS, qid);
-        if (!parent || responses[parent.id] !== 'yes') return;
-      }
+
+      if (!shouldIncludeInIncomplete(qid)) return;
+
       if (!isQuestionComplete(qid)) {
         incomplete.push(`Q${qid}: ${question.title}`);
       }
     });
     return incomplete;
   };
+
 
   const isFormValid = () => {
     return getIncompleteQuestions().length === 0;
