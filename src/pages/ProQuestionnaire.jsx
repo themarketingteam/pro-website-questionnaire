@@ -243,10 +243,6 @@ export default function ProQuestionnaire() {
       dispatch(setValidationStatus({ questionId: '2', status: q2Status }));
     }
 
-    // Special handling for question 23.1
-    if (questionId === '23.1') {
-      dispatch(setValidationStatus({ questionId: '23', status }));
-    }
 
     // If this is a child question, update parent status using required-children only
     const parentId = questionId.split('.')[0];
