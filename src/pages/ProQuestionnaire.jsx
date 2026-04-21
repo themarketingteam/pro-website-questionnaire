@@ -417,12 +417,21 @@ export default function ProQuestionnaire() {
     const isCurrentlyExpanded = expandedQuestions[questionId];
     dispatch(setExpandedQuestion({ questionId, expanded: !isCurrentlyExpanded }));
     
-    // If expanding, mark as touched; for non-textareas set initial incomplete when needed
+    // On expand: do NOT auto-touch optional children or any textarea
     if (!isCurrentlyExpanded) {
-      dispatch(setTouchedQuestion({ questionId, touched: true }));
       const q = getQuestionById(QUESTIONS, questionId);
-      if (q?.type !== 'textarea' && validationStatus[questionId] === '') {
-        dispatch(setValidationStatus({ questionId, status: 'incomplete' }));
+      const isChild = isChildQuestion(questionId);
+      const isOptionalChild = isChild && q?.requiredIfParentYes !== true;
+
+      // Skip auto-touching and auto-incomplete for optional children and all textareas
+      if (q?.type === 'textarea' || isOptionalChild) {
+        // no-op on expand
+      } else {
+        // For required questions (top-level or required children), mark touched and set initial incomplete if unset
+        dispatch(setTouchedQuestion({ questionId, touched: true }));
+        if (validationStatus[questionId] === '') {
+          dispatch(setValidationStatus({ questionId, status: 'incomplete' }));
+        }
       }
     }
     
@@ -1062,6 +1071,7 @@ export default function ProQuestionnaire() {
               debounceMs={250}
               onValidationChange={(status) => updateValidationState(question.id, status)}
               currentValidationStatus={validationStatus[question.id]}
+              onTouched={() => dispatch(setTouchedQuestion({ questionId: question.id, touched: true }))}
             />
           </>
         );

@@ -11,7 +11,8 @@ export default function TextareaQuestion({
   questionId = "",
   debounceMs = 500,
   onValidationChange,
-  currentValidationStatus = 'neutral'
+  currentValidationStatus = 'neutral',
+  onTouched
 }) {
   const [isManualValidating, setIsManualValidating] = useState(false);
   
@@ -31,6 +32,7 @@ export default function TextareaQuestion({
     if (!value || value.trim().length === 0) return;
     console.log(`🔘 [Q${questionId}] Manual validation triggered`);
     setIsManualValidating(true);
+    if (onTouched) onTouched();
   };
 
   // Stable parent callback + deduped notifications
@@ -95,6 +97,7 @@ export default function TextareaQuestion({
       <textarea
         value={value || ''}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={() => onTouched && onTouched()}
         placeholder={placeholder}
         rows={rows}
         className={`w-full p-3 border rounded focus:outline-none focus:ring-2 focus:border-transparent resize-y min-h-[120px] transition-colors ${getStatusBorderClass()}`}
