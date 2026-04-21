@@ -38,6 +38,7 @@ import ThankYouModal from '@/components/pro-form/ThankYouModal';
 import ValidationGuide from '@/components/pro-form/ValidationGuide';
 import ValidationGuideCollapsible from '@/components/pro-form/ValidationGuideCollapsible';
 import ReduxDataValidator from '@/components/pro-form/ReduxDataValidator';
+import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import { getQuestionById, getParentQuestionByChildId, getAllQuestionIds, isChildQuestion, computeParentValidationStatus } from '@/components/pro-form/questionUtils';
 
@@ -1222,6 +1223,7 @@ export default function ProQuestionnaire() {
   };
 
   return (
+    <ErrorBoundary>
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <FormHeader />
       
@@ -1447,5 +1449,6 @@ export default function ProQuestionnaire() {
         </div>
       )}
       </div>
+      </ErrorBoundary>
       );
       }
