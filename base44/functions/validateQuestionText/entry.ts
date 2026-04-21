@@ -97,7 +97,17 @@ const VALIDATION_INSTRUCTIONS = {
 
 Deno.serve(async (req) => {
   try {
-    const { text, questionContext } = await req.json();
+    const body = await req.json();
+    const text = body.text ?? body.user_answer ?? body.answer ?? '';
+    let questionContext = body.questionContext ?? body.question_context ?? body.context ?? '';
+
+    // Backward-compat: normalize contexts like "Question 23.1: ..." -> question_23_1
+    if (questionContext && !/^question_/i.test(String(questionContext))) {
+      const m = String(questionContext).match(/Question\s+([0-9]+(?:\.[0-9]+)?)/i);
+      if (m && m[1]) {
+        questionContext = `question_${m[1].replace(/\./g, '_')}`;
+      }
+    }
 
     if (!text || !questionContext) {
       return Response.json({ 

@@ -736,12 +736,13 @@ export default function ProQuestionnaire() {
         const question = getQuestionById(QUESTIONS, qId);
         
         try {
+          const questionKey = `question_${qId.replace('.', '_')}`;
           const result = await base44.functions.invoke('validateQuestionText', {
-            question_context: `Question ${qId}: ${question?.title}`,
-            user_answer: responses[qId]
+            text: responses[qId],
+            questionContext: questionKey
           });
           
-          const status = result.data?.validation_status || 'needs_work';
+          const status = result.data?.status || 'needs_work';
           dispatch(setValidationStatus({ questionId: qId, status }));
           
           return { qId, status };
