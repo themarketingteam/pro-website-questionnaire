@@ -40,6 +40,7 @@ import ValidationGuideCollapsible from '@/components/pro-form/ValidationGuideCol
 import ReduxDataValidator from '@/components/pro-form/ReduxDataValidator';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
+import { trackValidationDispatch, trackParentStatusChange, devDiagEnabled } from '@/lib/devDiagnostics';
 import { getQuestionById, getParentQuestionByChildId, getAllQuestionIds, isChildQuestion, computeParentValidationStatus } from '@/components/pro-form/questionUtils';
 
 export default function ProQuestionnaire() {
@@ -175,6 +176,7 @@ export default function ProQuestionnaire() {
     const prev = (snapshot ?? validationStatus)?.[qid] ?? '';
     if (prev === next) return false;
     dispatch(setValidationStatus({ questionId: qid, status: next }));
+    try { if (devDiagEnabled && devDiagEnabled()) trackValidationDispatch(qid, next); } catch {}
     return true;
   };
 
@@ -262,7 +264,12 @@ export default function ProQuestionnaire() {
           .filter(c => c.requiredIfParentYes)
           .forEach(c => { childStatuses[c.id] = newStatusSnapshot[c.id] || ''; });
         const parentNext = computeParentValidationStatus(parentQuestion, parentAnswer, childStatuses);
-        if (parentNext) setValidationStatusIfChanged(parentId, parentNext, validationStatus);
+        if (parentNext) {
+          const changed = setValidationStatusIfChanged(parentId, parentNext, validationStatus);
+          if (changed) {
+            try { if (devDiagEnabled && devDiagEnabled()) trackParentStatusChange(parentId, parentNext, questionId); } catch {}
+          }
+        }
       }
     }
   };
@@ -293,7 +300,10 @@ export default function ProQuestionnaire() {
             .filter(c => c.requiredIfParentYes)
             .forEach(c => { childStatuses[c.id] = validationStatus[c.id] || ''; });
           const parentNext = computeParentValidationStatus(question, value, childStatuses);
-          setValidationStatusIfChanged(questionId, parentNext, validationStatus);
+          const changed = setValidationStatusIfChanged(questionId, parentNext, validationStatus);
+          if (changed) {
+            try { if (devDiagEnabled && devDiagEnabled()) trackParentStatusChange(questionId, parentNext, undefined); } catch {}
+          }
         }
         break;
       }

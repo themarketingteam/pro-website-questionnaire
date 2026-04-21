@@ -92,6 +92,13 @@ export default function TextareaQuestion({
     }
   };
 
+  // Dev-only render loop diagnostics
+  try {
+    import('@/lib/devDiagnostics').then(m => {
+      if (m.devDiagEnabled && m.devDiagEnabled()) m.trackTextareaRender(questionId);
+    });
+  } catch {}
+
   return (
     <div className="space-y-3">
       <textarea
