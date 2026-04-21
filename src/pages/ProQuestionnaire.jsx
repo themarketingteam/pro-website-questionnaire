@@ -42,6 +42,7 @@ import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import { trackValidationDispatch, trackParentStatusChange, devDiagEnabled } from '@/lib/devDiagnostics';
 import { getQuestionById, getParentQuestionByChildId, getAllQuestionIds, isChildQuestion, computeParentValidationStatus } from '@/components/pro-form/questionUtils';
+import { doesChildParticipateInParentCompletion } from '@/components/pro-form/schemaPolicies';
 
 export default function ProQuestionnaire() {
   const dispatch = useDispatch();
@@ -207,61 +208,22 @@ export default function ProQuestionnaire() {
     dispatch(setTouchedQuestion({ questionId, touched: true }));
   }, [dispatch, responses]);
 
-  const calculateQuestion2Status = (status2_1, value2_2) => {
-    // Check 2.2 state
-    const hasImage = value2_2?.url ? true : false;
-    const hasTags = value2_2?.tags && Array.isArray(value2_2.tags) && 
-                    value2_2.tags.length > 0 && 
-                    value2_2.tags.every(tag => tag.person?.name);
 
-    // If 2.1 has not run or is incomplete
-    if (status2_1 === '' || status2_1 === 'incomplete') {
-      return 'incomplete';
-    }
-
-    // If 2.1 is needs_work
-    if (status2_1 === 'needs_work') {
-      if (!hasImage) {
-        return 'incomplete';
-      }
-      return 'needs_work';
-    }
-
-    // If 2.1 is complete
-    if (status2_1 === 'complete') {
-      if (!hasImage) {
-        return 'incomplete';
-      }
-      if (!hasTags) {
-        return 'needs_work';
-      }
-      return 'complete';
-    }
-
-    return 'incomplete';
-  };
 
   const updateValidationState = (questionId, status) => {
     // Child snapshot after applying this change
     const newStatusSnapshot = { ...validationStatus, [questionId]: status };
     setValidationStatusIfChanged(questionId, status, validationStatus);
 
-    // Special handling for question 2.1
-    if (questionId === '2.1') {
-      const value2_2 = responses['2.2'];
-      const q2Status = calculateQuestion2Status(status, value2_2);
-      setValidationStatusIfChanged('2', q2Status, validationStatus);
-    }
-
     // If this is a child question, deterministically update parent using schema
     if (isChildQuestion(questionId)) {
       const parentId = questionId.split('.')[0];
-      if (parentId && parentId !== '2') {
+      if (parentId) {
         const parentQuestion = getQuestionById(QUESTIONS, parentId);
         const parentAnswer = responses[parentId];
         const childStatuses = {};
         (parentQuestion?.conditionalChildren || [])
-          .filter(c => c.requiredIfParentYes)
+          .filter(c => doesChildParticipateInParentCompletion(c))
           .forEach(c => { childStatuses[c.id] = newStatusSnapshot[c.id] || ''; });
         const parentNext = computeParentValidationStatus(parentQuestion, parentAnswer, childStatuses);
         if (parentNext) {
@@ -284,20 +246,19 @@ export default function ProQuestionnaire() {
       case 'yes_no': {
         // If answer is 'no' → parent complete and clear children statuses
         if (value === 'no') {
+          // Parent complete and clear ALL child statuses generically when hidden
           setValidationStatusIfChanged(questionId, 'complete', validationStatus);
-          if (question.conditionalChildren) {
-            question.conditionalChildren.forEach(child => {
-              if ((validationStatus[child.id] || '') !== '') {
-                dispatch(setValidationStatus({ questionId: child.id, status: '' }));
-              }
-            });
-          }
+          (question.conditionalChildren || []).forEach(child => {
+            if ((validationStatus[child.id] || '') !== '') {
+              dispatch(setValidationStatus({ questionId: child.id, status: '' }));
+            }
+          });
           return;
         }
         if (value === 'yes') {
           const childStatuses = {};
           (question.conditionalChildren || [])
-            .filter(c => c.requiredIfParentYes)
+            .filter(c => doesChildParticipateInParentCompletion(c))
             .forEach(c => { childStatuses[c.id] = validationStatus[c.id] || ''; });
           const parentNext = computeParentValidationStatus(question, value, childStatuses);
           const changed = setValidationStatusIfChanged(questionId, parentNext, validationStatus);
@@ -357,11 +318,7 @@ export default function ProQuestionnaire() {
         const min = question.limits?.min || 0;
         newStatus = validItems.length >= min ? 'complete' : 'incomplete';
 
-        // Special handling for question 14.1
-        if (questionId === '14.1') {
-          const q14Status = validItems.length > 0 ? 'complete' : 'incomplete';
-          dispatch(setValidationStatus({ questionId: '14', status: q14Status }));
-        }
+
         break;
       }
 
@@ -379,7 +336,7 @@ export default function ProQuestionnaire() {
         return;
     }
 
-    setValidationStatusIfChanged(questionId, newStatus, validationStatus);
+    updateValidationState(questionId, newStatus);
   };
 
   const resetQuestion = (questionId) => {
@@ -1141,17 +1098,7 @@ export default function ProQuestionnaire() {
           <MultiCertificationQuestion
             value={responses[question.id] || []}
             onChange={(val) => {
-              dispatch(setResponse({ questionId: question.id, value: val }));
-              setShowAutoSave(prev => prev + 1);
-
-              // Update validation for Q12 if this is the canonical certifications question
-              if (question.id === '12.1' && responses['12'] === 'yes') {
-                const validItems = Array.isArray(val) ? val.filter(item => 
-                  item.saved === true || (item.name?.trim() && item.type && item.saved !== false)
-                ) : [];
-                const newStatus = validItems.length > 0 ? 'complete' : 'incomplete';
-                dispatch(setValidationStatus({ questionId: '12', status: newStatus }));
-              }
+              updateResponse(question.id, val);
             }}
             max={question.limits?.max || 20}
           />
@@ -1163,15 +1110,6 @@ export default function ProQuestionnaire() {
             value={responses[question.id] || []}
             onChange={(val) => {
               updateResponse(question.id, val);
-
-              // Special handling for question 14.1
-              if (question.id === '14.1') {
-                const validItems = Array.isArray(val) ? val.filter(item => 
-                  item.saved === true || (item.name?.trim() && item.type && (item.file || item.description?.trim()) && item.saved !== false)
-                ) : [];
-                const newStatus = validItems.length > 0 ? 'complete' : 'incomplete';
-                dispatch(setValidationStatus({ questionId: '14', status: newStatus }));
-              }
             }}
             max={question.limits?.max || 10}
           />

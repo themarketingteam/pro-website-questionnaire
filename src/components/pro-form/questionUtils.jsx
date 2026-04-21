@@ -52,7 +52,7 @@ export function isChildQuestion(questionId) {
 export function computeParentValidationStatus(parentQuestion, parentAnswer, childStatuses = {}) {
   if (!parentQuestion || parentQuestion.type !== 'yes_no') return '';
 
-  // If parent says 'no' → parent is complete regardless of children
+  // If parent says 'no' → parent is complete regardless of children and child states should be cleared upstream
   if (parentAnswer === 'no') return 'complete';
 
   // If not explicitly 'yes' yet, treat as incomplete
