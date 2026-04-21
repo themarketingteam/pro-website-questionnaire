@@ -231,3 +231,69 @@ export function normalizePersistedState(state) {
 
   return next;
 }
+
+// v3 migration: aggressively sanitize optional conditional children and self-heal bad sessions
+export function normalizePersistedStateV3(state) {
+  const base = normalizePersistedState(state);
+  if (!base || typeof base !== 'object') return base;
+
+  const next = {
+    ...base,
+    responses: { ...(base.responses || {}) },
+    validationStatus: { ...(base.validationStatus || {}) },
+    touchedQuestions: { ...(base.touchedQuestions || {}) },
+    expandedQuestions: { ...(base.expandedQuestions || {}) },
+  };
+
+  // Generic rule set
+  QUESTIONS.forEach((parent) => {
+    if (!Array.isArray(parent.conditionalChildren)) return;
+    const parentVal = next.responses[parent.id];
+    parent.conditionalChildren.forEach((child) => {
+      const isRequired = !!child.requiredIfParentYes;
+      const childVal = next.responses[child.id];
+      if (parentVal !== 'yes') {
+        // Parent not active: fully clear child state across slices
+        delete next.responses[child.id];
+        if (child.id in next.validationStatus) next.validationStatus[child.id] = '';
+        if (child.id in next.touchedQuestions) delete next.touchedQuestions[child.id];
+        next.expandedQuestions[child.id] = false;
+      } else {
+        // Parent is yes
+        const childType = getQuestionById(QUESTIONS, child.id)?.type;
+        if (!isRequired && childType === 'textarea') {
+          const empty = !childVal || (typeof childVal === 'string' && childVal.trim().length === 0);
+          if (empty) {
+            // Keep neutral and collapsed by default
+            if (child.id in next.validationStatus) next.validationStatus[child.id] = '';
+            next.expandedQuestions[child.id] = false;
+            if (child.id in next.touchedQuestions) delete next.touchedQuestions[child.id];
+          }
+        }
+      }
+    });
+  });
+
+  // Explicitly ensure recovery for 23.1 and 25.1
+  const fixOptional = (parentId, childId) => {
+    const parentVal = next.responses[parentId];
+    const val = next.responses[childId];
+    if (parentVal !== 'yes') {
+      delete next.responses[childId];
+      if (childId in next.validationStatus) next.validationStatus[childId] = '';
+      if (childId in next.touchedQuestions) delete next.touchedQuestions[childId];
+      next.expandedQuestions[childId] = false;
+    } else {
+      const empty = !val || (typeof val === 'string' && val.trim().length === 0);
+      if (empty) {
+        if (childId in next.validationStatus) next.validationStatus[childId] = '';
+        next.expandedQuestions[childId] = false;
+        if (childId in next.touchedQuestions) delete next.touchedQuestions[childId];
+      }
+    }
+  };
+  fixOptional('23', '23.1');
+  fixOptional('25', '25.1');
+
+  return next;
+}

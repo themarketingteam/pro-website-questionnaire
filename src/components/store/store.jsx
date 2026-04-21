@@ -3,15 +3,16 @@ import { persistStore, persistReducer, createMigrate, FLUSH, REHYDRATE, PAUSE, P
 import storage from 'redux-persist/lib/storage'; // defaults to localStorage
 import formReducer from './formSlice';
 
-import { normalizePersistedState } from './normalization';
+import { normalizePersistedState, normalizePersistedStateV3 } from './normalization';
 
 const migrations = {
   2: (state) => normalizePersistedState(state),
+  3: (state) => normalizePersistedStateV3(state),
 };
 
 const persistConfig = {
   key: 'pro-questionnaire-root',
-  version: 2,
+  version: 3,
   storage,
   whitelist: ['responses', 'validationStatus', 'touchedQuestions', 'expandedQuestions', 'credentials'],
   migrate: createMigrate(migrations, { debug: false }),
