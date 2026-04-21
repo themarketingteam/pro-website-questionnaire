@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import { useTextValidation } from './useTextValidation';
 
@@ -33,19 +33,23 @@ export default function TextareaQuestion({
     setIsManualValidating(true);
   };
 
-  // Report validation status to parent
-  React.useEffect(() => {
-    if (onValidationChange) {
-      // Map internal status to validation status
-      const statusMap = {
-        'green': 'complete',
-        'yellow': 'needs_work',
-        'red': 'incomplete',
-        'neutral': 'incomplete'
-      };
-      onValidationChange(statusMap[validation.status] || 'incomplete');
+  // Stable parent callback + deduped notifications
+  const onValidationChangeRef = useRef(onValidationChange);
+  useEffect(() => { onValidationChangeRef.current = onValidationChange; }, [onValidationChange]);
+  const lastSentRef = useRef(null);
+
+  // Report validation status to parent only when externally meaningful and changed
+  useEffect(() => {
+    if (!onValidationChangeRef.current) return;
+    const map = { green: 'complete', yellow: 'needs_work', red: 'incomplete', neutral: 'neutral' };
+    const external = map[validation.status] || 'neutral';
+    // Keep untouched/empty textareas neutral; do not dispatch
+    if (external === 'neutral') return;
+    if (lastSentRef.current !== external) {
+      onValidationChangeRef.current(external);
+      lastSentRef.current = external;
     }
-  }, [validation.status, onValidationChange]);
+  }, [validation.status]);
 
   const getStatusIcon = () => {
     switch (validation.status) {

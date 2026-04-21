@@ -417,10 +417,11 @@ export default function ProQuestionnaire() {
     const isCurrentlyExpanded = expandedQuestions[questionId];
     dispatch(setExpandedQuestion({ questionId, expanded: !isCurrentlyExpanded }));
     
-    // If expanding, mark as touched and set validation status
+    // If expanding, mark as touched; for non-textareas set initial incomplete when needed
     if (!isCurrentlyExpanded) {
       dispatch(setTouchedQuestion({ questionId, touched: true }));
-      if (validationStatus[questionId] === '') {
+      const q = getQuestionById(QUESTIONS, questionId);
+      if (q?.type !== 'textarea' && validationStatus[questionId] === '') {
         dispatch(setValidationStatus({ questionId, status: 'incomplete' }));
       }
     }
