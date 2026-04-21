@@ -46,3 +46,26 @@ export function getAllQuestionIds(QUESTIONS) {
 export function isChildQuestion(questionId) {
   return String(questionId || '').includes('.');
 }
+
+// Compute parent validation deterministically from schema + child snapshot
+// Returns one of: 'complete' | 'needs_work' | 'incomplete'
+export function computeParentValidationStatus(parentQuestion, parentAnswer, childStatuses = {}) {
+  if (!parentQuestion || parentQuestion.type !== 'yes_no') return '';
+
+  // If parent says 'no' → parent is complete regardless of children
+  if (parentAnswer === 'no') return 'complete';
+
+  // If not explicitly 'yes' yet, treat as incomplete
+  if (parentAnswer !== 'yes') return 'incomplete';
+
+  const requiredChildren = (parentQuestion.conditionalChildren || []).filter(c => c.requiredIfParentYes);
+  if (requiredChildren.length === 0) return 'complete';
+
+  let anyNeedsWork = false;
+  for (const child of requiredChildren) {
+    const st = childStatuses[child.id] || '';
+    if (st === '' || st === 'incomplete') return 'incomplete';
+    if (st === 'needs_work') anyNeedsWork = true;
+  }
+  return anyNeedsWork ? 'needs_work' : 'complete';
+}

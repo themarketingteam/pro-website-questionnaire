@@ -39,7 +39,7 @@ import ValidationGuide from '@/components/pro-form/ValidationGuide';
 import ValidationGuideCollapsible from '@/components/pro-form/ValidationGuideCollapsible';
 import ReduxDataValidator from '@/components/pro-form/ReduxDataValidator';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
-import { getQuestionById, getParentQuestionByChildId, getAllQuestionIds, isChildQuestion } from '@/components/pro-form/questionUtils';
+import { getQuestionById, getParentQuestionByChildId, getAllQuestionIds, isChildQuestion, computeParentValidationStatus } from '@/components/pro-form/questionUtils';
 
 export default function ProQuestionnaire() {
   const dispatch = useDispatch();
@@ -169,6 +169,14 @@ export default function ProQuestionnaire() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Helper: dispatch only when status meaningfully changes
+  const setValidationStatusIfChanged = (qid, next, snapshot) => {
+    const prev = (snapshot ?? validationStatus)?.[qid] ?? '';
+    if (prev === next) return false;
+    dispatch(setValidationStatus({ questionId: qid, status: next }));
+    return true;
+  };
+
   // No more cookie saving - Redux persist handles everything automatically
 
   const updateResponse = useCallback((questionId, value) => {
@@ -231,60 +239,29 @@ export default function ProQuestionnaire() {
   };
 
   const updateValidationState = (questionId, status) => {
-    dispatch(setValidationStatus({ questionId, status }));
-
-    // Build new status object for calculations
-    const newStatus = { ...validationStatus, [questionId]: status };
+    // Child snapshot after applying this change
+    const newStatusSnapshot = { ...validationStatus, [questionId]: status };
+    setValidationStatusIfChanged(questionId, status, validationStatus);
 
     // Special handling for question 2.1
     if (questionId === '2.1') {
       const value2_2 = responses['2.2'];
       const q2Status = calculateQuestion2Status(status, value2_2);
-      dispatch(setValidationStatus({ questionId: '2', status: q2Status }));
+      setValidationStatusIfChanged('2', q2Status, validationStatus);
     }
 
-
-    // If this is a child question, update parent status using required-children only
-    const parentId = questionId.split('.')[0];
-    if (questionId.includes('.') && parentId && parentId !== '2') {
-      const parentAnswer = responses[parentId];
-      if (parentAnswer === 'no') {
-        dispatch(setValidationStatus({ questionId: parentId, status: 'complete' }));
-        return;
-      }
-
-      const question = getQuestionById(QUESTIONS, parentId);
-      if (question?.conditionalChildren && parentAnswer === 'yes') {
-        const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
-        if (requiredChildren.length > 0) {
-          let allComplete = true;
-          let anyNeedsWork = false;
-          let anyEmpty = false;
-
-          for (const child of requiredChildren) {
-            const childStatus = newStatus[child.id] || '';
-            if (childStatus === '') {
-              anyEmpty = true;
-              allComplete = false;
-              break;
-            }
-            if (childStatus === 'incomplete') {
-              allComplete = false;
-              break;
-            }
-            if (childStatus === 'needs_work') {
-              anyNeedsWork = true;
-            }
-          }
-
-          if (!anyEmpty) {
-            const parentStatus = !allComplete ? 'incomplete' : anyNeedsWork ? 'needs_work' : 'complete';
-            dispatch(setValidationStatus({ questionId: parentId, status: parentStatus }));
-          }
-        } else {
-          // No required children: parent can be complete when answered yes
-          dispatch(setValidationStatus({ questionId: parentId, status: 'complete' }));
-        }
+    // If this is a child question, deterministically update parent using schema
+    if (isChildQuestion(questionId)) {
+      const parentId = questionId.split('.')[0];
+      if (parentId && parentId !== '2') {
+        const parentQuestion = getQuestionById(QUESTIONS, parentId);
+        const parentAnswer = responses[parentId];
+        const childStatuses = {};
+        (parentQuestion?.conditionalChildren || [])
+          .filter(c => c.requiredIfParentYes)
+          .forEach(c => { childStatuses[c.id] = newStatusSnapshot[c.id] || ''; });
+        const parentNext = computeParentValidationStatus(parentQuestion, parentAnswer, childStatuses);
+        if (parentNext) setValidationStatusIfChanged(parentId, parentNext, validationStatus);
       }
     }
   };
@@ -296,42 +273,29 @@ export default function ProQuestionnaire() {
     let newStatus = 'incomplete';
 
     switch (question.type) {
-      case 'yes_no':
-        // If answer is 'no', always mark as complete immediately
+      case 'yes_no': {
+        // If answer is 'no' → parent complete and clear children statuses
         if (value === 'no') {
-          dispatch(setValidationStatus({ questionId, status: 'complete' }));
-          // Clear children validation statuses
+          setValidationStatusIfChanged(questionId, 'complete', validationStatus);
           if (question.conditionalChildren) {
             question.conditionalChildren.forEach(child => {
-              dispatch(setValidationStatus({ questionId: child.id, status: '' }));
+              if ((validationStatus[child.id] || '') !== '') {
+                dispatch(setValidationStatus({ questionId: child.id, status: '' }));
+              }
             });
           }
-          return; // Exit early
+          return;
         }
-
-        // If answer is 'yes', check required children only
         if (value === 'yes') {
-          newStatus = 'complete';
-          if (question.conditionalChildren) {
-            const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
-            if (requiredChildren.length > 0) {
-              // Parent status will be updated by required children completeness
-              newStatus = 'incomplete';
-
-              // Preserve prior behavior for Q23 if present but only when it is marked required (it is optional by default)
-              if (questionId === '23') {
-                const child23 = question.conditionalChildren.find(c => c.id === '23.1');
-                if (child23?.requiredIfParentYes) {
-                  const child23_1Status = validationStatus['23.1'] || '';
-                  if (child23_1Status && child23_1Status !== '') {
-                    newStatus = child23_1Status;
-                  }
-                }
-              }
-            }
-          }
+          const childStatuses = {};
+          (question.conditionalChildren || [])
+            .filter(c => c.requiredIfParentYes)
+            .forEach(c => { childStatuses[c.id] = validationStatus[c.id] || ''; });
+          const parentNext = computeParentValidationStatus(question, value, childStatuses);
+          setValidationStatusIfChanged(questionId, parentNext, validationStatus);
         }
         break;
+      }
 
       case 'checkbox': {
         const selections = Array.isArray(value) ? value : [];
@@ -404,7 +368,7 @@ export default function ProQuestionnaire() {
         return;
     }
 
-    dispatch(setValidationStatus({ questionId, status: newStatus }));
+    setValidationStatusIfChanged(questionId, newStatus, validationStatus);
   };
 
   const resetQuestion = (questionId) => {
