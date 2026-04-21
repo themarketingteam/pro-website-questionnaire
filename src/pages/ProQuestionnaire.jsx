@@ -722,40 +722,45 @@ export default function ProQuestionnaire() {
 
   const runFinalValidations = async () => {
     const questionsToValidate = getQuestionsNeedingValidation();
-    
+
     if (questionsToValidate.length === 0) {
       return true;
     }
-    
+
     setIsValidating(true);
     setValidatingQuestions(questionsToValidate);
-    
+
     try {
+      const failures = [];
       // Run all validations in parallel
       const validationPromises = questionsToValidate.map(async (qId) => {
-        const question = getQuestionById(QUESTIONS, qId);
-        
         try {
-          const questionKey = `question_${qId.replace('.', '_')}`;
+          const questionKey = `question_${qId.replace('.', '_')}`; // canonical mapping (e.g., 23.1 -> question_23_1)
           const result = await base44.functions.invoke('validateQuestionText', {
             text: responses[qId],
             questionContext: questionKey
           });
-          
+
           const status = result.data?.status || 'needs_work';
-          dispatch(setValidationStatus({ questionId: qId, status }));
-          
+          updateValidationState(qId, status);
           return { qId, status };
         } catch (error) {
-          console.error(`Validation error for Q${qId}:`, error);
-          dispatch(setValidationStatus({ questionId: qId, status: 'needs_work' }));
-          return { qId, status: 'needs_work' };
+          console.error(`❌ Submit-time validation error for Q${qId}:`, error);
+          failures.push(qId);
+          // Keep behavior consistent with live validator: set to neutral on backend error
+          dispatch(setValidationStatus({ questionId: qId, status: 'neutral' }));
+          return { qId, status: 'neutral' };
         }
       });
-      
+
       await Promise.all(validationPromises);
       setIsValidating(false);
       setValidatingQuestions([]);
+
+      if (failures.length > 0) {
+        toast.error(`Some answers couldn't be validated right now (${failures.length}). Your text is saved; you can retry validation.`);
+      }
+
       return true;
     } catch (error) {
       console.error('Final validation error:', error);
@@ -1042,7 +1047,7 @@ export default function ProQuestionnaire() {
             )}
             <TextareaQuestion 
               {...commonProps} 
-              questionContext={`Question ${question.id}: ${question.title}`}
+              questionContext={`question_${String(question.id).replace('.', '_')}`}
               questionId={question.id}
               debounceMs={250}
               onValidationChange={(status) => updateValidationState(question.id, status)}
