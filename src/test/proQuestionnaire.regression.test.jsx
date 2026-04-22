@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen } from '@testing-library/react';
+
 import userEvent from '@testing-library/user-event';
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
 import { renderWithStore } from './utils/renderWithStore';
@@ -27,7 +28,10 @@ vi.mock('@/api/base44Client', () => {
   };
 });
 
-const { base44 } = await import('@/api/base44Client');
+let base44;
+beforeAll(async () => {
+  ({ base44 } = await import('@/api/base44Client'));
+});
 
 function getQ(id) {
   return QUESTIONS.find(q => q.id === id);
@@ -116,7 +120,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     expect(state.form.validationStatus['23']).not.toBe('incomplete');
   });
 
-  it('Backend failure surfaces cleanly and sets textarea status neutral (not needs_work)', async () => {
+  it('Backend failure surfaces cleanly and sets textarea status to incomplete for submit-time validation', async () => {
     const user = userEvent.setup();
 
     const invoke = base44.functions.invoke;
@@ -138,6 +142,6 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     await user.click(submit);
 
     const status = store.getState().form.validationStatus['23.1'];
-    expect(status).toBe('neutral');
+    expect(status).toBe('incomplete');
   });
 });

@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, within } from '@testing-library/react';
+
 import userEvent from '@testing-library/user-event';
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
 import { renderWithStore } from './utils/renderWithStore';
@@ -8,23 +9,23 @@ import { QUESTIONS } from '@/components/pro-form/questionData';
 
 // Mock base44 SDK
 vi.mock('@/api/base44Client', () => {
-  return {
-    base44: {
-      functions: {
-        invoke: vi.fn().mockResolvedValue({ status: 200, data: { status: 'needs_work', message: 'ok', characterCount: 5 } }),
-      },
-      entities: {
-        ProFormSubmission: { create: vi.fn().mockResolvedValue({ id: 'x' }) }
-      },
-      auth: {
-        isAuthenticated: vi.fn().mockResolvedValue(true),
-        me: vi.fn().mockResolvedValue({ email: 'test@example.com' }),
-      },
-      analytics: { track: vi.fn() },
-      connectors: { connectAppUser: vi.fn(), disconnectAppUser: vi.fn() },
-      users: { inviteUser: vi.fn() }
+return {
+  base44: {
+    functions: {
+      invoke: vi.fn().mockResolvedValue({ status: 200, data: { status: 'needs_work', message: 'ok', characterCount: 5 } }),
     },
-  };
+    entities: {
+      ProFormSubmission: { create: vi.fn().mockResolvedValue({ id: 'x' }) }
+    },
+    auth: {
+      isAuthenticated: vi.fn().mockResolvedValue(true),
+      me: vi.fn().mockResolvedValue({ email: 'test@example.com' }),
+    },
+    analytics: { track: vi.fn() },
+    connectors: { connectAppUser: vi.fn(), disconnectAppUser: vi.fn() },
+    users: { inviteUser: vi.fn() }
+  },
+};
 });
 
 function getQ(id) {
