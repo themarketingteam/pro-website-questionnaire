@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 
-export function useTextValidation(value, questionId, debounceMs = 3000, isManualValidating = false, setIsManualValidating = null, initialStatus = 'neutral') {
+export function useTextValidation(value, questionId, debounceMs = 3000, isManualValidating = false, setIsManualValidating = null, initialStatus = 'neutral', externalStatus = null) {
   const [validationState, setValidationState] = useState({
     status: initialStatus, // 'green', 'yellow', 'red', 'neutral'
     message: '',
@@ -9,6 +9,16 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
     expectedRange: null
   });
   
+  // Sync from Redux status changes (e.g., submit-time results, resets)
+  useEffect(() => {
+    if (!externalStatus) return;
+    const mapIn = { complete: 'green', needs_work: 'yellow', incomplete: 'red', neutral: 'neutral', '': 'neutral' };
+    setValidationState(prev => ({
+      ...prev,
+      status: mapIn[externalStatus] || 'neutral'
+    }));
+  }, [externalStatus]);
+
   // Manual validation trigger - ONLY validation method now
   useEffect(() => {
     if (isManualValidating && value && value.trim().length > 0) {

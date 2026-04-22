@@ -26,7 +26,7 @@ export default function TextareaQuestion({
   };
   const initialStatus = statusMap[currentValidationStatus] || 'neutral';
   
-  const validation = useTextValidation(value, questionId, debounceMs, isManualValidating, setIsManualValidating, initialStatus);
+  const validation = useTextValidation(value, questionId, debounceMs, isManualValidating, setIsManualValidating, initialStatus, currentValidationStatus);
 
   const handleManualValidate = () => {
     if (!value || value.trim().length === 0) return;
@@ -45,13 +45,17 @@ export default function TextareaQuestion({
     if (!onValidationChangeRef.current) return;
     const map = { green: 'complete', yellow: 'needs_work', red: 'incomplete', neutral: 'neutral' };
     const external = map[validation.status] || 'neutral';
-    // Keep untouched/empty textareas neutral; do not dispatch
+    // For textarea edits post-validation: propagate 'incomplete' when content changed to ensure Redux invalidates parent
+    if (external === 'neutral' && (value && value.trim().length > 0)) {
+      // do not send neutral; the container will mark dirty on change and clear prior validation
+      return;
+    }
     if (external === 'neutral') return;
     if (lastSentRef.current !== external) {
       onValidationChangeRef.current(external);
       lastSentRef.current = external;
     }
-  }, [validation.status]);
+  }, [validation.status, value]);
 
   const getStatusIcon = () => {
     switch (validation.status) {
@@ -92,12 +96,17 @@ export default function TextareaQuestion({
     }
   };
 
-  // Dev-only render loop diagnostics
-  try {
-    import('@/lib/devDiagnostics').then(m => {
-      if (m.devDiagEnabled && m.devDiagEnabled()) m.trackTextareaRender(questionId);
-    });
-  } catch {}
+  // Dev-only diagnostics moved to effect to keep render pure
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const m = await import('@/lib/devDiagnostics');
+        if (mounted && m.devDiagEnabled && m.devDiagEnabled()) m.trackTextareaRender(questionId);
+      } catch {}
+    })();
+    return () => { mounted = false; };
+  }, [questionId]);
 
   return (
     <div className="space-y-3">

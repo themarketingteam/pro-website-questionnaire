@@ -9,7 +9,8 @@ import {
   setCredentials,
   resetForm,
   deleteResponse,
-  initializeExpandedQuestions
+  initializeExpandedQuestions,
+  setTextareaDirtyMeta
 } from '@/components/store/formSlice';
 import { base44 } from '@/api/base44Client';
 
@@ -48,6 +49,7 @@ export default function ProQuestionnaire() {
   const dispatch = useDispatch();
   const responses = useSelector((state) => state.form.responses);
   const validationStatus = useSelector((state) => state.form.validationStatus);
+  const textValidationMeta = useSelector((state) => state.form.textValidationMeta || {});
   const touchedQuestions = useSelector((state) => state.form.touchedQuestions);
   const expandedQuestions = useSelector((state) => state.form.expandedQuestions);
   const credentials = useSelector((state) => state.form.credentials);
@@ -187,6 +189,20 @@ export default function ProQuestionnaire() {
     // Persist the field change first
     dispatch(setResponse({ questionId, value }));
 
+    // Textarea dirtiness invalidation: if a textarea that had a validated status is edited, mark dirty and clear its redux validation
+    const q = getQuestionById(QUESTIONS, questionId);
+    if (q?.type === 'textarea') {
+      const prevStatus = validationStatus[questionId];
+      const prevValue = responses[questionId] || '';
+      const nextValue = value || '';
+      const becameDirty = prevStatus && (prevStatus === 'complete' || prevStatus === 'needs_work') && prevValue !== nextValue;
+      if (becameDirty) {
+        dispatch(setTextareaDirtyMeta({ questionId, isDirty: true }));
+        // Invalidate redux validation so submit-time must revalidate
+        dispatch(setValidationStatus({ questionId, status: '' }));
+      }
+    }
+
     // Prepare merged snapshot for validation logic
     const newResponses = { ...responses, [questionId]: value };
 
@@ -246,11 +262,21 @@ export default function ProQuestionnaire() {
       case 'yes_no': {
         // If answer is 'no' → parent complete and clear children statuses
         if (value === 'no') {
-          // Parent complete and clear ALL child statuses generically when hidden
+          // Parent complete and clear ALL child states generically when hidden
           setValidationStatusIfChanged(questionId, 'complete', validationStatus);
           (question.conditionalChildren || []).forEach(child => {
+            // Clear validation status, response, touched, expanded
             if ((validationStatus[child.id] || '') !== '') {
               dispatch(setValidationStatus({ questionId: child.id, status: '' }));
+            }
+            if (responses[child.id] !== undefined) {
+              dispatch(deleteResponse(child.id));
+            }
+            if (touchedQuestions[child.id]) {
+              dispatch(setTouchedQuestion({ questionId: child.id, touched: false }));
+            }
+            if (expandedQuestions[child.id]) {
+              dispatch(setExpandedQuestion({ questionId: child.id, expanded: false }));
             }
           });
           return;
@@ -656,7 +682,9 @@ export default function ProQuestionnaire() {
     QUESTIONS.forEach(q => {
       if (q.type === 'textarea' && responses[q.id]) {
         const status = validationStatus[q.id];
-        if (!status || status === '' || status === 'incomplete') {
+        const meta = textValidationMeta[q.id];
+        const isDirty = meta?.isDirty === true;
+        if (isDirty || !status || status === '' || status === 'incomplete' || status === 'neutral') {
           needsValidation.push(q.id);
         }
       }
@@ -666,7 +694,9 @@ export default function ProQuestionnaire() {
         q.conditionalChildren.forEach(child => {
           if (child.type === 'textarea' && responses[child.id]) {
             const status = validationStatus[child.id];
-            if (!status || status === '' || status === 'incomplete') {
+            const meta = textValidationMeta[child.id];
+            const isDirty = meta?.isDirty === true;
+            if (isDirty || !status || status === '' || status === 'incomplete' || status === 'neutral') {
               needsValidation.push(child.id);
             }
           }
@@ -698,15 +728,17 @@ export default function ProQuestionnaire() {
             questionContext: questionKey
           });
 
-          const status = result.data?.status || 'needs_work';
+          const status = result.data?.status || 'incomplete';
           updateValidationState(qId, status);
+          // Mark clean after successful validation
+          dispatch(setTextareaDirtyMeta({ questionId: qId, isDirty: false, lastValidatedValue: responses[qId] }));
           return { qId, status };
         } catch (error) {
           console.error(`❌ Submit-time validation error for Q${qId}:`, error);
           failures.push(qId);
-          // Keep behavior consistent with live validator: set to neutral on backend error
-          dispatch(setValidationStatus({ questionId: qId, status: 'neutral' }));
-          return { qId, status: 'neutral' };
+          // On backend error: treat as 'incomplete' for required-child computation; do not allow parent to pass from neutral
+          dispatch(setValidationStatus({ questionId: qId, status: 'incomplete' }));
+          return { qId, status: 'incomplete' };
         }
       });
 

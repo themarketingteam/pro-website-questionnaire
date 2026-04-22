@@ -5,7 +5,8 @@ const initialState = {
   validationStatus: {},
   touchedQuestions: {},
   expandedQuestions: {},
-  credentials: {}
+  credentials: {},
+  textValidationMeta: {} // { [questionId]: { lastValidatedValue: string, isDirty: boolean } }
 };
 
 const formSlice = createSlice({
@@ -15,6 +16,7 @@ const formSlice = createSlice({
     setResponse: (state, action) => {
       const { questionId, value } = action.payload;
       state.responses[questionId] = value;
+      // If this is a textarea question (identified elsewhere), callers will also set dirty meta.
     },
     setMultipleResponses: (state, action) => {
       state.responses = { ...state.responses, ...action.payload };
@@ -51,9 +53,20 @@ const formSlice = createSlice({
       delete state.responses[questionId];
       delete state.responses[`${questionId}_other`];
       delete state.responses[`${questionId}_primary`];
+      delete state.textValidationMeta[questionId];
+      delete state.validationStatus[questionId];
+      delete state.touchedQuestions[questionId];
+      delete state.expandedQuestions[questionId];
     },
     initializeExpandedQuestions: (state, action) => {
       state.expandedQuestions = action.payload;
+    },
+    setTextareaDirtyMeta: (state, action) => {
+      const { questionId, lastValidatedValue, isDirty } = action.payload;
+      state.textValidationMeta[questionId] = {
+        lastValidatedValue: lastValidatedValue ?? state.textValidationMeta[questionId]?.lastValidatedValue ?? '',
+        isDirty: isDirty ?? state.textValidationMeta[questionId]?.isDirty ?? false,
+      };
     },
     loadInitialState: (state, action) => {
       return { ...state, ...action.payload };
@@ -73,6 +86,7 @@ export const {
   resetForm,
   deleteResponse,
   initializeExpandedQuestions,
+  setTextareaDirtyMeta,
   loadInitialState
 } = formSlice.actions;
 
