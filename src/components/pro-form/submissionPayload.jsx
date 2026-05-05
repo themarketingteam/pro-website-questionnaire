@@ -9,12 +9,16 @@ export const serializeError = (error) => ({
 const asTrimmedString = (value) =>
   typeof value === 'string' ? value.trim() : '';
 
-const asNumberOrNull = (value) => {
-  if (value == null || value === '') return null;
+const asCoordinateString = (value) => {
+  if (value == null || value === '') return '';
 
   const number = Number(value);
 
-  return Number.isFinite(number) ? number : null;
+  if (!Number.isFinite(number)) {
+    return '';
+  }
+
+  return String(number);
 };
 
 export const normalizeGeographicAreas = (locations = [], primaryIndex = 0) =>
@@ -33,8 +37,8 @@ export const normalizeGeographicAreas = (locations = [], primaryIndex = 0) =>
           label: asTrimmedString(
             isString ? location : location.label || location.name || ''
           ),
-          lat: isString ? null : asNumberOrNull(location.lat),
-          lon: isString ? null : asNumberOrNull(location.lon),
+          lat: isString ? '' : asCoordinateString(location.lat),
+          lon: isString ? '' : asCoordinateString(location.lon),
           place_id: isString ? '' : asTrimmedString(location.place_id),
           source: isString ? 'manual' : asTrimmedString(location.source) || 'google',
           primary: index === Number(primaryIndex || 0)
