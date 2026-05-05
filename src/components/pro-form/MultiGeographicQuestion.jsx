@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { MapPin, X, Info, Plus, Star } from "lucide-react";
+import { MapPin, X, Plus, Star } from "lucide-react";
 
+const PLACE_FIELDS = ["id", "displayName", "formattedAddress", "location", "addressComponents"];
 
 export default function MultiGeographicQuestion({
   selectedLocations = [],
@@ -12,8 +13,8 @@ export default function MultiGeographicQuestion({
   maxLocations = 5,
   externalDisabled = false
 }) {
-  const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
+  const autocompleteContainerRef = useRef(null);
   const selectedLocationsRef = useRef(selectedLocations);
   const retryCountRef = useRef(0);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
@@ -29,200 +30,136 @@ export default function MultiGeographicQuestion({
     selectedLocationsRef.current = selectedLocations;
   }, [selectedLocations]);
 
-  const loadGoogleMapsScript = (retryCount = 0) => {
+  const loadGooglePlaces = async (retryCount = 0) => {
     const maxRetries = 3;
-    const apiKey =
-      window.ENV?.GOOGLE_PLACES_API_KEY ||
-      import.meta.env.VITE_GOOGLE_PLACES_API_KEY ||
-      "AIzaSyDyQuexeP2lIif4UEYVe845bIYrytVp6O0";
 
-    if (!apiKey) {
-      setLoadError(true);
-      setErrorMessage('Location search is temporarily unavailable.');
+    try {
+      if (!window.google?.maps?.importLibrary) {
+        throw new Error("Google Maps loader unavailable");
+      }
+
+      await window.google.maps.importLibrary("places");
+      setIsScriptLoaded(true);
       setIsLoading(false);
-      return;
-    }
-
-    // Remove any existing failed scripts
-    const existingScripts = document.querySelectorAll('script[src*="maps.googleapis.com"]');
-    existingScripts.forEach(script => {
-      if (script.dataset.failed === 'true') {
-        script.remove();
-      }
-    });
-
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=initGooglePlaces`;
-    script.async = true;
-    script.defer = true;
-    
-    // Set timeout for loading
-    const timeout = setTimeout(() => {
-      if (!isScriptLoaded) {
-        script.dataset.failed = 'true';
-        if (retryCount < maxRetries) {
-          retryCountRef.current = retryCount + 1;
-          loadGoogleMapsScript(retryCount + 1);
-        } else {
-          setLoadError(true);
-          setErrorMessage("Connection timeout. Please check your internet connection.");
-          setIsLoading(false);
-        }
-      }
-    }, 10000); // 10 second timeout
-
-    window.initGooglePlaces = () => {
-      clearTimeout(timeout);
-      if (window.google && window.google.maps && window.google.maps.places) {
-        setIsScriptLoaded(true);
-        setIsLoading(false);
-        setLoadError(false);
-        retryCountRef.current = 0;
-      } else {
-        if (retryCount < maxRetries) {
-          retryCountRef.current = retryCount + 1;
-          loadGoogleMapsScript(retryCount + 1);
-        } else {
-          setLoadError(true);
-          setErrorMessage("Failed to initialize Google Places");
-          setIsLoading(false);
-        }
-      }
-    };
-
-    script.onerror = () => {
-      clearTimeout(timeout);
-      script.dataset.failed = 'true';
+      setLoadError(false);
+      retryCountRef.current = 0;
+    } catch (error) {
       if (retryCount < maxRetries) {
         retryCountRef.current = retryCount + 1;
-        setTimeout(() => loadGoogleMapsScript(retryCount + 1), 1000 * (retryCount + 1));
-      } else {
-        setLoadError(true);
-        setErrorMessage("Location search blocked. This may be due to an ad blocker or network restriction.");
-        setIsLoading(false);
+        setTimeout(() => loadGooglePlaces(retryCount + 1), 1000 * (retryCount + 1));
+        return;
       }
-    };
 
-    document.head.appendChild(script);
+      setLoadError(true);
+      setErrorMessage(
+        error?.message?.includes("loader")
+          ? "Location search is temporarily unavailable."
+          : "Location search blocked. This may be due to an ad blocker or network restriction."
+      );
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
-    if (window.google && window.google.maps && window.google.maps.places) {
-      setIsScriptLoaded(true);
-      setIsLoading(false);
-      return;
-    }
-
-    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
-    if (existingScript && !existingScript.dataset.failed) {
-      const checkExisting = () => {
-        if (window.google && window.google.maps && window.google.maps.places) {
-          setIsScriptLoaded(true);
-          setIsLoading(false);
-        } else {
-          setTimeout(checkExisting, 500);
-        }
-      };
-      checkExisting();
-      return;
-    }
-
-    loadGoogleMapsScript(0);
+    loadGooglePlaces(0);
   }, []);
 
   useEffect(() => {
-    if (!isScriptLoaded || !inputRef.current || loadError) return;
+    if (!isScriptLoaded || !autocompleteContainerRef.current || loadError) return;
 
-    // Clean up existing autocomplete instance
-    if (autocompleteRef.current) {
-      window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
-      autocompleteRef.current = null;
-    }
+    let placeAutocomplete = autocompleteRef.current;
 
-    try {
-      const autocomplete = new window.google.maps.places.Autocomplete(inputRef.current, {
-        types: ["(regions)"],
-        fields: ["place_id", "formatted_address", "geometry", "name", "address_components"]
-      });
+    const buildMetaFromPlace = async (place) => {
+      if (!place) return null;
 
-      autocomplete.addListener("place_changed", () => {
-        const place = autocomplete.getPlace();
+      if (typeof place.fetchFields === "function") {
+        await place.fetchFields({ fields: PLACE_FIELDS });
+      }
 
-        if (!place.geometry) {
-          return;
+      if (!place.location) {
+        return null;
+      }
+
+      const addressComponents = place.addressComponents || [];
+      const isContinent =
+        addressComponents.length === 1 &&
+        addressComponents[0].types?.includes("continent");
+
+      if (isContinent) {
+        alert("Please select a more specific location such as a city, county, or region. Continents are not allowed.");
+        return null;
+      }
+
+      const locationName = place.formattedAddress || place.displayName || "";
+      const isState = US_STATES.some((state) => locationName.includes(state) && !locationName.includes(","));
+      const isCounty = locationName.toLowerCase().includes("county");
+      const isCity = !isState && !isCounty && addressComponents.some((component) =>
+        component.types?.includes("locality") ||
+        component.types?.includes("sublocality") ||
+        component.types?.includes("postal_town")
+      );
+
+      return {
+        name: locationName,
+        label: locationName,
+        lat: place.location.lat(),
+        lon: place.location.lng(),
+        place_id: place.id,
+        source: "google",
+        originalName: locationName,
+        originalLabel: locationName,
+        isGreaterArea: false,
+        isCity
+      };
+    };
+
+    const mountAutocomplete = async () => {
+      try {
+        if (!placeAutocomplete) {
+          placeAutocomplete = new google.maps.places.PlaceAutocompleteElement({
+            includedPrimaryTypes: ["locality", "administrative_area_level_1", "administrative_area_level_2", "postal_town", "sublocality"]
+          });
+          placeAutocompleteRefCleanup();
+          autocompleteContainerRef.current.innerHTML = "";
+          autocompleteContainerRef.current.appendChild(placeAutocomplete);
+          autocompleteRef.current = placeAutocomplete;
         }
 
-        const addressComponents = place.address_components || [];
-        const isContinent = addressComponents.length === 1 && 
-                           addressComponents[0].types.includes('continent');
-        
-        if (isContinent) {
-          alert("Please select a more specific location such as a city, county, or region. Continents are not allowed.");
-          setCurrentInput("");
-          return;
-        }
+        const handlePlaceSelect = async ({ placePrediction }) => {
+          const place = placePrediction?.toPlace ? placePrediction.toPlace() : null;
+          const meta = await buildMetaFromPlace(place);
 
-        // US States list
-        const usStates = [
-          'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 
-          'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 
-          'Kansas', 'Kentucky', 'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 
-          'Minnesota', 'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 
-          'New Jersey', 'New Mexico', 'New York', 'North Carolina', 'North Dakota', 'Ohio', 
-          'Oklahoma', 'Oregon', 'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota', 
-          'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington', 'West Virginia', 
-          'Wisconsin', 'Wyoming'
-        ];
+          if (!meta) return;
 
-        const locationName = place.formatted_address || place.name || '';
-        
-        // Check if it's a state or county
-        const isState = usStates.some(state => locationName.includes(state) && !locationName.includes(','));
-        const isCounty = locationName.toLowerCase().includes('county');
-        
-        // Determine if this is a city/town/municipality (and not a state or county)
-        const isCity = !isState && !isCounty && addressComponents.some(component => 
-          component.types.includes('locality') || 
-          component.types.includes('sublocality') ||
-          component.types.includes('postal_town')
-        );
+          if (selectedLocationsRef.current.some((loc) => loc.place_id === meta.place_id)) {
+            alert("This location has already been added.");
+            return;
+          }
 
-        const meta = {
-          name: place.formatted_address || place.name,
-          label: place.formatted_address || place.name,
-          lat: place.geometry.location.lat(),
-          lon: place.geometry.location.lng(),
-          place_id: place.place_id,
-          source: "google",
-          originalName: place.formatted_address || place.name,
-          originalLabel: place.formatted_address || place.name,
-          isGreaterArea: false,
-          isCity: isCity
+          onAdd(meta);
         };
 
-        // Check if already added using ref to avoid stale closure
-        if (selectedLocationsRef.current.some(loc => loc.place_id === meta.place_id)) {
-          alert("This location has already been added.");
-          setCurrentInput("");
-          return;
-        }
-
-        onAdd(meta);
-        setCurrentInput("");
-      });
-
-      autocompleteRef.current = autocomplete;
-    } catch {
-      setLoadError(true);
-    }
-
-    // Cleanup on unmount or when dependencies change
-    return () => {
-      if (autocompleteRef.current) {
-        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+        placeAutocomplete.addEventListener("gmp-select", handlePlaceSelect);
+        placeAutocompleteRefCleanup.current = () => {
+          placeAutocomplete?.removeEventListener("gmp-select", handlePlaceSelect);
+        };
+      } catch {
+        setLoadError(true);
+        setErrorMessage("Failed to initialize Google Places");
       }
     };
-  }, [isScriptLoaded, loadError, selectedLocations.length]);
+
+    const placeAutocompleteRefCleanup = placeAutocompleteRefCleanup || { current: null };
+    mountAutocomplete();
+
+    return () => {
+      if (placeAutocompleteRefCleanup.current) {
+        placeAutocompleteRefCleanup.current();
+      }
+    };
+  }, [isScriptLoaded, loadError, onAdd]);
+
+  const autocompleteCleanupRef = useRef(null);
 
   const canAddMore = selectedLocations.length < maxLocations;
 
@@ -261,7 +198,7 @@ export default function MultiGeographicQuestion({
     setIsLoading(true);
     setErrorMessage("");
     retryCountRef.current = 0;
-    loadGoogleMapsScript(0);
+    loadGooglePlaces(0);
   };
 
   // Move US states list to top level to avoid recreation
@@ -279,35 +216,26 @@ export default function MultiGeographicQuestion({
   return (
     <div className="space-y-4">
       <style>{`
-        .pac-container {
-          z-index: 9999 !important;
-          border-radius: 12px !important;
-          margin-top: 4px !important;
-          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
-          border: 1px solid #e2e8f0 !important;
-          font-family: inherit !important;
+        gmp-place-autocomplete {
+          width: 100%;
         }
-        .pac-item {
-          padding: 12px 16px !important;
-          cursor: pointer !important;
-          font-size: 14px !important;
-          border-top: 1px solid #f1f5f9 !important;
+
+        gmp-place-autocomplete::part(input) {
+          width: 100%;
+          padding: 1rem 3rem 1rem 1rem;
+          border: 1px solid #cbd5e1;
+          border-radius: 0.75rem;
+          font-size: 1rem;
+          line-height: 1.5rem;
+          color: #0f172a;
+          background: white;
+          box-sizing: border-box;
         }
-        .pac-item:first-child {
-          border-top: none !important;
-        }
-        .pac-item:hover {
-          background-color: #f8fafc !important;
-        }
-        .pac-item-selected {
-          background-color: #eff6ff !important;
-        }
-        .pac-matched {
-          font-weight: 600 !important;
-          color: #2563eb !important;
-        }
-        .pac-icon {
-          margin-right: 12px !important;
+
+        gmp-place-autocomplete::part(input):focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35);
         }
       `}</style>
 
@@ -412,16 +340,12 @@ export default function MultiGeographicQuestion({
           {!loadError && isScriptLoaded && (
             <>
               <div className="relative">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  placeholder="e.g., Nashville, TN or Davidson County, TN"
-                  value={currentInput}
-                  onChange={(e) => setCurrentInput(e.target.value)}
-                  autoComplete="off"
-                  className="w-full p-4 pr-12 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                <div
+                  ref={autocompleteContainerRef}
+                  className="w-full"
+                  aria-label="Search for a city, county, or region"
                 />
-                <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none z-10" />
               </div>
 
               <div className="space-y-2">
