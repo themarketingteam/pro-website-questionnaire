@@ -59,6 +59,7 @@ import {
   getSafeAnswerMetadata
 } from '@/lib/clarity';
 import { getOrCreateQuestionnaireSessionId } from '@/lib/sessionId';
+import { buildDraftEventRecord } from '@/lib/draftEvents';
 
 const safeJsonStringify = (value) => {
   try {
@@ -98,6 +99,7 @@ export default function ProQuestionnaire() {
   const [hasTrackedStart, setHasTrackedStart] = useState(false);
   const trackedTypingQuestionsRef = useRef(new Set());
   const draftSaveTimeoutRef = useRef(null);
+  const draftTextEventTimeoutsRef = useRef({});
   const lastChangedQuestionIdRef = useRef('');
   const [questionnaireSessionId] = useState(() => getOrCreateQuestionnaireSessionId());
 
@@ -435,6 +437,74 @@ export default function ProQuestionnaire() {
     saveDraftSnapshot
   ]);
 
+  const createDraftEvent = useCallback(async ({
+    eventType,
+    questionId,
+    value
+  }) => {
+    try {
+      const question = questionId ? getQuestionById(QUESTIONS, questionId) : null;
+
+      const record = buildDraftEventRecord({
+        sessionId: questionnaireSessionId,
+        eventType,
+        questionId,
+        questionType: question?.type || 'unknown',
+        value,
+        businessName: businessNameParam || credentials.businessName || '',
+        domain: domainParam || credentials.domain || '',
+        userId: credentials.userId || ''
+      });
+
+      await base44.entities.ProFormDraftEvent.create(record);
+    } catch (error) {
+      console.error('Failed to create draft event:', {
+        message: error?.message || String(error)
+      });
+    }
+  }, [
+    questionnaireSessionId,
+    businessNameParam,
+    credentials.businessName,
+    credentials.domain,
+    credentials.userId,
+    domainParam
+  ]);
+
+  const queueDraftEvent = useCallback(({
+    eventType,
+    questionId,
+    value
+  }) => {
+    const question = getQuestionById(QUESTIONS, questionId);
+
+    const shouldDebounce =
+      question?.type === 'text' ||
+      question?.type === 'textarea';
+
+    if (shouldDebounce) {
+      if (draftTextEventTimeoutsRef.current[questionId]) {
+        clearTimeout(draftTextEventTimeoutsRef.current[questionId]);
+      }
+
+      draftTextEventTimeoutsRef.current[questionId] = setTimeout(() => {
+        createDraftEvent({
+          eventType: 'text_changed',
+          questionId,
+          value
+        });
+      }, 1000);
+
+      return;
+    }
+
+    createDraftEvent({
+      eventType,
+      questionId,
+      value
+    });
+  }, [createDraftEvent]);
+
   // Helper: dispatch only when status meaningfully changes
   const setValidationStatusIfChanged = (qid, next, snapshot) => {
     const prev = (snapshot ?? validationStatus)?.[qid] ?? '';
@@ -487,6 +557,25 @@ export default function ProQuestionnaire() {
     // Prepare merged snapshot for validation logic
     const newResponses = { ...responses, [questionId]: value };
     queueDraftSave(questionId, newResponses);
+    const eventQuestion = getQuestionById(QUESTIONS, questionId);
+    let eventType = 'answer_changed';
+
+    if (eventQuestion?.type === 'textarea' || eventQuestion?.type === 'text') {
+      eventType = 'text_changed';
+    } else if (eventQuestion?.type === 'radio' || eventQuestion?.type === 'checkbox' || eventQuestion?.type === 'yes_no') {
+      eventType = 'selection_changed';
+    } else if (questionId === '5' || eventQuestion?.type === 'multi_geographic') {
+      eventType = 'location_changed';
+    } else if (eventQuestion?.type === 'file_upload' || eventQuestion?.type === 'image_tagging') {
+      eventType = 'file_changed';
+    }
+
+    queueDraftEvent({
+      eventType,
+      questionId,
+      value
+    });
+
     const answerMetadata = getSafeAnswerMetadata(
       value,
       newResponses?.[`${questionId}_other`]
@@ -536,7 +625,8 @@ export default function ProQuestionnaire() {
     validationStatus,
     credentials.domain,
     domainParam,
-    queueDraftSave
+    queueDraftSave,
+    queueDraftEvent
   ]);
 
 
@@ -553,6 +643,14 @@ export default function ProQuestionnaire() {
         question_type: question?.type || 'unknown',
         validation_status: status,
         business_domain: credentials.domain || domainParam || 'unknown'
+      });
+
+      createDraftEvent({
+        eventType: 'validation_status_changed',
+        questionId,
+        value: {
+          validation_status: status
+        }
       });
 
       if (status === 'incomplete') {
@@ -738,6 +836,14 @@ export default function ProQuestionnaire() {
         question_id: questionId,
         question_type: q?.type || 'unknown',
         business_domain: credentials.domain || domainParam || 'unknown'
+      });
+
+      createDraftEvent({
+        eventType: 'question_opened',
+        questionId,
+        value: {
+          status: 'opened'
+        }
       });
       const isChild = isChildQuestion(questionId);
       const isOptionalChild = isChild && q?.requiredIfParentYes !== true;
@@ -1278,6 +1384,14 @@ export default function ProQuestionnaire() {
         business_domain: domain || credentials.domain || domainParam || 'unknown'
       });
 
+      createDraftEvent({
+        eventType: 'submit_attempted',
+        questionId: '',
+        value: {
+          status: 'submit_attempted'
+        }
+      });
+
       await saveDraftNow({
         status: 'submit_attempted'
       });
@@ -1289,6 +1403,15 @@ export default function ProQuestionnaire() {
       await saveDraftNow({
         status: 'submitted',
         finalSubmissionId: savedSubmission?.id || ''
+      });
+
+      createDraftEvent({
+        eventType: 'submitted',
+        questionId: '',
+        value: {
+          status: 'submitted',
+          final_submission_id: savedSubmission?.id || ''
+        }
       });
 
       try {
@@ -1321,6 +1444,15 @@ export default function ProQuestionnaire() {
       console.error('ProFormSubmission.create failed:', serialized);
 
       try {
+        createDraftEvent({
+          eventType: 'submit_failed',
+          questionId: '',
+          value: {
+            status: 'submit_failed',
+            error_message: error?.message || 'unknown'
+          }
+        });
+
         await saveDraftNow({
           status: 'submit_failed',
           submitError: JSON.stringify(serialized)
