@@ -100,6 +100,8 @@ export default function ProQuestionnaire() {
   const trackedTypingQuestionsRef = useRef(new Set());
   const draftSaveTimeoutRef = useRef(null);
   const draftTextEventTimeoutsRef = useRef({});
+  const draftRecordIdRef = useRef('');
+  const hasFinalSubmittedRef = useRef(false);
   const lastChangedQuestionIdRef = useRef('');
   const [questionnaireSessionId] = useState(() => getOrCreateQuestionnaireSessionId());
 
@@ -282,12 +284,23 @@ export default function ProQuestionnaire() {
   }, []);
 
   const findExistingDraftBySessionId = useCallback(async (sessionId) => {
+    if (draftRecordIdRef.current) {
+      return { id: draftRecordIdRef.current };
+    }
+
     const existingDrafts = await base44.entities.ProFormDraft.filter({
       session_id: sessionId
     });
 
     if (Array.isArray(existingDrafts) && existingDrafts.length > 0) {
-      return existingDrafts[0];
+      const sorted = [...existingDrafts].sort((a, b) => {
+        const aTime = new Date(a.last_saved_at || a.created_date || 0).getTime();
+        const bTime = new Date(b.last_saved_at || b.created_date || 0).getTime();
+        return bTime - aTime;
+      });
+
+      draftRecordIdRef.current = sorted[0].id;
+      return sorted[0];
     }
 
     return null;
@@ -305,7 +318,9 @@ export default function ProQuestionnaire() {
     currentQuestionId,
     lastChangedQuestionId,
     status = 'draft',
-    saveError = ''
+    saveError = '',
+    submitError = '',
+    finalSubmissionId = ''
   }) => {
     const safeCreds = sanitizeCredentialsForDraft(credentials);
     const now = new Date().toISOString();
@@ -331,6 +346,10 @@ export default function ProQuestionnaire() {
         pageUrl: window.location.href
       }),
       save_error: saveError,
+      submit_error: submitError,
+      final_submission_id: finalSubmissionId,
+      submit_attempted_at: status === 'submit_attempted' || status === 'submit_failed' ? now : '',
+      submitted_at: status === 'submitted' ? now : '',
       last_changed_at: now,
       last_saved_at: now
     };
