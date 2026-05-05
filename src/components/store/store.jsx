@@ -14,7 +14,7 @@ const persistConfig = {
   key: 'pro-questionnaire-root',
   version: 3,
   storage,
-  whitelist: ['responses', 'validationStatus', 'touchedQuestions', 'expandedQuestions', 'credentials'],
+  whitelist: ['responses', 'validationStatus', 'touchedQuestions', 'expandedQuestions', 'textValidationMeta'],
   migrate: createMigrate(migrations, { debug: false }),
   // Ensure nested objects are properly serialized
   serialize: true,

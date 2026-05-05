@@ -17,12 +17,24 @@ Deno.serve(async (req) => {
     console.log('📡 Received payload to forward to Zapier');
     console.log('📦 Payload size:', JSON.stringify(payload).length, 'bytes');
 
-    // Get Zapier webhook URL
-    const hookID = '23529934';
-    const hookKey = 'uas7p60';
-    const webhookUrl = `https://hooks.zapier.com/hooks/catch/${hookID}/${hookKey}/`;
-    
-    console.log('📡 Forwarding to Zapier webhook:', webhookUrl);
+    const webhookUrl = Deno.env.get('ZAPIER_WEBHOOK_URL');
+
+    if (!webhookUrl) {
+      console.error('Zapier webhook is not configured');
+
+      return Response.json(
+        {
+          success: false,
+          error: 'Zapier webhook is not configured'
+        },
+        {
+          status: 500,
+          headers: corsHeaders
+        }
+      );
+    }
+
+    console.log('Forwarding payload to configured Zapier webhook');
 
     // Forward the request to Zapier
     const zapierResponse = await fetch(webhookUrl, {
@@ -61,14 +73,11 @@ Deno.serve(async (req) => {
     }, { headers: corsHeaders });
 
   } catch (error) {
-    console.error('❌ Error in sendToZapier function:', error);
-    console.error('❌ Error message:', error.message);
-    console.error('❌ Error stack:', error.stack);
+    console.error('❌ Error in sendToZapier function:', error.message);
     
     return Response.json({
       success: false,
       error: error.message,
-      stack: error.stack,
     }, { 
       status: 500,
       headers: corsHeaders 

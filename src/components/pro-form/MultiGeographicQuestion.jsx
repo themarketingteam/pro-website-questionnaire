@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { MapPin, X, Info, Plus, Star } from "lucide-react";
 
-const TEMP_API_KEY = "AIzaSyDyQuexeP2lIif4UEYVe845bIYrytVp6O0";
 
 export default function MultiGeographicQuestion({
   selectedLocations = [],
@@ -32,11 +31,13 @@ export default function MultiGeographicQuestion({
 
   const loadGoogleMapsScript = (retryCount = 0) => {
     const maxRetries = 3;
-    const apiKey = TEMP_API_KEY || window.ENV?.GOOGLE_PLACES_API_KEY || import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
-    
+    const apiKey =
+      window.ENV?.GOOGLE_PLACES_API_KEY ||
+      import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
+
     if (!apiKey) {
       setLoadError(true);
-      setErrorMessage("API key not configured");
+      setErrorMessage('Location search is temporarily unavailable.');
       setIsLoading(false);
       return;
     }
@@ -59,7 +60,6 @@ export default function MultiGeographicQuestion({
       if (!isScriptLoaded) {
         script.dataset.failed = 'true';
         if (retryCount < maxRetries) {
-          console.log(`Google Maps timeout, retrying... (${retryCount + 1}/${maxRetries})`);
           retryCountRef.current = retryCount + 1;
           loadGoogleMapsScript(retryCount + 1);
         } else {
@@ -93,7 +93,6 @@ export default function MultiGeographicQuestion({
       clearTimeout(timeout);
       script.dataset.failed = 'true';
       if (retryCount < maxRetries) {
-        console.log(`Google Maps load error, retrying... (${retryCount + 1}/${maxRetries})`);
         retryCountRef.current = retryCount + 1;
         setTimeout(() => loadGoogleMapsScript(retryCount + 1), 1000 * (retryCount + 1));
       } else {

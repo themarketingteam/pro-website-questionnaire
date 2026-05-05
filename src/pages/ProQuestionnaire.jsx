@@ -99,14 +99,18 @@ export default function ProQuestionnaire() {
     domain: domainParam,
     userId: urlParams.get('userId') || '',
     userEmail: urlParams.get('userEmail') || '',
-    userName: urlParams.get('userName') || '',
-    accessToken: urlParams.get('accessToken') || ''
+    userName: urlParams.get('userName') || ''
     };
 
     // Only store if at least one credential field is present
     if (Object.values(creds).some(val => val)) {
     dispatch(setCredentials(creds));
-    console.log('✅ Credentials stored in Redux');
+    console.log('Credentials initialized for questionnaire', {
+      hasBusinessName: Boolean(creds.businessName),
+      hasDomain: Boolean(creds.domain),
+      hasUserId: Boolean(creds.userId),
+      hasUserEmail: Boolean(creds.userEmail)
+    });
     }
   }, [businessNameParam, domainParam, dispatch]);
 
