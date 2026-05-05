@@ -137,10 +137,16 @@ export default function MultiGeographicQuestion({
           if (!meta) return;
           if (selectedLocationsRef.current.some((loc) => loc.place_id === meta.place_id)) {
             alert("This location has already been added.");
+            if (placeAutocomplete) {
+              placeAutocomplete.value = "";
+            }
             return;
           }
 
           onAdd(meta);
+          if (placeAutocomplete) {
+            placeAutocomplete.value = "";
+          }
         };
 
         placeAutocomplete.addEventListener("gmp-select", handlePlaceSelect);

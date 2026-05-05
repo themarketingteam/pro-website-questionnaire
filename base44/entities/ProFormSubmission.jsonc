@@ -348,6 +348,7 @@
     "userdata"
   ],
   "rls": {
+    "create": {},
     "read": {
       "$or": [
         {
@@ -384,17 +385,6 @@
         }
       ]
     },
-    "write": {
-      "$or": [
-        {
-          "created_by": "{{user.email}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    }
+    "write": {}
   }
 }
