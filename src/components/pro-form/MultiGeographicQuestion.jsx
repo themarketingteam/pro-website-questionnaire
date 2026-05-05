@@ -236,10 +236,17 @@ export default function MultiGeographicQuestion({
         gmp-place-autocomplete:focus,
         gmp-place-autocomplete:focus-visible,
         gmp-place-autocomplete:focus-within,
-        gmp-place-autocomplete:active {
+        gmp-place-autocomplete:active,
+        gmp-place-autocomplete[focused],
+        gmp-place-autocomplete:has(input:focus),
+        gmp-place-autocomplete:has(input:focus-visible) {
           outline: none !important;
           box-shadow: none !important;
           border: none !important;
+          --gmpx-color-surface: transparent !important;
+          --gmpx-color-outline: transparent !important;
+          --gmpx-color-primary: transparent !important;
+          --gmpx-font-color: #0f172a !important;
         }
 
         gmp-place-autocomplete::part(input) {
