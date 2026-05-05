@@ -267,6 +267,10 @@ export default function MultiGeographicQuestion({
           box-shadow: none !important;
         }
 
+        .google-places-shell,
+        .google-places-shell:focus,
+        .google-places-shell:focus-within,
+        .google-places-shell:focus-visible,
         .google-places-input-wrapper,
         .google-places-input-wrapper:focus,
         .google-places-input-wrapper:focus-within,
@@ -277,13 +281,7 @@ export default function MultiGeographicQuestion({
         .google-places-input-wrapper *:focus-visible {
           outline: none !important;
           box-shadow: none !important;
-        }
-
-        .google-places-input-wrapper,
-        .google-places-input-wrapper:focus-within {
           border: none !important;
-          box-shadow: none !important;
-          outline: none !important;
         }
       `}</style>
 
@@ -387,12 +385,14 @@ export default function MultiGeographicQuestion({
 
           {!loadError && isScriptLoaded && (
             <>
-              <div
-                ref={autocompleteContainerRef}
-                className="google-places-input-wrapper w-full bg-transparent border-0 outline-none ring-0 shadow-none"
-                style={{ border: 'none', outline: 'none', boxShadow: 'none' }}
-                aria-label="Search for a city, county, or region"
-              />
+              <div className="google-places-shell w-full border-0 outline-none ring-0 shadow-none bg-transparent">
+                <div
+                  ref={autocompleteContainerRef}
+                  className="google-places-input-wrapper w-full bg-transparent border-0 outline-none ring-0 shadow-none"
+                  style={{ border: 'none', outline: 'none', boxShadow: 'none' }}
+                  aria-label="Search for a city, county, or region"
+                />
+              </div>
 
               <div className="space-y-2">
                 <div className="text-sm text-slate-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
