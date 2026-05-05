@@ -168,6 +168,34 @@ Do not use needs_work for answers over 100 characters unless the answer is uncle
 
 Only return incomplete when the answer is clearly unusable.
 
+-->> UNFINISHED OR TRAILING SENTENCE RULE <<--
+
+If the answer appears to have been accidentally cut off, dropped, or left as an unfinished sentence, return needs_work.
+
+Use this exact user_message:
+Please complete the sentence so we have the full answer.
+
+This applies across all questions.
+
+Examples that should return needs_work:
+-> Our ideal clients are professional service organizations with approximately 25–100 employees that rely heavily on
+-> We help small businesses with
+-> Clients choose us because
+-> Our process starts with
+-> Please avoid imagery that
+-> Our services are designed to
+
+Do not apply this rule to intentional fragments, CTA labels, bullet points, service names, industry names, or short list-style answers such as:
+-> Schedule A Call
+-> Managed IT Services
+-> Cybersecurity
+-> Restaurants
+-> No restaurants
+-> Real team photos
+-> Avoid stock photos
+
+Those may be evaluated under the normal relevance and thin-answer rules, but they should not receive the incomplete-sentence message unless they actually appear cut off.
+
 Use incomplete only for:
 
 -> Empty answers
@@ -1036,43 +1064,56 @@ Follow this exact order.
 
 Step 1:
 
-If the answer is below the hard minimum, return incomplete.
+Sanitize the answer.
 
 Step 2:
 
-If the answer is above the hard maximum, return incomplete.
+Calculate the sanitized character count.
 
 Step 3:
 
-If the answer is empty, gibberish, placeholder-only, completely unrelated, only repeats the question, or is almost entirely repeated filler, return incomplete.
+If the answer is below the hard minimum, return incomplete.
 
 Step 4:
 
-If the answer makes a reasonable attempt to answer the question and is within the hard character range, return complete.
+If the answer is above the hard maximum, return incomplete.
 
 Step 5:
 
-If the answer includes at least one usable detail for the specific question, return complete.
+If the answer is empty, gibberish, placeholder-only, completely unrelated, only repeats the question, or is almost entirely repeated filler, return incomplete.
 
 Step 6:
 
-If the answer includes multiple relevant details, return complete.
+If the answer appears to have been accidentally cut off, dropped, or left as an unfinished sentence, return needs_work with this exact user_message:
+Please complete the sentence so we have the full answer.
 
 Step 7:
 
-If the answer is similar to the provided example answer, return complete.
+If the answer makes a reasonable attempt to answer the question and is within the hard character range, return complete.
 
 Step 8:
 
-If the answer is long, detailed, and relevant, return complete.
+If the answer includes at least one usable detail for the specific question, return complete.
 
 Step 9:
 
-If the answer has minor grammar issues, casual wording, repeated business terms, imperfect phrasing, or could benefit from more proof points, return complete.
+If the answer includes multiple relevant details, return complete.
 
 Step 10:
 
-Only return needs_work if the answer is valid but extremely thin, usually near the low end of the character range.
+If the answer is similar to the provided example answer, return complete.
+
+Step 11:
+
+If the answer is long, detailed, and relevant, return complete.
+
+Step 12:
+
+If the answer has minor grammar issues, casual wording, repeated business terms, imperfect phrasing, or could benefit from more proof points, return complete.
+
+Step 13:
+
+Only return needs_work for other cases when the answer is valid but extremely thin, usually near the low end of the character range.
 
 -->> INCORRECT BEHAVIOR TO AVOID <<--
 
@@ -1110,6 +1151,79 @@ const sanitizeAnswer = (value) => String(value || '')
   .trim()
   .replace(/ {5,}/g, ' ')
   .replace(/([!?.,;:])\1{4,}/g, '$1');
+
+const TRAILING_SENTENCE_MESSAGE = 'Please complete the sentence so we have the full answer.';
+
+const TRAILING_WORDS = [
+  'a', 'an', 'the', 'and', 'or', 'but', 'so', 'because', 'since', 'although', 'though', 'while',
+  'when', 'where', 'which', 'that', 'who', 'whose', 'what', 'how', 'why', 'with', 'without',
+  'for', 'to', 'from', 'by', 'at', 'in', 'on', 'into', 'onto', 'about', 'around', 'through',
+  'throughout', 'across', 'including', 'like', 'such', 'as', 'than', 'rather', 'instead', 'via', 'per'
+];
+
+const TRAILING_PHRASES = [
+  'such as', 'as well as', 'along with', 'based on', 'focused on', 'rely on', 'relies on',
+  'relying on', 'designed to', 'built to', 'able to', 'ability to', 'helps them', 'helps clients',
+  'provides them', 'allows them', 'gives them', 'makes it', 'ensures that', 'so they can',
+  'in order to', 'rather than', 'instead of', 'compared to', 'due to', 'known for', 'starts with',
+  'begins with', 'works with', 'working with', 'specialize in', 'specializes in', 'avoid working with',
+  'best suited for', 'come to us when', 'choose us because', 'value our ability to',
+  'prefer content that', 'prefer images that', 'avoid photos that', 'avoid imagery that',
+  'want content that', 'services are designed to', 'process includes', 'team is known for',
+  'main frustration is', 'sets us apart is'
+];
+
+const SUSPICIOUS_ENDING_PUNCTUATION = [',', ':', ';', '-', '–', '—', '/', '('];
+
+const getFinalNonEmptyLine = (text) => {
+  const lines = String(text || '').split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  return lines[lines.length - 1] || '';
+};
+
+const normalizeEndingForCheck = (text) => String(text || '')
+  .trim()
+  .replace(/[.!?]+$/g, '')
+  .trim()
+  .toLowerCase();
+
+const endsWithWholeWord = (text, word) => new RegExp(`\\b${word.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\b$`, 'i').test(text);
+const endsWithWholePhrase = (text, phrase) => new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}\\b$`, 'i').test(text);
+
+// Intentionally conservative: only flag endings that strongly suggest the user was cut off mid-thought.
+const appearsToEndMidSentence = (text) => {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return false;
+
+  const finalLine = getFinalNonEmptyLine(trimmed);
+  if (!finalLine) return false;
+
+  const wordCount = finalLine.split(/\s+/).filter(Boolean).length;
+  const normalizedEnding = normalizeEndingForCheck(finalLine);
+  if (!normalizedEnding) return false;
+
+  if (TRAILING_PHRASES.some((phrase) => endsWithWholePhrase(normalizedEnding, phrase))) {
+    return true;
+  }
+
+  if (wordCount < 5) {
+    return false;
+  }
+
+  const lastChar = finalLine.trim().slice(-1);
+  if (SUSPICIOUS_ENDING_PUNCTUATION.includes(lastChar)) {
+    return true;
+  }
+
+  if (/\.\.\.$/.test(finalLine) && wordCount >= 5) {
+    return true;
+  }
+
+  if (TRAILING_WORDS.some((word) => endsWithWholeWord(normalizedEnding, word))) {
+    return true;
+  }
+
+  return false;
+};
 
 const QUESTION_RANGES = {
   question_1_1: { min: 20, max: 3000 },
@@ -1159,6 +1273,16 @@ Deno.serve(async (req) => {
     }
 
     const characterCount = sanitizedText.length;
+
+    if (characterCount >= range.min && characterCount <= range.max && appearsToEndMidSentence(sanitizedText)) {
+      return Response.json({
+        status: 'needs_work',
+        message: TRAILING_SENTENCE_MESSAGE,
+        characterCount,
+        expectedRange: buildRangeMessage(characterCount, range)
+      });
+    }
+
     const openai = new OpenAI({ apiKey: Deno.env.get('OPENAI_KEY') });
 
     const prompt = `${VALIDATION_AGENT_INSTRUCTIONS}
