@@ -13,6 +13,40 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AdminSubmitIntake from './pages/AdminSubmitIntake';
 import ProFormDraftRecovery from './pages/ProFormDraftRecovery';
 
+const ADMIN_EMAILS = ['benjamin.hines8@gmail.com'];
+
+const isAdminUser = (user) => {
+  if (user?.role === 'admin') return true;
+  return Boolean(user?.email && ADMIN_EMAILS.includes(user.email.toLowerCase()));
+};
+
+const AdminOnly = ({ children }) => {
+  const { user, isLoadingAuth } = useAuth();
+
+  if (isLoadingAuth) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!isAdminUser(user)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6">
+        <div className="max-w-lg bg-white rounded-xl border shadow-sm p-6 text-center">
+          <h1 className="text-xl font-bold text-slate-900">Access denied</h1>
+          <p className="text-slate-600 mt-2">
+            You do not have permission to view questionnaire draft recovery data.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return children;
+};
+
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
 const MainPage = mainPageKey ? Pages[mainPageKey] : <></>;
@@ -70,9 +104,11 @@ const AuthenticatedApp = () => {
         </LayoutWrapper>
       } />
       <Route path="/admin/draft-recovery" element={
-        <LayoutWrapper currentPageName={"admin/draft-recovery"}>
-          <ProFormDraftRecovery />
-        </LayoutWrapper>
+        <AdminOnly>
+          <LayoutWrapper currentPageName={"admin/draft-recovery"}>
+            <ProFormDraftRecovery />
+          </LayoutWrapper>
+        </AdminOnly>
       } />
       <Route path="*" element={<PageNotFound />} />
     </Routes>

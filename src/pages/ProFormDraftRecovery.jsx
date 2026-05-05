@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Copy, ChevronDown, ChevronUp } from 'lucide-react';
+import { Copy, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const safeJsonParse = (value, fallback = {}) => {
@@ -38,10 +38,9 @@ const formatDate = (value) => {
   return date.toLocaleString();
 };
 
-function DraftRow({ draft, expanded, onToggle }) {
+function DraftRow({ draft, expanded, onToggle, hasDuplicateSession }) {
   const parsedResponses = safeJsonParse(draft.responses_json, {});
   const parsedValidation = safeJsonParse(draft.validation_status_json, {});
-  const parsedMetadata = safeJsonParse(draft.metadata_json, {});
 
   const copyResponses = async () => {
     await navigator.clipboard.writeText(JSON.stringify(parsedResponses, null, 2));
@@ -54,9 +53,11 @@ function DraftRow({ draft, expanded, onToggle }) {
       business_name: draft.business_name,
       domain: draft.domain,
       status: draft.status,
+      last_saved_at: draft.last_saved_at,
+      submitted_at: draft.submitted_at,
+      final_submission_id: draft.final_submission_id,
       responses: parsedResponses,
-      validation_status: parsedValidation,
-      metadata: parsedMetadata
+      validation_status: parsedValidation
     };
 
     await navigator.clipboard.writeText(JSON.stringify(recoveryBundle, null, 2));
@@ -80,10 +81,16 @@ function DraftRow({ draft, expanded, onToggle }) {
               <p className="text-sm text-slate-500">User Email</p>
               <p className="text-sm text-slate-900 break-all">{draft.user_email || '—'}</p>
             </div>
-            <div>
+            <div className="space-y-2">
               <Badge className={statusStyles[draft.status] || statusStyles.draft}>
                 {draft.status || 'draft'}
               </Badge>
+              {hasDuplicateSession && (
+                <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50 flex items-center gap-1 w-fit">
+                  <AlertTriangle className="w-3 h-3" />
+                  Duplicate session ID — latest record shown first
+                </Badge>
+              )}
             </div>
             <div>
               <p className="text-sm text-slate-500">Last Saved</p>
@@ -150,6 +157,7 @@ function DraftRow({ draft, expanded, onToggle }) {
 export default function ProFormDraftRecovery() {
   const [drafts, setDrafts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState('');
@@ -159,18 +167,28 @@ export default function ProFormDraftRecovery() {
 
     const loadDrafts = async () => {
       setLoading(true);
-      const data = await base44.entities.ProFormDraft.list();
+      setError('');
 
-      if (!mounted) return;
+      try {
+        const data = await base44.entities.ProFormDraft.list();
 
-      const sorted = [...(Array.isArray(data) ? data : [])].sort((a, b) => {
-        const aTime = new Date(a.last_saved_at || 0).getTime();
-        const bTime = new Date(b.last_saved_at || 0).getTime();
-        return bTime - aTime;
-      });
+        if (!mounted) return;
 
-      setDrafts(sorted);
-      setLoading(false);
+        const sorted = [...(Array.isArray(data) ? data : [])].sort((a, b) => {
+          const aTime = new Date(a.last_saved_at || a.created_date || 0).getTime();
+          const bTime = new Date(b.last_saved_at || b.created_date || 0).getTime();
+          return bTime - aTime;
+        });
+
+        setDrafts(sorted);
+      } catch (loadError) {
+        if (!mounted) return;
+        setError(loadError?.message || 'Failed to load drafts.');
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
     };
 
     loadDrafts();
@@ -178,6 +196,21 @@ export default function ProFormDraftRecovery() {
       mounted = false;
     };
   }, []);
+
+  const duplicateSessionIds = useMemo(() => {
+    const sessionCounts = drafts.reduce((acc, draft) => {
+      if (!draft.session_id) return acc;
+      acc[draft.session_id] = (acc[draft.session_id] || 0) + 1;
+      return acc;
+    }, {});
+
+    const duplicates = new Set();
+    Object.entries(sessionCounts).forEach(([sessionId, count]) => {
+      if (count > 1) duplicates.add(sessionId);
+    });
+
+    return duplicates;
+  }, [drafts]);
 
   const filteredDrafts = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -234,6 +267,12 @@ export default function ProFormDraftRecovery() {
         </Card>
 
         <div className="space-y-4">
+          {error && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-6 text-red-700">{error}</CardContent>
+            </Card>
+          )}
+
           {loading ? (
             <Card>
               <CardContent className="p-6 text-slate-600">Loading drafts...</CardContent>
@@ -249,6 +288,7 @@ export default function ProFormDraftRecovery() {
                 draft={draft}
                 expanded={expandedId === draft.id}
                 onToggle={() => setExpandedId(expandedId === draft.id ? '' : draft.id)}
+                hasDuplicateSession={duplicateSessionIds.has(draft.session_id)}
               />
             ))
           )}
