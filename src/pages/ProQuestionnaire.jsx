@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
   setResponse, 
@@ -55,7 +55,8 @@ import {
 import {
   identifyClarityUser,
   setClarityTags,
-  trackClarityEvent
+  trackClarityEvent,
+  getSafeAnswerMetadata
 } from '@/lib/clarity';
 
 export default function ProQuestionnaire() {
@@ -78,6 +79,7 @@ export default function ProQuestionnaire() {
   const [isValidating, setIsValidating] = useState(false);
   const [validatingQuestions, setValidatingQuestions] = useState([]);
   const [hasTrackedStart, setHasTrackedStart] = useState(false);
+  const trackedTypingQuestionsRef = useRef(new Set());
 
   // Extract URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -134,31 +136,33 @@ export default function ProQuestionnaire() {
 
   useEffect(() => {
     const safeDomain = domainParam || credentials.domain || 'unknown';
-    const safeBusinessNamePresent = businessNameParam ? 'true' : 'false';
+    const safeBusinessName = businessNameParam || credentials.businessName || '';
 
     setClarityTags({
       app: 'pro_questionnaire',
       service_type: 'pro',
       business_domain: safeDomain,
-      business_name_present: safeBusinessNamePresent
+      business_name_present: safeBusinessName ? 'true' : 'false'
     });
 
     if (credentials.userId) {
       identifyClarityUser({
         userId: credentials.userId,
         pageId: window.location.pathname,
-        friendlyName: businessNameParam || domainParam || 'Pro Questionnaire Client'
+        friendlyName: safeBusinessName || safeDomain || 'Pro Questionnaire Client'
       });
     }
 
     trackClarityEvent('pro_questionnaire_loaded', {
-      business_domain: safeDomain
+      business_domain: safeDomain,
+      business_name_present: safeBusinessName ? 'true' : 'false'
     });
   }, [
     businessNameParam,
     domainParam,
-    credentials.userId,
-    credentials.domain
+    credentials.businessName,
+    credentials.domain,
+    credentials.userId
   ]);
 
   // Initialize expanded questions on mount
@@ -245,6 +249,19 @@ export default function ProQuestionnaire() {
 
     // Textarea dirtiness invalidation: if a textarea that had a validated status is edited, mark dirty and clear its redux validation
     const q = getQuestionById(QUESTIONS, questionId);
+
+    if (
+      (q?.type === 'text' || q?.type === 'textarea') &&
+      !trackedTypingQuestionsRef.current.has(questionId)
+    ) {
+      trackedTypingQuestionsRef.current.add(questionId);
+
+      trackClarityEvent('pro_questionnaire_question_typing_started', {
+        question_id: questionId,
+        question_type: q?.type || 'unknown',
+        business_domain: credentials.domain || domainParam || 'unknown'
+      });
+    }
     if (q?.type === 'textarea') {
       const prevStatus = validationStatus[questionId];
       const prevValue = responses[questionId] || '';
@@ -259,6 +276,17 @@ export default function ProQuestionnaire() {
 
     // Prepare merged snapshot for validation logic
     const newResponses = { ...responses, [questionId]: value };
+    const answerMetadata = getSafeAnswerMetadata(
+      value,
+      newResponses?.[`${questionId}_other`]
+    );
+
+    trackClarityEvent('pro_questionnaire_answer_changed', {
+      question_id: questionId,
+      question_type: q?.type || 'unknown',
+      business_domain: credentials.domain || domainParam || 'unknown',
+      ...answerMetadata
+    });
 
     // If an auxiliary `_other` field changed, revalidate the owning base question only when `_other` is relevant
     if (questionId.endsWith('_other')) {
@@ -297,7 +325,26 @@ export default function ProQuestionnaire() {
   const updateValidationState = (questionId, status) => {
     // Child snapshot after applying this change
     const newStatusSnapshot = { ...validationStatus, [questionId]: status };
-    setValidationStatusIfChanged(questionId, status, validationStatus);
+    const question = getQuestionById(QUESTIONS, questionId);
+    const changed = setValidationStatusIfChanged(questionId, status, validationStatus);
+
+    if (changed) {
+      trackClarityEvent('pro_questionnaire_validation_status_changed', {
+        question_id: questionId,
+        question_type: question?.type || 'unknown',
+        validation_status: status,
+        business_domain: credentials.domain || domainParam || 'unknown'
+      });
+
+      if (status === 'incomplete') {
+        trackClarityEvent('pro_questionnaire_validation_failed', {
+          question_id: questionId,
+          question_type: question?.type || 'unknown',
+          validation_status: 'incomplete',
+          business_domain: credentials.domain || domainParam || 'unknown'
+        });
+      }
+    }
 
     // If this is a child question, deterministically update parent using schema
     if (isChildQuestion(questionId)) {
@@ -467,6 +514,12 @@ export default function ProQuestionnaire() {
     // On expand: do NOT auto-touch optional children or any textarea
     if (!isCurrentlyExpanded) {
       const q = getQuestionById(QUESTIONS, questionId);
+
+      trackClarityEvent('pro_questionnaire_question_opened', {
+        question_id: questionId,
+        question_type: q?.type || 'unknown',
+        business_domain: credentials.domain || domainParam || 'unknown'
+      });
       const isChild = isChildQuestion(questionId);
       const isOptionalChild = isChild && q?.requiredIfParentYes !== true;
 
@@ -1002,6 +1055,7 @@ export default function ProQuestionnaire() {
     try {
       trackClarityEvent('pro_questionnaire_submit_attempt', {
         completed_questions: Object.keys(responseSnapshot).length,
+        submit_status: 'attempted',
         business_domain: domain || credentials.domain || domainParam || 'unknown'
       });
 
@@ -1019,6 +1073,8 @@ export default function ProQuestionnaire() {
       }
 
       trackClarityEvent('pro_questionnaire_submit_success', {
+        completed_questions: Object.keys(responseSnapshot).length,
+        submit_status: 'success',
         business_domain: domain || credentials.domain || domainParam || 'unknown'
       });
 
@@ -1053,6 +1109,7 @@ export default function ProQuestionnaire() {
       }
 
       trackClarityEvent('pro_questionnaire_submit_failed', {
+        submit_status: 'failed',
         business_domain: domain || credentials.domain || domainParam || 'unknown',
         error_message: error?.message || 'unknown'
       });
