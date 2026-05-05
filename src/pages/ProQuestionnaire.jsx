@@ -1137,7 +1137,7 @@ export default function ProQuestionnaire() {
             const status = result.data?.status || 'incomplete';
             updateValidationState(qId, status);
 
-            const isPassingStatus = status === 'complete';
+            const isPassingStatus = status === 'complete' || status === 'needs_work';
 
             dispatch(setTextareaDirtyMeta({
               questionId: qId,
@@ -1181,10 +1181,12 @@ export default function ProQuestionnaire() {
 
       if (failedResults.length > 0) {
         failedResults.forEach(({ qId, status }) => {
-          dispatch(setValidationStatus({
-            questionId: qId,
-            status: 'incomplete'
-          }));
+          if (status === 'incomplete') {
+            dispatch(setValidationStatus({
+              questionId: qId,
+              status: 'incomplete'
+            }));
+          }
 
           dispatch(setTouchedQuestion({
             questionId: qId,
