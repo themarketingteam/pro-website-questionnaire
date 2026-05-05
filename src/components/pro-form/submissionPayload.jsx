@@ -111,6 +111,104 @@ export const normalizeGuarantees = (items = []) =>
       guarantee_description: item.description || ''
     }));
 
+export const transformResponsesToPayload = (
+  responses,
+  businessName,
+  domain,
+  serviceOptionsGrouped = {}
+) => {
+  const geographicAreas = normalizeGeographicAreas(
+    responses['5'] || [],
+    responses['5_primary'] || 0
+  );
+
+  const certificationsPartnerships = responses['12'] === 'yes'
+    ? normalizeCertifications(responses['12.1'] || [])
+    : [];
+
+  const teamPhoto = responses['2'] === 'yes'
+    ? normalizeTeamPhoto(responses['2.2'])
+    : { imageUrl: '', imageName: '', taggedPeople: [] };
+
+  const serviceGuaranteeItems = responses['14'] === 'yes'
+    ? normalizeGuarantees(responses['14.1'] || [])
+    : [];
+
+  const additionalPagesList = {
+    why_choose_us_page: {
+      generate_page: responses['1'] === 'yes',
+      why_choose_us_description: responses['1'] === 'yes' ? (responses['1.1'] || '') : ''
+    },
+    meet_the_team_page: {
+      generate_page: responses['2'] === 'yes',
+      team_introduction: responses['2'] === 'yes' ? (responses['2.1'] || '') : '',
+      team_photo_with_tags: teamPhoto
+    }
+  };
+
+  return {
+    metadata: {
+      business_name: businessName,
+      businessDomain: domain,
+      submission_datetime: new Date().toISOString(),
+      service_type: 'pro'
+    },
+    userdata: {
+      additional_pages_list: additionalPagesList,
+      service_offerings: (responses['3'] || []).flatMap((s) => {
+        if (s.startsWith('CATEGORY:')) {
+          const categoryName = s.replace('CATEGORY:', '');
+          return serviceOptionsGrouped[categoryName] || [];
+        }
+
+        return [s];
+      }),
+      service_offerings_other: Array.isArray(responses['3_other'])
+        ? responses['3_other'].filter((v) => v?.trim()).join(', ')
+        : (responses['3_other'] || ''),
+      target_industries: responses['4'] || [],
+      target_industries_other: Array.isArray(responses['4_other'])
+        ? responses['4_other'].filter((v) => v?.trim()).join(', ')
+        : (responses['4_other'] || ''),
+      geographic_areas: geographicAreas,
+      company_description: responses['6'] || '',
+      delivery_model: responses['7'] || '',
+      delivery_model_other: responses['7_other'] || '',
+      pricing_packaging: responses['8'] || [],
+      pricing_packaging_other: responses['8_other'] || '',
+      differentiation: responses['9'] || '',
+      company_goals: responses['10'] || [],
+      company_goals_other: responses['10_other'] || '',
+      brand_tone: responses['11'] || '',
+      brand_tone_other: responses['11_other'] || '',
+      certifications_partnerships: certificationsPartnerships,
+      sales_process: responses['13'] || '',
+      service_guarantee: responses['14'] === 'yes',
+      service_guarantee_items: serviceGuaranteeItems,
+      client_acquisition: responses['15'] || '',
+      client_acquisition_other: responses['15_other'] || '',
+      website_objectives: responses['16'] || [],
+      website_objectives_other: responses['16_other'] || '',
+      client_size: responses['17'] || '',
+      client_challenges: responses['18'] || [],
+      client_challenges_other: Array.isArray(responses['18_other'])
+        ? responses['18_other'].filter((v) => v?.trim()).join(', ')
+        : (responses['18_other'] || ''),
+      client_frustrations: responses['19'] || '',
+      client_outcomes: responses['20'] || [],
+      client_outcomes_other: Array.isArray(responses['20_other'])
+        ? responses['20_other'].filter((v) => v?.trim()).join(', ')
+        : (responses['20_other'] || ''),
+      value_description: responses['21'] || '',
+      ideal_client: responses['22'] || '',
+      avoided_clients: responses['23'] === 'yes' ? (responses['23.1'] || '') : '',
+      primary_cta: responses['24'] || '',
+      primary_cta_other: responses['24_other'] || '',
+      additional_notes: responses['25'] === 'yes' ? (responses['25.1'] || '') : ''
+    }
+  };
+};
+
 export const validateSubmissionPayload = (payload) => {
   const errors = [];
 
