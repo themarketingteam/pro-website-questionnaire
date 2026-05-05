@@ -41,6 +41,9 @@ const formatDate = (value) => {
 function DraftRow({ draft, expanded, onToggle, hasDuplicateSession }) {
   const parsedResponses = safeJsonParse(draft.responses_json, {});
   const parsedValidation = safeJsonParse(draft.validation_status_json, {});
+  const parsedMappedPayload = safeJsonParse(draft.mapped_payload_json, {});
+  const parsedMetadata = safeJsonParse(draft.metadata_json, {});
+  const parsedUserdata = safeJsonParse(draft.userdata_json, {});
 
   const copyResponses = async () => {
     await navigator.clipboard.writeText(JSON.stringify(parsedResponses, null, 2));
@@ -56,6 +59,9 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession }) {
       last_saved_at: draft.last_saved_at,
       submitted_at: draft.submitted_at,
       final_submission_id: draft.final_submission_id,
+      metadata: parsedMetadata,
+      userdata: parsedUserdata,
+      mapped_payload: parsedMappedPayload,
       responses: parsedResponses,
       validation_status: parsedValidation
     };

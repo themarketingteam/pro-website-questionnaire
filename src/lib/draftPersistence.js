@@ -1,3 +1,5 @@
+import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
+
 export const safeJsonStringifyDraft = (value) => {
   try {
     return JSON.stringify(value ?? {});
@@ -53,6 +55,7 @@ export const createSaveDraftSnapshot = ({
     credentials,
     businessNameParam,
     domainParam,
+    serviceOptionsGrouped = {},
     currentQuestionId,
     lastChangedQuestionId,
     status = 'draft',
@@ -62,11 +65,19 @@ export const createSaveDraftSnapshot = ({
   }) => {
     const safeCreds = sanitizeCredentialsForDraft(credentials);
     const now = new Date().toISOString();
+    const businessName = businessNameParam || safeCreds.businessName || '';
+    const businessDomain = domainParam || safeCreds.domain || '';
+    const mappedPayload = transformResponsesToPayload(
+      responses || {},
+      businessName,
+      businessDomain,
+      serviceOptionsGrouped
+    );
 
     const draftRecord = {
       session_id: sessionId,
-      business_name: businessNameParam || safeCreds.businessName || '',
-      domain: domainParam || safeCreds.domain || '',
+      business_name: businessName,
+      domain: businessDomain,
       user_id: safeCreds.userId || '',
       user_name: safeCreds.userName || '',
       user_email: safeCreds.userEmail || '',
@@ -77,7 +88,10 @@ export const createSaveDraftSnapshot = ({
       validation_status_json: safeJsonStringifyDraft(validationStatus),
       touched_questions_json: safeJsonStringifyDraft(touchedQuestions),
       expanded_questions_json: safeJsonStringifyDraft(expandedQuestions),
-      metadata_json: safeJsonStringifyDraft({
+      metadata_json: safeJsonStringifyDraft(mappedPayload.metadata),
+      userdata_json: safeJsonStringifyDraft(mappedPayload.userdata),
+      mapped_payload_json: safeJsonStringifyDraft(mappedPayload),
+      draft_metadata_json: safeJsonStringifyDraft({
         app: 'pro_questionnaire',
         source: 'real_time_draft',
         userAgent: navigator.userAgent,

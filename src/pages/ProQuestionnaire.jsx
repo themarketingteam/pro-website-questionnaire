@@ -298,6 +298,7 @@ export default function ProQuestionnaire() {
       credentials,
       businessNameParam,
       domainParam,
+      serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
       currentQuestionId: lastChangedQuestionIdRef.current || '',
       lastChangedQuestionId: lastChangedQuestionIdRef.current || '',
       status,
@@ -338,6 +339,7 @@ export default function ProQuestionnaire() {
           credentials,
           businessNameParam,
           domainParam,
+          serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
           currentQuestionId: changedQuestionId,
           lastChangedQuestionId: changedQuestionId,
           status: 'draft'

@@ -56,7 +56,19 @@
     },
     "metadata_json": {
       "type": "string",
-      "description": "Serialized draft metadata"
+      "description": "JSON string of mapped final payload metadata"
+    },
+    "userdata_json": {
+      "type": "string",
+      "description": "JSON string of mapped final payload userdata"
+    },
+    "mapped_payload_json": {
+      "type": "string",
+      "description": "JSON string of full mapped final-style questionnaire payload"
+    },
+    "draft_metadata_json": {
+      "type": "string",
+      "description": "Technical draft autosave metadata such as page path, source, and user agent"
     },
     "save_error": {
       "type": "string",
@@ -89,55 +101,5 @@
   },
   "required": [
     "session_id"
-  ],
-  "rls": {
-    "read": {
-      "$or": [
-        {
-          "created_by": "{{user.email}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
-    "update": {
-      "$or": [
-        {
-          "created_by": "{{user.email}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
-    "delete": {
-      "$or": [
-        {
-          "created_by": "{{user.email}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
-    "write": {
-      "$or": [
-        {
-          "created_by": "{{user.email}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    }
-  }
+  ]
 }
