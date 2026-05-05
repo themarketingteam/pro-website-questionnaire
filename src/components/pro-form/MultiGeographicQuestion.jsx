@@ -255,8 +255,8 @@ export default function MultiGeographicQuestion({
 
         gmp-place-autocomplete::part(input):focus {
           outline: none;
-          border-color: #3b82f6;
-          box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.35);
+          border-color: #cbd5e1;
+          box-shadow: none;
         }
       `}</style>
 
