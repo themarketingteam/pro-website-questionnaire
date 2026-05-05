@@ -121,9 +121,33 @@ export default function MultiGeographicQuestion({
           placeAutocomplete = new window.google.maps.places.PlaceAutocompleteElement({
             includedPrimaryTypes: ["locality", "administrative_area_level_1", "administrative_area_level_2", "postal_town", "sublocality"]
           });
+
+          placeAutocomplete.style.border = '0';
+          placeAutocomplete.style.outline = 'none';
+          placeAutocomplete.style.boxShadow = 'none';
           autocompleteContainerRef.current.innerHTML = "";
           autocompleteContainerRef.current.appendChild(placeAutocomplete);
           autocompleteRef.current = placeAutocomplete;
+
+          requestAnimationFrame(() => {
+            const root = placeAutocomplete.shadowRoot;
+            if (!root) return;
+
+            const inputContainer = root.querySelector('.input-container');
+            const focusRing = root.querySelector('.focus-ring');
+
+            if (inputContainer) {
+              inputContainer.style.border = 'none';
+              inputContainer.style.outline = 'none';
+              inputContainer.style.boxShadow = 'none';
+            }
+
+            if (focusRing) {
+              focusRing.style.border = 'none';
+              focusRing.style.opacity = '0';
+              focusRing.style.boxShadow = 'none';
+            }
+          });
         }
 
         if (autocompleteCleanupRef.current) {
@@ -267,6 +291,12 @@ export default function MultiGeographicQuestion({
           box-shadow: none !important;
         }
 
+        gmp-place-autocomplete::part(focus-ring) {
+          border: 0 !important;
+          opacity: 0 !important;
+          box-shadow: none !important;
+        }
+
         .google-places-shell,
         .google-places-shell:focus,
         .google-places-shell:focus-within,
@@ -278,9 +308,21 @@ export default function MultiGeographicQuestion({
         .google-places-input-wrapper *,
         .google-places-input-wrapper *:focus,
         .google-places-input-wrapper *:focus-within,
-        .google-places-input-wrapper *:focus-visible {
+        .google-places-input-wrapper *:focus-visible,
+        .google-places-input-wrapper .input-container,
+        .google-places-input-wrapper .input-container:focus,
+        .google-places-input-wrapper .input-container:focus-within,
+        .google-places-input-wrapper .input-container:focus-visible,
+        .google-places-input-wrapper .focus-ring {
           outline: none !important;
           box-shadow: none !important;
+        }
+
+        .google-places-input-wrapper .input-container,
+        .google-places-input-wrapper .input-container:focus,
+        .google-places-input-wrapper .input-container:focus-within,
+        .google-places-input-wrapper .input-container:focus-visible,
+        .google-places-input-wrapper .focus-ring {
           border: none !important;
         }
       `}</style>
