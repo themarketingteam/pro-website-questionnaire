@@ -33,7 +33,8 @@ export default function MultiGeographicQuestion({
     const maxRetries = 3;
     const apiKey =
       window.ENV?.GOOGLE_PLACES_API_KEY ||
-      import.meta.env.VITE_GOOGLE_PLACES_API_KEY;
+      import.meta.env.VITE_GOOGLE_PLACES_API_KEY ||
+      "AIzaSyDyQuexeP2lIif4UEYVe845bIYrytVp6O0";
 
     if (!apiKey) {
       setLoadError(true);
