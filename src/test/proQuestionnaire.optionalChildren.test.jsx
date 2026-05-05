@@ -12,7 +12,7 @@ vi.mock('@/api/base44Client', () => {
 return {
   base44: {
     functions: {
-      invoke: vi.fn().mockResolvedValue({ status: 200, data: { status: 'needs_work', message: 'ok', characterCount: 5 } }),
+      invoke: vi.fn().mockResolvedValue({ status: 200, data: { status: 'complete', message: 'ok', characterCount: 5 } }),
     },
     entities: {
       ProFormSubmission: { create: vi.fn().mockResolvedValue({ id: 'x' }) }

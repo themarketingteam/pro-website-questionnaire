@@ -560,12 +560,7 @@ export default function ProQuestionnaire() {
       
       case 'textarea': {
         const status = validationStatus[questionId];
-        // If validation status is set and complete/needs_work, return true
-        if (status === 'complete' || status === 'needs_work') {
-          return true;
-        }
-        // Fallback: check if there's text content (for cases where validation status wasn't saved)
-        return answer && answer.trim().length > 0;
+        return status === 'complete';
       }
       
       case 'multi_text': {
@@ -748,7 +743,12 @@ export default function ProQuestionnaire() {
       setValidatingQuestions([]);
 
       if (failures.length > 0) {
-        toast.error(`Some answers couldn't be validated right now (${failures.length}). Your text is saved; you can retry validation.`);
+        failures.forEach((questionId) => {
+          dispatch(setValidationStatus({ questionId, status: 'incomplete' }));
+          dispatch(setTouchedQuestion({ questionId, touched: true }));
+        });
+        toast.error('Please fix the highlighted responses before submitting.');
+        return false;
       }
 
       return true;
@@ -762,21 +762,20 @@ export default function ProQuestionnaire() {
   };
 
   const handleSubmitClick = async () => {
-    // Run final validations first
-    const validationSuccess = await runFinalValidations();
-    
-    if (!validationSuccess) {
-      return;
-    }
-    
-    // After validation, check if form is complete
-    if (!isFormValid()) {
+    const finalValidationPassed = await runFinalValidations();
+
+    if (!finalValidationPassed) {
       setShowIncompleteList(true);
       return;
     }
-    
-    setShowIncompleteList(false);
-    setShowConfirmModal(true);
+
+    if (isFormValid()) {
+      setShowIncompleteList(false);
+      setShowConfirmModal(true);
+    } else {
+      setShowIncompleteList(true);
+      toast.error('Please complete all required questions before submitting.');
+    }
   };
 
   const transformResponsesToPayload = (responses, businessName, domain) => {

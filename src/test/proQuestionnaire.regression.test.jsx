@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 
 import userEvent from '@testing-library/user-event';
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
@@ -143,5 +143,85 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
 
     const status = store.getState().form.validationStatus['23.1'];
     expect(status).toBe('incomplete');
+  });
+
+  it('does not open the confirmation modal when final required textarea validation fails', async () => {
+    const user = userEvent.setup();
+
+    const invoke = base44.functions.invoke;
+    invoke.mockImplementation(async (name) => {
+      if (name === 'validateQuestionText') {
+        throw new Error('network down');
+      }
+      return { status: 200, data: {} };
+    });
+
+    const preloaded = {
+      form: {
+        responses: {
+          '1': 'yes',
+          '1.1': 'Short bad answer',
+          '2': 'no',
+          '3': ['Managed IT'],
+          '4': ['Healthcare / Medical'],
+          '5': [{ label: 'Chicago, IL', name: 'Chicago, IL' }],
+          '6': 'Company description',
+          '7': 'Fully Managed IT Provider',
+          '8': ['Per-user pricing'],
+          '9': 'Differentiation text',
+          '10': ['Increase recurring revenue'],
+          '11': 'Professional & Corporate',
+          '12': 'no',
+          '13': 'Onboarding process',
+          '14': 'no',
+          '15': 'Referrals / Word of Mouth',
+          '16': ['Generate qualified leads'],
+          '17': '10-50 employees',
+          '18': ['Frequent downtime or outages'],
+          '19': 'Client frustrations',
+          '20': ['Reliable systems and less downtime'],
+          '21': 'Reliable and proactive',
+          '22': 'Ideal client text',
+          '23': 'no',
+          '24': 'Schedule a Consultation',
+          '25': 'no'
+        },
+        validationStatus: {
+          '1': 'complete',
+          '2': 'complete',
+          '3': 'complete',
+          '4': 'complete',
+          '5': 'complete',
+          '7': 'complete',
+          '8': 'complete',
+          '10': 'complete',
+          '11': 'complete',
+          '12': 'complete',
+          '14': 'complete',
+          '16': 'complete',
+          '18': 'complete',
+          '20': 'complete',
+          '23': 'complete',
+          '24': 'complete',
+          '25': 'complete'
+        },
+        touchedQuestions: {},
+        expandedQuestions: { '1': true },
+        credentials: {},
+        textValidationMeta: {}
+      },
+    };
+
+    const { store } = renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
+
+    const submit = await screen.findByRole('button', { name: /submit questionnaire/i });
+    await user.click(submit);
+
+    await waitFor(() => {
+      expect(store.getState().form.validationStatus['1.1']).toBe('incomplete');
+      expect(store.getState().form.touchedQuestions['1.1']).toBe(true);
+    });
+
+    expect(screen.queryByText(/review your answers/i)).not.toBeInTheDocument();
   });
 });
