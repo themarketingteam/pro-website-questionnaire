@@ -262,9 +262,28 @@ export default function MultiGeographicQuestion({
         }
 
         gmp-place-autocomplete::part(input):focus {
-          outline: none;
-          border-color: #cbd5e1;
-          box-shadow: none;
+          outline: none !important;
+          border-color: #cbd5e1 !important;
+          box-shadow: none !important;
+        }
+
+        .google-places-input-wrapper,
+        .google-places-input-wrapper:focus,
+        .google-places-input-wrapper:focus-within,
+        .google-places-input-wrapper:focus-visible,
+        .google-places-input-wrapper *,
+        .google-places-input-wrapper *:focus,
+        .google-places-input-wrapper *:focus-within,
+        .google-places-input-wrapper *:focus-visible {
+          outline: none !important;
+          box-shadow: none !important;
+        }
+
+        .google-places-input-wrapper,
+        .google-places-input-wrapper:focus-within {
+          border: none !important;
+          box-shadow: none !important;
+          outline: none !important;
         }
       `}</style>
 
@@ -370,7 +389,7 @@ export default function MultiGeographicQuestion({
             <>
               <div
                 ref={autocompleteContainerRef}
-                className="w-full bg-transparent border-0 outline-none ring-0 shadow-none"
+                className="google-places-input-wrapper w-full bg-transparent border-0 outline-none ring-0 shadow-none"
                 style={{ border: 'none', outline: 'none', boxShadow: 'none' }}
                 aria-label="Search for a city, county, or region"
               />
