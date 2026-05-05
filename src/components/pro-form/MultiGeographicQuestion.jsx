@@ -148,7 +148,6 @@ export default function MultiGeographicQuestion({
         const place = autocomplete.getPlace();
 
         if (!place.geometry) {
-          console.warn("No geometry for selected place");
           return;
         }
 
@@ -212,8 +211,7 @@ export default function MultiGeographicQuestion({
       });
 
       autocompleteRef.current = autocomplete;
-    } catch (error) {
-      console.warn("Error initializing Google Places:", error);
+    } catch {
       setLoadError(true);
     }
 
