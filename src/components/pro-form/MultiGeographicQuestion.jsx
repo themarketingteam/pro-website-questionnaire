@@ -226,11 +226,13 @@ export default function MultiGeographicQuestion({
       <style>{`
         gmp-place-autocomplete {
           width: 100%;
+          display: block;
+          background: transparent;
         }
 
         gmp-place-autocomplete::part(input) {
           width: 100%;
-          padding: 1rem 3rem 1rem 1rem;
+          padding: 1rem;
           border: 1px solid #cbd5e1;
           border-radius: 0.75rem;
           font-size: 1rem;
@@ -347,14 +349,11 @@ export default function MultiGeographicQuestion({
 
           {!loadError && isScriptLoaded && (
             <>
-              <div className="relative">
-                <div
-                  ref={autocompleteContainerRef}
-                  className="w-full"
-                  aria-label="Search for a city, county, or region"
-                />
-                <MapPin className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none z-10" />
-              </div>
+              <div
+                ref={autocompleteContainerRef}
+                className="w-full bg-transparent"
+                aria-label="Search for a city, county, or region"
+              />
 
               <div className="space-y-2">
                 <div className="text-sm text-slate-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
