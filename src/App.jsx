@@ -99,9 +99,11 @@ const AuthenticatedApp = () => {
       ))}
       {/* Temporary admin utility route for one-click submission */}
       <Route path="/admin/submit-intake" element={
-        <LayoutWrapper currentPageName={"admin/submit-intake"}>
-          <AdminSubmitIntake />
-        </LayoutWrapper>
+        <AdminOnly>
+          <LayoutWrapper currentPageName={"admin/submit-intake"}>
+            <AdminSubmitIntake />
+          </LayoutWrapper>
+        </AdminOnly>
       } />
       <Route path="/admin/draft-recovery" element={
         <AdminOnly>
