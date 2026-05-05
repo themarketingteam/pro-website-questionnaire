@@ -6,6 +6,17 @@ import userEvent from '@testing-library/user-event';
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
 import { renderWithStore } from './utils/renderWithStore';
 import { QUESTIONS } from '@/components/pro-form/questionData';
+import { formatAnswerForDisplay } from '@/components/pro-form/answerFormatting';
+import {
+  normalizeCertifications,
+  normalizeGeographicAreas,
+  normalizeGuarantees,
+  normalizeTeamPhoto
+} from '@/components/pro-form/submissionPayload';
+import {
+  createFindExistingDraftBySessionId,
+  createSaveDraftSnapshot
+} from '@/lib/draftPersistence';
 
 // Mock base44 SDK
 vi.mock('@/api/base44Client', () => {
@@ -15,7 +26,13 @@ vi.mock('@/api/base44Client', () => {
         invoke: vi.fn(),
       },
       entities: {
-        ProFormSubmission: { create: vi.fn().mockResolvedValue({ id: 'x' }) }
+        ProFormSubmission: { create: vi.fn().mockResolvedValue({ id: 'x' }) },
+        ProFormDraft: {
+          filter: vi.fn().mockResolvedValue([]),
+          create: vi.fn().mockResolvedValue({ id: 'draft-1' }),
+          update: vi.fn().mockResolvedValue({ id: 'draft-1' })
+        },
+        ProFormDraftEvent: { create: vi.fn().mockResolvedValue({ id: 'event-1' }) }
       },
       auth: {
         isAuthenticated: vi.fn().mockResolvedValue(true),
@@ -41,6 +58,9 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    base44.entities.ProFormDraft.filter.mockResolvedValue([]);
+    base44.entities.ProFormDraft.create.mockResolvedValue({ id: 'draft-1' });
+    base44.entities.ProFormDraft.update.mockResolvedValue({ id: 'draft-1' });
   });
 
   it('Q23 answered Yes, then 23.1 expanded: renders without crash or loop', async () => {
@@ -144,6 +164,124 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
 
     const status = store.getState().form.validationStatus['23.1'];
     expect(status).toBe('incomplete');
+  });
+
+  it('Q24 normal radio option completes after one click', async () => {
+    const user = userEvent.setup();
+    const preloaded = {
+      form: {
+        responses: {},
+        validationStatus: {},
+        touchedQuestions: {},
+        expandedQuestions: { '24': true },
+        credentials: {},
+        textValidationMeta: {}
+      },
+    };
+
+    const { store } = renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
+    await user.click(await screen.findByText(getQ('24').title));
+    await user.click(await screen.findByLabelText('Schedule a Consultation'));
+
+    await waitFor(() => {
+      expect(store.getState().form.validationStatus['24']).toBe('complete');
+    });
+  });
+
+  it('Q24 Other requires custom text and normal option stays complete when switching back', async () => {
+    const user = userEvent.setup();
+    const preloaded = {
+      form: {
+        responses: {},
+        validationStatus: {},
+        touchedQuestions: {},
+        expandedQuestions: { '24': true },
+        credentials: {},
+        textValidationMeta: {}
+      },
+    };
+
+    const { store } = renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
+    await user.click(await screen.findByText(getQ('24').title));
+    await user.click(await screen.findByLabelText('Other'));
+
+    await waitFor(() => {
+      expect(store.getState().form.validationStatus['24']).toBe('incomplete');
+    });
+
+    await user.type(screen.getByPlaceholderText(/what action would you like client's to take on your website/i), 'Book a strategy call');
+
+    await waitFor(() => {
+      expect(store.getState().form.validationStatus['24']).toBe('complete');
+    });
+
+    await user.click(await screen.findByLabelText('Schedule a Consultation'));
+
+    await waitFor(() => {
+      expect(store.getState().form.validationStatus['24']).toBe('complete');
+    });
+  });
+
+  it('submit-time validation blocks incomplete returned statuses', async () => {
+    const user = userEvent.setup();
+
+    const invoke = base44.functions.invoke;
+    invoke.mockImplementation(async (name) => {
+      if (name === 'validateQuestionText') {
+        return { status: 200, data: { status: 'incomplete' } };
+      }
+      return { status: 200, data: {} };
+    });
+
+    const preloaded = {
+      form: {
+        responses: {
+          '1': 'yes',
+          '1.1': 'Needs better answer',
+          '2': 'no',
+          '3': ['Managed IT'],
+          '4': ['Healthcare / Medical'],
+          '5': [{ label: 'Chicago, IL', name: 'Chicago, IL' }],
+          '6': 'Company description',
+          '7': 'Fully Managed IT Provider',
+          '8': ['Per-user pricing'],
+          '9': 'Differentiation text',
+          '10': ['Increase recurring revenue'],
+          '11': 'Professional & Corporate',
+          '12': 'no',
+          '13': 'Onboarding process',
+          '14': 'no',
+          '15': 'Referrals / Word of Mouth',
+          '16': ['Generate qualified leads'],
+          '17': '10-50 employees',
+          '18': ['Frequent downtime or outages'],
+          '19': 'Client frustrations',
+          '20': ['Reliable systems and less downtime'],
+          '21': 'Reliable and proactive',
+          '22': 'Ideal client text',
+          '23': 'no',
+          '24': 'Schedule a Consultation',
+          '25': 'no'
+        },
+        validationStatus: {
+          '1': 'complete','2': 'complete','3': 'complete','4': 'complete','5': 'complete','7': 'complete','8': 'complete','10': 'complete','11': 'complete','12': 'complete','14': 'complete','16': 'complete','18': 'complete','20': 'complete','23': 'complete','24': 'complete','25': 'complete'
+        },
+        touchedQuestions: {},
+        expandedQuestions: { '1': true },
+        credentials: {},
+        textValidationMeta: {}
+      },
+    };
+
+    const { store } = renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
+    await user.click(await screen.findByRole('button', { name: /submit questionnaire/i }));
+
+    await waitFor(() => {
+      expect(store.getState().form.validationStatus['1.1']).toBe('incomplete');
+      expect(store.getState().form.touchedQuestions['1.1']).toBe(true);
+    });
+
+    expect(screen.queryByText(/review your answers/i)).not.toBeInTheDocument();
   });
 
   it('does not open the confirmation modal when final required textarea validation fails', async () => {
@@ -318,5 +456,119 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     });
 
     expect(screen.getByText(/thank you/i)).toBeInTheDocument();
+  });
+
+  it('prevents duplicate draft creation by reusing the saved draft record id', async () => {
+    const draftRecordIdRef = { current: '' };
+    const filter = vi.fn().mockResolvedValue([]);
+    const create = vi.fn().mockResolvedValue({ id: 'draft-1' });
+    const update = vi.fn().mockResolvedValue({ id: 'draft-1' });
+    const entities = { ProFormDraft: { filter, create, update } };
+
+    const findExistingDraftBySessionId = createFindExistingDraftBySessionId({ draftRecordIdRef });
+    const saveDraftSnapshot = createSaveDraftSnapshot({
+      entities,
+      draftRecordIdRef,
+      findExistingDraftBySessionId
+    });
+
+    const payload = {
+      sessionId: 'session-1',
+      responses: { '6': 'abc' },
+      validationStatus: {},
+      touchedQuestions: {},
+      expandedQuestions: {},
+      credentials: {},
+      businessNameParam: '',
+      domainParam: '',
+      currentQuestionId: '6',
+      lastChangedQuestionId: '6',
+      status: 'draft'
+    };
+
+    await saveDraftSnapshot(payload);
+    await saveDraftSnapshot({ ...payload, responses: { '6': 'abcd' } });
+
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(filter).toHaveBeenCalledTimes(1);
+  });
+
+  it('pending autosave after submit does not overwrite submitted status back to draft', async () => {
+    vi.useFakeTimers();
+
+    const hasFinalSubmittedRef = { current: false };
+    const saveDraftSnapshot = vi.fn().mockResolvedValue({});
+    const draftSaveTimeoutRef = { current: null };
+
+    const queueDraftSave = (changedQuestionId, nextResponses = {}) => {
+      if (hasFinalSubmittedRef.current) return;
+      if (draftSaveTimeoutRef.current) {
+        clearTimeout(draftSaveTimeoutRef.current);
+      }
+      draftSaveTimeoutRef.current = setTimeout(async () => {
+        if (hasFinalSubmittedRef.current) return;
+        await saveDraftSnapshot({
+          sessionId: 'session-1',
+          responses: nextResponses,
+          validationStatus: {},
+          touchedQuestions: {},
+          expandedQuestions: {},
+          credentials: {},
+          businessNameParam: '',
+          domainParam: '',
+          currentQuestionId: changedQuestionId,
+          lastChangedQuestionId: changedQuestionId,
+          status: 'draft'
+        });
+      }, 600);
+    };
+
+    queueDraftSave('6', { '6': 'latest' });
+    hasFinalSubmittedRef.current = true;
+    await vi.runAllTimersAsync();
+
+    expect(saveDraftSnapshot).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+
+  it('formatting helpers never return [object Object] for complex answers', () => {
+    const q5 = formatAnswerForDisplay('5', [{ geographic_area_meta: { label: 'Chicago, IL', primary: true } }], '', { '5_primary': 0 });
+    const q121 = formatAnswerForDisplay('12.1', [{ name: 'SOC 2', type: 'certification', image: { name: 'badge.png' } }], '', {});
+    const q141 = formatAnswerForDisplay('14.1', [{ name: 'SLA', type: 'sla', description: '24/7 support' }], '', {});
+    const q22 = formatAnswerForDisplay('2.2', { url: 'https://img', tags: [{ person: { name: 'Alex', position: 'Engineer' } }] }, '', {});
+
+    expect(q5).not.toContain('[object Object]');
+    expect(q121).not.toContain('[object Object]');
+    expect(q141).not.toContain('[object Object]');
+    expect(q22).not.toContain('[object Object]');
+  });
+
+  it('payload normalization preserves x/y zero values and filters incomplete rows', () => {
+    const team = normalizeTeamPhoto({
+      url: 'https://img',
+      tags: [{ x: 0, y: 0, person: { name: 'Alex', position: 'Engineer', bio: 'Bio' } }]
+    });
+    const certs = normalizeCertifications([
+      { name: 'SOC 2', type: 'certification', image: { url: 'https://badge' } },
+      { name: '', type: 'certification' }
+    ]);
+    const guarantees = normalizeGuarantees([
+      { name: 'SLA', type: 'sla', description: '24/7' },
+      { name: 'Broken', type: 'sla' }
+    ]);
+    const geographic = normalizeGeographicAreas([
+      { label: 'Chicago, IL', lat: '0', lon: '0', place_id: 'abc', source: 'google' },
+      { label: 'Invalid', lat: 'x', lon: '', place_id: 'def', source: 'google' }
+    ], 0);
+
+    expect(team.taggedPeople[0].x).toBe(0);
+    expect(team.taggedPeople[0].y).toBe(0);
+    expect(certs).toHaveLength(1);
+    expect(guarantees).toHaveLength(1);
+    expect(geographic[0].geographic_area_meta.lat).toBe(0);
+    expect(geographic[0].geographic_area_meta.lon).toBe(0);
+    expect(geographic[1].geographic_area_meta.lat).toBeNull();
+    expect(geographic[1].geographic_area_meta.lon).toBeNull();
   });
 });

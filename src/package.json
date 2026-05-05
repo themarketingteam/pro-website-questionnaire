@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run --passWithNoTests",
-    "test:watch": "vitest --passWithNoTests"
+    "test": "vitest run --config vitest.config.js --passWithNoTests",
+    "test:watch": "vitest --config vitest.config.js --passWithNoTests"
   }
 }

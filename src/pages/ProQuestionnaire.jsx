@@ -1130,44 +1130,90 @@ export default function ProQuestionnaire() {
     setValidatingQuestions(questionsToValidate);
 
     try {
-      const failures = [];
-      // Run all validations in parallel
-      const validationPromises = questionsToValidate.map(async (qId) => {
-        try {
-          const questionKey = `question_${qId.replace('.', '_')}`; // canonical mapping (e.g., 23.1 -> question_23_1)
-          const result = await base44.functions.invoke('validateQuestionText', {
-            text: responses[qId],
-            questionContext: questionKey
-          });
+      const validationResults = await Promise.all(
+        questionsToValidate.map(async (qId) => {
+          try {
+            const questionKey = `question_${qId.replace('.', '_')}`;
 
-          const status = result.data?.status || 'incomplete';
-          updateValidationState(qId, status);
-          // Mark clean after successful validation
-          dispatch(setTextareaDirtyMeta({ questionId: qId, isDirty: false, lastValidatedValue: responses[qId] }));
-          return { qId, status };
-        } catch (error) {
-          console.error(`❌ Submit-time validation error for Q${qId}:`, error);
-          failures.push(qId);
-          // On backend error: treat as 'incomplete' for required-child computation; do not allow parent to pass from neutral
-          dispatch(setValidationStatus({ questionId: qId, status: 'incomplete' }));
-          return { qId, status: 'incomplete' };
-        }
-      });
+            const result = await base44.functions.invoke('validateQuestionText', {
+              text: responses[qId],
+              questionContext: questionKey
+            });
 
-      await Promise.all(validationPromises);
+            const status = result.data?.status || 'incomplete';
+            updateValidationState(qId, status);
+
+            const isPassingStatus = status === 'complete';
+
+            dispatch(setTextareaDirtyMeta({
+              questionId: qId,
+              isDirty: !isPassingStatus,
+              lastValidatedValue: responses[qId]
+            }));
+
+            return {
+              qId,
+              status,
+              ok: isPassingStatus
+            };
+          } catch (error) {
+            console.error(`Submit-time validation error for Q${qId}:`, error);
+
+            dispatch(setValidationStatus({
+              questionId: qId,
+              status: 'incomplete'
+            }));
+
+            dispatch(setTextareaDirtyMeta({
+              questionId: qId,
+              isDirty: true,
+              lastValidatedValue: responses[qId]
+            }));
+
+            return {
+              qId,
+              status: 'incomplete',
+              ok: false,
+              error
+            };
+          }
+        })
+      );
+
       setIsValidating(false);
       setValidatingQuestions([]);
 
-      if (failures.length > 0) {
-        failures.forEach((questionId) => {
-          dispatch(setValidationStatus({ questionId, status: 'incomplete' }));
-          dispatch(setTouchedQuestion({ questionId, touched: true }));
+      const failedResults = validationResults.filter((result) => !result.ok);
+
+      if (failedResults.length > 0) {
+        failedResults.forEach(({ qId, status }) => {
+          dispatch(setValidationStatus({
+            questionId: qId,
+            status: 'incomplete'
+          }));
+
+          dispatch(setTouchedQuestion({
+            questionId: qId,
+            touched: true
+          }));
+
           trackClarityEvent('pro_questionnaire_validation_failed', {
-            validation_failed_question_id: questionId,
-            current_question_id: questionId,
+            validation_failed_question_id: qId,
+            current_question_id: qId,
+            validation_status: status || 'incomplete',
             business_domain: credentials.domain || domainParam || 'unknown'
           });
+
+          createDraftEvent({
+            eventType: 'validation_status_changed',
+            questionId: qId,
+            value: {
+              validation_status: 'incomplete',
+              submit_blocked: true
+            }
+          });
         });
+
         toast.error('Please fix the highlighted responses before submitting.');
         return false;
       }
