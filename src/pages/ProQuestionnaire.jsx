@@ -44,7 +44,14 @@ import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questi
 import { trackValidationDispatch, trackParentStatusChange, devDiagEnabled } from '@/lib/devDiagnostics';
 import { getQuestionById, getParentQuestionByChildId, getAllQuestionIds, isChildQuestion, computeParentValidationStatus } from '@/components/pro-form/questionUtils';
 import { doesChildParticipateInParentCompletion } from '@/components/pro-form/schemaPolicies';
-import { serializeError, validateSubmissionPayload } from '@/components/pro-form/submissionPayload';
+import {
+  serializeError,
+  validateSubmissionPayload,
+  normalizeGeographicAreas,
+  normalizeCertifications,
+  normalizeTeamPhoto,
+  normalizeGuarantees
+} from '@/components/pro-form/submissionPayload';
 import {
   identifyClarityUser,
   setClarityTags,
@@ -830,54 +837,23 @@ export default function ProQuestionnaire() {
   };
 
   const transformResponsesToPayload = (responses, businessName, domain) => {
-    // Transform geographic areas with nested structure
-    const geographicAreas = (responses['5'] || []).map((location, index) => ({
-      geographic_area_meta: {
-        name: typeof location === 'string' ? location : (location.name || location.label || ''),
-        label: typeof location === 'string' ? location : (location.label || location.name || ''),
-        lat: location.lat != null ? String(location.lat) : '',
-        lon: location.lon != null ? String(location.lon) : '',
-        place_id: location.place_id || '',
-        source: "google",
-        primary: index === (responses['5_primary'] || 0)
-      }
-    }));
+    const geographicAreas = normalizeGeographicAreas(
+      responses['5'] || [],
+      responses['5_primary'] || 0
+    );
 
-    // Transform certifications/partnerships
-    const certificationsPartnerships = responses['12'] === 'yes' && responses['12.1'] 
-      ? (responses['12.1'] || []).map(item => ({
-          cert_item_name: item.name || '',
-          cert_item_type: item.type || '',
-          cert_item_image_url: item.imageUrl || item.image?.url || '',
-          cert_item_file_url: Array.isArray(item.files) && item.files.length > 0 ? item.files[0].url : ''
-        }))
+    const certificationsPartnerships = responses['12'] === 'yes'
+      ? normalizeCertifications(responses['12.1'] || [])
       : [];
 
-    // Transform team photo
-    const teamPhoto = responses['2'] === 'yes' && responses['2.2']
-      ? {
-          imageUrl: responses['2.2'].url || '',
-          taggedPeople: (responses['2.2'].tags || []).map(tag => ({
-            name: tag.person?.name || '',
-            position: tag.person?.position || '',
-            bio: tag.person?.bio || '',
-            x: tag.x || 0,
-            y: tag.y || 0
-          }))
-        }
-      : { imageUrl: '', taggedPeople: [] };
+    const teamPhoto = responses['2'] === 'yes'
+      ? normalizeTeamPhoto(responses['2.2'])
+      : { imageUrl: '', imageName: '', taggedPeople: [] };
 
-    // Transform service guarantee items
-    const serviceGuaranteeItems = responses['14'] === 'yes' && responses['14.1']
-      ? (responses['14.1'] || []).map(item => ({
-          guarantee_name: item.name || '',
-          guarantee_type: item.type || '',
-          guarantee_file_url: item.fileUrl || item.file?.url || '',
-          guarantee_description: item.description || ''
-        }))
+    const serviceGuaranteeItems = responses['14'] === 'yes'
+      ? normalizeGuarantees(responses['14.1'] || [])
       : [];
 
-    // Build additional_pages_list structure
     const additionalPagesList = {
       why_choose_us_page: {
         generate_page: responses['1'] === 'yes',
