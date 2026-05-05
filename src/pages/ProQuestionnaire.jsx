@@ -58,6 +58,23 @@ import {
   trackClarityEvent,
   getSafeAnswerMetadata
 } from '@/lib/clarity';
+import { getOrCreateQuestionnaireSessionId } from '@/lib/sessionId';
+
+const safeJsonStringify = (value) => {
+  try {
+    return JSON.stringify(value ?? {});
+  } catch {
+    return '{}';
+  }
+};
+
+const sanitizeCredentialsForDraft = (credentials = {}) => ({
+  businessName: credentials.businessName || '',
+  domain: credentials.domain || '',
+  userId: credentials.userId || '',
+  userName: credentials.userName || '',
+  userEmail: credentials.userEmail || ''
+});
 
 export default function ProQuestionnaire() {
   const dispatch = useDispatch();
@@ -80,6 +97,9 @@ export default function ProQuestionnaire() {
   const [validatingQuestions, setValidatingQuestions] = useState([]);
   const [hasTrackedStart, setHasTrackedStart] = useState(false);
   const trackedTypingQuestionsRef = useRef(new Set());
+  const draftSaveTimeoutRef = useRef(null);
+  const lastChangedQuestionIdRef = useRef('');
+  const [questionnaireSessionId] = useState(() => getOrCreateQuestionnaireSessionId());
 
   // Extract URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -165,6 +185,40 @@ export default function ProQuestionnaire() {
     credentials.userId
   ]);
 
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try {
+        const backup = {
+          session_id: questionnaireSessionId,
+          responses,
+          validationStatus,
+          touchedQuestions,
+          expandedQuestions,
+          savedAt: new Date().toISOString()
+        };
+
+        localStorage.setItem(
+          `pro_questionnaire_local_backup_${questionnaireSessionId}`,
+          JSON.stringify(backup)
+        );
+      } catch {
+        // no-op
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [
+    questionnaireSessionId,
+    responses,
+    validationStatus,
+    touchedQuestions,
+    expandedQuestions
+  ]);
+
   // Initialize expanded questions on mount
   useEffect(() => {
     try {
@@ -225,6 +279,162 @@ export default function ProQuestionnaire() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const findExistingDraftBySessionId = useCallback(async (sessionId) => {
+    const existingDrafts = await base44.entities.ProFormDraft.filter({
+      session_id: sessionId
+    });
+
+    if (Array.isArray(existingDrafts) && existingDrafts.length > 0) {
+      return existingDrafts[0];
+    }
+
+    return null;
+  }, []);
+
+  const saveDraftSnapshot = useCallback(async ({
+    sessionId,
+    responses,
+    validationStatus,
+    touchedQuestions,
+    expandedQuestions,
+    credentials,
+    businessNameParam,
+    domainParam,
+    currentQuestionId,
+    lastChangedQuestionId,
+    status = 'draft',
+    saveError = ''
+  }) => {
+    const safeCreds = sanitizeCredentialsForDraft(credentials);
+    const now = new Date().toISOString();
+
+    const draftRecord = {
+      session_id: sessionId,
+      business_name: businessNameParam || safeCreds.businessName || '',
+      domain: domainParam || safeCreds.domain || '',
+      user_id: safeCreds.userId || '',
+      user_name: safeCreds.userName || '',
+      user_email: safeCreds.userEmail || '',
+      status,
+      current_question_id: currentQuestionId || '',
+      last_changed_question_id: lastChangedQuestionId || '',
+      responses_json: safeJsonStringify(responses),
+      validation_status_json: safeJsonStringify(validationStatus),
+      touched_questions_json: safeJsonStringify(touchedQuestions),
+      expanded_questions_json: safeJsonStringify(expandedQuestions),
+      metadata_json: safeJsonStringify({
+        app: 'pro_questionnaire',
+        source: 'real_time_draft',
+        userAgent: navigator.userAgent,
+        pageUrl: window.location.href
+      }),
+      save_error: saveError,
+      last_changed_at: now,
+      last_saved_at: now
+    };
+
+    const existingDraft = await findExistingDraftBySessionId(sessionId);
+
+    if (existingDraft?.id) {
+      return base44.entities.ProFormDraft.update(existingDraft.id, draftRecord);
+    }
+
+    return base44.entities.ProFormDraft.create(draftRecord);
+  }, [findExistingDraftBySessionId]);
+
+  const saveDraftNow = useCallback(async ({
+    status = 'draft',
+    submitError = '',
+    finalSubmissionId = ''
+  } = {}) => {
+    const now = new Date().toISOString();
+    const existingDraft = await findExistingDraftBySessionId(questionnaireSessionId);
+
+    const record = {
+      session_id: questionnaireSessionId,
+      business_name: businessNameParam || credentials.businessName || '',
+      domain: domainParam || credentials.domain || '',
+      user_id: credentials.userId || '',
+      user_name: credentials.userName || '',
+      user_email: credentials.userEmail || '',
+      status,
+      current_question_id: lastChangedQuestionIdRef.current || '',
+      last_changed_question_id: lastChangedQuestionIdRef.current || '',
+      responses_json: safeJsonStringify(responses),
+      validation_status_json: safeJsonStringify(validationStatus),
+      touched_questions_json: safeJsonStringify(touchedQuestions),
+      expanded_questions_json: safeJsonStringify(expandedQuestions),
+      metadata_json: safeJsonStringify({
+        app: 'pro_questionnaire',
+        source: 'real_time_draft',
+        pageUrl: window.location.href
+      }),
+      submit_error: submitError,
+      final_submission_id: finalSubmissionId,
+      submit_attempted_at: status === 'submit_attempted' || status === 'submit_failed' ? now : '',
+      submitted_at: status === 'submitted' ? now : '',
+      last_saved_at: now
+    };
+
+    if (existingDraft?.id) {
+      return base44.entities.ProFormDraft.update(existingDraft.id, record);
+    }
+
+    return base44.entities.ProFormDraft.create(record);
+  }, [
+    findExistingDraftBySessionId,
+    questionnaireSessionId,
+    businessNameParam,
+    credentials.businessName,
+    credentials.domain,
+    credentials.userId,
+    credentials.userName,
+    credentials.userEmail,
+    domainParam,
+    responses,
+    validationStatus,
+    touchedQuestions,
+    expandedQuestions
+  ]);
+
+  const queueDraftSave = useCallback((changedQuestionId, nextResponses = responses) => {
+    lastChangedQuestionIdRef.current = changedQuestionId;
+
+    if (draftSaveTimeoutRef.current) {
+      clearTimeout(draftSaveTimeoutRef.current);
+    }
+
+    draftSaveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await saveDraftSnapshot({
+          sessionId: questionnaireSessionId,
+          responses: nextResponses,
+          validationStatus,
+          touchedQuestions,
+          expandedQuestions,
+          credentials,
+          businessNameParam,
+          domainParam,
+          currentQuestionId: changedQuestionId,
+          lastChangedQuestionId: changedQuestionId,
+          status: 'draft'
+        });
+      } catch (error) {
+        console.error('Draft autosave failed:', serializeError(error));
+      }
+    }, 600);
+  }, [
+    questionnaireSessionId,
+    responses,
+    validationStatus,
+    touchedQuestions,
+    expandedQuestions,
+    credentials,
+    businessNameParam,
+    domainParam,
+    saveDraftSnapshot
+  ]);
+
   // Helper: dispatch only when status meaningfully changes
   const setValidationStatusIfChanged = (qid, next, snapshot) => {
     const prev = (snapshot ?? validationStatus)?.[qid] ?? '';
@@ -276,6 +486,7 @@ export default function ProQuestionnaire() {
 
     // Prepare merged snapshot for validation logic
     const newResponses = { ...responses, [questionId]: value };
+    queueDraftSave(questionId, newResponses);
     const answerMetadata = getSafeAnswerMetadata(
       value,
       newResponses?.[`${questionId}_other`]
@@ -318,7 +529,15 @@ export default function ProQuestionnaire() {
     // UI feedback + touched state for the specific control that changed
     setShowAutoSave(prev => prev + 1);
     dispatch(setTouchedQuestion({ questionId, touched: true }));
-  }, [dispatch, responses]);
+  }, [
+    dispatch,
+    responses,
+    hasTrackedStart,
+    validationStatus,
+    credentials.domain,
+    domainParam,
+    queueDraftSave
+  ]);
 
 
 
@@ -1059,9 +1278,18 @@ export default function ProQuestionnaire() {
         business_domain: domain || credentials.domain || domainParam || 'unknown'
       });
 
+      await saveDraftNow({
+        status: 'submit_attempted'
+      });
+
       const savedSubmission = await base44.entities.ProFormSubmission.create(
         transformedPayload
       );
+
+      await saveDraftNow({
+        status: 'submitted',
+        finalSubmissionId: savedSubmission?.id || ''
+      });
 
       try {
         await base44.functions.invoke('sendToZapier', transformedPayload);
@@ -1093,10 +1321,17 @@ export default function ProQuestionnaire() {
       console.error('ProFormSubmission.create failed:', serialized);
 
       try {
+        await saveDraftNow({
+          status: 'submit_failed',
+          submitError: JSON.stringify(serialized)
+        });
+
         localStorage.setItem(
           `failed_pro_submission_${Date.now()}`,
           JSON.stringify({
-            payload: transformedPayload,
+            session_id: questionnaireSessionId,
+            responses,
+            transformedPayload,
             error: serialized,
             createdAt: new Date().toISOString()
           })
