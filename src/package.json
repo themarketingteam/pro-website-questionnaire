@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run --config vitest.config.js --passWithNoTests",
-    "test:watch": "vitest --config vitest.config.js --passWithNoTests"
+    "test": "vitest run --config src/vitest.config.js --passWithNoTests",
+    "test:watch": "vitest --config src/vitest.config.js --passWithNoTests",
+    "check": "npm run lint && npm run test && npm run build"
   }
 }
