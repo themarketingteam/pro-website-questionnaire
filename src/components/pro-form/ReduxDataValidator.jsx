@@ -5,6 +5,8 @@ import { QUESTIONS } from '@/components/pro-form/questionData';
 import { getAllQuestionIds, getQuestionById } from '@/components/pro-form/questionUtils';
 
 export default function ReduxDataValidator() {
+  const isDev = import.meta.env.DEV;
+
   // Check if redux-data=true is in URL
   const urlParams = new URLSearchParams(window.location.search);
   const isEnabled = urlParams.get('redux-data') === 'true';
@@ -234,38 +236,38 @@ export default function ReduxDataValidator() {
 
     setValidationResults(results);
 
-    // Log detailed results to console
-    console.log('========================================');
-    console.log('🔍 REDUX DATA VALIDATION REPORT');
-    console.log('========================================');
-    console.log('Timestamp:', results.timestamp);
-    console.log('');
-    results.checks.forEach(check => {
-      console.log(check.passed ? '✅' : '❌', check.name);
-      console.log('   └─', check.details);
-    });
-    console.log('');
-    console.log('📊 FULL REDUX STATE:');
-    console.log('Responses:', responses);
-    console.log('Validation Status:', validationStatus);
-    console.log('Touched Questions:', touchedQuestions);
-    console.log('Expanded Questions:', expandedQuestions);
-    console.log('Credentials:', credentials);
-    
-    if (persistData) {
-      try {
-        const parsed = JSON.parse(persistData);
+    if (import.meta.env.DEV) {
+      console.log('========================================');
+      console.log('🔍 REDUX DATA VALIDATION REPORT');
+      console.log('========================================');
+      console.log('Timestamp:', results.timestamp);
+      console.log('');
+      results.checks.forEach(check => {
+        console.log(check.passed ? '✅' : '❌', check.name);
+        console.log('   └─', check.details);
+      });
+      console.log('');
+      console.log('Responses:', responses);
+      console.log('Validation Status:', validationStatus);
+      console.log('Touched Questions:', touchedQuestions);
+      console.log('Expanded Questions:', expandedQuestions);
+      console.log('Credentials summary:', {
+        hasBusinessName: Boolean(credentials?.businessName),
+        hasDomain: Boolean(credentials?.domain),
+        hasUserId: Boolean(credentials?.userId),
+        hasUserEmail: Boolean(credentials?.userEmail)
+      });
+
+      if (persistData) {
         console.log('');
-        console.log('💾 PERSISTED DATA IN LOCALSTORAGE:');
-        console.log(JSON.parse(parsed.form || '{}'));
-      } catch (e) {
-        console.error('Error parsing persisted data:', e);
+        console.log('💾 PERSISTED DATA IN LOCALSTORAGE: present');
       }
+
+      console.log('========================================');
     }
-    console.log('========================================');
   };
 
-  if (!isEnabled) {
+  if (!isDev || !isEnabled) {
     return null;
   }
 

@@ -30,7 +30,9 @@ export default function TextareaQuestion({
 
   const handleManualValidate = () => {
     if (!value || value.trim().length === 0) return;
-    console.log(`🔘 [Q${questionId}] Manual validation triggered`);
+    if (import.meta.env.DEV) {
+      console.log(`🔘 [Q${questionId}] Manual validation triggered`);
+    }
     setIsManualValidating(true);
     if (onTouched) onTouched();
   };

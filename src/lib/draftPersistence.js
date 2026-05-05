@@ -81,7 +81,8 @@ export const createSaveDraftSnapshot = ({
         app: 'pro_questionnaire',
         source: 'real_time_draft',
         userAgent: navigator.userAgent,
-        pageUrl: window.location.href
+        pagePath: window.location.pathname,
+        pageOrigin: window.location.origin
       }),
       save_error: saveError,
       submit_error: submitError,
