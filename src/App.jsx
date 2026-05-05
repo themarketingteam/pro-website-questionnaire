@@ -11,6 +11,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AdminSubmitIntake from './pages/AdminSubmitIntake';
+import ProFormDraftRecovery from './pages/ProFormDraftRecovery';
 
 const { Pages, Layout, mainPage } = pagesConfig;
 const mainPageKey = mainPage ?? Object.keys(Pages)[0];
@@ -66,6 +67,11 @@ const AuthenticatedApp = () => {
       <Route path="/admin/submit-intake" element={
         <LayoutWrapper currentPageName={"admin/submit-intake"}>
           <AdminSubmitIntake />
+        </LayoutWrapper>
+      } />
+      <Route path="/admin/draft-recovery" element={
+        <LayoutWrapper currentPageName={"admin/draft-recovery"}>
+          <ProFormDraftRecovery />
         </LayoutWrapper>
       } />
       <Route path="*" element={<PageNotFound />} />
