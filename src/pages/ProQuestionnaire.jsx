@@ -44,6 +44,7 @@ import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questi
 import { trackValidationDispatch, trackParentStatusChange, devDiagEnabled } from '@/lib/devDiagnostics';
 import { getQuestionById, getParentQuestionByChildId, getAllQuestionIds, isChildQuestion, computeParentValidationStatus } from '@/components/pro-form/questionUtils';
 import { doesChildParticipateInParentCompletion } from '@/components/pro-form/schemaPolicies';
+import { serializeError, validateSubmissionPayload } from '@/components/pro-form/submissionPayload';
 
 export default function ProQuestionnaire() {
   const dispatch = useDispatch();
@@ -88,18 +89,18 @@ export default function ProQuestionnaire() {
   // Extract and store credentials from URL
   useEffect(() => {
     const creds = {
-      businessName: businessNameParam,
-      domain: domainParam,
-      userId: urlParams.get('userId') || '',
-      userEmail: urlParams.get('userEmail') || '',
-      userName: urlParams.get('userName') || '',
-      accessToken: urlParams.get('accessToken') || ''
+    businessName: businessNameParam,
+    domain: domainParam,
+    userId: urlParams.get('userId') || '',
+    userEmail: urlParams.get('userEmail') || '',
+    userName: urlParams.get('userName') || '',
+    accessToken: urlParams.get('accessToken') || ''
     };
-    
+
     // Only store if at least one credential field is present
     if (Object.values(creds).some(val => val)) {
-      dispatch(setCredentials(creds));
-      console.log('✅ Credentials stored in Redux:', creds);
+    dispatch(setCredentials(creds));
+    console.log('✅ Credentials stored in Redux');
     }
   }, [businessNameParam, domainParam, dispatch]);
 
@@ -902,48 +903,69 @@ export default function ProQuestionnaire() {
   };
 
   const handleConfirmSubmit = async (businessName, domain) => {
-    // NOTE: Do NOT close the modal or set isSubmitting here.
-    // The modal manages its own submission state and will re-throw on failure
-    // so it can show an inline error without losing user input.
-    console.log('📤 [handleConfirmSubmit] Submission started for:', businessName);
+    const responseSnapshot = { ...responses };
+    const transformedPayload = transformResponsesToPayload(
+      responseSnapshot,
+      businessName,
+      domain
+    );
 
-    // Transform payload for both database and Zapier
-    const transformedPayload = transformResponsesToPayload(responses, businessName, domain);
-    
-    console.log('==========================================');
-    console.log('📤 FORM SUBMISSION - COMPLETE JSON PAYLOAD');
-    console.log('==========================================');
-    console.log(JSON.stringify(transformedPayload, null, 2));
-    console.log('==========================================');
+    const validation = validateSubmissionPayload(transformedPayload);
 
-    // Save to database — let errors throw so modal catches them
-    await base44.entities.ProFormSubmission.create(transformedPayload);
-    console.log('✅ Saved to database');
-
-    // Send to Zapier — non-fatal, log but don't throw
-    try {
-      console.log('📡 Sending to Zapier via backend function');
-      const zapierResult = await base44.functions.invoke('sendToZapier', transformedPayload);
-      console.log('📡 Backend function response:', zapierResult.data);
-      if (zapierResult.data?.success) {
-        console.log('✅ Successfully sent to Zapier');
-      } else {
-        console.error('❌ Zapier webhook failed:', zapierResult.data?.error);
-      }
-    } catch (zapierError) {
-      // Non-fatal: log but don't fail the submission
-      console.error('❌ Zapier webhook error (non-fatal):', zapierError.message);
+    if (!validation.ok) {
+      const message = `Invalid questionnaire payload: ${validation.errors.join(' ')}`;
+      console.error(message, validation.errors);
+      toast.error('The form could not be submitted because required submission data is incomplete.');
+      throw new Error(message);
     }
 
-    // Success — clear store, close modal, show thank you
-    dispatch(resetForm());
-    toast.success('Questionnaire submitted successfully!');
-    setSubmittedBusinessName(businessName);
-    setSubmittedDomain(domain);
-    setSubmittedFormData(responses);
-    setShowConfirmModal(false);
-    setShowThankYouModal(true);
-    console.log('✅ Submission complete for:', businessName);
+    try {
+      const savedSubmission = await base44.entities.ProFormSubmission.create(
+        transformedPayload
+      );
+
+      try {
+        await base44.functions.invoke('sendToZapier', transformedPayload);
+      } catch (zapierError) {
+        console.error(
+          'Zapier webhook failed after successful database save:',
+          serializeError(zapierError)
+        );
+      }
+
+      dispatch(resetForm());
+      toast.success('Questionnaire submitted successfully!');
+      setSubmittedBusinessName(businessName);
+      setSubmittedDomain(domain);
+      setSubmittedFormData(responseSnapshot);
+      setShowConfirmModal(false);
+      setShowThankYouModal(true);
+
+      return savedSubmission;
+    } catch (error) {
+      const serialized = serializeError(error);
+
+      console.error('ProFormSubmission.create failed:', serialized);
+
+      try {
+        localStorage.setItem(
+          `failed_pro_submission_${Date.now()}`,
+          JSON.stringify({
+            payload: transformedPayload,
+            error: serialized,
+            createdAt: new Date().toISOString()
+          })
+        );
+      } catch (storageError) {
+        console.error(
+          'Could not write failed submission backup:',
+          serializeError(storageError)
+        );
+      }
+
+      toast.error('Submission failed. Your answers were preserved locally so support can recover them.');
+      throw error;
+    }
   };
 
 
