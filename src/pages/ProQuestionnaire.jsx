@@ -52,6 +52,7 @@ import {
   normalizeTeamPhoto,
   normalizeGuarantees
 } from '@/components/pro-form/submissionPayload';
+import { submitProQuestionnaire, serializeSubmitError } from '@/lib/proQuestionnaireSubmit';
 import {
   identifyClarityUser,
   setClarityTags,
@@ -1245,97 +1246,7 @@ export default function ProQuestionnaire() {
     }
   };
 
-  const transformResponsesToPayload = (responses, businessName, domain) => {
-    const geographicAreas = normalizeGeographicAreas(
-      responses['5'] || [],
-      responses['5_primary'] || 0
-    );
 
-    const certificationsPartnerships = responses['12'] === 'yes'
-      ? normalizeCertifications(responses['12.1'] || [])
-      : [];
-
-    const teamPhoto = responses['2'] === 'yes'
-      ? normalizeTeamPhoto(responses['2.2'])
-      : { imageUrl: '', imageName: '', taggedPeople: [] };
-
-    const serviceGuaranteeItems = responses['14'] === 'yes'
-      ? normalizeGuarantees(responses['14.1'] || [])
-      : [];
-
-    const additionalPagesList = {
-      why_choose_us_page: {
-        generate_page: responses['1'] === 'yes',
-        why_choose_us_description: responses['1'] === 'yes' ? (responses['1.1'] || '') : ''
-      },
-      meet_the_team_page: {
-        generate_page: responses['2'] === 'yes',
-        team_introduction: responses['2'] === 'yes' ? (responses['2.1'] || '') : '',
-        team_photo_with_tags: teamPhoto
-      }
-    };
-
-    return {
-      metadata: {
-        business_name: businessName,
-        businessDomain: domain,
-        submission_datetime: new Date().toISOString(),
-        service_type: "pro"
-      },
-      userdata: {
-        additional_pages_list: additionalPagesList,
-        service_offerings: (responses['3'] || []).flatMap(s => {
-          if (s.startsWith('CATEGORY:')) {
-            const categoryName = s.replace('CATEGORY:', '');
-            return SERVICE_OPTIONS_GROUPED[categoryName] || [];
-          }
-          return [s];
-        }),
-        service_offerings_other: Array.isArray(responses['3_other']) 
-          ? responses['3_other'].filter(v => v?.trim()).join(', ') 
-          : (responses['3_other'] || ''),
-        target_industries: responses['4'] || [],
-        target_industries_other: Array.isArray(responses['4_other'])
-          ? responses['4_other'].filter(v => v?.trim()).join(', ')
-          : (responses['4_other'] || ''),
-        geographic_areas: geographicAreas,
-        company_description: responses['6'] || '',
-        delivery_model: responses['7'] || '',
-        delivery_model_other: responses['7_other'] || '',
-        pricing_packaging: responses['8'] || [],
-        pricing_packaging_other: responses['8_other'] || '',
-        differentiation: responses['9'] || '',
-        company_goals: responses['10'] || [],
-        company_goals_other: responses['10_other'] || '',
-        brand_tone: responses['11'] || '',
-        brand_tone_other: responses['11_other'] || '',
-        certifications_partnerships: certificationsPartnerships,
-        sales_process: responses['13'] || '',
-        service_guarantee: responses['14'] === 'yes',
-        service_guarantee_items: serviceGuaranteeItems,
-        client_acquisition: responses['15'] || '',
-        client_acquisition_other: responses['15_other'] || '',
-        website_objectives: responses['16'] || [],
-        website_objectives_other: responses['16_other'] || '',
-        client_size: responses['17'] || '',
-        client_challenges: responses['18'] || [],
-        client_challenges_other: Array.isArray(responses['18_other'])
-          ? responses['18_other'].filter(v => v?.trim()).join(', ')
-          : (responses['18_other'] || ''),
-        client_frustrations: responses['19'] || '',
-        client_outcomes: responses['20'] || [],
-        client_outcomes_other: Array.isArray(responses['20_other'])
-          ? responses['20_other'].filter(v => v?.trim()).join(', ')
-          : (responses['20_other'] || ''),
-        value_description: responses['21'] || '',
-        ideal_client: responses['22'] || '',
-        avoided_clients: responses['23'] === 'yes' ? (responses['23.1'] || '') : '',
-        primary_cta: responses['24'] || '',
-        primary_cta_other: responses['24_other'] || '',
-        additional_notes: responses['25'] === 'yes' ? (responses['25.1'] || '') : ''
-      }
-    };
-  };
 
   const handleConfirmSubmit = async (businessName, domain) => {
     if (draftSaveTimeoutRef.current) {
@@ -1343,134 +1254,40 @@ export default function ProQuestionnaire() {
       draftSaveTimeoutRef.current = null;
     }
 
-    const responseSnapshot = { ...responses };
-    const transformedPayload = transformResponsesToPayload(
-      responseSnapshot,
-      businessName,
-      domain
-    );
-
-    const validation = validateSubmissionPayload(transformedPayload);
-
-    if (!validation.ok) {
-      const message = `Invalid questionnaire payload: ${validation.errors.join(' ')}`;
-      console.error(message, validation.errors);
-      trackClarityEvent('pro_questionnaire_validation_failed', {
-        validation_failed_question_id: 'submission_payload',
-        business_domain: domain || credentials.domain || domainParam || 'unknown'
-      });
-      toast.error('The form could not be submitted because required submission data is incomplete.');
-      throw new Error(message);
-    }
-
     try {
-      trackClarityEvent('pro_questionnaire_submit_attempt', {
-        completed_questions: Object.keys(responseSnapshot).length,
-        submit_status: 'attempted',
-        business_domain: domain || credentials.domain || domainParam || 'unknown'
-      });
+      const result = await submitProQuestionnaire({
+        businessName,
+        domain,
+        responses,
+        validationStatus,
+        touchedQuestions,
+        expandedQuestions,
+        credentials,
+        domainParam,
+        questionnaireSessionId,
+        saveDraftNow,
+        createDraftEvent,
+        serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
+        onFinalSubmitSuccess: ({ savedSubmission, responseSnapshot }) => {
+          hasFinalSubmittedRef.current = true;
 
-      createDraftEvent({
-        eventType: 'submit_attempted',
-        questionId: '',
-        value: {
-          status: 'submit_attempted'
+          dispatch(resetForm());
+          toast.success('Questionnaire submitted successfully!');
+          setSubmittedBusinessName(businessName);
+          setSubmittedDomain(domain);
+          setSubmittedFormData(responseSnapshot);
+          setShowConfirmModal(false);
+          setShowThankYouModal(true);
+        },
+        onFinalSubmitFailure: () => {
+          // Failure toast is handled below after the final DB save failure is thrown.
         }
       });
 
-      await saveDraftNow({
-        status: 'submit_attempted',
-        responsesSnapshot: responseSnapshot
-      });
-
-      const savedSubmission = await base44.entities.ProFormSubmission.create(
-        transformedPayload
-      );
-
-      hasFinalSubmittedRef.current = true;
-
-      await saveDraftNow({
-        status: 'submitted',
-        finalSubmissionId: savedSubmission?.id || '',
-        responsesSnapshot: responseSnapshot
-      });
-
-      createDraftEvent({
-        eventType: 'submitted',
-        questionId: '',
-        value: {
-          status: 'submitted',
-          final_submission_id: savedSubmission?.id || ''
-        }
-      });
-
-      try {
-        await base44.functions.invoke('sendToZapier', transformedPayload);
-      } catch (zapierError) {
-        console.error(
-          'Zapier webhook failed after successful database save:',
-          serializeError(zapierError)
-        );
-      }
-
-      trackClarityEvent('pro_questionnaire_submit_success', {
-        completed_questions: Object.keys(responseSnapshot).length,
-        submit_status: 'success',
-        business_domain: domain || credentials.domain || domainParam || 'unknown'
-      });
-
-      dispatch(resetForm());
-      toast.success('Questionnaire submitted successfully!');
-      setSubmittedBusinessName(businessName);
-      setSubmittedDomain(domain);
-      setSubmittedFormData(responseSnapshot);
-      setShowConfirmModal(false);
-      setShowThankYouModal(true);
-
-      return savedSubmission;
+      return result.savedSubmission;
     } catch (error) {
-      const serialized = serializeError(error);
+      console.error('Questionnaire submit failed:', serializeSubmitError(error));
 
-      console.error('ProFormSubmission.create failed:', serialized);
-
-      try {
-        createDraftEvent({
-          eventType: 'submit_failed',
-          questionId: '',
-          value: {
-            status: 'submit_failed',
-            error_message: error?.message || 'unknown'
-          }
-        });
-
-        await saveDraftNow({
-          status: 'submit_failed',
-          submitError: JSON.stringify(serialized),
-          responsesSnapshot: responseSnapshot
-        });
-
-        localStorage.setItem(
-          `failed_pro_submission_${Date.now()}`,
-          JSON.stringify({
-            session_id: questionnaireSessionId,
-            responses: responseSnapshot,
-            transformedPayload,
-            error: serialized,
-            createdAt: new Date().toISOString()
-          })
-        );
-      } catch (storageError) {
-        console.error(
-          'Could not write failed submission backup:',
-          serializeError(storageError)
-        );
-      }
-
-      trackClarityEvent('pro_questionnaire_submit_failed', {
-        submit_status: 'failed',
-        business_domain: domain || credentials.domain || domainParam || 'unknown',
-        error_message: error?.message || 'unknown'
-      });
       toast.error('Submission failed. Your answers were preserved locally so support can recover them.');
       throw error;
     }
