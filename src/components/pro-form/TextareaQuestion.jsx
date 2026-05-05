@@ -129,7 +129,7 @@ export default function TextareaQuestion({
             {validation.charCount > 0 && (
               <p className="text-xs mt-1 opacity-75">
                 Character count: {validation.charCount}
-                {validation.expectedRange && ` • Expected range: ${validation.expectedRange}`}
+                {validation.expectedRange && ` • ${validation.expectedRange}`}
               </p>
             )}
           </div>

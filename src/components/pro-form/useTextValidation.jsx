@@ -118,10 +118,10 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
           error: error
         });
       }
-      // Fallback to neutral on error
+      // Fallback to visible warning on error
       setValidationState({
-        status: 'neutral',
-        message: '',
+        status: 'yellow',
+        message: 'Unable to complete the AI quality check right now. Please review that your answer is specific and includes enough client-relevant detail.',
         charCount: text.length,
         expectedRange: null
       });
