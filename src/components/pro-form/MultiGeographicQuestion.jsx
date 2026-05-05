@@ -370,7 +370,8 @@ export default function MultiGeographicQuestion({
             <>
               <div
                 ref={autocompleteContainerRef}
-                className="w-full bg-transparent"
+                className="w-full bg-transparent border-0 outline-none ring-0 shadow-none"
+                style={{ border: 'none', outline: 'none', boxShadow: 'none' }}
                 aria-label="Search for a city, county, or region"
               />
 
