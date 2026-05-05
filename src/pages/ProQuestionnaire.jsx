@@ -44,14 +44,7 @@ import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questi
 import { trackValidationDispatch, trackParentStatusChange, devDiagEnabled } from '@/lib/devDiagnostics';
 import { getQuestionById, getParentQuestionByChildId, getAllQuestionIds, isChildQuestion, computeParentValidationStatus } from '@/components/pro-form/questionUtils';
 import { doesChildParticipateInParentCompletion } from '@/components/pro-form/schemaPolicies';
-import {
-  serializeError,
-  validateSubmissionPayload,
-  normalizeGeographicAreas,
-  normalizeCertifications,
-  normalizeTeamPhoto,
-  normalizeGuarantees
-} from '@/components/pro-form/submissionPayload';
+import { serializeError } from '@/components/pro-form/submissionPayload';
 import { submitProQuestionnaire, serializeSubmitError } from '@/lib/proQuestionnaireSubmit';
 import {
   identifyClarityUser,
