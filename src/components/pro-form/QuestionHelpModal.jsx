@@ -16,6 +16,9 @@ export default function QuestionHelpModal({ open, onClose, title, why, guidance,
           <DialogTitle className="text-lg font-semibold text-slate-900 pr-6">
             {title}
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Help and guidance for this questionnaire question, including why it is asked and example answers.
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-5 mt-2">
