@@ -41,7 +41,15 @@ export default function RadioQuestion({
               checked={checked}
               onChange={() => {
                 onChange(option);
-                if (showOther && onOtherChange) onOtherChange(''); // clear other on normal selection
+
+                const shouldClearOther =
+                  showOther &&
+                  onOtherChange &&
+                  (value === 'Other' || isLegacyOtherSelected || !!otherValue);
+
+                if (shouldClearOther) {
+                  onOtherChange('');
+                }
               }}
               className="sr-only"
             />

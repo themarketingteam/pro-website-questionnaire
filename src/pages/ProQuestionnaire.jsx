@@ -260,12 +260,26 @@ export default function ProQuestionnaire() {
     // Prepare merged snapshot for validation logic
     const newResponses = { ...responses, [questionId]: value };
 
-    // If an auxiliary `_other` field changed, also revalidate the owning base question
+    // If an auxiliary `_other` field changed, revalidate the owning base question only when `_other` is relevant
     if (questionId.endsWith('_other')) {
       const baseId = questionId.slice(0, -6);
+      const baseQuestion = getQuestionById(QUESTIONS, baseId);
       const baseVal = newResponses[baseId];
-      // Re-run validation for the base question (radio logic checks `${baseId}_other` itself)
-      updateQuestionValidation(baseId, baseVal, newResponses);
+
+      const shouldRevalidateBase =
+        baseQuestion?.type !== 'radio' ||
+        baseVal === 'Other' ||
+        (
+          baseQuestion?.showOther &&
+          baseVal &&
+          Array.isArray(baseQuestion.options) &&
+          !baseQuestion.options.includes(baseVal)
+        );
+
+      if (shouldRevalidateBase) {
+        updateQuestionValidation(baseId, baseVal, newResponses);
+      }
+
       // Mark the base question as touched so icons/lists reflect the latest state immediately
       dispatch(setTouchedQuestion({ questionId: baseId, touched: true }));
     } else {
@@ -366,10 +380,31 @@ export default function ProQuestionnaire() {
       }
 
       case 'radio': {
-        const inOptions = Array.isArray(question.options) && question.options.includes(value);
-        const isOtherSelected = value === 'Other' || (question.showOther && value && !inOptions);
-        newStatus = (value && (isOtherSelected ? (allResponses[`${questionId}_other`]?.trim()) : true))
-          ? 'complete' : 'incomplete';
+        const inOptions =
+          Array.isArray(question.options) &&
+          question.options.includes(value);
+
+        const isOtherSelected =
+          question.showOther &&
+          (
+            value === 'Other' ||
+            (value && !inOptions)
+          );
+
+        if (!value) {
+          newStatus = 'incomplete';
+        } else if (isOtherSelected) {
+          const otherText = allResponses[`${questionId}_other`];
+          newStatus =
+            typeof otherText === 'string' && otherText.trim().length > 0
+              ? 'complete'
+              : 'incomplete';
+        } else if (inOptions) {
+          newStatus = 'complete';
+        } else {
+          newStatus = 'incomplete';
+        }
+
         break;
       }
 
@@ -606,9 +641,24 @@ export default function ProQuestionnaire() {
       }
       
       case 'radio': {
-        const inOptions = Array.isArray(question.options) && question.options.includes(answer);
-        const isOtherSelected = answer === 'Other' || (question.showOther && answer && !inOptions);
-        return !!answer && (isOtherSelected ? (otherValue && otherValue.trim()) : true);
+        const inOptions =
+          Array.isArray(question.options) &&
+          question.options.includes(answer);
+
+        const isOtherSelected =
+          question.showOther &&
+          (
+            answer === 'Other' ||
+            (answer && !inOptions)
+          );
+
+        if (!answer) return false;
+
+        if (isOtherSelected) {
+          return typeof otherValue === 'string' && otherValue.trim().length > 0;
+        }
+
+        return inOptions;
       }
       
       case 'textarea': {
