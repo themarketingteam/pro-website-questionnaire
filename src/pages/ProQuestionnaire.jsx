@@ -45,6 +45,11 @@ import { trackValidationDispatch, trackParentStatusChange, devDiagEnabled } from
 import { getQuestionById, getParentQuestionByChildId, getAllQuestionIds, isChildQuestion, computeParentValidationStatus } from '@/components/pro-form/questionUtils';
 import { doesChildParticipateInParentCompletion } from '@/components/pro-form/schemaPolicies';
 import { serializeError, validateSubmissionPayload } from '@/components/pro-form/submissionPayload';
+import {
+  identifyClarityUser,
+  setClarityTags,
+  trackClarityEvent
+} from '@/lib/clarity';
 
 export default function ProQuestionnaire() {
   const dispatch = useDispatch();
@@ -65,6 +70,7 @@ export default function ProQuestionnaire() {
   const [showIncompleteList, setShowIncompleteList] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [validatingQuestions, setValidatingQuestions] = useState([]);
+  const [hasTrackedStart, setHasTrackedStart] = useState(false);
 
   // Extract URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -114,6 +120,35 @@ export default function ProQuestionnaire() {
     link.href = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6925fec3678942d22522b010/96c140c55_kaseya-logo.png';
     document.head.appendChild(link);
   }, []);
+
+  useEffect(() => {
+    const safeDomain = domainParam || credentials.domain || 'unknown';
+    const safeBusinessNamePresent = businessNameParam ? 'true' : 'false';
+
+    setClarityTags({
+      app: 'pro_questionnaire',
+      service_type: 'pro',
+      business_domain: safeDomain,
+      business_name_present: safeBusinessNamePresent
+    });
+
+    if (credentials.userId) {
+      identifyClarityUser({
+        userId: credentials.userId,
+        pageId: window.location.pathname,
+        friendlyName: businessNameParam || domainParam || 'Pro Questionnaire Client'
+      });
+    }
+
+    trackClarityEvent('pro_questionnaire_loaded', {
+      business_domain: safeDomain
+    });
+  }, [
+    businessNameParam,
+    domainParam,
+    credentials.userId,
+    credentials.domain
+  ]);
 
   // Initialize expanded questions on mount
   useEffect(() => {
@@ -187,6 +222,13 @@ export default function ProQuestionnaire() {
   // No more cookie saving - Redux persist handles everything automatically
 
   const updateResponse = useCallback((questionId, value) => {
+    if (!hasTrackedStart) {
+      trackClarityEvent('pro_questionnaire_started', {
+        first_question_id: questionId
+      });
+      setHasTrackedStart(true);
+    }
+
     // Persist the field change first
     dispatch(setResponse({ questionId, value }));
 
@@ -746,6 +788,11 @@ export default function ProQuestionnaire() {
         failures.forEach((questionId) => {
           dispatch(setValidationStatus({ questionId, status: 'incomplete' }));
           dispatch(setTouchedQuestion({ questionId, touched: true }));
+          trackClarityEvent('pro_questionnaire_validation_failed', {
+            validation_failed_question_id: questionId,
+            current_question_id: questionId,
+            business_domain: credentials.domain || domainParam || 'unknown'
+          });
         });
         toast.error('Please fix the highlighted responses before submitting.');
         return false;
@@ -914,11 +961,20 @@ export default function ProQuestionnaire() {
     if (!validation.ok) {
       const message = `Invalid questionnaire payload: ${validation.errors.join(' ')}`;
       console.error(message, validation.errors);
+      trackClarityEvent('pro_questionnaire_validation_failed', {
+        validation_failed_question_id: 'submission_payload',
+        business_domain: domain || credentials.domain || domainParam || 'unknown'
+      });
       toast.error('The form could not be submitted because required submission data is incomplete.');
       throw new Error(message);
     }
 
     try {
+      trackClarityEvent('pro_questionnaire_submit_attempt', {
+        completed_questions: Object.keys(responseSnapshot).length,
+        business_domain: domain || credentials.domain || domainParam || 'unknown'
+      });
+
       const savedSubmission = await base44.entities.ProFormSubmission.create(
         transformedPayload
       );
@@ -931,6 +987,10 @@ export default function ProQuestionnaire() {
           serializeError(zapierError)
         );
       }
+
+      trackClarityEvent('pro_questionnaire_submit_success', {
+        business_domain: domain || credentials.domain || domainParam || 'unknown'
+      });
 
       dispatch(resetForm());
       toast.success('Questionnaire submitted successfully!');
@@ -962,6 +1022,10 @@ export default function ProQuestionnaire() {
         );
       }
 
+      trackClarityEvent('pro_questionnaire_submit_failed', {
+        business_domain: domain || credentials.domain || domainParam || 'unknown',
+        error_message: error?.message || 'unknown'
+      });
       toast.error('Submission failed. Your answers were preserved locally so support can recover them.');
       throw error;
     }

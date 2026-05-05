@@ -3,6 +3,7 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { QUESTIONS } from './questionData';
 import { formatAnswerForDisplay, escapeHtml } from './answerFormatting';
+import { trackClarityEvent } from '@/lib/clarity';
 
 export const generatePDF = async (formData, businessName, domain) => {
   // Create a condensed business name for filename
@@ -169,6 +170,9 @@ export const generatePDF = async (formData, businessName, domain) => {
 
     // Download PDF
     pdf.save(filename);
+    trackClarityEvent('pro_questionnaire_pdf_downloaded', {
+      business_domain: domain || 'unknown'
+    });
 
     return { success: true, filename };
   } catch (error) {
