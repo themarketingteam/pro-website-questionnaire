@@ -228,6 +228,17 @@ export default function MultiGeographicQuestion({
           width: 100%;
           display: block;
           background: transparent;
+          outline: none;
+          box-shadow: none;
+          border: none;
+        }
+
+        gmp-place-autocomplete:focus,
+        gmp-place-autocomplete:focus-visible,
+        gmp-place-autocomplete:focus-within {
+          outline: none;
+          box-shadow: none;
+          border: none;
         }
 
         gmp-place-autocomplete::part(input) {
