@@ -2,6 +2,7 @@ import React from 'react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { QUESTIONS } from './questionData';
+import { formatAnswerForDisplay, escapeHtml } from './answerFormatting';
 
 export const generatePDF = async (formData, businessName, domain) => {
   // Create a condensed business name for filename
@@ -29,33 +30,6 @@ export const generatePDF = async (formData, businessName, domain) => {
   container.style.fontFamily = 'system-ui, -apple-system, sans-serif';
   document.body.appendChild(container);
 
-  // Helper function to format answers
-  const formatAnswer = (questionId, answer, otherValue) => {
-    if (!answer && !otherValue) return 'Not answered';
-    
-    let mainAnswer = '';
-    if (Array.isArray(answer)) {
-      mainAnswer = answer.length > 0 ? answer.join(', ') : '';
-    } else if (typeof answer === 'string') {
-      mainAnswer = answer;
-    } else if (typeof answer === 'object' && answer !== null) {
-      // Handle complex objects (like geographic areas, certifications, etc.)
-      return JSON.stringify(answer, null, 2);
-    }
-
-    if (otherValue) {
-      if (Array.isArray(otherValue)) {
-        const filtered = otherValue.filter(v => v?.trim());
-        if (filtered.length > 0) {
-          return mainAnswer ? `${mainAnswer}, Other: ${filtered.join(', ')}` : `Other: ${filtered.join(', ')}`;
-        }
-      } else if (otherValue.trim()) {
-        return mainAnswer ? `${mainAnswer}, Other: ${otherValue}` : `Other: ${otherValue}`;
-      }
-    }
-
-    return mainAnswer || 'Not answered';
-  };
 
   // Build grouped answers
   const groupedAnswers = QUESTIONS.reduce((acc, question) => {
@@ -69,7 +43,7 @@ export const generatePDF = async (formData, businessName, domain) => {
     acc[question.section].push({
       id: question.id,
       title: question.title,
-      answer: formatAnswer(question.id, answer, otherValue),
+      answer: formatAnswerForDisplay(question.id, answer, otherValue, formData),
       hasConditional: question.conditionalChildren && answer === 'yes'
     });
 
@@ -81,7 +55,7 @@ export const generatePDF = async (formData, businessName, domain) => {
         acc[question.section].push({
           id: child.id,
           title: child.title,
-          answer: formatAnswer(child.id, childAnswer, childOther),
+          answer: formatAnswerForDisplay(child.id, childAnswer, childOther, formData),
           isChild: true
         });
       });
@@ -91,6 +65,14 @@ export const generatePDF = async (formData, businessName, domain) => {
   }, {});
 
   // Build HTML content with styling
+  const safeBusinessName = escapeHtml(businessName);
+  const safeDomain = escapeHtml(domain);
+  const safeSubmissionDate = escapeHtml(new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  }));
+
   let htmlContent = `
     <div style="font-family: system-ui, -apple-system, sans-serif; color: #1e293b; line-height: 1.6;">
       <!-- Header -->
@@ -104,19 +86,15 @@ export const generatePDF = async (formData, businessName, domain) => {
         <h2 style="margin: 0 0 15px 0; font-size: 20px; font-weight: 600; color: #1e3a8a;">Business Information</h2>
         <div style="margin-bottom: 10px;">
           <span style="font-weight: 600; color: #475569;">Business Name:</span>
-          <span style="margin-left: 8px; color: #1e293b;">${businessName}</span>
+          <span style="margin-left: 8px; color: #1e293b;">${safeBusinessName}</span>
         </div>
         <div style="margin-bottom: 10px;">
           <span style="font-weight: 600; color: #475569;">Domain:</span>
-          <span style="margin-left: 8px; color: #1e293b;">${domain}</span>
+          <span style="margin-left: 8px; color: #1e293b;">${safeDomain}</span>
         </div>
         <div>
           <span style="font-weight: 600; color: #475569;">Submission Date:</span>
-          <span style="margin-left: 8px; color: #1e293b;">${new Date().toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}</span>
+          <span style="margin-left: 8px; color: #1e293b;">${safeSubmissionDate}</span>
         </div>
       </div>
   `;
@@ -126,7 +104,7 @@ export const generatePDF = async (formData, businessName, domain) => {
     htmlContent += `
       <div style="margin-bottom: 30px;">
         <h2 style="font-size: 20px; font-weight: 600; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 15px;">
-          ${sectionName}
+          ${escapeHtml(sectionName)}
         </h2>
     `;
 
@@ -135,14 +113,16 @@ export const generatePDF = async (formData, businessName, domain) => {
       const marginLeft = isChild ? '30px' : '0';
       const borderLeft = isChild ? '3px solid #3b82f6' : '4px solid #1e3a8a';
       const paddingLeft = isChild ? '15px' : '15px';
+      const safeTitle = escapeHtml(q.title);
+      const safeAnswer = escapeHtml(q.answer).replace(/\n/g, '<br />');
 
       htmlContent += `
         <div style="background: #f8fafc; border-radius: 8px; padding: 15px; margin-bottom: 12px; margin-left: ${marginLeft}; border-left: ${borderLeft}; padding-left: ${paddingLeft};">
           <div style="font-size: 14px; font-weight: 600; color: #475569; margin-bottom: 6px;">
-            Question ${q.id}: ${q.title}
+            Question ${q.id}: ${safeTitle}
           </div>
           <div style="font-size: 14px; color: #64748b; word-wrap: break-word; white-space: pre-wrap;">
-            ${q.answer}
+            ${safeAnswer}
           </div>
         </div>
       `;
@@ -155,7 +135,7 @@ export const generatePDF = async (formData, businessName, domain) => {
       <!-- Footer -->
       <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid #e2e8f0; text-align: center; color: #64748b; font-size: 12px;">
         <p style="margin: 0;">Generated by MSP Success - Pro Website Content Questionnaire</p>
-        <p style="margin: 5px 0 0 0;">${new Date().toLocaleString('en-US')}</p>
+        <p style="margin: 5px 0 0 0;">${escapeHtml(new Date().toLocaleString('en-US'))}</p>
       </div>
     </div>
   `;

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Download, Loader2 } from 'lucide-react';
 import { QUESTIONS } from './questionData';
 import { generatePDF } from './PDFGenerator';
+import { formatAnswerForDisplay } from './answerFormatting';
 import { toast } from 'sonner';
 
 const cleanDomainForSubmission = (domainStr) => {
@@ -112,29 +113,6 @@ export default function ConfirmModal({
     if (e.target === e.currentTarget && !isSubmitting) onCancel();
   };
 
-  const formatAnswer = (questionId, answer, otherValue) => {
-    if (!answer && !otherValue) return 'Not answered';
-    
-    let mainAnswer = '';
-    if (Array.isArray(answer)) {
-      mainAnswer = answer.length > 0 ? answer.join(', ') : '';
-    } else if (typeof answer === 'string') {
-      mainAnswer = answer;
-    }
-
-    if (otherValue) {
-      if (Array.isArray(otherValue)) {
-        const filtered = otherValue.filter(v => v?.trim());
-        if (filtered.length > 0) {
-          return mainAnswer ? `${mainAnswer}, Other: ${filtered.join(', ')}` : `Other: ${filtered.join(', ')}`;
-        }
-      } else if (otherValue.trim()) {
-        return mainAnswer ? `${mainAnswer}, Other: ${otherValue}` : `Other: ${otherValue}`;
-      }
-    }
-
-    return mainAnswer || 'Not answered';
-  };
 
   const groupedAnswers = QUESTIONS.reduce((acc, question) => {
     if (!acc[question.section]) {
@@ -147,7 +125,7 @@ export default function ConfirmModal({
     acc[question.section].push({
       id: question.id,
       title: question.title,
-      answer: formatAnswer(question.id, answer, otherValue),
+      answer: formatAnswerForDisplay(question.id, answer, otherValue, formData),
       hasConditional: question.conditionalChildren && answer === 'yes'
     });
 
@@ -159,7 +137,7 @@ export default function ConfirmModal({
         acc[question.section].push({
           id: child.id,
           title: child.title,
-          answer: formatAnswer(child.id, childAnswer, childOther),
+          answer: formatAnswerForDisplay(child.id, childAnswer, childOther, formData),
           isChild: true
         });
       });
@@ -252,7 +230,7 @@ export default function ConfirmModal({
                   <div className="text-sm font-medium text-slate-700 mb-1">
                     Question {q.id}: {q.title}
                   </div>
-                  <div className="text-sm text-slate-600">
+                  <div className="text-sm text-slate-600 whitespace-pre-line">
                     {q.answer}
                   </div>
                 </div>
