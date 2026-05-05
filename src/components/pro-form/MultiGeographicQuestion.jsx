@@ -21,7 +21,6 @@ export default function MultiGeographicQuestion({
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [currentInput, setCurrentInput] = useState("");
   const [manualInput, setManualInput] = useState("");
   const [showManualEntry, setShowManualEntry] = useState(false);
 
@@ -64,10 +63,10 @@ export default function MultiGeographicQuestion({
     loadGooglePlaces(0);
   }, []);
 
+  const autocompleteCleanupRef = useRef(null);
+
   useEffect(() => {
     if (!isScriptLoaded || !autocompleteContainerRef.current || loadError) return;
-
-    let placeAutocomplete = autocompleteRef.current;
 
     const buildMetaFromPlace = async (place) => {
       if (!place) return null;
@@ -76,9 +75,7 @@ export default function MultiGeographicQuestion({
         await place.fetchFields({ fields: PLACE_FIELDS });
       }
 
-      if (!place.location) {
-        return null;
-      }
+      if (!place.location) return null;
 
       const addressComponents = place.addressComponents || [];
       const isContinent =
@@ -90,7 +87,10 @@ export default function MultiGeographicQuestion({
         return null;
       }
 
-      const locationName = place.formattedAddress || place.displayName || "";
+      const displayName = typeof place.displayName === "string"
+        ? place.displayName
+        : place.displayName?.text || "";
+      const locationName = place.formattedAddress || displayName || "";
       const isState = US_STATES.some((state) => locationName.includes(state) && !locationName.includes(","));
       const isCounty = locationName.toLowerCase().includes("county");
       const isCity = !isState && !isCounty && addressComponents.some((component) =>
@@ -115,14 +115,19 @@ export default function MultiGeographicQuestion({
 
     const mountAutocomplete = async () => {
       try {
+        let placeAutocomplete = autocompleteRef.current;
+
         if (!placeAutocomplete) {
-          placeAutocomplete = new google.maps.places.PlaceAutocompleteElement({
+          placeAutocomplete = new window.google.maps.places.PlaceAutocompleteElement({
             includedPrimaryTypes: ["locality", "administrative_area_level_1", "administrative_area_level_2", "postal_town", "sublocality"]
           });
-          placeAutocompleteRefCleanup();
           autocompleteContainerRef.current.innerHTML = "";
           autocompleteContainerRef.current.appendChild(placeAutocomplete);
           autocompleteRef.current = placeAutocomplete;
+        }
+
+        if (autocompleteCleanupRef.current) {
+          autocompleteCleanupRef.current();
         }
 
         const handlePlaceSelect = async ({ placePrediction }) => {
@@ -130,7 +135,6 @@ export default function MultiGeographicQuestion({
           const meta = await buildMetaFromPlace(place);
 
           if (!meta) return;
-
           if (selectedLocationsRef.current.some((loc) => loc.place_id === meta.place_id)) {
             alert("This location has already been added.");
             return;
@@ -140,8 +144,8 @@ export default function MultiGeographicQuestion({
         };
 
         placeAutocomplete.addEventListener("gmp-select", handlePlaceSelect);
-        placeAutocompleteRefCleanup.current = () => {
-          placeAutocomplete?.removeEventListener("gmp-select", handlePlaceSelect);
+        autocompleteCleanupRef.current = () => {
+          placeAutocomplete.removeEventListener("gmp-select", handlePlaceSelect);
         };
       } catch {
         setLoadError(true);
@@ -149,17 +153,15 @@ export default function MultiGeographicQuestion({
       }
     };
 
-    const placeAutocompleteRefCleanup = placeAutocompleteRefCleanup || { current: null };
     mountAutocomplete();
 
     return () => {
-      if (placeAutocompleteRefCleanup.current) {
-        placeAutocompleteRefCleanup.current();
+      if (autocompleteCleanupRef.current) {
+        autocompleteCleanupRef.current();
+        autocompleteCleanupRef.current = null;
       }
     };
   }, [isScriptLoaded, loadError, onAdd]);
-
-  const autocompleteCleanupRef = useRef(null);
 
   const canAddMore = selectedLocations.length < maxLocations;
 
