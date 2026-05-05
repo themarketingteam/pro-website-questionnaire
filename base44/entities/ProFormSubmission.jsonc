@@ -1,0 +1,391 @@
+{
+  "name": "ProFormSubmission",
+  "type": "object",
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "business_name": {
+          "type": "string",
+          "description": "The business name"
+        },
+        "businessDomain": {
+          "type": "string",
+          "description": "The business domain"
+        },
+        "submission_datetime": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the form was submitted"
+        },
+        "service_type": {
+          "type": "string",
+          "default": "pro",
+          "description": "The service tier (pro, essentials, etc.)"
+        }
+      }
+    },
+    "userdata": {
+      "type": "object",
+      "properties": {
+        "additional_pages_list": {
+          "type": "object",
+          "description": "Optional additional pages configuration",
+          "properties": {
+            "why_choose_us_page": {
+              "type": "object",
+              "properties": {
+                "generate_page": {
+                  "type": "boolean",
+                  "description": "If true, generate a Why Choose Us page. Based on Q1."
+                },
+                "why_choose_us_description": {
+                  "type": "string",
+                  "description": "Q1.1: Description for the Why Choose Us page"
+                }
+              }
+            },
+            "meet_the_team_page": {
+              "type": "object",
+              "properties": {
+                "generate_page": {
+                  "type": "boolean",
+                  "description": "If true, generate a Meet the Team page. Based on Q2."
+                },
+                "team_introduction": {
+                  "type": "string",
+                  "description": "Q2.1: Introduction text for the Meet the Team page"
+                },
+                "team_photo_with_tags": {
+                  "type": "object",
+                  "description": "Q2.2: Team photo and tagged team members",
+                  "properties": {
+                    "imageUrl": {
+                      "type": "string",
+                      "description": "URL of the team photo"
+                    },
+                    "taggedPeople": {
+                      "type": "array",
+                      "description": "Array of team members tagged in the photo",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "description": "Team member's name"
+                          },
+                          "position": {
+                            "type": "string",
+                            "description": "Team member's position/title"
+                          },
+                          "bio": {
+                            "type": "string",
+                            "description": "Team member's biography"
+                          },
+                          "x": {
+                            "type": "number",
+                            "description": "X coordinate of tag on image"
+                          },
+                          "y": {
+                            "type": "number",
+                            "description": "Y coordinate of tag on image"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "service_offerings": {
+          "type": "array",
+          "description": "Q3: Selected service offerings from predefined list",
+          "items": {
+            "type": "string"
+          }
+        },
+        "service_offerings_other": {
+          "type": "string",
+          "description": "Q3: Custom service offerings not in predefined list"
+        },
+        "target_industries": {
+          "type": "array",
+          "description": "Q4: Selected target industries from predefined list",
+          "items": {
+            "type": "string"
+          }
+        },
+        "target_industries_other": {
+          "type": "string",
+          "description": "Q4: Custom target industries not in predefined list"
+        },
+        "geographic_areas": {
+          "type": "array",
+          "description": "Q5: Geographic areas served with location metadata",
+          "items": {
+            "type": "object",
+            "properties": {
+              "geographic_area_meta": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Location name"
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "Full location label"
+                  },
+                  "lat": {
+                    "type": "string",
+                    "description": "Latitude"
+                  },
+                  "lon": {
+                    "type": "string",
+                    "description": "Longitude"
+                  },
+                  "place_id": {
+                    "type": "string",
+                    "description": "Google Places ID"
+                  },
+                  "source": {
+                    "type": "string",
+                    "description": "Data source (e.g., 'google')"
+                  },
+                  "primary": {
+                    "type": "boolean",
+                    "description": "True if this is the primary service location"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "company_description": {
+          "type": "string",
+          "description": "Q6: Company description and history"
+        },
+        "delivery_model": {
+          "type": "string",
+          "description": "Q7: How services are delivered (on-site, remote, hybrid)"
+        },
+        "delivery_model_other": {
+          "type": "string",
+          "description": "Q7: Custom delivery model if 'Other' was selected"
+        },
+        "pricing_packaging": {
+          "type": "array",
+          "description": "Q8: Pricing and packaging models",
+          "items": {
+            "type": "string"
+          }
+        },
+        "pricing_packaging_other": {
+          "type": "string",
+          "description": "Q8: Custom pricing model if 'Other' was selected"
+        },
+        "differentiation": {
+          "type": "string",
+          "description": "Q9: What makes the company different from competitors"
+        },
+        "company_goals": {
+          "type": "array",
+          "description": "Q10: Company goals for the website",
+          "items": {
+            "type": "string"
+          }
+        },
+        "company_goals_other": {
+          "type": "string",
+          "description": "Q10: Custom goals not in predefined list"
+        },
+        "brand_tone": {
+          "type": "string",
+          "description": "Q11: Desired brand tone and voice"
+        },
+        "brand_tone_other": {
+          "type": "string",
+          "description": "Q11: Custom brand tone if 'Other' was selected"
+        },
+        "certifications_partnerships": {
+          "type": "array",
+          "description": "Q12.1: Certifications, awards, and partnerships (only if Q12 is yes)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cert_item_name": {
+                "type": "string",
+                "description": "Name of certification/partnership"
+              },
+              "cert_item_type": {
+                "type": "string",
+                "description": "Type: certification, accolade, award, or partnership"
+              },
+              "cert_item_image_url": {
+                "type": "string",
+                "description": "Badge or logo image URL"
+              },
+              "cert_item_file_url": {
+                "type": "string",
+                "description": "Supporting document URL"
+              }
+            }
+          }
+        },
+        "sales_process": {
+          "type": "string",
+          "description": "Q13: Sales process and client onboarding"
+        },
+        "service_guarantee": {
+          "type": "boolean",
+          "description": "Q14: If true, the company offers service guarantees/warranties/SLAs. If false, they do not."
+        },
+        "service_guarantee_items": {
+          "type": "array",
+          "description": "Q14.1: Service guarantees, warranties, and SLAs (only if service_guarantee is true)",
+          "items": {
+            "type": "object",
+            "properties": {
+              "guarantee_name": {
+                "type": "string",
+                "description": "Name of the guarantee"
+              },
+              "guarantee_type": {
+                "type": "string",
+                "description": "Type: warranty, guarantee, or sla"
+              },
+              "guarantee_file_url": {
+                "type": "string",
+                "description": "Supporting document URL"
+              },
+              "guarantee_description": {
+                "type": "string",
+                "description": "Description of the guarantee"
+              }
+            }
+          }
+        },
+        "client_acquisition": {
+          "type": "string",
+          "description": "Q15: How the company currently acquires clients"
+        },
+        "client_acquisition_other": {
+          "type": "string",
+          "description": "Q15: Custom acquisition method if 'Other' was selected"
+        },
+        "website_objectives": {
+          "type": "array",
+          "description": "Q16: Primary objectives for the website",
+          "items": {
+            "type": "string"
+          }
+        },
+        "website_objectives_other": {
+          "type": "string",
+          "description": "Q16: Custom objectives not in predefined list"
+        },
+        "client_size": {
+          "type": "string",
+          "description": "Q17: Typical client company size (e.g., '10-100 employees')"
+        },
+        "client_challenges": {
+          "type": "array",
+          "description": "Q18: Challenges that ideal clients face",
+          "items": {
+            "type": "string"
+          }
+        },
+        "client_challenges_other": {
+          "type": "string",
+          "description": "Q18: Custom challenges not in predefined list"
+        },
+        "client_frustrations": {
+          "type": "string",
+          "description": "Q19: Client frustrations and pain points"
+        },
+        "client_outcomes": {
+          "type": "array",
+          "description": "Q20: Desired outcomes for clients",
+          "items": {
+            "type": "string"
+          }
+        },
+        "client_outcomes_other": {
+          "type": "string",
+          "description": "Q20: Custom outcomes not in predefined list"
+        },
+        "value_description": {
+          "type": "string",
+          "description": "Q21: How the company delivers value to clients"
+        },
+        "ideal_client": {
+          "type": "string",
+          "description": "Q22: Description of the ideal client profile"
+        },
+        "avoided_clients": {
+          "type": "string",
+          "description": "Q23.1: Types of clients to avoid (only if Q23 is yes)"
+        },
+        "primary_cta": {
+          "type": "string",
+          "description": "Q24: Primary call-to-action for the website"
+        },
+        "primary_cta_other": {
+          "type": "string",
+          "description": "Q24: Custom CTA if 'Other' was selected"
+        },
+        "additional_notes": {
+          "type": "string",
+          "description": "Q25.1: Additional notes or instructions (only if Q25 is yes)"
+        }
+      }
+    }
+  },
+  "required": [
+    "metadata",
+    "userdata"
+  ],
+  "rls": {
+    "create": {
+      "created_by": "{{user.email}}"
+    },
+    "read": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "update": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    },
+    "delete": {
+      "$or": [
+        {
+          "created_by": "{{user.email}}"
+        },
+        {
+          "user_condition": {
+            "role": "admin"
+          }
+        }
+      ]
+    }
+  }
+}
