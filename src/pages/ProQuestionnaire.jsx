@@ -60,22 +60,11 @@ import {
 } from '@/lib/clarity';
 import { getOrCreateQuestionnaireSessionId } from '@/lib/sessionId';
 import { buildDraftEventRecord } from '@/lib/draftEvents';
-
-const safeJsonStringify = (value) => {
-  try {
-    return JSON.stringify(value ?? {});
-  } catch {
-    return '{}';
-  }
-};
-
-const sanitizeCredentialsForDraft = (credentials = {}) => ({
-  businessName: credentials.businessName || '',
-  domain: credentials.domain || '',
-  userId: credentials.userId || '',
-  userName: credentials.userName || '',
-  userEmail: credentials.userEmail || ''
-});
+import {
+  createFindExistingDraftBySessionId,
+  createSaveDraftSnapshot,
+  writeDraftFailureBackup
+} from '@/lib/draftPersistence';
 
 export default function ProQuestionnaire() {
   const dispatch = useDispatch();
@@ -283,142 +272,59 @@ export default function ProQuestionnaire() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const findExistingDraftBySessionId = useCallback(async (sessionId) => {
-    if (draftRecordIdRef.current) {
-      return { id: draftRecordIdRef.current };
-    }
+  const findExistingDraftBySessionId = useCallback(
+    createFindExistingDraftBySessionId({ draftRecordIdRef }),
+    []
+  );
 
-    const existingDrafts = await base44.entities.ProFormDraft.filter({
-      session_id: sessionId
+  const saveDraftSnapshot = useCallback(
+    createSaveDraftSnapshot({
+      entities: base44.entities,
+      draftRecordIdRef,
+      findExistingDraftBySessionId
+    }),
+    [findExistingDraftBySessionId]
+  );
+
+  const saveDraftNow = useCallback(async ({
+    status = 'draft',
+    submitError = '',
+    finalSubmissionId = '',
+    responsesSnapshot = responses,
+    validationStatusSnapshot = validationStatus,
+    touchedQuestionsSnapshot = touchedQuestions,
+    expandedQuestionsSnapshot = expandedQuestions
+  } = {}) => {
+    return saveDraftSnapshot({
+      sessionId: questionnaireSessionId,
+      responses: responsesSnapshot,
+      validationStatus: validationStatusSnapshot,
+      touchedQuestions: touchedQuestionsSnapshot,
+      expandedQuestions: expandedQuestionsSnapshot,
+      credentials,
+      businessNameParam,
+      domainParam,
+      currentQuestionId: lastChangedQuestionIdRef.current || '',
+      lastChangedQuestionId: lastChangedQuestionIdRef.current || '',
+      status,
+      submitError,
+      finalSubmissionId
     });
-
-    if (Array.isArray(existingDrafts) && existingDrafts.length > 0) {
-      const sorted = [...existingDrafts].sort((a, b) => {
-        const aTime = new Date(a.last_saved_at || a.created_date || 0).getTime();
-        const bTime = new Date(b.last_saved_at || b.created_date || 0).getTime();
-        return bTime - aTime;
-      });
-
-      draftRecordIdRef.current = sorted[0].id;
-      return sorted[0];
-    }
-
-    return null;
-  }, []);
-
-  const saveDraftSnapshot = useCallback(async ({
-    sessionId,
+  }, [
+    saveDraftSnapshot,
+    questionnaireSessionId,
     responses,
     validationStatus,
     touchedQuestions,
     expandedQuestions,
     credentials,
     businessNameParam,
-    domainParam,
-    currentQuestionId,
-    lastChangedQuestionId,
-    status = 'draft',
-    saveError = '',
-    submitError = '',
-    finalSubmissionId = ''
-  }) => {
-    const safeCreds = sanitizeCredentialsForDraft(credentials);
-    const now = new Date().toISOString();
-
-    const draftRecord = {
-      session_id: sessionId,
-      business_name: businessNameParam || safeCreds.businessName || '',
-      domain: domainParam || safeCreds.domain || '',
-      user_id: safeCreds.userId || '',
-      user_name: safeCreds.userName || '',
-      user_email: safeCreds.userEmail || '',
-      status,
-      current_question_id: currentQuestionId || '',
-      last_changed_question_id: lastChangedQuestionId || '',
-      responses_json: safeJsonStringify(responses),
-      validation_status_json: safeJsonStringify(validationStatus),
-      touched_questions_json: safeJsonStringify(touchedQuestions),
-      expanded_questions_json: safeJsonStringify(expandedQuestions),
-      metadata_json: safeJsonStringify({
-        app: 'pro_questionnaire',
-        source: 'real_time_draft',
-        userAgent: navigator.userAgent,
-        pageUrl: window.location.href
-      }),
-      save_error: saveError,
-      submit_error: submitError,
-      final_submission_id: finalSubmissionId,
-      submit_attempted_at: status === 'submit_attempted' || status === 'submit_failed' ? now : '',
-      submitted_at: status === 'submitted' ? now : '',
-      last_changed_at: now,
-      last_saved_at: now
-    };
-
-    const existingDraft = await findExistingDraftBySessionId(sessionId);
-
-    if (existingDraft?.id) {
-      return base44.entities.ProFormDraft.update(existingDraft.id, draftRecord);
-    }
-
-    return base44.entities.ProFormDraft.create(draftRecord);
-  }, [findExistingDraftBySessionId]);
-
-  const saveDraftNow = useCallback(async ({
-    status = 'draft',
-    submitError = '',
-    finalSubmissionId = ''
-  } = {}) => {
-    const now = new Date().toISOString();
-    const existingDraft = await findExistingDraftBySessionId(questionnaireSessionId);
-
-    const record = {
-      session_id: questionnaireSessionId,
-      business_name: businessNameParam || credentials.businessName || '',
-      domain: domainParam || credentials.domain || '',
-      user_id: credentials.userId || '',
-      user_name: credentials.userName || '',
-      user_email: credentials.userEmail || '',
-      status,
-      current_question_id: lastChangedQuestionIdRef.current || '',
-      last_changed_question_id: lastChangedQuestionIdRef.current || '',
-      responses_json: safeJsonStringify(responses),
-      validation_status_json: safeJsonStringify(validationStatus),
-      touched_questions_json: safeJsonStringify(touchedQuestions),
-      expanded_questions_json: safeJsonStringify(expandedQuestions),
-      metadata_json: safeJsonStringify({
-        app: 'pro_questionnaire',
-        source: 'real_time_draft',
-        pageUrl: window.location.href
-      }),
-      submit_error: submitError,
-      final_submission_id: finalSubmissionId,
-      submit_attempted_at: status === 'submit_attempted' || status === 'submit_failed' ? now : '',
-      submitted_at: status === 'submitted' ? now : '',
-      last_saved_at: now
-    };
-
-    if (existingDraft?.id) {
-      return base44.entities.ProFormDraft.update(existingDraft.id, record);
-    }
-
-    return base44.entities.ProFormDraft.create(record);
-  }, [
-    findExistingDraftBySessionId,
-    questionnaireSessionId,
-    businessNameParam,
-    credentials.businessName,
-    credentials.domain,
-    credentials.userId,
-    credentials.userName,
-    credentials.userEmail,
-    domainParam,
-    responses,
-    validationStatus,
-    touchedQuestions,
-    expandedQuestions
+    domainParam
   ]);
 
   const queueDraftSave = useCallback((changedQuestionId, nextResponses = responses) => {
+    if (hasFinalSubmittedRef.current) return;
+
     lastChangedQuestionIdRef.current = changedQuestionId;
 
     if (draftSaveTimeoutRef.current) {
@@ -426,6 +332,8 @@ export default function ProQuestionnaire() {
     }
 
     draftSaveTimeoutRef.current = setTimeout(async () => {
+      if (hasFinalSubmittedRef.current) return;
+
       try {
         await saveDraftSnapshot({
           sessionId: questionnaireSessionId,
@@ -442,6 +350,14 @@ export default function ProQuestionnaire() {
         });
       } catch (error) {
         console.error('Draft autosave failed:', serializeError(error));
+        writeDraftFailureBackup({
+          questionnaireSessionId,
+          responses: nextResponses,
+          validationStatus,
+          touchedQuestions,
+          expandedQuestions,
+          error: serializeError(error)
+        });
       }
     }, 600);
   }, [
@@ -1376,6 +1292,11 @@ export default function ProQuestionnaire() {
   };
 
   const handleConfirmSubmit = async (businessName, domain) => {
+    if (draftSaveTimeoutRef.current) {
+      clearTimeout(draftSaveTimeoutRef.current);
+      draftSaveTimeoutRef.current = null;
+    }
+
     const responseSnapshot = { ...responses };
     const transformedPayload = transformResponsesToPayload(
       responseSnapshot,
@@ -1412,16 +1333,20 @@ export default function ProQuestionnaire() {
       });
 
       await saveDraftNow({
-        status: 'submit_attempted'
+        status: 'submit_attempted',
+        responsesSnapshot: responseSnapshot
       });
 
       const savedSubmission = await base44.entities.ProFormSubmission.create(
         transformedPayload
       );
 
+      hasFinalSubmittedRef.current = true;
+
       await saveDraftNow({
         status: 'submitted',
-        finalSubmissionId: savedSubmission?.id || ''
+        finalSubmissionId: savedSubmission?.id || '',
+        responsesSnapshot: responseSnapshot
       });
 
       createDraftEvent({
@@ -1474,14 +1399,15 @@ export default function ProQuestionnaire() {
 
         await saveDraftNow({
           status: 'submit_failed',
-          submitError: JSON.stringify(serialized)
+          submitError: JSON.stringify(serialized),
+          responsesSnapshot: responseSnapshot
         });
 
         localStorage.setItem(
           `failed_pro_submission_${Date.now()}`,
           JSON.stringify({
             session_id: questionnaireSessionId,
-            responses,
+            responses: responseSnapshot,
             transformedPayload,
             error: serialized,
             createdAt: new Date().toISOString()
