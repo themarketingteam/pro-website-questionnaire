@@ -1614,8 +1614,8 @@ export default function ProQuestionnaire() {
                   return (
                     <div key="span-questions-wrapper" className={wideContentClass}>
                       <div className={`rounded-lg p-4 -mx-4 sm:-mx-6 lg:mx-0 ${getSpanBackgroundClass()}`}>
-                        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_310px] 2xl:grid-cols-[minmax(0,1fr)_340px] lg:gap-5 xl:gap-6 lg:items-start">
-                          <div className="min-w-0">
+                        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_280px] xl:grid-cols-[minmax(0,1fr)_310px] 2xl:grid-cols-[minmax(0,1fr)_340px] lg:gap-5 xl:gap-6 lg:items-stretch">
+                          <div className="min-w-0 self-start">
                             {spanQuestions.map(q => (
                               <div key={q.id} className="mb-8 last:mb-0">
                                 <QuestionWrapper
@@ -1643,17 +1643,19 @@ export default function ProQuestionnaire() {
                             ))}
                           </div>
 
-                          <aside className="hidden lg:block self-start">
-                            <div className="sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto">
-                              <SelectionSpanIndicator
-                                servicesCount={servicesCount}
-                                industriesCount={industriesCount}
-                                regionsCount={regionsCount}
-                                variant="desktopHelper"
-                                showExplainer={true}
-                                showPointer={true}
-                                isCondensed={areAllSpanQuestionsCollapsed}
-                              />
+                          <aside className="hidden lg:block self-stretch relative">
+                            <div className="sticky top-6">
+                              <div className="max-h-[calc(100vh-3rem)] overflow-y-auto">
+                                <SelectionSpanIndicator
+                                  servicesCount={servicesCount}
+                                  industriesCount={industriesCount}
+                                  regionsCount={regionsCount}
+                                  variant="desktopHelper"
+                                  showExplainer={true}
+                                  showPointer={true}
+                                  isCondensed={areAllSpanQuestionsCollapsed}
+                                />
+                              </div>
                             </div>
                           </aside>
                         </div>

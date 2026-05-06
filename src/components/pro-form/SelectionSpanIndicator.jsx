@@ -142,7 +142,7 @@ function DesktopHelperIndicator({
       : { backgroundColor: '#fef2f2', borderColor: '#fecaca' };
 
   return (
-    <div className={cn('relative overflow-visible', stickyMode && 'lg:sticky lg:top-6', className)}>
+    <div className={cn('relative overflow-visible', className)}>
       {showPointer && (
         <div
           aria-hidden="true"
