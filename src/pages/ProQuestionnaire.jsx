@@ -109,6 +109,10 @@ export default function ProQuestionnaire() {
   const regionsCount = Array.isArray(responses['5']) ? responses['5'].length : 0;
   const totalSelections = servicesCount + industriesCount + regionsCount;
   const isSpanLimitReached = totalSelections >= 25;
+  const spanQuestionIds = ['3', '4', '5'];
+  const areAllSpanQuestionsCollapsed = spanQuestionIds.every(
+    (id) => expandedQuestions[id] === false
+  );
   
   // Extract and store credentials from URL
   useEffect(() => {
@@ -1628,7 +1632,7 @@ export default function ProQuestionnaire() {
                             ))}
                           </div>
 
-                          <aside className="hidden lg:block self-stretch">
+                          <aside className="hidden lg:block self-start">
                             <div className="sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto">
                               <SelectionSpanIndicator
                                 servicesCount={servicesCount}
@@ -1637,6 +1641,7 @@ export default function ProQuestionnaire() {
                                 variant="desktopHelper"
                                 showExplainer={true}
                                 showPointer={true}
+                                isCondensed={areAllSpanQuestionsCollapsed}
                               />
                             </div>
                           </aside>
