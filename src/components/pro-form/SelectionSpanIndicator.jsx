@@ -264,8 +264,10 @@ export default function SelectionSpanIndicator({
 }) {
   const total = servicesCount + industriesCount + regionsCount;
   const state = getSelectionState({ total, minTotal, maxTotal });
+  const isDesktopHelper = variant === 'desktopHelper';
+  const shouldCondense = isDesktopHelper && isCondensed;
 
-  if (variant === 'desktopHelper') {
+  if (isDesktopHelper) {
     return (
       <DesktopHelperIndicator
         total={total}
@@ -279,7 +281,7 @@ export default function SelectionSpanIndicator({
         showExplainer={showExplainer}
         showPointer={showPointer}
         stickyMode={stickyMode}
-        isCondensed={isCondensed}
+        isCondensed={shouldCondense}
       />
     );
   }
