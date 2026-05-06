@@ -133,27 +133,25 @@ function DesktopHelperIndicator({
 }) {
   const StatusIcon = state.icon;
   const progressWidth = getProgressWidth(total, maxTotal);
+  const pointerStyle = state.isValid
+    ? { backgroundColor: '#f7fee7', borderColor: '#90C944' }
+    : state.isTooLow
+      ? { backgroundColor: '#fff7ed', borderColor: '#F29100' }
+      : { backgroundColor: '#fef2f2', borderColor: '#fecaca' };
 
   return (
-    <div className={cn('relative', stickyMode && 'lg:sticky lg:top-6', className)}>
+    <div className={cn('relative overflow-visible', stickyMode && 'lg:sticky lg:top-6', className)}>
       {showPointer && (
         <div
           aria-hidden="true"
-          className={cn(
-            'hidden lg:block absolute right-full top-10 w-0 h-0',
-            'border-y-[10px] border-y-transparent border-r-[12px]',
-            state.isValid
-              ? 'border-r-[#90C944]'
-              : state.isTooLow
-                ? 'border-r-[#F29100]'
-                : 'border-r-red-200'
-          )}
+          className="hidden lg:block absolute -left-[9px] top-6 h-4 w-4 rotate-45 border-l border-b"
+          style={pointerStyle}
         />
       )}
 
       <div
         className={cn(
-          'rounded-2xl border bg-white shadow-[0_12px_32px_rgba(18,41,71,0.08)] p-5',
+          'relative overflow-visible rounded-2xl border bg-white shadow-[0_12px_32px_rgba(18,41,71,0.08)] p-5',
           state.borderClassName,
           state.backgroundClassName
         )}
