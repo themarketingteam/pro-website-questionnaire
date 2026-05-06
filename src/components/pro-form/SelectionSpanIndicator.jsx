@@ -19,7 +19,8 @@ const getSelectionState = ({ total, minTotal, maxTotal }) => {
       backgroundClassName: 'bg-[#90C944]/[0.02]',
       progressClassName: 'bg-[#90C944]',
       helperTitleClassName: 'text-[#122947]',
-      statusMessage: 'Your selections are within the recommended range.'
+      inlineStatusMessage: 'Your selections are within the recommended range.',
+      desktopStatusMessage: 'Your selections are within the required range.'
     };
   }
 
@@ -37,7 +38,8 @@ const getSelectionState = ({ total, minTotal, maxTotal }) => {
       backgroundClassName: 'bg-[#F29100]/[0.02]',
       progressClassName: 'bg-[#F29100]',
       helperTitleClassName: 'text-[#122947]',
-      statusMessage: `Add ${missing} more selection${missing === 1 ? '' : 's'} across Services, Industries, or Locations.`
+      inlineStatusMessage: `Add ${missing} more selection${missing === 1 ? '' : 's'} across Services, Industries, or Locations.`,
+      desktopStatusMessage: `Add ${missing} more selection${missing === 1 ? '' : 's'} to reach the minimum.`
     };
   }
 
@@ -54,7 +56,8 @@ const getSelectionState = ({ total, minTotal, maxTotal }) => {
     backgroundClassName: 'bg-red-50/20',
     progressClassName: 'bg-red-600',
     helperTitleClassName: 'text-[#122947]',
-    statusMessage: `Remove ${excess} selection${excess === 1 ? '' : 's'} to stay within the limit.`
+    inlineStatusMessage: `Remove ${excess} selection${excess === 1 ? '' : 's'} to stay within the limit.`,
+    desktopStatusMessage: `Remove ${excess} selection${excess === 1 ? '' : 's'} to stay within the limit.`
   };
 };
 
@@ -95,7 +98,7 @@ function InlineIndicator({
           </p>
           <div aria-live="polite">
             <p className={cn('text-sm mt-1', state.emphasisClassName)}>
-              {state.statusMessage}
+              {state.inlineStatusMessage}
             </p>
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-sm">
@@ -180,12 +183,23 @@ function DesktopHelperIndicator({
 
         <div aria-live="polite" className="mt-4">
           <p className={cn('text-sm font-medium', state.emphasisClassName)}>
-            {state.statusMessage}
+            {state.desktopStatusMessage}
           </p>
         </div>
 
+        <p className="mt-3 text-sm leading-relaxed text-[#566C75]">
+          Your service, industry, and location choices help determine which pages and SEO opportunities are included in the final website.
+        </p>
+
         <div className="mt-4">
-          <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+          <div
+            className="h-2 w-full overflow-hidden rounded-full bg-slate-200"
+            role="progressbar"
+            aria-label={`Selection progress: ${total} of ${maxTotal} selected`}
+            aria-valuemin={0}
+            aria-valuemax={maxTotal}
+            aria-valuenow={Math.min(total, maxTotal)}
+          >
             <div
               className={cn('h-full rounded-full transition-all duration-300', state.progressClassName)}
               style={{ width: `${progressWidth}%` }}
@@ -193,18 +207,18 @@ function DesktopHelperIndicator({
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-          <div className="rounded-xl bg-slate-50 px-3 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-[#566C75]">Services</p>
-            <p className="mt-1 text-lg font-bold text-[#122947]">{servicesCount}</p>
+        <div className="mt-4 space-y-2">
+          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5 text-sm">
+            <span className="font-medium text-[#566C75]">Services</span>
+            <span className="font-bold text-[#122947]">{servicesCount}</span>
           </div>
-          <div className="rounded-xl bg-slate-50 px-3 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-[#566C75]">Industries</p>
-            <p className="mt-1 text-lg font-bold text-[#122947]">{industriesCount}</p>
+          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5 text-sm">
+            <span className="font-medium text-[#566C75]">Industries</span>
+            <span className="font-bold text-[#122947]">{industriesCount}</span>
           </div>
-          <div className="rounded-xl bg-slate-50 px-3 py-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-[#566C75]">Locations</p>
-            <p className="mt-1 text-lg font-bold text-[#122947]">{regionsCount}</p>
+          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5 text-sm">
+            <span className="font-medium text-[#566C75]">Locations</span>
+            <span className="font-bold text-[#122947]">{regionsCount}</span>
           </div>
         </div>
 
@@ -213,7 +227,7 @@ function DesktopHelperIndicator({
             <div className="flex items-start gap-2">
               <Info className="mt-0.5 h-4 w-4 text-[#1E6BA8]" />
               <p className="text-sm leading-relaxed text-[#566C75]">
-                Choose a balanced set of services, industries, and locations. These selections help determine which service, industry, and location pages are created for the final website.
+                Recommended spread: choose enough across all three areas so the final site has a useful mix of service, industry, and location content.
               </p>
             </div>
           </div>

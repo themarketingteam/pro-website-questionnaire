@@ -1557,7 +1557,8 @@ export default function ProQuestionnaire() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <FormHeader />
       
-      <main className="max-w-4xl mx-auto px-4 md:px-6 py-8 md:py-12 md:pl-16">
+      <main className="px-4 md:px-6 py-8 md:py-12">
+        <div className="max-w-4xl mx-auto md:pl-16">
         {/* Validation Status Guide - Collapsible */}
         <ValidationGuideCollapsible />
 
@@ -1589,47 +1590,62 @@ export default function ProQuestionnaire() {
               </div>
 
               {sectionQuestions.map((question, qIndex) => {
-                const isInSpan = ["3", "4", "5"].includes(question.id);
-
                 // For questions 3-5, render with background wrapper
                 if (question.id === "3") {
-                  // Find Q3, Q4, Q5
                   const spanQuestions = sectionQuestions.filter(q => ["3", "4", "5"].includes(q.id));
 
                   return (
-                    <div key="span-questions-wrapper">
-                      <div className={`rounded-lg p-4 -mx-4 ${getSpanBackgroundClass()}`}>
-                        {spanQuestions.map(q => (
-                          <div key={q.id} className="mb-8 last:mb-0">
-                            <QuestionWrapper
-                              id={`question-${q.id}`}
-                              number={q.id}
-                              title={q.title}
-                              guidance={q.guidance}
-                              why={q.why}
-                              examples={q.examples}
-                              isCollapsible={true}
-                              isExpanded={expandedQuestions[q.id]}
-                              onToggle={() => toggleQuestion(q.id)}
-                              onReset={() => resetQuestion(q.id)}
-                              hasAnswer={!!responses[q.id] || !!responses[`${q.id}_other`]}
-                              isComplete={isQuestionComplete(q.id)}
-                              wasTouched={touchedQuestions[q.id]}
-                              validationStatus={getQuestionValidationStatus(q.id)}
-                              showStatusIcon={touchedQuestions[q.id]}
-                            >
-                              {renderQuestion(q)}
-                            </QuestionWrapper>
+                    <div key="span-questions-wrapper" className="max-w-6xl xl:max-w-7xl mx-auto">
+                      <div className={`rounded-lg p-4 -mx-4 lg:mx-0 ${getSpanBackgroundClass()}`}>
+                        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px] lg:gap-6 lg:items-start">
+                          <div className="min-w-0">
+                            {spanQuestions.map(q => (
+                              <div key={q.id} className="mb-8 last:mb-0">
+                                <QuestionWrapper
+                                  id={`question-${q.id}`}
+                                  number={q.id}
+                                  title={q.title}
+                                  guidance={q.guidance}
+                                  why={q.why}
+                                  examples={q.examples}
+                                  isCollapsible={true}
+                                  isExpanded={expandedQuestions[q.id]}
+                                  onToggle={() => toggleQuestion(q.id)}
+                                  onReset={() => resetQuestion(q.id)}
+                                  hasAnswer={!!responses[q.id] || !!responses[`${q.id}_other`]}
+                                  isComplete={isQuestionComplete(q.id)}
+                                  wasTouched={touchedQuestions[q.id]}
+                                  validationStatus={getQuestionValidationStatus(q.id)}
+                                  showStatusIcon={touchedQuestions[q.id]}
+                                >
+                                  {renderQuestion(q)}
+                                </QuestionWrapper>
 
-                            {renderConditionalChildren(q)}
+                                {renderConditionalChildren(q)}
+                              </div>
+                            ))}
                           </div>
-                        ))}
 
-                        <div className="mt-6">
+                          <aside className="hidden lg:block self-stretch">
+                            <div className="sticky top-6 max-h-[calc(100vh-3rem)] overflow-y-auto">
+                              <SelectionSpanIndicator
+                                servicesCount={servicesCount}
+                                industriesCount={industriesCount}
+                                regionsCount={regionsCount}
+                                variant="desktopHelper"
+                                showExplainer={true}
+                                showPointer={true}
+                              />
+                            </div>
+                          </aside>
+                        </div>
+
+                        <div className="mt-6 lg:hidden">
                           <SelectionSpanIndicator
                             servicesCount={servicesCount}
                             industriesCount={industriesCount}
                             regionsCount={regionsCount}
+                            variant="inline"
                           />
                         </div>
                       </div>
@@ -1730,6 +1746,7 @@ export default function ProQuestionnaire() {
           </div>
 
               <ValidationGuide />
+              </div>
               </div>
               </main>
 
