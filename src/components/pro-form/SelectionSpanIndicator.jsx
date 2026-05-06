@@ -132,6 +132,7 @@ function DesktopHelperIndicator({
   stickyMode,
   isCondensed
 }) {
+  const shouldCondense = !!isCondensed;
   const StatusIcon = state.icon;
   const progressWidth = getProgressWidth(total, maxTotal);
   const pointerStyle = state.isValid
@@ -153,7 +154,7 @@ function DesktopHelperIndicator({
       <div
         className={cn(
           'relative overflow-visible rounded-2xl border bg-white shadow-[0_12px_32px_rgba(18,41,71,0.08)]',
-          isCondensed ? 'p-3.5 xl:p-4' : 'p-3.5 xl:p-5',
+          shouldCondense ? 'p-4' : 'p-3.5 xl:p-5',
           state.borderClassName,
           state.backgroundClassName
         )}
@@ -181,7 +182,7 @@ function DesktopHelperIndicator({
           </div>
         </div>
 
-        {!isCondensed && (
+        {!shouldCondense && (
           <>
             <div aria-live="polite" className="mt-3">
               <p className={cn('text-sm font-medium leading-snug', state.emphasisClassName)}>
@@ -211,7 +212,10 @@ function DesktopHelperIndicator({
           </>
         )}
 
-        <div className={cn(isCondensed ? 'mt-2.5 space-y-1.5' : 'mt-3 space-y-1.5 xl:space-y-2')}>
+        <div
+          className={cn(shouldCondense ? 'mt-3 space-y-1.5' : 'mt-3 space-y-1.5 xl:space-y-2')}
+          aria-live="polite"
+        >
           <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
             <span className="font-medium text-[#566C75]">Services</span>
             <span className="font-bold text-[#122947]">{servicesCount}</span>
@@ -226,7 +230,7 @@ function DesktopHelperIndicator({
           </div>
         </div>
 
-        {showExplainer && !isCondensed && (
+        {showExplainer && !shouldCondense && (
           <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 xl:px-4">
             <div className="flex items-start gap-2">
               <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#1E6BA8]" />
@@ -237,7 +241,7 @@ function DesktopHelperIndicator({
           </div>
         )}
 
-        <p className="mt-3 text-xs text-[#566C75]">
+        <p className="mt-3 text-xs text-[#566C75]" aria-live="polite">
           Selections update automatically as you click.
         </p>
       </div>
