@@ -151,14 +151,14 @@ function DesktopHelperIndicator({
 
       <div
         className={cn(
-          'relative overflow-visible rounded-2xl border bg-white shadow-[0_12px_32px_rgba(18,41,71,0.08)] p-5',
+          'relative overflow-visible rounded-2xl border bg-white p-4 shadow-[0_12px_32px_rgba(18,41,71,0.08)] xl:p-5',
           state.borderClassName,
           state.backgroundClassName
         )}
       >
         <div className="flex items-start gap-3">
           <div className={cn(
-            'mt-0.5 flex h-10 w-10 items-center justify-center rounded-full',
+            'mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full xl:h-10 xl:w-10',
             state.isValid
               ? 'bg-[#90C944]/15'
               : state.isTooLow
@@ -172,24 +172,24 @@ function DesktopHelperIndicator({
             <p className="text-sm font-semibold tracking-[0.02em] text-[#122947]">
               Selection Balance
             </p>
-            <p className="mt-1 text-2xl font-bold text-[#122947]">
+            <p className="mt-1 text-2xl font-bold leading-none text-[#122947] xl:text-3xl">
               {total} / {maxTotal} selected
             </p>
             <p className="mt-1 text-sm text-[#566C75]">Minimum {minTotal} required</p>
           </div>
         </div>
 
-        <div aria-live="polite" className="mt-4">
-          <p className={cn('text-sm font-medium', state.emphasisClassName)}>
+        <div aria-live="polite" className="mt-3">
+          <p className={cn('text-sm font-medium leading-snug', state.emphasisClassName)}>
             {state.desktopStatusMessage}
           </p>
         </div>
 
-        <p className="mt-3 text-sm leading-relaxed text-[#566C75]">
+        <p className="mt-2 text-sm leading-relaxed text-[#566C75]">
           Your service, industry, and location choices help determine which pages and SEO opportunities are included in the final website. Don't worry you can always request other selections later, these today will help us prioritize your primary choices.
         </p>
 
-        <div className="mt-4">
+        <div className="mt-3">
           <div
             className="h-2 w-full overflow-hidden rounded-full bg-slate-200"
             role="progressbar"
@@ -205,33 +205,33 @@ function DesktopHelperIndicator({
           </div>
         </div>
 
-        <div className="mt-4 space-y-2">
-          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5 text-sm">
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
             <span className="font-medium text-[#566C75]">Services</span>
             <span className="font-bold text-[#122947]">{servicesCount}</span>
           </div>
-          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5 text-sm">
+          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
             <span className="font-medium text-[#566C75]">Industries</span>
             <span className="font-bold text-[#122947]">{industriesCount}</span>
           </div>
-          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2.5 text-sm">
+          <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
             <span className="font-medium text-[#566C75]">Locations</span>
             <span className="font-bold text-[#122947]">{regionsCount}</span>
           </div>
         </div>
 
         {showExplainer && (
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 xl:px-4">
             <div className="flex items-start gap-2">
-              <Info className="mt-0.5 h-4 w-4 text-[#1E6BA8]" />
-              <p className="text-sm leading-relaxed text-[#566C75]">
+              <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-[#1E6BA8]" />
+              <p className="text-xs leading-relaxed text-[#566C75] xl:text-sm">
                 Recommended spread: choose enough across all three areas so the final site has a useful mix of service, industry, and location content.
               </p>
             </div>
           </div>
         )}
 
-        <p className="mt-4 text-xs text-[#566C75]">
+        <p className="mt-3 text-xs text-[#566C75]">
           Selections update automatically as you click.
         </p>
       </div>

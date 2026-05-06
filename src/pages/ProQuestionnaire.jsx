@@ -1597,7 +1597,7 @@ export default function ProQuestionnaire() {
                   return (
                     <div key="span-questions-wrapper" className="max-w-6xl xl:max-w-7xl mx-auto">
                       <div className={`rounded-lg p-4 -mx-4 lg:mx-0 ${getSpanBackgroundClass()}`}>
-                        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px] lg:gap-6 lg:items-start">
+                        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_270px] xl:grid-cols-[minmax(0,1fr)_310px] 2xl:grid-cols-[minmax(0,1fr)_340px] lg:gap-6 lg:items-start">
                           <div className="min-w-0">
                             {spanQuestions.map(q => (
                               <div key={q.id} className="mb-8 last:mb-0">
