@@ -13,7 +13,7 @@ export default function FormHeader() {
       
       {/* Content */}
       <div className="relative py-10 md:py-20">
-        <div className="max-w-4xl mx-auto px-4 md:px-6 md:pl-16">
+        <div className="w-full max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto px-4 sm:px-6 lg:px-0">
           <h1 className="text-xl sm:text-2xl md:text-4xl font-bold text-white tracking-tight leading-tight">
             MSP Success - Pro | Website Content Questionnaire
           </h1>
