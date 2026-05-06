@@ -151,7 +151,7 @@ function DesktopHelperIndicator({
 
       <div
         className={cn(
-          'relative overflow-visible rounded-2xl border bg-white p-4 shadow-[0_12px_32px_rgba(18,41,71,0.08)] xl:p-5',
+          'relative overflow-visible rounded-2xl border bg-white p-3.5 shadow-[0_12px_32px_rgba(18,41,71,0.08)] xl:p-5',
           state.borderClassName,
           state.backgroundClassName
         )}
@@ -185,8 +185,8 @@ function DesktopHelperIndicator({
           </p>
         </div>
 
-        <p className="mt-2 text-sm leading-relaxed text-[#566C75]">
-          Your service, industry, and location choices help determine which pages and SEO opportunities are included in the final website. Don't worry you can always request other selections later, these today will help us prioritize your primary choices.
+        <p className="mt-2 text-sm leading-snug text-[#566C75]">
+          Your service, industry, and location choices help determine which pages and SEO opportunities are included in the final website. You can always request other selections later—today's choices help us prioritize your primary focus.
         </p>
 
         <div className="mt-3">
@@ -205,7 +205,7 @@ function DesktopHelperIndicator({
           </div>
         </div>
 
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-1.5 xl:space-y-2">
           <div className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-sm">
             <span className="font-medium text-[#566C75]">Services</span>
             <span className="font-bold text-[#122947]">{servicesCount}</span>
