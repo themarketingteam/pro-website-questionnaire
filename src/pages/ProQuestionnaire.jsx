@@ -62,6 +62,8 @@ import {
 
 export default function ProQuestionnaire() {
   const dispatch = useDispatch();
+  const standardContentClass = 'w-full max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto';
+  const wideContentClass = 'w-full max-w-4xl lg:max-w-6xl xl:max-w-7xl 2xl:max-w-[1440px] mx-auto';
   const responses = useSelector((state) => state.form.responses);
   const validationStatus = useSelector((state) => state.form.validationStatus);
   const textValidationMeta = useSelector((state) => state.form.textValidationMeta || {});
@@ -1557,8 +1559,8 @@ export default function ProQuestionnaire() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <FormHeader />
       
-      <main className="px-4 md:px-6 py-8 md:py-12">
-        <div className="max-w-4xl mx-auto md:pl-16">
+      <main className="px-4 sm:px-6 lg:px-6 py-8 md:py-12">
+        <div className={standardContentClass}>
         {/* Validation Status Guide - Collapsible */}
         <ValidationGuideCollapsible />
 
@@ -1595,8 +1597,8 @@ export default function ProQuestionnaire() {
                   const spanQuestions = sectionQuestions.filter(q => ["3", "4", "5"].includes(q.id));
 
                   return (
-                    <div key="span-questions-wrapper" className="max-w-6xl xl:max-w-7xl mx-auto">
-                      <div className={`rounded-lg p-4 -mx-4 lg:mx-0 ${getSpanBackgroundClass()}`}>
+                    <div key="span-questions-wrapper" className={wideContentClass}>
+                      <div className={`rounded-lg p-4 -mx-4 sm:-mx-6 lg:mx-0 ${getSpanBackgroundClass()}`}>
                         <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_270px] xl:grid-cols-[minmax(0,1fr)_310px] 2xl:grid-cols-[minmax(0,1fr)_340px] lg:gap-6 lg:items-start">
                           <div className="min-w-0">
                             {spanQuestions.map(q => (
