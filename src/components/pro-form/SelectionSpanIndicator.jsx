@@ -186,7 +186,7 @@ function DesktopHelperIndicator({
         </div>
 
         <p className="mt-3 text-sm leading-relaxed text-[#566C75]">
-          Your service, industry, and location choices help determine which pages and SEO opportunities are included in the final website.
+          Your service, industry, and location choices help determine which pages and SEO opportunities are included in the final website. Don't worry you can always request other selections later, these today will help us prioritize your primary choices.
         </p>
 
         <div className="mt-4">
