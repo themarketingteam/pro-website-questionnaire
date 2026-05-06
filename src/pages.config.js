@@ -47,10 +47,12 @@
  *
  * The mainPage value must match a key in the PAGES object exactly.
  */
-import Home from './pages/Home';
-import ProQuestionnaire from './pages/ProQuestionnaire';
-import ThankYou from './pages/ThankYou';
+import React, { lazy } from 'react';
 import __Layout from './Layout.jsx';
+
+const Home = lazy(() => import('./pages/Home'));
+const ProQuestionnaire = lazy(() => import('./pages/ProQuestionnaire'));
+const ThankYou = lazy(() => import('./pages/ThankYou'));
 
 
 export const PAGES = {

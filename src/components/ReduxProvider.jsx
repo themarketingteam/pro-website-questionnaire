@@ -26,11 +26,7 @@ export default function ReduxProvider({ children }) {
   return (
     <Provider store={store}>
       <PersistGate 
-        loading={
-          <div className="min-h-screen flex items-center justify-center">
-            <div className="text-gray-600">Loading saved data...</div>
-          </div>
-        } 
+        loading={null}
         persistor={persistor}
         onBeforeLift={async () => {
           // Programmatic reset before app renders (on boot)

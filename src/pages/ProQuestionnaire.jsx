@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
   setResponse, 
@@ -30,15 +30,16 @@ import FileUploadQuestion from '@/components/pro-form/FileUploadQuestion';
 import NumericRangeQuestion from '@/components/pro-form/NumericRangeQuestion';
 import MultiCertificationQuestion from '@/components/pro-form/MultiCertificationQuestion';
 import MultiGuaranteeQuestion from '@/components/pro-form/MultiGuaranteeQuestion';
-import ImageTaggingQuestion from '@/components/pro-form/ImageTaggingQuestion';
 import InfoMessageQuestion from '@/components/pro-form/InfoMessageQuestion';
 import SelectionSpanIndicator from '@/components/pro-form/SelectionSpanIndicator';
 import AutoSaveIndicator from '@/components/pro-form/AutoSaveIndicator';
-import ConfirmModal from '@/components/pro-form/ConfirmModal';
-import ThankYouModal from '@/components/pro-form/ThankYouModal';
-import ValidationGuide from '@/components/pro-form/ValidationGuide';
 import ValidationGuideCollapsible from '@/components/pro-form/ValidationGuideCollapsible';
-import ReduxDataValidator from '@/components/pro-form/ReduxDataValidator';
+
+const ImageTaggingQuestion = lazy(() => import('@/components/pro-form/ImageTaggingQuestion'));
+const ConfirmModal = lazy(() => import('@/components/pro-form/ConfirmModal'));
+const ThankYouModal = lazy(() => import('@/components/pro-form/ThankYouModal'));
+const ValidationGuide = lazy(() => import('@/components/pro-form/ValidationGuide'));
+const ReduxDataValidator = lazy(() => import('@/components/pro-form/ReduxDataValidator'));
 import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import { trackValidationDispatch, trackParentStatusChange, devDiagEnabled } from '@/lib/devDiagnostics';
@@ -59,6 +60,12 @@ import {
   createSaveDraftSnapshot,
   writeDraftFailureBackup
 } from '@/lib/draftPersistence';
+
+const DeferredSectionLoader = () => (
+  <div className="flex items-center justify-center py-6">
+    <div className="w-6 h-6 border-2 border-slate-200 border-t-slate-700 rounded-full animate-spin"></div>
+  </div>
+);
 
 export default function ProQuestionnaire() {
   const dispatch = useDispatch();
@@ -1498,7 +1505,11 @@ export default function ProQuestionnaire() {
         );
 
               case 'image_tagging':
-            return <ImageTaggingQuestion {...commonProps} />;
+            return (
+              <Suspense fallback={<DeferredSectionLoader />}>
+                <ImageTaggingQuestion {...commonProps} />
+              </Suspense>
+            );
 
                   case 'info_message':
                     return <InfoMessageQuestion 
@@ -1752,30 +1763,38 @@ export default function ProQuestionnaire() {
             )}
           </div>
 
-              <ValidationGuide />
+              <Suspense fallback={<DeferredSectionLoader />}>
+                <ValidationGuide />
+              </Suspense>
               </div>
               </div>
               </main>
 
       <AutoSaveIndicator show={showAutoSave} />
-      <ReduxDataValidator />
+      <Suspense fallback={null}>
+        <ReduxDataValidator />
+      </Suspense>
 
       {showConfirmModal && (
-        <ConfirmModal
-          formData={responses}
-          onConfirm={handleConfirmSubmit}
-          onCancel={() => setShowConfirmModal(false)}
-          initialBusinessName={businessNameParam}
-          initialDomain={domainParam}
-        />
+        <Suspense fallback={<DeferredSectionLoader />}>
+          <ConfirmModal
+            formData={responses}
+            onConfirm={handleConfirmSubmit}
+            onCancel={() => setShowConfirmModal(false)}
+            initialBusinessName={businessNameParam}
+            initialDomain={domainParam}
+          />
+        </Suspense>
       )}
 
       {showThankYouModal && (
-        <ThankYouModal 
-          businessName={submittedBusinessName} 
-          domain={submittedDomain}
-          formData={submittedFormData}
-        />
+        <Suspense fallback={<DeferredSectionLoader />}>
+          <ThankYouModal 
+            businessName={submittedBusinessName} 
+            domain={submittedDomain}
+            formData={submittedFormData}
+          />
+        </Suspense>
       )}
 
       {showClearAllModal && (
