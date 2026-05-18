@@ -520,22 +520,12 @@ export const normalizeQuestionnaireResponses = (responses) => {
     }
 
     if (GEOGRAPHIC_IDS.has(questionId)) {
-      const nextValue = asArray(value).map((item) => {
-        if (typeof item === 'string') return asTrimmedString(item);
-        const safeItem = asPlainObject(item);
-        return {
-          name: asTrimmedString(safeItem.name || safeItem.label || safeItem.value),
-          label: asTrimmedString(safeItem.label || safeItem.name || safeItem.value),
-          lat: asTrimmedString(safeItem.lat),
-          lon: asTrimmedString(safeItem.lon),
-          place_id: asTrimmedString(safeItem.place_id || safeItem.placeId),
-          source: asTrimmedString(safeItem.source),
-          primary: asBoolean(safeItem.primary, false)
-        };
-      });
+      const nextValue = normalizeGeographicAreas(value);
+
       if (!Array.isArray(value)) {
         addWarning(questionId, 'Normalized geographic answer shape.', value, 'array');
       }
+
       normalizedResponses[questionId] = nextValue;
       return;
     }
