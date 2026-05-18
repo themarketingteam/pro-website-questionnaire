@@ -97,6 +97,11 @@ When a client says they could not submit:
 - Production ignores all submit debug params.
 - Final submit path uses `createProFormSubmissionWithFallback`, `repairProSubmissionPayload`, `normalizeQuestionnaireResponses`, safe Clarity helpers, safe browser helpers, submit-stage logging, and intake fallback behavior.
 
+## Build and test status
+- `npm run build`: not executed by tool in this pass.
+- `npm test`: not executed by tool in this pass.
+- `retryProQuestionnaireIntakeSubmission`: not present in the currently deployed backend function list, so retry verification is currently limited until that function is restored/deployed.
+
 ## Known limitations
 - Debug simulation is for development only and should be tested locally.
 - Build/test status should be re-run after each hardening batch merge.

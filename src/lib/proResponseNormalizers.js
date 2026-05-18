@@ -124,6 +124,54 @@ export const normalizeAdditionalPagesList = (value) => {
 
   return safeObject;
 };
+
+const asFiniteNumber = (value) => {
+  if (value == null || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const pickSafeGeographicArea = (value) => {
+  if (typeof value === 'string') {
+    const label = asTrimmedString(value);
+    return label ? { label } : null;
+  }
+
+  const source = isPlainObject(value) ? value : {};
+  const area = {};
+  ['label', 'name', 'city', 'state', 'region', 'county', 'zip', 'type'].forEach((key) => {
+    const normalized = asTrimmedString(source[key]);
+    if (normalized) area[key] = normalized;
+  });
+
+  if (!area.label) area.label = asTrimmedString(source.label || source.name || source.city || source.value || source.title);
+  if (!area.name) area.name = asTrimmedString(source.name || source.label || source.city);
+
+  const latitude = asFiniteNumber(source.latitude ?? source.lat);
+  const longitude = asFiniteNumber(source.longitude ?? source.lon ?? source.lng);
+  const radius = asFiniteNumber(source.radius);
+
+  if (latitude != null) area.latitude = latitude;
+  if (longitude != null) area.longitude = longitude;
+  if (radius != null) area.radius = radius;
+
+  return Object.keys(area).length ? area : null;
+};
+
+export const normalizeGeographicAreas = (value) => {
+  const seen = new Set();
+
+  return asArray(value)
+    .map(pickSafeGeographicArea)
+    .filter(Boolean)
+    .filter((item) => {
+      const key = JSON.stringify(item);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+};
+
 export const asPlainObject = (value) => (isPlainObject(value) ? value : {});
 
 const pickSafeFileShape = (value, extraKeys = []) => {
