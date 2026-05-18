@@ -362,6 +362,42 @@ export const asSafeTaggedFileList = (value) =>
 const MAX_TEAM_PHOTO_TAGS = 50;
 const MAX_TEAM_PHOTO_NOTES_LENGTH = 2000;
 
+const normalizeTaggedPerson = (value) => {
+  const safeValue = asPlainObject(value);
+  const person = asPlainObject(safeValue.person);
+
+  const x = toFiniteNumberOrNull(safeValue.x);
+  const y = toFiniteNumberOrNull(safeValue.y);
+
+  const normalizedPerson = {
+    name: asTrimmedString(person.name || safeValue.name || safeValue.label),
+    position: asTrimmedString(person.position || person.title || safeValue.position || safeValue.title),
+    bio: asTrimmedString(person.bio || safeValue.bio)
+  };
+
+  const hasPersonData = Boolean(
+    normalizedPerson.name ||
+    normalizedPerson.position ||
+    normalizedPerson.bio
+  );
+
+  if (x == null && y == null && !hasPersonData) {
+    return null;
+  }
+
+  return {
+    x,
+    y,
+    person: normalizedPerson
+  };
+};
+
+const normalizeTaggedPeople = (value) => {
+  return asArray(value)
+    .map(normalizeTaggedPerson)
+    .filter(Boolean);
+};
+
 const normalizeTeamPhotoTagValue = (value) => {
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return asTrimmedString(value);
@@ -421,12 +457,15 @@ export const normalizeTeamPhotoWithTags = (value) => {
     primaryFile?.name
   );
 
-  const rawTags = safeObject.tags || safeObject.selectedTags || safeObject.peopleTags;
-  const tags = asArray(rawTags)
-    .flatMap((item) => {
-      if (Array.isArray(item)) return item;
-      return [item];
-    })
+  const rawTagSource = safeObject.taggedPeople || safeObject.tags || safeObject.peopleTags || [];
+  const rawTagArray = asArray(rawTagSource);
+
+  const taggedPeople = normalizeTaggedPeople(
+    rawTagArray.filter((item) => item && typeof item === 'object')
+  );
+
+  const tags = rawTagArray
+    .filter((item) => typeof item !== 'object' || item == null)
     .map(normalizeTeamPhotoTagValue)
     .filter(Boolean)
     .filter((tag, index, array) => array.indexOf(tag) === index)
@@ -439,7 +478,7 @@ export const normalizeTeamPhotoWithTags = (value) => {
   return {
     imageUrl,
     imageName,
-    taggedPeople: [],
+    taggedPeople,
     files: safeFiles,
     tags,
     notes,

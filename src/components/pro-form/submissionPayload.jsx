@@ -1,4 +1,5 @@
 import {
+  asArray,
   asPlainObject,
   asSafeFileList,
   asTrimmedString,
@@ -44,20 +45,66 @@ export const normalizeGeographicAreasForPayload = (locations = [], primaryIndex 
     );
 
 export const normalizeCertifications = (items = []) =>
-  items
+  asArray(items)
     .map((item) => {
       const safeItem = asPlainObject(item);
-      const itemName = asTrimmedString(safeItem.name || safeItem.label);
-      const itemType = asTrimmedString(safeItem.type || safeItem.category);
+
+      const itemName = asTrimmedString(
+        safeItem.name ||
+        safeItem.label ||
+        safeItem.cert_item_name
+      );
+
+      const itemType = asTrimmedString(
+        safeItem.type ||
+        safeItem.category ||
+        safeItem.tag ||
+        safeItem.cert_item_type
+      );
+
       if (!itemName || !itemType) return null;
 
       const image = asPlainObject(safeItem.image);
+      const primaryFile = asPlainObject(safeItem.file);
+      const files = asSafeFileList(safeItem.files || safeItem.supporting_files || safeItem.cert_item_files);
+
       return {
         cert_item_name: itemName,
         cert_item_type: itemType,
-        cert_item_image_url: asTrimmedString(safeItem.imageUrl || image.url),
-        cert_item_image_name: asTrimmedString(image.name),
-        cert_item_files: asSafeFileList(safeItem.files)
+        cert_item_image_url: asTrimmedString(
+          safeItem.imageUrl ||
+          safeItem.image_url ||
+          safeItem.cert_item_image_url ||
+          image.url ||
+          image.file_url ||
+          image.image_url
+        ),
+        cert_item_image_name: asTrimmedString(
+          safeItem.imageName ||
+          safeItem.image_name ||
+          safeItem.cert_item_image_name ||
+          image.name ||
+          image.fileName ||
+          image.filename
+        ),
+        cert_item_file_url: asTrimmedString(
+          safeItem.fileUrl ||
+          safeItem.file_url ||
+          safeItem.url ||
+          safeItem.cert_item_file_url ||
+          primaryFile.url ||
+          primaryFile.file_url
+        ),
+        cert_item_file_name: asTrimmedString(
+          safeItem.fileName ||
+          safeItem.file_name ||
+          safeItem.name ||
+          safeItem.cert_item_file_name ||
+          primaryFile.name ||
+          primaryFile.fileName ||
+          primaryFile.filename
+        ),
+        cert_item_files: files
       };
     })
     .filter(Boolean);
@@ -65,14 +112,47 @@ export const normalizeCertifications = (items = []) =>
 export const normalizeTeamPhoto = (answer) => normalizeTeamPhotoWithTags(answer);
 
 export const normalizeGuarantees = (items = []) =>
-  items
+  asArray(items)
     .map((item) => {
       const safeItem = asPlainObject(item);
-      const guaranteeName = asTrimmedString(safeItem.name || safeItem.label);
-      const guaranteeType = asTrimmedString(safeItem.type || safeItem.category);
       const file = asPlainObject(safeItem.file);
-      const guaranteeFileUrl = asTrimmedString(safeItem.fileUrl || file.url);
-      const guaranteeDescription = asTrimmedString(safeItem.description);
+
+      const guaranteeName = asTrimmedString(
+        safeItem.name ||
+        safeItem.label ||
+        safeItem.guarantee_name
+      );
+
+      const guaranteeType = asTrimmedString(
+        safeItem.type ||
+        safeItem.category ||
+        safeItem.tag ||
+        safeItem.guarantee_type
+      );
+
+      const guaranteeFileUrl = asTrimmedString(
+        safeItem.fileUrl ||
+        safeItem.file_url ||
+        safeItem.url ||
+        safeItem.guarantee_file_url ||
+        file.url ||
+        file.file_url
+      );
+
+      const guaranteeFileName = asTrimmedString(
+        safeItem.fileName ||
+        safeItem.file_name ||
+        safeItem.filename ||
+        safeItem.guarantee_file_name ||
+        file.name ||
+        file.fileName ||
+        file.filename
+      );
+
+      const guaranteeDescription = asTrimmedString(
+        safeItem.description ||
+        safeItem.guarantee_description
+      );
 
       if (!guaranteeName || !guaranteeType || (!guaranteeFileUrl && !guaranteeDescription)) {
         return null;
@@ -82,7 +162,7 @@ export const normalizeGuarantees = (items = []) =>
         guarantee_name: guaranteeName,
         guarantee_type: guaranteeType,
         guarantee_file_url: guaranteeFileUrl,
-        guarantee_file_name: asTrimmedString(file.name),
+        guarantee_file_name: guaranteeFileName,
         guarantee_description: guaranteeDescription
       };
     })

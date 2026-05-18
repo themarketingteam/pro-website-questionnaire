@@ -1,4 +1,5 @@
 import {
+  asArray,
   asPlainObject,
   normalizeAdditionalPagesList,
   normalizeGeographicAreas,
@@ -7,19 +8,22 @@ import {
   normalizeStringSelectionList
 } from '@/lib/proResponseNormalizers';
 
-const KNOWN_ARRAY_FIELDS = [
+const STRING_ARRAY_FIELDS = [
   'service_offerings',
   'target_industries',
-  'geographic_areas',
   'pricing_packaging',
   'company_goals',
-  'certifications_partnerships',
-  'service_guarantee_items',
   'website_objectives',
   'client_challenges',
   'client_outcomes',
   'industries',
-  'locations',
+  'locations'
+];
+
+const OBJECT_ARRAY_FIELDS = [
+  'certifications_partnerships',
+  'service_guarantee_items',
+  'geographic_areas',
   'service_areas'
 ];
 
@@ -187,13 +191,11 @@ export const repairProSubmissionPayload = (payload) => {
   repairedPayload.userdata.additional_pages_list.meet_the_team_page = meetTheTeamPage;
   repairedPayload.userdata.team_photo_with_tags = meetTheTeamPage.team_photo_with_tags;
 
-  KNOWN_ARRAY_FIELDS.forEach((field) => {
+  STRING_ARRAY_FIELDS.forEach((field) => {
     const originalValue = repairedPayload.userdata[field];
-    let nextValue = originalValue;
+    let nextValue;
 
-    if (field === 'geographic_areas' || field === 'service_areas') {
-      nextValue = normalizeGeographicAreas(originalValue);
-    } else if (field === 'target_industries' || field === 'industries') {
+    if (field === 'target_industries' || field === 'industries') {
       nextValue = normalizeIndustrySelections(originalValue);
     } else if (field === 'locations') {
       nextValue = normalizeLocationSelections(originalValue);
@@ -202,8 +204,25 @@ export const repairProSubmissionPayload = (payload) => {
     }
 
     repairedPayload.userdata[field] = Array.isArray(nextValue) ? nextValue : [];
+
     if (!Array.isArray(originalValue)) {
-      warnings.push('array_field_repaired');
+      warnings.push(`${field}_repaired_to_array`);
+    }
+  });
+
+  OBJECT_ARRAY_FIELDS.forEach((field) => {
+    const originalValue = repairedPayload.userdata[field];
+
+    if (field === 'geographic_areas' || field === 'service_areas') {
+      repairedPayload.userdata[field] = normalizeGeographicAreas(originalValue);
+    } else {
+      repairedPayload.userdata[field] = asArray(originalValue)
+        .map((item) => asPlainObject(item))
+        .filter((item) => Object.keys(item).length > 0);
+    }
+
+    if (!Array.isArray(originalValue)) {
+      warnings.push(`${field}_repaired_to_object_array`);
     }
   });
 
