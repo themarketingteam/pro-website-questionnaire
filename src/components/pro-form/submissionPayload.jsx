@@ -1,3 +1,11 @@
+import {
+  asPlainObject,
+  asSafeFileList,
+  asStringArray,
+  asTrimmedString,
+  normalizeQuestionnaireResponses
+} from '@/lib/proResponseNormalizers';
+
 export const serializeError = (error) => ({
   name: error?.name,
   message: error?.message,
@@ -6,8 +14,6 @@ export const serializeError = (error) => ({
   stack: import.meta.env.DEV ? error?.stack : undefined
 });
 
-const asTrimmedString = (value) =>
-  typeof value === 'string' ? value.trim() : '';
 
 const asCoordinateString = (value) => {
   if (value == null || value === '') return '';
@@ -26,21 +32,22 @@ export const normalizeGeographicAreas = (locations = [], primaryIndex = 0) =>
     .filter(Boolean)
     .map((location, index) => {
       const isString = typeof location === 'string';
+      const safeLocation = isString ? {} : asPlainObject(location);
 
       const name = isString
         ? location
-        : location.name || location.label || '';
+        : safeLocation.name || safeLocation.label || '';
 
       return {
         geographic_area_meta: {
           name: asTrimmedString(name),
           label: asTrimmedString(
-            isString ? location : location.label || location.name || ''
+            isString ? location : safeLocation.label || safeLocation.name || ''
           ),
-          lat: isString ? '' : asCoordinateString(location.lat),
-          lon: isString ? '' : asCoordinateString(location.lon),
-          place_id: isString ? '' : asTrimmedString(location.place_id),
-          source: isString ? 'manual' : asTrimmedString(location.source) || 'google',
+          lat: isString ? '' : asCoordinateString(safeLocation.lat),
+          lon: isString ? '' : asCoordinateString(safeLocation.lon),
+          place_id: isString ? '' : asTrimmedString(safeLocation.place_id),
+          source: isString ? 'manual' : asTrimmedString(safeLocation.source) || 'google',
           primary: index === Number(primaryIndex || 0)
         }
       };
@@ -53,24 +60,27 @@ export const normalizeGeographicAreas = (locations = [], primaryIndex = 0) =>
 
 export const normalizeCertifications = (items = []) =>
   items
-    .filter((item) => item?.name?.trim() && item?.type)
-    .map((item) => ({
-      cert_item_name: item.name.trim(),
-      cert_item_type: item.type,
-      cert_item_image_url: item.imageUrl || item.image?.url || '',
-      cert_item_image_name: item.image?.name || '',
-      cert_item_files: Array.isArray(item.files)
-        ? item.files
-            .map((file) => ({
-              name: file?.name || '',
-              url: file?.url || ''
-            }))
-            .filter((file) => file.url || file.name)
-        : []
-    }));
+    .map((item) => {
+      const safeItem = asPlainObject(item);
+      const itemName = asTrimmedString(safeItem.name || safeItem.label);
+      const itemType = asTrimmedString(safeItem.type || safeItem.category);
+      if (!itemName || !itemType) return null;
+
+      const image = asPlainObject(safeItem.image);
+      return {
+        cert_item_name: itemName,
+        cert_item_type: itemType,
+        cert_item_image_url: asTrimmedString(safeItem.imageUrl || image.url),
+        cert_item_image_name: asTrimmedString(image.name),
+        cert_item_files: asSafeFileList(safeItem.files)
+      };
+    })
+    .filter(Boolean);
 
 export const normalizeTeamPhoto = (answer) => {
-  if (!answer?.url && !answer?.imageUrl) {
+  const safeAnswer = asPlainObject(answer);
+
+  if (!safeAnswer.url && !safeAnswer.imageUrl) {
     return {
       imageUrl: '',
       imageName: '',
@@ -79,41 +89,49 @@ export const normalizeTeamPhoto = (answer) => {
   }
 
   return {
-    imageUrl: answer.url || answer.imageUrl || '',
-    imageName: answer.name || '',
-    taggedPeople: Array.isArray(answer.tags)
-      ? answer.tags
-          .filter((tag) => tag?.person?.name?.trim())
-          .map((tag) => ({
-            name: tag.person.name.trim(),
-            position: tag.person.position || '',
-            bio: tag.person.bio || '',
-            x: tag.x ?? 0,
-            y: tag.y ?? 0
-          }))
-      : []
+    imageUrl: asTrimmedString(safeAnswer.url || safeAnswer.imageUrl),
+    imageName: asTrimmedString(safeAnswer.name || safeAnswer.fileName || safeAnswer.filename),
+    taggedPeople: (Array.isArray(safeAnswer.tags) ? safeAnswer.tags : [])
+      .map((tag) => {
+        const safeTag = asPlainObject(tag);
+        const person = asPlainObject(safeTag.person);
+        const name = asTrimmedString(person.name || person.label);
+        if (!name) return null;
+        return {
+          name,
+          position: asTrimmedString(person.position || person.title),
+          bio: asTrimmedString(person.bio || person.description),
+          x: Number.isFinite(Number(safeTag.x)) ? Number(safeTag.x) : 0,
+          y: Number.isFinite(Number(safeTag.y)) ? Number(safeTag.y) : 0
+        };
+      })
+      .filter(Boolean)
   };
 };
 
 export const normalizeGuarantees = (items = []) =>
   items
-    .filter(
-      (item) =>
-        item?.name?.trim() &&
-        item?.type &&
-        (
-          item?.file?.url ||
-          item?.fileUrl ||
-          item?.description?.trim()
-        )
-    )
-    .map((item) => ({
-      guarantee_name: item.name.trim(),
-      guarantee_type: item.type,
-      guarantee_file_url: item.fileUrl || item.file?.url || '',
-      guarantee_file_name: item.file?.name || '',
-      guarantee_description: item.description || ''
-    }));
+    .map((item) => {
+      const safeItem = asPlainObject(item);
+      const guaranteeName = asTrimmedString(safeItem.name || safeItem.label);
+      const guaranteeType = asTrimmedString(safeItem.type || safeItem.category);
+      const file = asPlainObject(safeItem.file);
+      const guaranteeFileUrl = asTrimmedString(safeItem.fileUrl || file.url);
+      const guaranteeDescription = asTrimmedString(safeItem.description);
+
+      if (!guaranteeName || !guaranteeType || (!guaranteeFileUrl && !guaranteeDescription)) {
+        return null;
+      }
+
+      return {
+        guarantee_name: guaranteeName,
+        guarantee_type: guaranteeType,
+        guarantee_file_url: guaranteeFileUrl,
+        guarantee_file_name: asTrimmedString(file.name),
+        guarantee_description: guaranteeDescription
+      };
+    })
+    .filter(Boolean);
 
 export const transformResponsesToPayload = (
   responses,
@@ -121,31 +139,38 @@ export const transformResponsesToPayload = (
   domain,
   serviceOptionsGrouped = {}
 ) => {
+  const normalizedResponses = normalizeQuestionnaireResponses(responses);
+  const serviceSelections = asStringArray(normalizedResponses['3']);
+  const serviceOfferingsOther = asStringArray(normalizedResponses['3_other']).join(', ');
+  const targetIndustriesOther = asStringArray(normalizedResponses['4_other']).join(', ');
+  const clientChallengesOther = asStringArray(normalizedResponses['18_other']).join(', ');
+  const clientOutcomesOther = asStringArray(normalizedResponses['20_other']).join(', ');
+
   const geographicAreas = normalizeGeographicAreas(
-    responses['5'] || [],
-    responses['5_primary'] || 0
+    normalizedResponses['5'] || [],
+    normalizedResponses['5_primary'] || 0
   );
 
-  const certificationsPartnerships = responses['12'] === 'yes'
-    ? normalizeCertifications(responses['12.1'] || [])
+  const certificationsPartnerships = normalizedResponses['12'] === 'yes'
+    ? normalizeCertifications(normalizedResponses['12.1'] || [])
     : [];
 
-  const teamPhoto = responses['2'] === 'yes'
-    ? normalizeTeamPhoto(responses['2.2'])
+  const teamPhoto = normalizedResponses['2'] === 'yes'
+    ? normalizeTeamPhoto(normalizedResponses['2.2'])
     : { imageUrl: '', imageName: '', taggedPeople: [] };
 
-  const serviceGuaranteeItems = responses['14'] === 'yes'
-    ? normalizeGuarantees(responses['14.1'] || [])
+  const serviceGuaranteeItems = normalizedResponses['14'] === 'yes'
+    ? normalizeGuarantees(normalizedResponses['14.1'] || [])
     : [];
 
   const additionalPagesList = {
     why_choose_us_page: {
-      generate_page: responses['1'] === 'yes',
-      why_choose_us_description: responses['1'] === 'yes' ? (responses['1.1'] || '') : ''
+      generate_page: normalizedResponses['1'] === 'yes',
+      why_choose_us_description: normalizedResponses['1'] === 'yes' ? asTrimmedString(normalizedResponses['1.1']) : ''
     },
     meet_the_team_page: {
-      generate_page: responses['2'] === 'yes',
-      team_introduction: responses['2'] === 'yes' ? (responses['2.1'] || '') : '',
+      generate_page: normalizedResponses['2'] === 'yes',
+      team_introduction: normalizedResponses['2'] === 'yes' ? asTrimmedString(normalizedResponses['2.1']) : '',
       team_photo_with_tags: teamPhoto
     }
   };
@@ -159,56 +184,48 @@ export const transformResponsesToPayload = (
     },
     userdata: {
       additional_pages_list: additionalPagesList,
-      service_offerings: (responses['3'] || []).flatMap((s) => {
-        if (s.startsWith('CATEGORY:')) {
-          const categoryName = s.replace('CATEGORY:', '');
+      service_offerings: serviceSelections.flatMap((selection) => {
+        if (selection.startsWith('CATEGORY:')) {
+          const categoryName = selection.replace('CATEGORY:', '').trim();
           return serviceOptionsGrouped[categoryName] || [];
         }
 
-        return [s];
+        return [selection];
       }),
-      service_offerings_other: Array.isArray(responses['3_other'])
-        ? responses['3_other'].filter((v) => v?.trim()).join(', ')
-        : (responses['3_other'] || ''),
-      target_industries: responses['4'] || [],
-      target_industries_other: Array.isArray(responses['4_other'])
-        ? responses['4_other'].filter((v) => v?.trim()).join(', ')
-        : (responses['4_other'] || ''),
+      service_offerings_other: serviceOfferingsOther,
+      target_industries: asStringArray(normalizedResponses['4']),
+      target_industries_other: targetIndustriesOther,
       geographic_areas: geographicAreas,
-      company_description: responses['6'] || '',
-      delivery_model: responses['7'] || '',
-      delivery_model_other: responses['7_other'] || '',
-      pricing_packaging: responses['8'] || [],
-      pricing_packaging_other: responses['8_other'] || '',
-      differentiation: responses['9'] || '',
-      company_goals: responses['10'] || [],
-      company_goals_other: responses['10_other'] || '',
-      brand_tone: responses['11'] || '',
-      brand_tone_other: responses['11_other'] || '',
+      company_description: asTrimmedString(normalizedResponses['6']),
+      delivery_model: asTrimmedString(normalizedResponses['7']),
+      delivery_model_other: asTrimmedString(normalizedResponses['7_other']),
+      pricing_packaging: asStringArray(normalizedResponses['8']),
+      pricing_packaging_other: asTrimmedString(normalizedResponses['8_other']),
+      differentiation: asTrimmedString(normalizedResponses['9']),
+      company_goals: asStringArray(normalizedResponses['10']),
+      company_goals_other: asTrimmedString(normalizedResponses['10_other']),
+      brand_tone: asTrimmedString(normalizedResponses['11']),
+      brand_tone_other: asTrimmedString(normalizedResponses['11_other']),
       certifications_partnerships: certificationsPartnerships,
-      sales_process: responses['13'] || '',
-      service_guarantee: responses['14'] === 'yes',
+      sales_process: asTrimmedString(normalizedResponses['13']),
+      service_guarantee: normalizedResponses['14'] === 'yes',
       service_guarantee_items: serviceGuaranteeItems,
-      client_acquisition: responses['15'] || '',
-      client_acquisition_other: responses['15_other'] || '',
-      website_objectives: responses['16'] || [],
-      website_objectives_other: responses['16_other'] || '',
-      client_size: responses['17'] || '',
-      client_challenges: responses['18'] || [],
-      client_challenges_other: Array.isArray(responses['18_other'])
-        ? responses['18_other'].filter((v) => v?.trim()).join(', ')
-        : (responses['18_other'] || ''),
-      client_frustrations: responses['19'] || '',
-      client_outcomes: responses['20'] || [],
-      client_outcomes_other: Array.isArray(responses['20_other'])
-        ? responses['20_other'].filter((v) => v?.trim()).join(', ')
-        : (responses['20_other'] || ''),
-      value_description: responses['21'] || '',
-      ideal_client: responses['22'] || '',
-      avoided_clients: responses['23'] === 'yes' ? (responses['23.1'] || '') : '',
-      primary_cta: responses['24'] || '',
-      primary_cta_other: responses['24_other'] || '',
-      additional_notes: responses['25'] === 'yes' ? (responses['25.1'] || '') : ''
+      client_acquisition: asTrimmedString(normalizedResponses['15']),
+      client_acquisition_other: asTrimmedString(normalizedResponses['15_other']),
+      website_objectives: asStringArray(normalizedResponses['16']),
+      website_objectives_other: asTrimmedString(normalizedResponses['16_other']),
+      client_size: asTrimmedString(normalizedResponses['17']),
+      client_challenges: asStringArray(normalizedResponses['18']),
+      client_challenges_other: clientChallengesOther,
+      client_frustrations: asTrimmedString(normalizedResponses['19']),
+      client_outcomes: asStringArray(normalizedResponses['20']),
+      client_outcomes_other: clientOutcomesOther,
+      value_description: asTrimmedString(normalizedResponses['21']),
+      ideal_client: asTrimmedString(normalizedResponses['22']),
+      avoided_clients: normalizedResponses['23'] === 'yes' ? asTrimmedString(normalizedResponses['23.1']) : '',
+      primary_cta: asTrimmedString(normalizedResponses['24']),
+      primary_cta_other: asTrimmedString(normalizedResponses['24_other']),
+      additional_notes: normalizedResponses['25'] === 'yes' ? asTrimmedString(normalizedResponses['25.1']) : ''
     }
   };
 };

@@ -3,7 +3,8 @@ import {
   normalizeGeographicAreas,
   normalizeCertifications,
   normalizeGuarantees,
-  normalizeTeamPhoto
+  normalizeTeamPhoto,
+  transformResponsesToPayload
 } from '@/components/pro-form/submissionPayload';
 
 describe('submission payload normalizers', () => {
@@ -24,11 +25,11 @@ describe('submission payload normalizers', () => {
     );
 
     expect(result[0].geographic_area_meta.name).toBe('Denver');
-    expect(result[0].geographic_area_meta.lat).toBe(39.7392);
-    expect(result[0].geographic_area_meta.lon).toBe(-104.9903);
+    expect(result[0].geographic_area_meta.lat).toBe('39.7392');
+    expect(result[0].geographic_area_meta.lon).toBe('-104.9903');
     expect(result[0].geographic_area_meta.primary).toBe(true);
     expect(result[1].geographic_area_meta.name).toBe('Nashville, TN');
-    expect(result[1].geographic_area_meta.lat).toBeNull();
+    expect(result[1].geographic_area_meta.lat).toBe('');
     expect(result[1].geographic_area_meta.source).toBe('manual');
   });
 
@@ -115,5 +116,23 @@ describe('submission payload normalizers', () => {
 
     expect(result[0].guarantee_file_url).toBe('https://example.test/sla.pdf');
     expect(result[0].guarantee_description).toBe('We respond quickly.');
+  });
+
+  it('keeps valid questionnaire responses mapping intact', () => {
+    const payload = transformResponsesToPayload({
+      '1': 'yes',
+      '1.1': 'Why choose us text',
+      '3': ['CATEGORY:Security', 'Help Desk'],
+      '4': ['Healthcare'],
+      '5': [{ name: 'Denver', label: 'Denver, CO, USA', lat: '39.7392', lon: '-104.9903', source: 'google' }],
+      '6': 'Company description',
+      '14': 'yes',
+      '14.1': [{ name: 'Response SLA', type: 'sla', description: 'We respond quickly.' }]
+    }, 'Acme', 'acme.com', { Security: ['Firewall Management'] });
+
+    expect(payload.metadata.business_name).toBe('Acme');
+    expect(payload.userdata.service_offerings).toEqual(['Firewall Management', 'Help Desk']);
+    expect(payload.userdata.target_industries).toEqual(['Healthcare']);
+    expect(payload.userdata.service_guarantee).toBe(true);
   });
 });
