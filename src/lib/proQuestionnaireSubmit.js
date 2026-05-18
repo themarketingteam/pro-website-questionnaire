@@ -4,14 +4,12 @@ import {
   validateSubmissionPayload
 } from '@/components/pro-form/submissionPayload';
 import { trackClarityEvent } from '@/lib/clarity';
+import {
+  createProFormSubmissionResilient,
+  serializeSubmitError
+} from '@/lib/proSubmissionResilience';
 
-export const serializeSubmitError = (error) => ({
-  name: error?.name || '',
-  message: error?.message || String(error || ''),
-  status: error?.status || error?.response?.status || '',
-  data: error?.response?.data || null,
-  stack: import.meta.env.DEV ? error?.stack : undefined
-});
+export { serializeSubmitError } from '@/lib/proSubmissionResilience';
 
 const safeJsonStringify = (value) => {
   try {
@@ -218,12 +216,20 @@ export const submitProQuestionnaire = async ({
 
   let savedSubmission;
 
-  try {
-    savedSubmission = await base44.entities.ProFormSubmission.create(
-      transformedPayload
-    );
-  } catch (error) {
-    const serialized = serializeSubmitError(error);
+  const resilientSubmitResult = await createProFormSubmissionResilient(
+    transformedPayload,
+    {
+      maxAttempts: 3,
+      timeoutMs: 15000
+    }
+  );
+
+  if (!resilientSubmitResult.ok) {
+    const serialized = resilientSubmitResult.error || serializeSubmitError(null);
+    const submitFailure = new Error('Questionnaire submission failed');
+    submitFailure.name = 'ProSubmissionCreateFailed';
+    submitFailure.failureKind = resilientSubmitResult.failureKind;
+    submitFailure.attempts = resilientSubmitResult.attempts;
 
     console.error('ProFormSubmission.create failed:', serialized);
 
@@ -232,7 +238,7 @@ export const submitProQuestionnaire = async ({
       eventType: 'submit_failed',
       value: {
         status: 'submit_failed',
-        error_message: error?.message || 'unknown'
+        error_message: serialized?.message || 'unknown'
       }
     });
 
@@ -260,20 +266,22 @@ export const submitProQuestionnaire = async ({
       completed_questions: Object.keys(responseSnapshot).length,
       submit_status: 'failed',
       business_domain: domain || credentials?.domain || domainParam || 'unknown',
-      error_message: error?.message || 'unknown'
+      error_message: serialized?.message || 'unknown'
     });
 
     if (typeof onFinalSubmitFailure === 'function') {
       onFinalSubmitFailure({
-        error,
+        error: submitFailure,
         serialized,
         responseSnapshot,
         transformedPayload
       });
     }
 
-    throw error;
+    throw submitFailure;
   }
+
+  savedSubmission = resilientSubmitResult.submission;
 
   await safeDraftSave({
     saveDraftNow,
