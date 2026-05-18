@@ -40,30 +40,45 @@ export const classifySubmitError = (error) => {
   const status = getErrorStatus(error);
   const message = getErrorMessage(error).toLowerCase();
   const name = String(error?.name ?? '').toLowerCase();
+  const code = String(error?.code ?? error?.response?.data?.code ?? '').toLowerCase();
+  const statusText = getErrorStatusText(error).toLowerCase();
 
-  if (name.includes('timeout') || message.includes('timeout') || message.includes('timed out') || message.includes('aborted')) {
+  if (name.includes('timeout') || code.includes('timeout') || message.includes('timeout') || message.includes('timed out') || message.includes('aborted')) {
     return 'timeout';
   }
 
-  if (status === 401 || /unauthorized|auth|session|login|token/.test(message)) {
+  if (
+    status === 401 ||
+    /unauthorized|auth|session|login|token|jwt|expired session|not authenticated|authentication required/.test(message) ||
+    /unauthorized/.test(statusText) ||
+    /auth|session|token|jwt|unauthorized/.test(code)
+  ) {
     return 'auth';
   }
 
-  if (status === 403 || /forbidden|permission|rls|policy|access denied/.test(message)) {
+  if (
+    status === 403 ||
+    /forbidden|permission|rls|policy|access denied|insufficient privileges|not allowed/.test(message) ||
+    /forbidden/.test(statusText) ||
+    /permission|forbidden|rls|policy|access/.test(code)
+  ) {
     return 'permission';
   }
 
-  if (status === 429) {
+  if (status === 429 || /rate limit|too many requests/.test(message) || code.includes('rate')) {
     return 'rate_limit';
   }
 
   if (status === 400 || status === 422) {
-    if (/schema/.test(message)) return 'schema';
-    if (/validation|invalid|required/.test(message)) return 'validation';
+    if (/schema|column|field type|invalid input syntax|shape/.test(message) || /schema/.test(code)) return 'schema';
+    if (/validation|invalid|required|must be|expected/.test(message)) return 'validation';
     return 'validation';
   }
 
-  if (/failed to fetch|network|cors|offline/.test(message)) {
+  if (
+    /failed to fetch|networkerror|network error|network request failed|load failed|cors|offline|fetch failed/.test(message) ||
+    code.includes('network')
+  ) {
     return 'network';
   }
 
@@ -82,9 +97,15 @@ export const serializeSubmitError = (error) => {
     message: getErrorMessage(error),
     status: getErrorStatus(error),
     statusText: getErrorStatusText(error),
-    code: truncateString(error?.code ?? '', MAX_MESSAGE_LENGTH),
+    code: truncateString(error?.code ?? error?.response?.data?.code ?? '', MAX_MESSAGE_LENGTH),
     type: truncateString(error?.type ?? '', MAX_MESSAGE_LENGTH),
     failureKind,
+    isAuthLike: failureKind === 'auth',
+    isPermissionLike: failureKind === 'permission',
+    isNetworkLike: failureKind === 'network',
+    isTimeoutLike: failureKind === 'timeout',
+    isServerLike: failureKind === 'server',
+    isRateLimitLike: failureKind === 'rate_limit',
     stackSnippet: truncateString(error?.stack ?? '', MAX_STACK_LENGTH),
     rawString: truncateString(typeof error === 'string' ? error : String(error ?? ''), MAX_RAW_LENGTH)
   };
@@ -188,6 +209,103 @@ export const createProFormSubmissionResilient = async (payload, options = {}) =>
     failureKind: 'unknown'
   };
 };
+
+export const getBrowserOnlineStatus = () => {
+  try {
+    if (typeof navigator === 'undefined' || typeof navigator.onLine !== 'boolean') {
+      return null;
+    }
+
+    return navigator.onLine;
+  } catch {
+    return null;
+  }
+};
+
+const getSafeWindowLocationHref = () => {
+  try {
+    return typeof window !== 'undefined' && window.location?.href ? window.location.href : '';
+  } catch {
+    return '';
+  }
+};
+
+const getSafeUserAgent = () => {
+  try {
+    return typeof navigator !== 'undefined' && navigator.userAgent ? navigator.userAgent : '';
+  } catch {
+    return '';
+  }
+};
+
+const safeCountArray = (value) => (Array.isArray(value) ? value.filter(Boolean).length : 0);
+
+export const buildPayloadFeatureSummary = (payload) => {
+  const metadata = payload && typeof payload === 'object' ? payload.metadata || {} : {};
+  const userdata = payload && typeof payload === 'object' ? payload.userdata || {} : {};
+  const additionalPagesList = userdata && typeof userdata.additional_pages_list === 'object' && !Array.isArray(userdata.additional_pages_list)
+    ? userdata.additional_pages_list
+    : {};
+  const teamPhoto = additionalPagesList?.meet_the_team_page?.team_photo_with_tags;
+  const certifications = Array.isArray(userdata.certifications_partnerships) ? userdata.certifications_partnerships : [];
+  const guarantees = Array.isArray(userdata.service_guarantee_items) ? userdata.service_guarantee_items : [];
+  const geographicAreas = Array.isArray(userdata.geographic_areas) ? userdata.geographic_areas : [];
+  const serviceOfferings = Array.isArray(userdata.service_offerings) ? userdata.service_offerings : [];
+  const industries = Array.isArray(userdata.target_industries) ? userdata.target_industries : [];
+
+  return {
+    hasTeamPhotoWithTags: Boolean(teamPhoto && typeof teamPhoto === 'object'),
+    certificationFileCount: certifications.reduce((count, item) => {
+      const files = Array.isArray(item?.cert_item_files) ? item.cert_item_files.filter(Boolean).length : 0;
+      return count + files;
+    }, 0),
+    guaranteeFileCount: guarantees.reduce((count, item) => count + (item?.guarantee_file_url ? 1 : 0), 0),
+    additionalPagesCount: Object.values(additionalPagesList).filter(Boolean).length,
+    geographicAreaCount: geographicAreas.length,
+    serviceOfferingCount: serviceOfferings.length,
+    industryCount: industries.length,
+    locationCount: geographicAreas.length,
+    payloadSizeChars: (() => {
+      try {
+        return JSON.stringify({ metadata, userdata }).length;
+      } catch {
+        return null;
+      }
+    })()
+  };
+};
+
+export const buildSubmitDiagnostics = ({
+  questionnaireSessionId,
+  businessName,
+  domain,
+  draftId,
+  primaryResult,
+  fallbackResult,
+  submitContext,
+  payloadSummary
+}) => ({
+  questionnaireSessionId: questionnaireSessionId || '',
+  businessNamePresent: Boolean(String(businessName || '').trim()),
+  domainPresent: Boolean(String(domain || '').trim()),
+  draftIdPresent: Boolean(draftId),
+  primaryOk: Boolean(primaryResult?.ok),
+  primaryFailureKind: primaryResult?.failureKind || primaryResult?.error?.failureKind || null,
+  primaryStatus: primaryResult?.error?.status ?? null,
+  primaryCode: primaryResult?.error?.code || null,
+  fallbackAttempted: Boolean(fallbackResult || primaryResult?.usedFallback),
+  fallbackOk: fallbackResult ? Boolean(fallbackResult?.ok) : null,
+  fallbackFailureKind: fallbackResult?.failureKind || fallbackResult?.error?.failureKind || null,
+  fallbackStatus: fallbackResult?.error?.status ?? null,
+  usedFallback: Boolean(fallbackResult?.ok || fallbackResult?.usedFallback || primaryResult?.usedFallback),
+  browserOnline: getBrowserOnlineStatus(),
+  pageUrlPresent: Boolean(getSafeWindowLocationHref()),
+  userAgentPresent: Boolean(getSafeUserAgent()),
+  appVersionPresent: Boolean(submitContext?.app_version || import.meta.env?.VITE_APP_VERSION || import.meta.env?.MODE),
+  payloadSizeChars: payloadSummary?.payloadSizeChars ?? null,
+  payloadFeatureSummary: payloadSummary || buildPayloadFeatureSummary(null),
+  timestamp: new Date().toISOString()
+});
 
 export const createProFormSubmissionWithFallback = async (payload, options = {}) => {
   const {

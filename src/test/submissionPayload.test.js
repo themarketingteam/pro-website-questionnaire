@@ -4,7 +4,8 @@ import {
   normalizeCertifications,
   normalizeGuarantees,
   normalizeTeamPhoto,
-  transformResponsesToPayload
+  transformResponsesToPayload,
+  validateSubmissionPayload
 } from '@/components/pro-form/submissionPayload';
 
 describe('submission payload normalizers', () => {
@@ -134,5 +135,10 @@ describe('submission payload normalizers', () => {
     expect(payload.userdata.service_offerings).toEqual(['Firewall Management', 'Help Desk']);
     expect(payload.userdata.target_industries).toEqual(['Healthcare']);
     expect(payload.userdata.service_guarantee).toBe(true);
+  });
+
+  it('fails validation when required metadata is missing', () => {
+    const payload = transformResponsesToPayload({}, '', '', {});
+    expect(validateSubmissionPayload(payload).ok).toBe(false);
   });
 });
