@@ -194,3 +194,110 @@ export const createProFormSubmissionResilient = async (payload, options = {}) =>
     failureKind: 'unknown'
   };
 };
+
+export const createProFormSubmissionWithFallback = async (payload, options = {}) => {
+  const {
+    responseSnapshot = null,
+    questionnaireSessionId = null,
+    draftId = null,
+    submitContext = null,
+    onPrimaryFailure = null,
+    onFallbackAttempt = null,
+    onFallbackSuccess = null,
+    onFallbackFailure = null,
+    ...resilienceOptions
+  } = options;
+
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    const error = serializeSubmitError(new Error('Invalid submission payload'));
+    return {
+      ok: false,
+      submission: null,
+      error,
+      attempts: 0,
+      usedFallback: false,
+      failureKind: error.failureKind,
+      primaryError: error
+    };
+  }
+
+  const primaryResult = await createProFormSubmissionResilient(payload, resilienceOptions);
+
+  if (primaryResult.ok) {
+    return primaryResult;
+  }
+
+  if (typeof onPrimaryFailure === 'function') {
+    onPrimaryFailure(primaryResult);
+  }
+
+  if (typeof onFallbackAttempt === 'function') {
+    onFallbackAttempt({ primaryError: primaryResult.error, failureKind: primaryResult.failureKind });
+  }
+
+  try {
+    const response = await base44.functions.invoke('submitProQuestionnaireFallback', {
+      transformedPayload: payload,
+      responseSnapshot,
+      questionnaireSessionId,
+      draftId,
+      primaryError: primaryResult.error,
+      submitContext
+    });
+
+    const fallbackData = response?.data;
+
+    if (fallbackData?.success && fallbackData?.submission) {
+      const result = {
+        ok: true,
+        submission: fallbackData.submission,
+        error: null,
+        attempts: primaryResult.attempts,
+        usedFallback: true,
+        failureKind: null,
+        primaryError: primaryResult.error,
+        zapierSent: Boolean(fallbackData?.zapierSent)
+      };
+
+      if (typeof onFallbackSuccess === 'function') {
+        onFallbackSuccess(result);
+      }
+
+      return result;
+    }
+
+    const fallbackError = serializeSubmitError(fallbackData?.error || new Error('Malformed fallback response'));
+    const failedResult = {
+      ok: false,
+      submission: null,
+      error: fallbackError,
+      attempts: primaryResult.attempts,
+      usedFallback: true,
+      failureKind: fallbackError.failureKind,
+      primaryError: primaryResult.error
+    };
+
+    if (typeof onFallbackFailure === 'function') {
+      onFallbackFailure(failedResult);
+    }
+
+    return failedResult;
+  } catch (error) {
+    const fallbackError = serializeSubmitError(error);
+    const failedResult = {
+      ok: false,
+      submission: null,
+      error: fallbackError,
+      attempts: primaryResult.attempts,
+      usedFallback: true,
+      failureKind: fallbackError.failureKind,
+      primaryError: primaryResult.error
+    };
+
+    if (typeof onFallbackFailure === 'function') {
+      onFallbackFailure(failedResult);
+    }
+
+    return failedResult;
+  }
+};

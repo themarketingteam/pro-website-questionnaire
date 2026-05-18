@@ -5,7 +5,7 @@ import {
 } from '@/components/pro-form/submissionPayload';
 import { trackClarityEvent } from '@/lib/clarity';
 import {
-  createProFormSubmissionResilient,
+  createProFormSubmissionWithFallback,
   serializeSubmitError
 } from '@/lib/proSubmissionResilience';
 
@@ -216,9 +216,24 @@ export const submitProQuestionnaire = async ({
 
   let savedSubmission;
 
-  const resilientSubmitResult = await createProFormSubmissionResilient(
+  const submitContext = {
+    business_name: businessName || null,
+    domain: domain || credentials?.domain || domainParam || null,
+    user_email: credentials?.email || null,
+    user_id: credentials?.id || null,
+    page_url: typeof window !== 'undefined' ? window.location.href : null,
+    user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+    app_version: import.meta.env.VITE_APP_VERSION || null,
+    submitted_at_client: new Date().toISOString()
+  };
+
+  const resilientSubmitResult = await createProFormSubmissionWithFallback(
     transformedPayload,
     {
+      responseSnapshot,
+      questionnaireSessionId,
+      draftId: null,
+      submitContext,
       maxAttempts: 3,
       timeoutMs: 15000
     }
@@ -226,10 +241,11 @@ export const submitProQuestionnaire = async ({
 
   if (!resilientSubmitResult.ok) {
     const serialized = resilientSubmitResult.error || serializeSubmitError(null);
-    const submitFailure = new Error('Questionnaire submission failed');
+    const submitFailure = new Error('We could not finish your submission right now. Your recovery code is ' + questionnaireSessionId + '.');
     submitFailure.name = 'ProSubmissionCreateFailed';
     submitFailure.failureKind = resilientSubmitResult.failureKind;
     submitFailure.attempts = resilientSubmitResult.attempts;
+    submitFailure.usedFallback = resilientSubmitResult.usedFallback;
 
     console.error('ProFormSubmission.create failed:', serialized);
 
@@ -238,7 +254,9 @@ export const submitProQuestionnaire = async ({
       eventType: 'submit_failed',
       value: {
         status: 'submit_failed',
-        error_message: serialized?.message || 'unknown'
+        error_message: serialized?.message || 'unknown',
+        recovery_code: questionnaireSessionId,
+        fallback_used: Boolean(resilientSubmitResult.usedFallback)
       }
     });
 
@@ -266,7 +284,8 @@ export const submitProQuestionnaire = async ({
       completed_questions: Object.keys(responseSnapshot).length,
       submit_status: 'failed',
       business_domain: domain || credentials?.domain || domainParam || 'unknown',
-      error_message: serialized?.message || 'unknown'
+      error_message: serialized?.message || 'unknown',
+      fallback_used: Boolean(resilientSubmitResult.usedFallback)
     });
 
     if (typeof onFinalSubmitFailure === 'function') {
@@ -282,6 +301,24 @@ export const submitProQuestionnaire = async ({
   }
 
   savedSubmission = resilientSubmitResult.submission;
+
+  if (resilientSubmitResult.usedFallback) {
+    await createDraftEventSafe({
+      createDraftEvent,
+      eventType: 'submit_fallback_succeeded',
+      value: {
+        status: 'submitted',
+        fallback_used: true,
+        final_submission_id: savedSubmission?.id || ''
+      }
+    });
+
+    trackClarityEvent('pro_questionnaire_submit_fallback_success', {
+      completed_questions: Object.keys(responseSnapshot).length,
+      submit_status: 'success',
+      business_domain: domain || credentials?.domain || domainParam || 'unknown'
+    });
+  }
 
   await safeDraftSave({
     saveDraftNow,
@@ -305,7 +342,9 @@ export const submitProQuestionnaire = async ({
     }
   });
 
-  await sendZapierSafe(transformedPayload);
+  if (!resilientSubmitResult.zapierSent) {
+    await sendZapierSafe(transformedPayload);
+  }
 
   try {
     trackClarityEvent('pro_questionnaire_submit_success', {
