@@ -1,21 +1,26 @@
-/* global Deno */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-const parsePayload = (value) => {
+const parsePayload = (value: unknown) => {
   if (!value) return null;
   if (typeof value === 'object') return value;
   if (typeof value !== 'string') return null;
-  return JSON.parse(value);
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 };
 
-const safeError = (error) => ({
-  name: error?.name || '',
-  message: error?.message || 'Unknown error',
-  status: error?.status || error?.response?.status || null,
-  code: error?.code || error?.response?.data?.code || '',
-});
+const safeError = (error: unknown) => {
+  const safe = (error ?? {}) as Record<string, unknown> & { response?: { status?: number } };
+  return {
+    message: typeof safe.message === 'string' ? safe.message : 'Unknown error',
+    status: typeof safe.status === 'number' ? safe.status : safe.response?.status ?? null,
+    code: typeof safe.code === 'string' ? safe.code : ''
+  };
+};
 
-const incrementRetryCount = (value) => {
+const incrementRetryCount = (value: unknown) => {
   const count = Number(value);
   return Number.isFinite(count) ? count + 1 : 1;
 };
@@ -30,8 +35,8 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const intakeId = body?.intakeId || '';
-    const questionnaireSessionId = body?.questionnaireSessionId || '';
+    const intakeId = typeof body?.intakeId === 'string' ? body.intakeId : '';
+    const questionnaireSessionId = typeof body?.questionnaireSessionId === 'string' ? body.questionnaireSessionId : '';
     const forceRetry = Boolean(body?.forceRetry);
 
     if (!intakeId && !questionnaireSessionId) {
@@ -43,7 +48,7 @@ Deno.serve(async (req) => {
       : await base44.asServiceRole.entities.ProFormSubmissionIntake.filter({ questionnaire_session_id: questionnaireSessionId });
 
     const intake = Array.isArray(intakeList) && intakeList.length > 0
-      ? intakeList.sort((a, b) => new Date(b.created_at_server || b.created_date || 0).getTime() - new Date(a.created_at_server || a.created_date || 0).getTime())[0]
+      ? [...intakeList].sort((a, b) => new Date(String(b.created_at_server || b.created_date || 0)).getTime() - new Date(String(a.created_at_server || a.created_date || 0)).getTime())[0]
       : null;
 
     if (!intake) {
@@ -55,26 +60,26 @@ Deno.serve(async (req) => {
         success: true,
         alreadySubmitted: true,
         linkedSubmissionId: intake.linked_submission_id,
-        intakeId: intake.id,
+        intakeId: intake.id
       });
     }
 
-    let transformedPayload;
-    try {
-      transformedPayload = parsePayload(intake.transformed_payload_json);
-    } catch {
-      const error = { message: 'Malformed transformed payload JSON' };
+    const transformedPayload = parsePayload(intake.transformed_payload_json);
+
+    if (!transformedPayload) {
       await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
         status: 'retry_failed',
-        retry_error_json: JSON.stringify(error),
+        retry_error_json: JSON.stringify({ message: 'Malformed transformed payload JSON' }),
         last_retry_at: new Date().toISOString(),
-        retry_count: incrementRetryCount(intake.retry_count),
+        retry_count: incrementRetryCount(intake.retry_count)
       });
-      return Response.json({ success: false, error, intakeId: intake.id }, { status: 400 });
+
+      return Response.json({ success: false, error: { message: 'Malformed transformed payload JSON' }, intakeId: intake.id }, { status: 400 });
     }
 
-    const businessName = transformedPayload?.metadata?.business_name?.trim?.() || '';
-    const businessDomain = transformedPayload?.metadata?.businessDomain?.trim?.() || '';
+    const metadata = typeof transformedPayload.metadata === 'object' && transformedPayload.metadata ? transformedPayload.metadata : {};
+    const businessName = typeof metadata.business_name === 'string' ? metadata.business_name.trim() : '';
+    const businessDomain = typeof metadata.businessDomain === 'string' ? metadata.businessDomain.trim() : '';
 
     if (!businessName || !businessDomain) {
       const error = { message: 'Missing required metadata fields' };
@@ -82,7 +87,7 @@ Deno.serve(async (req) => {
         status: 'retry_failed',
         retry_error_json: JSON.stringify(error),
         last_retry_at: new Date().toISOString(),
-        retry_count: incrementRetryCount(intake.retry_count),
+        retry_count: incrementRetryCount(intake.retry_count)
       });
       return Response.json({ success: false, error, intakeId: intake.id }, { status: 400 });
     }
@@ -94,7 +99,7 @@ Deno.serve(async (req) => {
           success: true,
           alreadySubmitted: true,
           linkedSubmissionId: intake.linked_submission_id,
-          intakeId: intake.id,
+          intakeId: intake.id
         });
       }
     }
@@ -104,14 +109,15 @@ Deno.serve(async (req) => {
       await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
         status: 'retry_success',
         linked_submission_id: submission.id,
+        retry_error_json: '',
         last_retry_at: new Date().toISOString(),
-        retry_count: incrementRetryCount(intake.retry_count),
+        retry_count: incrementRetryCount(intake.retry_count)
       });
 
       return Response.json({
         success: true,
         linkedSubmissionId: submission.id,
-        intakeId: intake.id,
+        intakeId: intake.id
       });
     } catch (error) {
       const serialized = safeError(error);
@@ -119,7 +125,7 @@ Deno.serve(async (req) => {
         status: 'retry_failed',
         retry_error_json: JSON.stringify(serialized),
         last_retry_at: new Date().toISOString(),
-        retry_count: incrementRetryCount(intake.retry_count),
+        retry_count: incrementRetryCount(intake.retry_count)
       });
 
       return Response.json({ success: false, error: serialized, intakeId: intake.id }, { status: 500 });

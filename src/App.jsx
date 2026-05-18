@@ -12,6 +12,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AdminSubmitIntake from './pages/AdminSubmitIntake';
 import ProFormDraftRecovery from './pages/ProFormDraftRecovery';
+import QuestionnaireIntakeRecoveryPage from './pages/QuestionnaireIntakeRecovery';
 
 const ADMIN_EMAILS = ['benjamin.hines8@gmail.com'];
 
@@ -117,6 +118,13 @@ const AuthenticatedApp = () => {
         <AdminOnly>
           <LayoutWrapper currentPageName={"admin/draft-recovery"}>
             <ProFormDraftRecovery />
+          </LayoutWrapper>
+        </AdminOnly>
+      } />
+      <Route path="/admin/questionnaire-intake-recovery" element={
+        <AdminOnly>
+          <LayoutWrapper currentPageName={"admin/questionnaire-intake-recovery"}>
+            <QuestionnaireIntakeRecoveryPage />
           </LayoutWrapper>
         </AdminOnly>
       } />

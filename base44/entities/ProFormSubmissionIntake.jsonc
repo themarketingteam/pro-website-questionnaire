@@ -1,0 +1,112 @@
+{
+  "name": "ProFormSubmissionIntake",
+  "type": "object",
+  "properties": {
+    "questionnaire_session_id": {
+      "type": "string",
+      "description": "Questionnaire session identifier used for recovery and deduplication"
+    },
+    "business_name": {
+      "type": "string"
+    },
+    "business_domain": {
+      "type": "string"
+    },
+    "user_email": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "submitted",
+        "received_intake",
+        "retry_pending",
+        "retry_success",
+        "retry_failed",
+        "abandoned"
+      ],
+      "default": "received_intake"
+    },
+    "intake_reason": {
+      "type": "string"
+    },
+    "primary_failure_kind": {
+      "type": "string"
+    },
+    "fallback_failure_kind": {
+      "type": "string"
+    },
+    "primary_error_json": {
+      "type": "string"
+    },
+    "fallback_error_json": {
+      "type": "string"
+    },
+    "retry_error_json": {
+      "type": "string"
+    },
+    "transformed_payload_json": {
+      "type": "string"
+    },
+    "raw_responses_json": {
+      "type": "string"
+    },
+    "diagnostics_json": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "created_at_client": {
+      "type": "string"
+    },
+    "created_at_server": {
+      "type": "string"
+    },
+    "last_retry_at": {
+      "type": "string"
+    },
+    "retry_count": {
+      "type": "number",
+      "default": 0
+    },
+    "linked_submission_id": {
+      "type": "string"
+    },
+    "zapier_sent": {
+      "type": "boolean",
+      "default": false
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "questionnaire_session_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "write": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
