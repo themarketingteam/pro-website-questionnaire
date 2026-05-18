@@ -125,49 +125,153 @@ export const normalizeAdditionalPagesList = (value) => {
   return safeObject;
 };
 
-const asFiniteNumber = (value) => {
-  if (value == null || value === '') return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+const toFiniteNumberOrNull = (value) => {
+  if (value === '' || value == null) return null;
+  const numberValue = Number(value);
+  return Number.isFinite(numberValue) ? numberValue : null;
 };
 
-const pickSafeGeographicArea = (value) => {
-  if (typeof value === 'string') {
-    const label = asTrimmedString(value);
-    return label ? { label } : null;
-  }
-
-  const source = isPlainObject(value) ? value : {};
-  const area = {};
-  ['label', 'name', 'city', 'state', 'region', 'county', 'zip', 'type'].forEach((key) => {
-    const normalized = asTrimmedString(source[key]);
-    if (normalized) area[key] = normalized;
-  });
-
-  if (!area.label) area.label = asTrimmedString(source.label || source.name || source.city || source.value || source.title);
-  if (!area.name) area.name = asTrimmedString(source.name || source.label || source.city);
-
-  const latitude = asFiniteNumber(source.latitude ?? source.lat);
-  const longitude = asFiniteNumber(source.longitude ?? source.lon ?? source.lng);
-  const radius = asFiniteNumber(source.radius);
-
-  if (latitude != null) area.latitude = latitude;
-  if (longitude != null) area.longitude = longitude;
-  if (radius != null) area.radius = radius;
-
-  return Object.keys(area).length ? area : null;
-};
+const firstDefined = (...values) => values.find((value) => value !== undefined && value !== null && value !== '');
 
 export const normalizeGeographicAreas = (value) => {
+  return asArray(value)
+    .map((item) => {
+      if (typeof item === 'string' || typeof item === 'number') {
+        const label = asTrimmedString(item);
+        return label
+          ? {
+              label,
+              name: label,
+              city: '',
+              state: '',
+              region: '',
+              county: '',
+              zip: '',
+              radius: null,
+              latitude: null,
+              longitude: null,
+              place_id: '',
+              source: 'manual',
+              type: '',
+              primary: false
+            }
+          : null;
+      }
+
+      const safeItem = asPlainObject(item);
+      const meta = asPlainObject(
+        safeItem.geographic_area_meta ||
+        safeItem.meta ||
+        safeItem.location ||
+        safeItem.place
+      );
+
+      const label = asTrimmedString(firstDefined(
+        safeItem.label,
+        safeItem.name,
+        safeItem.city,
+        safeItem.value,
+        meta.label,
+        meta.name,
+        meta.city
+      ));
+
+      const name = asTrimmedString(firstDefined(
+        safeItem.name,
+        safeItem.label,
+        safeItem.city,
+        safeItem.value,
+        meta.name,
+        meta.label,
+        meta.city
+      ));
+
+      const latitude = toFiniteNumberOrNull(firstDefined(
+        safeItem.latitude,
+        safeItem.lat,
+        meta.latitude,
+        meta.lat
+      ));
+
+      const longitude = toFiniteNumberOrNull(firstDefined(
+        safeItem.longitude,
+        safeItem.lon,
+        safeItem.lng,
+        meta.longitude,
+        meta.lon,
+        meta.lng
+      ));
+
+      const radius = toFiniteNumberOrNull(firstDefined(
+        safeItem.radius,
+        meta.radius
+      ));
+
+      const normalized = {
+        label,
+        name,
+        city: asTrimmedString(firstDefined(safeItem.city, meta.city)),
+        state: asTrimmedString(firstDefined(safeItem.state, meta.state)),
+        region: asTrimmedString(firstDefined(safeItem.region, meta.region)),
+        county: asTrimmedString(firstDefined(safeItem.county, meta.county)),
+        zip: asTrimmedString(firstDefined(
+          safeItem.zip,
+          safeItem.postalCode,
+          safeItem.postal_code,
+          meta.zip,
+          meta.postalCode,
+          meta.postal_code
+        )),
+        radius,
+        latitude,
+        longitude,
+        place_id: asTrimmedString(firstDefined(
+          safeItem.place_id,
+          safeItem.placeId,
+          meta.place_id,
+          meta.placeId
+        )),
+        source: asTrimmedString(firstDefined(safeItem.source, meta.source)) || 'manual',
+        type: asTrimmedString(firstDefined(safeItem.type, meta.type)),
+        primary: asBoolean(firstDefined(safeItem.primary, meta.primary), false)
+      };
+
+      return normalized.label || normalized.name ? normalized : null;
+    })
+    .filter(Boolean);
+};
+
+export const normalizeServiceSelections = (value, serviceOptionsGrouped = {}) => {
+  const selections = normalizeStringSelectionList(value);
+  const expanded = [];
+
+  selections.forEach((selection) => {
+    if (selection.startsWith('CATEGORY:')) {
+      const categoryName = selection.replace('CATEGORY:', '').trim();
+      const categoryServices = Array.isArray(serviceOptionsGrouped?.[categoryName])
+        ? serviceOptionsGrouped[categoryName]
+        : [];
+
+      if (categoryServices.length > 0) {
+        expanded.push(...categoryServices);
+      } else {
+        expanded.push(selection);
+      }
+
+      return;
+    }
+
+    expanded.push(selection);
+  });
+
   const seen = new Set();
 
-  return asArray(value)
-    .map(pickSafeGeographicArea)
+  return expanded
+    .map((item) => asTrimmedString(item))
     .filter(Boolean)
     .filter((item) => {
-      const key = JSON.stringify(item);
-      if (seen.has(key)) return false;
-      seen.add(key);
+      if (seen.has(item)) return false;
+      seen.add(item);
       return true;
     });
 };
