@@ -1,12 +1,12 @@
 import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
+import {
+  safeGetUserAgent,
+  safeJsonStringify,
+  safeLocalStorageSet,
+  safeNowIso
+} from '@/lib/browserSafety';
 
-export const safeJsonStringifyDraft = (value) => {
-  try {
-    return JSON.stringify(value ?? {});
-  } catch {
-    return '{}';
-  }
-};
+export const safeJsonStringifyDraft = (value) => safeJsonStringify(value, '{}');
 
 export const sanitizeCredentialsForDraft = (credentials = {}) => ({
   businessName: credentials.businessName || '',
@@ -64,7 +64,7 @@ export const createSaveDraftSnapshot = ({
     finalSubmissionId = ''
   }) => {
     const safeCreds = sanitizeCredentialsForDraft(credentials);
-    const now = new Date().toISOString();
+    const now = safeNowIso();
     const businessName = businessNameParam || safeCreds.businessName || '';
     const businessDomain = domainParam || safeCreds.domain || '';
     const mappedPayload = transformResponsesToPayload(
@@ -94,9 +94,7 @@ export const createSaveDraftSnapshot = ({
       draft_metadata_json: safeJsonStringifyDraft({
         app: 'pro_questionnaire',
         source: 'real_time_draft',
-        userAgent: navigator.userAgent,
-        pagePath: window.location.pathname,
-        pageOrigin: window.location.origin
+        userAgent: safeGetUserAgent()
       }),
       save_error: saveError,
       submit_error: submitError,
@@ -136,17 +134,17 @@ export const writeDraftFailureBackup = ({
   error
 }) => {
   try {
-    localStorage.setItem(
+    safeLocalStorageSet(
       `pro_questionnaire_local_backup_${questionnaireSessionId}`,
-      JSON.stringify({
+      {
         session_id: questionnaireSessionId,
         responses,
         validationStatus,
         touchedQuestions,
         expandedQuestions,
         error,
-        savedAt: new Date().toISOString()
-      })
+        savedAt: safeNowIso()
+      }
     );
   } catch {
     // no-op

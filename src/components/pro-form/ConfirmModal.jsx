@@ -16,15 +16,16 @@ const cleanDomainForSubmission = (domainStr) => {
 export default function ConfirmModal({ 
   formData, 
   onConfirm, 
-  onCancel, 
+  onCancel,
+  isSubmitting = false,
   initialBusinessName = '', 
   initialDomain = '' 
 }) {
   const [businessName, setBusinessName] = useState(initialBusinessName);
   const [domain, setDomain] = useState(initialDomain);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const submitAttemptRef = useRef(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const businessNameRef = useRef(null);
   const domainRef = useRef(null);
@@ -57,36 +58,31 @@ export default function ConfirmModal({
   };
 
   const handleSubmit = async () => {
-    // Guard: block if already submitting (prevents double-click / Enter race)
-    if (isSubmitting) {
-      console.warn('[ConfirmModal] Submit blocked — already submitting.');
+    if (isSubmitting || submitAttemptRef.current) {
+      if (import.meta.env.DEV) {
+        console.warn('[ConfirmModal] Submit blocked — already submitting.');
+      }
       return;
     }
 
-    // Validate fields inline
     const errors = validate();
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      // Focus first invalid field
       if (errors.businessName) businessNameRef.current?.focus();
       else if (errors.domain) domainRef.current?.focus();
       return;
     }
 
+    submitAttemptRef.current = true;
     setFieldErrors({});
     setSubmitError('');
-    setIsSubmitting(true);
-    console.log('[ConfirmModal] Submission started for:', businessName);
 
     try {
       await onConfirm(businessName, cleanDomainForSubmission(domain));
-      // onConfirm handles its own success state (shows ThankYou modal)
-      // We don't close/reset here — the parent controls that
     } catch (err) {
-      console.error('[ConfirmModal] Submission failed:', err);
-      setSubmitError("We couldn't submit your form right now. Please review your entries and try again.");
-      setIsSubmitting(false);
-      // Preserve all input — do NOT reset state
+      setSubmitError(err?.userMessage || "We saved your progress, but final submission could not complete.\n\nPlease try submitting again. If it still does not work, send this recovery code to support so we can recover your questionnaire: unknown-session");
+    } finally {
+      submitAttemptRef.current = false;
     }
   };
 

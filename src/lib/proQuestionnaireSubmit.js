@@ -8,16 +8,15 @@ import {
   createProFormSubmissionWithFallback,
   serializeSubmitError
 } from '@/lib/proSubmissionResilience';
+import {
+  getSafeSubmitContext,
+  safeJsonStringify,
+  safeLocalStorageSet,
+  safeNowIso
+} from '@/lib/browserSafety';
 
 export { serializeSubmitError } from '@/lib/proSubmissionResilience';
 
-const safeJsonStringify = (value) => {
-  try {
-    return JSON.stringify(value ?? {});
-  } catch {
-    return '{}';
-  }
-};
 
 export const writeFailedSubmissionBackup = ({
   questionnaireSessionId,
@@ -26,15 +25,15 @@ export const writeFailedSubmissionBackup = ({
   error
 }) => {
   try {
-    localStorage.setItem(
+    safeLocalStorageSet(
       `failed_pro_submission_${Date.now()}`,
-      JSON.stringify({
+      {
         session_id: questionnaireSessionId,
         responses: responseSnapshot,
         transformedPayload,
         error,
-        createdAt: new Date().toISOString()
-      })
+        createdAt: safeNowIso()
+      }
     );
   } catch (storageError) {
     console.error(
@@ -53,17 +52,17 @@ export const writeDraftFailureBackup = ({
   error
 }) => {
   try {
-    localStorage.setItem(
+    safeLocalStorageSet(
       `pro_questionnaire_local_backup_${questionnaireSessionId}`,
-      JSON.stringify({
+      {
         session_id: questionnaireSessionId,
         responses,
         validationStatus,
         touchedQuestions,
         expandedQuestions,
         error,
-        savedAt: new Date().toISOString()
-      })
+        savedAt: safeNowIso()
+      }
     );
   } catch {
     // no-op
@@ -216,47 +215,41 @@ export const submitProQuestionnaire = async ({
 
   let savedSubmission;
 
-  const submitContext = {
-    business_name: businessName || null,
+  const submitContext = getSafeSubmitContext({
+    business_name: businessName,
     domain: domain || credentials?.domain || domainParam || null,
-    user_email: credentials?.email || null,
-    user_id: credentials?.id || null,
-    page_url: typeof window !== 'undefined' ? window.location.href : null,
-    user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
-    app_version: import.meta.env.VITE_APP_VERSION || null,
-    submitted_at_client: new Date().toISOString()
-  };
+    user_email: credentials?.userEmail || credentials?.email || null,
+    user_id: credentials?.userId || credentials?.id || null
+  });
 
   const resilientSubmitResult = await createProFormSubmissionWithFallback(
     transformedPayload,
     {
+      maxAttempts: 3,
+      timeoutMs: 15000,
       responseSnapshot,
       questionnaireSessionId,
       draftId: null,
-      submitContext,
-      maxAttempts: 3,
-      timeoutMs: 15000
+      submitContext
     }
   );
 
   if (!resilientSubmitResult.ok) {
     const serialized = resilientSubmitResult.error || serializeSubmitError(null);
-    const submitFailure = new Error('We could not finish your submission right now. Your recovery code is ' + questionnaireSessionId + '.');
+    const submitFailure = new Error('Questionnaire submission failed');
     submitFailure.name = 'ProSubmissionCreateFailed';
     submitFailure.failureKind = resilientSubmitResult.failureKind;
     submitFailure.attempts = resilientSubmitResult.attempts;
-    submitFailure.usedFallback = resilientSubmitResult.usedFallback;
+    submitFailure.recoveryCode = questionnaireSessionId || 'unknown-session';
 
     console.error('ProFormSubmission.create failed:', serialized);
 
     await createDraftEventSafe({
       createDraftEvent,
-      eventType: 'submit_failed',
+      eventType: 'submit_failed_after_fallback',
       value: {
         status: 'submit_failed',
-        error_message: serialized?.message || 'unknown',
-        recovery_code: questionnaireSessionId,
-        fallback_used: Boolean(resilientSubmitResult.usedFallback)
+        recovery_code: questionnaireSessionId || 'unknown-session'
       }
     });
 
@@ -284,8 +277,7 @@ export const submitProQuestionnaire = async ({
       completed_questions: Object.keys(responseSnapshot).length,
       submit_status: 'failed',
       business_domain: domain || credentials?.domain || domainParam || 'unknown',
-      error_message: serialized?.message || 'unknown',
-      fallback_used: Boolean(resilientSubmitResult.usedFallback)
+      recovery_code: questionnaireSessionId || 'unknown-session'
     });
 
     if (typeof onFinalSubmitFailure === 'function') {
@@ -293,7 +285,8 @@ export const submitProQuestionnaire = async ({
         error: submitFailure,
         serialized,
         responseSnapshot,
-        transformedPayload
+        transformedPayload,
+        recoveryCode: questionnaireSessionId || 'unknown-session'
       });
     }
 
@@ -305,10 +298,10 @@ export const submitProQuestionnaire = async ({
   if (resilientSubmitResult.usedFallback) {
     await createDraftEventSafe({
       createDraftEvent,
-      eventType: 'submit_fallback_succeeded',
+      eventType: 'submit_fallback_success',
       value: {
         status: 'submitted',
-        fallback_used: true,
+        used_fallback: true,
         final_submission_id: savedSubmission?.id || ''
       }
     });

@@ -60,6 +60,7 @@ import {
   createSaveDraftSnapshot,
   writeDraftFailureBackup
 } from '@/lib/draftPersistence';
+import { safeLocalStorageSet, safeNowIso } from '@/lib/browserSafety';
 
 const DeferredSectionLoader = () => (
   <div className="flex items-center justify-center py-6">
@@ -78,6 +79,7 @@ export default function ProQuestionnaire() {
   const expandedQuestions = useSelector((state) => state.form.expandedQuestions);
   const credentials = useSelector((state) => state.form.credentials);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const finalSubmitInFlightRef = useRef(false);
   const [showAutoSave, setShowAutoSave] = useState(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showThankYouModal, setShowThankYouModal] = useState(false);
@@ -194,12 +196,12 @@ export default function ProQuestionnaire() {
           validationStatus,
           touchedQuestions,
           expandedQuestions,
-          savedAt: new Date().toISOString()
+          savedAt: safeNowIso()
         };
 
-        localStorage.setItem(
+        safeLocalStorageSet(
           `pro_questionnaire_local_backup_${questionnaireSessionId}`,
-          JSON.stringify(backup)
+          backup
         );
       } catch {
         // no-op
@@ -1259,6 +1261,16 @@ export default function ProQuestionnaire() {
 
 
   const handleConfirmSubmit = async (businessName, domain) => {
+    if (finalSubmitInFlightRef.current) {
+      if (import.meta.env.DEV) {
+        console.warn('[ProQuestionnaire] Final submit blocked — already in flight.');
+      }
+      return;
+    }
+
+    finalSubmitInFlightRef.current = true;
+    setIsSubmitting(true);
+
     if (draftSaveTimeoutRef.current) {
       clearTimeout(draftSaveTimeoutRef.current);
       draftSaveTimeoutRef.current = null;
@@ -1278,9 +1290,8 @@ export default function ProQuestionnaire() {
         saveDraftNow,
         createDraftEvent,
         serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
-        onFinalSubmitSuccess: ({ savedSubmission, responseSnapshot }) => {
+        onFinalSubmitSuccess: ({ responseSnapshot }) => {
           hasFinalSubmittedRef.current = true;
-
           dispatch(resetForm());
           toast.success('Questionnaire submitted successfully!');
           setSubmittedBusinessName(businessName);
@@ -1289,17 +1300,21 @@ export default function ProQuestionnaire() {
           setShowConfirmModal(false);
           setShowThankYouModal(true);
         },
-        onFinalSubmitFailure: () => {
-          // Failure toast is handled below after the final DB save failure is thrown.
-        }
+        onFinalSubmitFailure: () => {}
       });
 
       return result.savedSubmission;
     } catch (error) {
-      console.error('Questionnaire submit failed:', serializeSubmitError(error));
-
-      toast.error('Submission failed. Your answers were preserved locally so support can recover them.');
+      const recoveryCode = error?.recoveryCode || questionnaireSessionId || 'unknown-session';
+      const userMessage = `We saved your progress, but final submission could not complete.\n\nPlease try submitting again. If it still does not work, send this recovery code to support so we can recover your questionnaire: ${recoveryCode}`;
+      toast.error('We saved your progress, but final submission could not complete.');
+      error.userMessage = userMessage;
       throw error;
+    } finally {
+      finalSubmitInFlightRef.current = false;
+      if (!hasFinalSubmittedRef.current) {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -1783,6 +1798,7 @@ export default function ProQuestionnaire() {
             formData={responses}
             onConfirm={handleConfirmSubmit}
             onCancel={() => setShowConfirmModal(false)}
+            isSubmitting={isSubmitting}
             initialBusinessName={businessNameParam}
             initialDomain={domainParam}
           />

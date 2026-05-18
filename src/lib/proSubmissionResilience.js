@@ -160,13 +160,7 @@ export const createProFormSubmissionResilient = async (payload, options = {}) =>
       const willRetry = attempt < maxAttempts && isRetryableSubmitError(error);
 
       if (typeof onFailure === 'function') {
-        onFailure({
-          attempt,
-          error,
-          serializedError,
-          failureKind,
-          willRetry
-        });
+        onFailure({ attempt, error, serializedError, failureKind, willRetry });
       }
 
       if (!willRetry) {
@@ -196,19 +190,7 @@ export const createProFormSubmissionResilient = async (payload, options = {}) =>
 };
 
 export const createProFormSubmissionWithFallback = async (payload, options = {}) => {
-  const {
-    responseSnapshot = null,
-    questionnaireSessionId = null,
-    draftId = null,
-    submitContext = null,
-    onPrimaryFailure = null,
-    onFallbackAttempt = null,
-    onFallbackSuccess = null,
-    onFallbackFailure = null,
-    ...resilienceOptions
-  } = options;
-
-  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+  if (!payload || typeof payload !== 'object') {
     const error = serializeSubmitError(new Error('Invalid submission payload'));
     return {
       ok: false,
@@ -217,11 +199,23 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
       attempts: 0,
       usedFallback: false,
       failureKind: error.failureKind,
-      primaryError: error
+      primaryError: null
     };
   }
 
-  const primaryResult = await createProFormSubmissionResilient(payload, resilienceOptions);
+  const {
+    responseSnapshot,
+    questionnaireSessionId,
+    draftId,
+    submitContext,
+    onPrimaryFailure,
+    onFallbackAttempt,
+    onFallbackSuccess,
+    onFallbackFailure,
+    ...resilientOptions
+  } = options;
+
+  const primaryResult = await createProFormSubmissionResilient(payload, resilientOptions);
 
   if (primaryResult.ok) {
     return primaryResult;
@@ -245,18 +239,18 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
       submitContext
     });
 
-    const fallbackData = response?.data;
+    const data = response?.data;
 
-    if (fallbackData?.success && fallbackData?.submission) {
+    if (data?.success && data?.submission) {
       const result = {
         ok: true,
-        submission: fallbackData.submission,
+        submission: data.submission,
         error: null,
         attempts: primaryResult.attempts,
         usedFallback: true,
         failureKind: null,
         primaryError: primaryResult.error,
-        zapierSent: Boolean(fallbackData?.zapierSent)
+        zapierSent: Boolean(data?.zapierSent)
       };
 
       if (typeof onFallbackSuccess === 'function') {
@@ -266,7 +260,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
       return result;
     }
 
-    const fallbackError = serializeSubmitError(fallbackData?.error || new Error('Malformed fallback response'));
+    const fallbackError = serializeSubmitError(data?.error || new Error('Fallback submission failed'));
     const failedResult = {
       ok: false,
       submission: null,
