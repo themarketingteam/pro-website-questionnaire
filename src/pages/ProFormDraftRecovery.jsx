@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Copy, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+import QuestionnaireIntakeRecovery from '@/components/admin/QuestionnaireIntakeRecovery';
 
 const safeJsonParse = (value, fallback = {}) => {
   try {
@@ -271,6 +272,8 @@ export default function ProFormDraftRecovery() {
             />
           </CardContent>
         </Card>
+
+        <QuestionnaireIntakeRecovery />
 
         <div className="space-y-4">
           {error && (

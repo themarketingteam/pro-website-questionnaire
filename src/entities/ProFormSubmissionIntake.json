@@ -48,6 +48,10 @@
       "type": "string",
       "description": "Serialized fallback error details"
     },
+    "retry_error_json": {
+      "type": "string",
+      "description": "Serialized retry error details"
+    },
     "transformed_payload_json": {
       "type": "string",
       "description": "Serialized transformed payload used for retry or recovery"
