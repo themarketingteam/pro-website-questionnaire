@@ -3,9 +3,11 @@ import {
   asSafeFileList,
   asTrimmedString,
   normalizeAdditionalPagesList,
+  normalizeGeographicAreas,
   normalizeIndustrySelections,
   normalizeLocationSelections,
   normalizeQuestionnaireResponses,
+  normalizeServiceSelections,
   normalizeStringSelectionList,
   normalizeTeamPhotoWithTags
 } from '@/lib/proResponseNormalizers';
@@ -19,31 +21,19 @@ export const serializeError = (error) => ({
 });
 
 
-const asCoordinateString = (value) => {
-  if (value == null || value === '') return '';
-
-  const number = Number(value);
-
-  if (!Number.isFinite(number)) {
-    return '';
-  }
-
-  return String(number);
-};
-
-export const normalizeGeographicAreas = (locations = [], primaryIndex = 0) =>
-  normalizeLocationSelections(locations)
+export const normalizeGeographicAreasForPayload = (locations = [], primaryIndex = 0) =>
+  normalizeGeographicAreas(locations)
     .map((location, index) => {
-      const safeLocation = typeof location === 'string' ? { label: location } : asPlainObject(location);
+      const safeLocation = asPlainObject(location);
 
       return {
         geographic_area_meta: {
-          name: asTrimmedString(safeLocation.name || safeLocation.city || safeLocation.label),
+          name: asTrimmedString(safeLocation.name || safeLocation.label || safeLocation.city),
           label: asTrimmedString(safeLocation.label || safeLocation.name || safeLocation.city),
-          lat: asCoordinateString(safeLocation.lat ?? safeLocation.latitude),
-          lon: asCoordinateString(safeLocation.lon ?? safeLocation.longitude),
+          lat: safeLocation.latitude != null ? String(safeLocation.latitude) : '',
+          lon: safeLocation.longitude != null ? String(safeLocation.longitude) : '',
           place_id: asTrimmedString(safeLocation.place_id || safeLocation.placeId),
-          source: asTrimmedString(safeLocation.source) || 'google',
+          source: asTrimmedString(safeLocation.source) || 'manual',
           primary: index === Number(primaryIndex || 0)
         }
       };
@@ -53,19 +43,6 @@ export const normalizeGeographicAreas = (locations = [], primaryIndex = 0) =>
         item.geographic_area_meta.name ||
         item.geographic_area_meta.label
     );
-
-export const normalizeServiceSelections = (value, serviceOptionsGrouped = {}) => {
-  const normalizedSelections = normalizeStringSelectionList(value);
-  const expandedSelections = normalizedSelections.flatMap((selection) => {
-    if (!selection.startsWith('CATEGORY:')) return [selection];
-
-    const categoryName = selection.replace('CATEGORY:', '').trim();
-    const categoryServices = normalizeStringSelectionList(serviceOptionsGrouped[categoryName]);
-    return categoryServices.length ? categoryServices : [selection];
-  });
-
-  return normalizeStringSelectionList(expandedSelections);
-};
 
 export const normalizeCertifications = (items = []) =>
   items
@@ -121,11 +98,11 @@ export const transformResponsesToPayload = (
   const normalizedResponses = normalizeQuestionnaireResponses(responses);
   const serviceSelections = normalizeServiceSelections(normalizedResponses['3'], serviceOptionsGrouped);
   const serviceOfferingsOther = normalizeStringSelectionList(normalizedResponses['3_other']).join(', ');
-  const targetIndustriesOther = normalizeIndustrySelections(normalizedResponses['4_other']).join(', ');
+  const targetIndustriesOther = normalizeStringSelectionList(normalizedResponses['4_other']).join(', ');
   const clientChallengesOther = normalizeStringSelectionList(normalizedResponses['18_other']).join(', ');
   const clientOutcomesOther = normalizeStringSelectionList(normalizedResponses['20_other']).join(', ');
 
-  const geographicAreas = normalizeGeographicAreas(
+  const geographicAreas = normalizeGeographicAreasForPayload(
     normalizedResponses['5'] || [],
     normalizedResponses['5_primary'] || 0
   );

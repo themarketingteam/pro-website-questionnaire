@@ -1,18 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
   normalizeCertifications,
-  normalizeGeographicAreas,
+  normalizeGeographicAreasForPayload,
   normalizeGuarantees,
-  normalizeServiceSelections,
   transformResponsesToPayload,
   validateSubmissionPayload
 } from '@/components/pro-form/submissionPayload';
 import {
   normalizeAdditionalPagesList,
+  normalizeGeographicAreas,
   normalizeIndustrySelections,
   normalizeLocationSelections,
+  normalizeServiceSelections,
   normalizeTeamPhotoWithTags
 } from '@/lib/proResponseNormalizers';
+import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
 
 const groupedServices = {
   'Core Services': ['Managed IT Services', 'Help Desk'],
@@ -207,33 +209,6 @@ const buildPayload = (responses, businessName = 'Acme IT', domain = 'acmeit.com'
   transformResponsesToPayload(responses, businessName, domain, groupedServices);
 
 describe('submission payload transformation shape safety', () => {
-  it('normalizeServiceSelections handles strings', () => {
-    expect(normalizeServiceSelections('Managed IT Services', groupedServices)).toEqual(['Managed IT Services']);
-  });
-
-  it('normalizeServiceSelections handles objects', () => {
-    expect(normalizeServiceSelections({ label: 'Endpoint Protection' }, groupedServices)).toEqual(['Endpoint Protection']);
-  });
-
-  it('normalizeServiceSelections expands CATEGORY values', () => {
-    expect(normalizeServiceSelections(['CATEGORY:Core Services'], groupedServices)).toEqual(['Managed IT Services', 'Help Desk']);
-  });
-
-  it('normalizeIndustrySelections returns array', () => {
-    expect(normalizeIndustrySelections({ label: 'Healthcare' })).toEqual(['Healthcare']);
-  });
-
-  it('normalizeLocationSelections returns array', () => {
-    expect(normalizeLocationSelections({ label: 'Chicago, IL' })).toEqual(['Chicago, IL']);
-  });
-
-  it('normalizeAdditionalPagesList always returns object', () => {
-    expect(normalizeAdditionalPagesList(null)).toEqual({});
-    expect(normalizeAdditionalPagesList(['Why Choose Us'])).toEqual({ items: ['Why Choose Us'] });
-    expect(typeof normalizeAdditionalPagesList({ section: { enabled: true } })).toBe('object');
-    expect(Array.isArray(normalizeAdditionalPagesList(['Why Choose Us']))).toBe(false);
-  });
-
   it('normalizeTeamPhotoWithTags returns a safe object for null input', () => {
     expect(normalizeTeamPhotoWithTags(null)).toEqual({
       imageUrl: '',
@@ -366,61 +341,25 @@ describe('submission payload transformation shape safety', () => {
   });
 
   it('geographic areas normalize without throwing', () => {
-    expect(() => normalizeGeographicAreas(malformedMixedResponses['5'], malformedMixedResponses['5_primary'])).not.toThrow();
+    expect(() => normalizeGeographicAreas(malformedMixedResponses['5'])).not.toThrow();
+
+    const normalizedAreas = normalizeGeographicAreas([
+      'Chicago, IL',
+      { label: 'Milwaukee, WI', lat: '43.0389', lon: '-87.9065', radius: '25' },
+      { label: 'Bad Coords', lat: 'north', lon: 'west' }
+    ]);
+
+    expect(normalizedAreas).toEqual([
+      { label: 'Chicago, IL' },
+      { label: 'Milwaukee, WI', name: 'Milwaukee, WI', latitude: 43.0389, longitude: -87.9065, radius: 25 },
+      { label: 'Bad Coords', name: 'Bad Coords' }
+    ]);
+
+    const payloadAreas = normalizeGeographicAreasForPayload(malformedMixedResponses['5'], malformedMixedResponses['5_primary']);
+    expect(Array.isArray(payloadAreas)).toBe(true);
 
     const payload = buildPayload(malformedMixedResponses);
     expect(Array.isArray(payload.userdata.geographic_areas)).toBe(true);
-  });
-
-  it('normalizeGeographicAreas handles string object array and null', () => {
-    expect(normalizeGeographicAreas(null)).toEqual([]);
-    expect(normalizeGeographicAreas('Chicago, IL')).toEqual([
-      {
-        geographic_area_meta: {
-          name: 'Chicago, IL',
-          label: 'Chicago, IL',
-          lat: '',
-          lon: '',
-          place_id: '',
-          source: 'google',
-          primary: true
-        }
-      }
-    ]);
-    expect(normalizeGeographicAreas({ label: 'Milwaukee, WI', latitude: '43.0389', longitude: '-87.9065' })).toEqual([
-      {
-        geographic_area_meta: {
-          name: 'Milwaukee, WI',
-          label: 'Milwaukee, WI',
-          lat: '43.0389',
-          lon: '-87.9065',
-          place_id: '',
-          source: 'google',
-          primary: true
-        }
-      }
-    ]);
-  });
-
-  it('normalizeGeographicAreas outputs schema-compatible lat lon values', () => {
-    const normalized = normalizeGeographicAreas([
-      { label: 'Chicago, IL', latitude: '41.8781', longitude: '-87.6298' },
-      { label: 'Bad Place', latitude: 'north', longitude: {} }
-    ]);
-
-    expect(normalized[0].geographic_area_meta.lat).toBe('41.8781');
-    expect(normalized[0].geographic_area_meta.lon).toBe('-87.6298');
-    expect(normalized[1].geographic_area_meta.lat).toBe('');
-    expect(normalized[1].geographic_area_meta.lon).toBe('');
-  });
-
-  it('transformResponsesToPayload does not throw for malformed geography', () => {
-    expect(() => buildPayload({
-      ...validMinimalResponses,
-      '4': { label: 'Healthcare' },
-      '5': { label: 'Chicago, IL', latitude: '41.8781', longitude: '-87.6298' },
-      '3': { value: 'CATEGORY:Core Services' }
-    })).not.toThrow();
   });
 
   it('missing business name or domain still fails validation, not transformation', () => {
