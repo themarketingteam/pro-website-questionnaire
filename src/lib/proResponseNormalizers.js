@@ -79,86 +79,125 @@ export const asStringArray = (value) => {
 
 export const asPlainObject = (value) => (isPlainObject(value) ? value : {});
 
-const pickSafeFileShape = (value, extraKeys = []) => {
-  const source = asPlainObject(value);
-  const safeFile = {};
-  const allowedKeys = [
-    'url',
-    'name',
-    'fileName',
-    'filename',
-    'type',
-    'size',
-    'mimeType',
-    'uploadedAt',
-    ...extraKeys
-  ];
+const MAX_UPLOAD_ITEMS = 100;
+const MAX_SAFE_STRING_LENGTH = 500;
+const MAX_UPLOAD_DESCRIPTION_LENGTH = 2000;
+
+const sanitizeUploadString = (value, maxLength = MAX_SAFE_STRING_LENGTH) => {
+  const normalized = asTrimmedString(value);
+  if (!normalized) return '';
+  if (/^data:/i.test(normalized)) return '';
+  return normalized.slice(0, maxLength);
+};
+
+const isBlobLike = (value) => {
+  if (!value || typeof value !== 'object') return false;
+  const constructorName = value?.constructor?.name || '';
+  return ['File', 'Blob', 'ArrayBuffer'].includes(constructorName);
+};
+
+const getNestedUploadSource = (source) => {
+  const nestedKeys = ['file', 'upload', 'response', 'data', 'asset'];
+  for (const key of nestedKeys) {
+    const nested = source?.[key];
+    if (isPlainObject(nested)) {
+      return nested;
+    }
+  }
+  return {};
+};
+
+export const normalizeUploadItem = (item) => {
+  if (item == null || isBlobLike(item)) return null;
+
+  if (typeof item === 'string') {
+    const url = sanitizeUploadString(item);
+    return url ? { url } : null;
+  }
+
+  const source = asPlainObject(item);
+  if (!Object.keys(source).length) return null;
+
+  const nested = getNestedUploadSource(source);
+  const safeItem = {};
+  const allowedKeys = ['url', 'file_url', 'image_url', 'name', 'fileName', 'filename', 'type', 'mimeType', 'size', 'uploadedAt', 'category', 'tag', 'label', 'description'];
 
   allowedKeys.forEach((key) => {
-    const currentValue = source[key];
-    if (currentValue == null) return;
+    const currentValue = source[key] ?? nested[key];
+    if (currentValue == null || isBlobLike(currentValue)) return;
 
     if (key === 'size') {
       const size = Number(currentValue);
-      if (Number.isFinite(size)) safeFile[key] = size;
+      if (Number.isFinite(size)) safeItem[key] = size;
       return;
     }
 
-    if (key === 'tags' && Array.isArray(currentValue)) {
-      const tags = asStringArray(currentValue);
-      if (tags.length) safeFile[key] = tags;
-      return;
-    }
-
-    const normalized = asTrimmedString(currentValue);
-    if (normalized) safeFile[key] = normalized;
+    const maxLength = key === 'description' ? MAX_UPLOAD_DESCRIPTION_LENGTH : MAX_SAFE_STRING_LENGTH;
+    const normalized = sanitizeUploadString(currentValue, maxLength);
+    if (normalized) safeItem[key] = normalized;
   });
 
-  if (!safeFile.url) {
-    safeFile.url = asTrimmedString(
-      source.url || source.file_url || source.fileUrl || source.imageUrl || source.src
-    );
-  }
+  const derivedUrl = sanitizeUploadString(
+    source.url || source.file_url || source.fileUrl || source.image_url || source.imageUrl || source.src ||
+    nested.url || nested.file_url || nested.fileUrl || nested.image_url || nested.imageUrl || nested.src
+  );
+  const derivedName = sanitizeUploadString(
+    source.name || source.fileName || source.filename || source.originalName || source.label ||
+    nested.name || nested.fileName || nested.filename || nested.originalName || nested.label
+  );
 
-  if (!safeFile.name) {
-    safeFile.name = asTrimmedString(
-      source.name || source.fileName || source.filename || source.originalName || source.label
-    );
+  if (!safeItem.url && derivedUrl) safeItem.url = derivedUrl;
+  if (!safeItem.file_url && sanitizeUploadString(source.file_url || source.fileUrl || nested.file_url || nested.fileUrl)) {
+    safeItem.file_url = sanitizeUploadString(source.file_url || source.fileUrl || nested.file_url || nested.fileUrl);
   }
+  if (!safeItem.image_url && sanitizeUploadString(source.image_url || source.imageUrl || nested.image_url || nested.imageUrl)) {
+    safeItem.image_url = sanitizeUploadString(source.image_url || source.imageUrl || nested.image_url || nested.imageUrl);
+  }
+  if (!safeItem.name && derivedName) safeItem.name = derivedName;
 
-  return Object.keys(safeFile).length ? safeFile : null;
+  return Object.keys(safeItem).length ? safeItem : null;
 };
 
-export const asSafeFileList = (value) => {
+export const normalizeUploadList = (value, options = {}) => {
+  const maxItems = Number.isFinite(Number(options.maxItems)) ? Number(options.maxItems) : MAX_UPLOAD_ITEMS;
   const list = asArray(value)
-    .map((item) => {
-      if (typeof item === 'string') {
-        const normalized = asTrimmedString(item);
-        return normalized ? { url: normalized } : null;
-      }
-      return pickSafeFileShape(item);
-    })
+    .flatMap((item) => Array.isArray(item) ? item : [item])
+    .map(normalizeUploadItem)
     .filter(Boolean);
 
   const seen = new Set();
   return list.filter((item) => {
-    const key = `${item.url || ''}|${item.name || ''}`;
+    const key = `${item.url || item.file_url || item.image_url || ''}|${item.name || item.fileName || item.filename || ''}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  });
+  }).slice(0, maxItems);
 };
 
+export const normalizeCertificationAwardPartnerUploads = (value) => normalizeUploadList(value);
+
+export const normalizeGuaranteeUploads = (value) => normalizeUploadList(value);
+
+const pickSafeFileShape = (value, extraKeys = []) => {
+  const normalized = normalizeUploadItem(value);
+  if (!normalized) return null;
+
+  if (!extraKeys.length) {
+    return normalized;
+  }
+
+  const safeFile = { ...normalized };
+  extraKeys.forEach((key) => {
+    const nextValue = sanitizeUploadString(asPlainObject(value)?.[key], key === 'description' ? MAX_UPLOAD_DESCRIPTION_LENGTH : MAX_SAFE_STRING_LENGTH);
+    if (nextValue) safeFile[key] = nextValue;
+  });
+  return safeFile;
+};
+
+export const asSafeFileList = (value) => normalizeUploadList(value);
+
 export const asSafeTaggedFileList = (value) =>
-  asArray(value)
-    .map((item) => {
-      if (typeof item === 'string') {
-        const normalized = asTrimmedString(item);
-        return normalized ? { url: normalized } : null;
-      }
-      return pickSafeFileShape(item, ['tag', 'tags', 'category', 'description', 'label']);
-    })
-    .filter(Boolean);
+  normalizeUploadList(value).map((item) => ({ ...item }));
 
 const MAX_TEAM_PHOTO_TAGS = 50;
 const MAX_TEAM_PHOTO_NOTES_LENGTH = 2000;

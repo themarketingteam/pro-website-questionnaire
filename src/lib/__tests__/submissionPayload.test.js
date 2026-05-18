@@ -6,7 +6,13 @@ import {
   transformResponsesToPayload,
   validateSubmissionPayload
 } from '@/components/pro-form/submissionPayload';
-import { normalizeTeamPhotoWithTags } from '@/lib/proResponseNormalizers';
+import {
+  normalizeCertificationAwardPartnerUploads,
+  normalizeGuaranteeUploads,
+  normalizeTeamPhotoWithTags,
+  normalizeUploadItem,
+  normalizeUploadList
+} from '@/lib/proResponseNormalizers';
 
 const groupedServices = {
   'Core Services': ['Managed IT Services', 'Help Desk'],
@@ -255,6 +261,40 @@ describe('submission payload transformation shape safety', () => {
     expect(normalized.has_team_photo).toBe(true);
   });
 
+  it('normalizeUploadItem handles string urls', () => {
+    expect(normalizeUploadItem('https://example.test/file.pdf')).toEqual({ url: 'https://example.test/file.pdf' });
+  });
+
+  it('normalizeUploadItem preserves safe keys only', () => {
+    expect(normalizeUploadItem({
+      name: 'cert.pdf',
+      data: { url: 'https://example.test/cert.pdf' },
+      description: 'Proof file',
+      base64: 'data:application/pdf;base64,abc',
+      blob: { huge: true }
+    })).toEqual({
+      url: 'https://example.test/cert.pdf',
+      name: 'cert.pdf',
+      description: 'Proof file'
+    });
+  });
+
+  it('normalizeUploadList handles single object and array nulls with dedupe', () => {
+    expect(normalizeUploadList({ url: 'https://example.test/one.pdf', name: 'one.pdf' })).toEqual([
+      { url: 'https://example.test/one.pdf', name: 'one.pdf' }
+    ]);
+
+    expect(normalizeUploadList([
+      null,
+      { url: 'https://example.test/dup.pdf', name: 'dup.pdf' },
+      { file_url: 'https://example.test/dup.pdf', name: 'dup.pdf' },
+      { data: { url: 'https://example.test/two.pdf' }, filename: 'two.pdf' }
+    ])).toEqual([
+      { url: 'https://example.test/dup.pdf', name: 'dup.pdf' },
+      { url: 'https://example.test/two.pdf', filename: 'two.pdf', name: 'two.pdf' }
+    ]);
+  });
+
   it('transformResponsesToPayload does not throw for validMinimalResponses', () => {
     expect(() => buildPayload(validMinimalResponses)).not.toThrow();
   });
@@ -306,21 +346,42 @@ describe('submission payload transformation shape safety', () => {
 
   it('certification files normalize to schema-safe arrays', () => {
     const fullPayload = buildPayload(validFullResponses);
-    const malformedPayload = buildPayload(malformedMixedResponses);
+    const malformedPayload = buildPayload({
+      ...malformedMixedResponses,
+      '12.1': {
+        name: 'Microsoft Partner',
+        type: 'partnership',
+        image: { data: { url: 'https://example.test/logo.png' }, base64: 'ignore' },
+        supportingFiles: [null, { response: { url: 'https://example.test/certificate.pdf' }, filename: 'certificate.pdf' }]
+      }
+    });
 
     expect(Array.isArray(fullPayload.userdata.certifications_partnerships)).toBe(true);
     expect(Array.isArray(fullPayload.userdata.certifications_partnerships[0].cert_item_files)).toBe(true);
     expect(Array.isArray(malformedPayload.userdata.certifications_partnerships)).toBe(true);
     expect(Array.isArray(malformedPayload.userdata.certifications_partnerships[0].cert_item_files)).toBe(true);
+    expect(malformedPayload.userdata.certifications_partnerships[0].cert_item_image_url).toBe('https://example.test/logo.png');
 
     const directNormalized = normalizeCertifications(malformedMixedResponses['12.1']);
     expect(Array.isArray(directNormalized)).toBe(true);
     expect(Array.isArray(directNormalized[0].cert_item_files)).toBe(true);
+    expect(Array.isArray(normalizeCertificationAwardPartnerUploads({ data: { url: 'https://example.test/partner.pdf' }, filename: 'partner.pdf' }))).toBe(true);
   });
 
   it('guarantee files normalize to schema-safe values', () => {
     const fullPayload = buildPayload(validFullResponses);
-    const malformedPayload = buildPayload(malformedMixedResponses);
+    const malformedPayload = buildPayload({
+      ...malformedMixedResponses,
+      '14.1': {
+        name: 'Response SLA',
+        type: 'sla',
+        supportingFiles: [
+          null,
+          { file: { url: 'https://example.test/sla.pdf', name: 'sla.pdf' }, blob: { huge: true } }
+        ],
+        description: ['Fast response']
+      }
+    });
 
     expect(Array.isArray(fullPayload.userdata.service_guarantee_items)).toBe(true);
     expect(fullPayload.userdata.service_guarantee_items[0].guarantee_file_url).toBe('https://example.test/sla.pdf');
@@ -330,6 +391,7 @@ describe('submission payload transformation shape safety', () => {
     const directNormalized = normalizeGuarantees(malformedMixedResponses['14.1']);
     expect(Array.isArray(directNormalized)).toBe(true);
     expect(typeof directNormalized[0].guarantee_file_url).toBe('string');
+    expect(Array.isArray(normalizeGuaranteeUploads({ response: { url: 'https://example.test/guarantee.pdf' }, filename: 'guarantee.pdf' }))).toBe(true);
   });
 
   it('geographic areas normalize without throwing', () => {
@@ -353,5 +415,6 @@ describe('submission payload transformation shape safety', () => {
 
     expect(Array.isArray(nullPayload.userdata.service_offerings)).toBe(true);
     expect(Array.isArray(emptyPayload.userdata.service_offerings)).toBe(true);
+    expect(validateSubmissionPayload(buildPayload({ ...validMinimalResponses, '12': 'no', '14': 'no' })).ok).toBe(true);
   });
 });

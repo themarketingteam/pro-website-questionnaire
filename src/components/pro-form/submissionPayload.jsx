@@ -1,8 +1,9 @@
 import {
   asPlainObject,
-  asSafeFileList,
   asStringArray,
   asTrimmedString,
+  normalizeCertificationAwardPartnerUploads,
+  normalizeGuaranteeUploads,
   normalizeQuestionnaireResponses,
   normalizeTeamPhotoWithTags
 } from '@/lib/proResponseNormalizers';
@@ -68,12 +69,14 @@ export const normalizeCertifications = (items = []) =>
       if (!itemName || !itemType) return null;
 
       const image = asPlainObject(safeItem.image);
+      const safeLogos = normalizeCertificationAwardPartnerUploads(safeItem.image || safeItem.logo || safeItem.imageUrl || image.url);
+      const primaryLogo = safeLogos[0] || {};
       return {
         cert_item_name: itemName,
         cert_item_type: itemType,
-        cert_item_image_url: asTrimmedString(safeItem.imageUrl || image.url),
-        cert_item_image_name: asTrimmedString(image.name),
-        cert_item_files: asSafeFileList(safeItem.files)
+        cert_item_image_url: asTrimmedString(primaryLogo.image_url || primaryLogo.url || safeItem.imageUrl || image.url),
+        cert_item_image_name: asTrimmedString(primaryLogo.name || image.name),
+        cert_item_files: normalizeCertificationAwardPartnerUploads(safeItem.files || safeItem.supporting_files || safeItem.supportingFiles)
       };
     })
     .filter(Boolean);
@@ -86,8 +89,9 @@ export const normalizeGuarantees = (items = []) =>
       const safeItem = asPlainObject(item);
       const guaranteeName = asTrimmedString(safeItem.name || safeItem.label);
       const guaranteeType = asTrimmedString(safeItem.type || safeItem.category);
-      const file = asPlainObject(safeItem.file);
-      const guaranteeFileUrl = asTrimmedString(safeItem.fileUrl || file.url);
+      const safeFiles = normalizeGuaranteeUploads(safeItem.file || safeItem.fileUrl || safeItem.supporting_files || safeItem.supportingFiles);
+      const primaryFile = safeFiles[0] || {};
+      const guaranteeFileUrl = asTrimmedString(primaryFile.file_url || primaryFile.url || safeItem.fileUrl);
       const guaranteeDescription = asTrimmedString(safeItem.description);
 
       if (!guaranteeName || !guaranteeType || (!guaranteeFileUrl && !guaranteeDescription)) {
@@ -98,7 +102,7 @@ export const normalizeGuarantees = (items = []) =>
         guarantee_name: guaranteeName,
         guarantee_type: guaranteeType,
         guarantee_file_url: guaranteeFileUrl,
-        guarantee_file_name: asTrimmedString(file.name),
+        guarantee_file_name: asTrimmedString(primaryFile.name || primaryFile.fileName || primaryFile.filename),
         guarantee_description: guaranteeDescription
       };
     })
