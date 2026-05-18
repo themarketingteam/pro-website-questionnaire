@@ -1,6 +1,8 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 
+const global = globalThis;
+
 // Basic matchMedia mock for components that might use it
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
