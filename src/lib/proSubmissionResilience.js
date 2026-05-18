@@ -1,5 +1,4 @@
 import { base44 } from '@/api/base44Client';
-import { shouldSimulateSubmitFailure } from '@/lib/submitDebugFlags';
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const MAX_MESSAGE_LENGTH = 500;
@@ -28,6 +27,17 @@ const getErrorMessage = (error) => {
 
 const delay = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
 
+const createDevSimulatedError = (mode) => {
+  const error = new Error(`DEV_ONLY_SIMULATED_SUBMIT_FAILURE: ${mode}`);
+  error.name = 'DevSimulatedSubmitError';
+  error.code = `DEV_SIMULATED_${String(mode || '').toUpperCase()}`;
+  error.type = mode;
+  if (mode === 'primary_create') error.status = 503;
+  if (mode === 'network_timeout') error.code = 'TIMEOUT';
+  if (mode === 'fallback_create') error.status = 503;
+  return error;
+};
+
 export class TimeoutError extends Error {
   constructor(message = 'Request timed out') {
     super(message);
@@ -36,19 +46,6 @@ export class TimeoutError extends Error {
     this.type = 'timeout';
   }
 }
-
-const createSimulatedSubmitError = (mode) => {
-  if (mode === 'network_timeout') {
-    return new TimeoutError('DEV_ONLY_SIMULATED_SUBMIT_FAILURE: network_timeout');
-  }
-
-  const error = new Error(`DEV_ONLY_SIMULATED_SUBMIT_FAILURE: ${mode}`);
-  error.name = 'DevOnlySimulatedSubmitFailure';
-  error.code = mode === 'primary_create' ? 'SIMULATED_PRIMARY_CREATE' : 'SIMULATED_FALLBACK_CREATE';
-  error.type = mode === 'primary_create' ? 'server' : 'fallback';
-  error.status = mode === 'primary_create' ? 503 : 500;
-  return error;
-};
 
 export const classifySubmitError = (error) => {
   const status = getErrorStatus(error);
@@ -167,7 +164,8 @@ export const createProFormSubmissionResilient = async (payload, options = {}) =>
     timeoutMs = DEFAULT_TIMEOUT_MS,
     baseDelayMs = 750,
     onAttempt = null,
-    onFailure = null
+    onFailure = null,
+    debugFailureMode = null
   } = options;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -176,12 +174,12 @@ export const createProFormSubmissionResilient = async (payload, options = {}) =>
     }
 
     try {
-      if (shouldSimulateSubmitFailure('primary_create')) {
-        throw createSimulatedSubmitError('primary_create');
+      if (import.meta.env.DEV && debugFailureMode === 'primary_create') {
+        throw createDevSimulatedError('primary_create');
       }
 
-      if (shouldSimulateSubmitFailure('network_timeout')) {
-        throw createSimulatedSubmitError('network_timeout');
+      if (import.meta.env.DEV && debugFailureMode === 'network_timeout') {
+        throw new TimeoutError('DEV_ONLY_SIMULATED_SUBMIT_FAILURE: network_timeout');
       }
 
       const submission = await withTimeout(
@@ -344,6 +342,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
     onFallbackAttempt,
     onFallbackSuccess,
     onFallbackFailure,
+    debugFailureMode = null,
     ...resilientOptions
   } = options;
 
@@ -362,8 +361,8 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
     }
 
     try {
-      if (shouldSimulateSubmitFailure('fallback_create')) {
-        throw createSimulatedSubmitError('fallback_create');
+      if (import.meta.env.DEV && debugFailureMode === 'fallback_create') {
+        throw createDevSimulatedError('fallback_create');
       }
 
       const response = await base44.functions.invoke('submitProQuestionnaireFallback', {
@@ -433,7 +432,10 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
     }
   }
 
-  const primaryResult = await createProFormSubmissionResilient(payload, resilientOptions);
+  const primaryResult = await createProFormSubmissionResilient(payload, {
+    ...resilientOptions,
+    debugFailureMode
+  });
 
   if (primaryResult.ok) {
     return primaryResult;
@@ -448,8 +450,8 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
   }
 
   try {
-    if (shouldSimulateSubmitFailure('fallback_create')) {
-      throw createSimulatedSubmitError('fallback_create');
+    if (import.meta.env.DEV && debugFailureMode === 'fallback_create') {
+      throw createDevSimulatedError('fallback_create');
     }
 
     const response = await base44.functions.invoke('submitProQuestionnaireFallback', {

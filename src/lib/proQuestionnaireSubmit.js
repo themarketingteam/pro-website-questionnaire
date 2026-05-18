@@ -3,13 +3,14 @@ import {
   transformResponsesToPayload,
   validateSubmissionPayload
 } from '@/components/pro-form/submissionPayload';
-import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
 import { trackClarityEvent } from '@/lib/clarity';
 import {
   createProFormSubmissionWithFallback,
   serializeSubmitError
 } from '@/lib/proSubmissionResilience';
 import { buildDraftEventRecord } from '@/lib/draftEvents';
+import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
+import { getSubmitDebugFailureMode, shouldSimulateSubmitFailure } from '@/lib/submitDebugFlags';
 import {
   getSafeSubmitContext,
   safeJsonStringify,
@@ -241,6 +242,7 @@ export const submitProQuestionnaire = async ({
     user_id: credentials?.userId || credentials?.id || null
   });
   const responseSnapshotMetadata = buildResponseSnapshotMetadata(responseSnapshot, validationStatus);
+  const submitDebugMode = getSubmitDebugFailureMode();
 
   const recordSubmitStage = async (stage, details = {}) => {
     const safeDetails = sanitizeStageDetails(details);
@@ -312,35 +314,20 @@ export const submitProQuestionnaire = async ({
 
   try {
     await recordSubmitStage('before_payload_transform');
+    if (shouldSimulateSubmitFailure('transform')) {
+      const transformError = new Error('DEV_ONLY_SIMULATED_SUBMIT_FAILURE: transform');
+      transformError.name = 'DevSimulatedTransformError';
+      transformError.code = 'DEV_SIMULATED_TRANSFORM';
+      transformError.type = 'transform';
+      throw transformError;
+    }
+
     transformedPayload = transformResponsesToPayload(
       responseSnapshot,
       businessName,
       domain,
       serviceOptionsGrouped
     );
-
-    const repairResult = repairProSubmissionPayload(transformedPayload);
-    transformedPayload = repairResult.payload;
-
-    await recordSubmitStage('payload_repair_completed', {
-      warningCount: repairResult.warnings.length,
-      warningCodes: repairResult.warnings,
-      payloadSizeChars: safePayloadSize(transformedPayload),
-      featureSummary: {
-        hasAdditionalPagesList: Boolean(transformedPayload?.userdata?.additional_pages_list),
-        geographicAreaCount: Array.isArray(transformedPayload?.userdata?.geographic_areas) ? transformedPayload.userdata.geographic_areas.length : 0,
-        serviceOfferingCount: Array.isArray(transformedPayload?.userdata?.service_offerings) ? transformedPayload.userdata.service_offerings.length : 0
-      }
-    });
-
-    if (!repairResult.ok) {
-      const repairError = new Error(`Payload repair failed: ${(repairResult.errors || []).join(', ')}`);
-      repairError.name = 'PayloadRepairError';
-      repairError.repairWarnings = repairResult.warnings;
-      repairError.repairErrors = repairResult.errors;
-      throw repairError;
-    }
-
     await recordSubmitStage('payload_transform_success', {
       payloadSizeChars: safePayloadSize(transformedPayload)
     });
@@ -452,10 +439,37 @@ export const submitProQuestionnaire = async ({
     throw submitFailure;
   }
 
+  const repairResult = repairProSubmissionPayload(transformedPayload);
+  transformedPayload = repairResult.payload;
+
+  await recordSubmitStage('payload_repair_completed', {
+    warningCount: repairResult.warnings.length,
+    warningCodes: repairResult.warnings,
+    payloadSizeChars: safePayloadSize(transformedPayload),
+    featureSummary: responseSnapshotMetadata
+  });
+
   let validation;
   try {
-    await recordSubmitStage('before_payload_validation');
+    await recordSubmitStage('before_payload_validation', {
+      debugMode: submitDebugMode || ''
+    });
+
+    if (!repairResult.ok) {
+      const repairError = new Error(`Invalid questionnaire payload: ${(repairResult.errors || []).join(' ')}`);
+      repairError.name = 'PayloadRepairError';
+      repairError.code = 'PAYLOAD_REPAIR_FAILED';
+      throw repairError;
+    }
+
     validation = validateSubmissionPayload(transformedPayload);
+    if (shouldSimulateSubmitFailure('validation')) {
+      const validationError = new Error('DEV_ONLY_SIMULATED_SUBMIT_FAILURE: validation');
+      validationError.name = 'DevSimulatedValidationError';
+      validationError.code = 'DEV_SIMULATED_VALIDATION';
+      validationError.type = 'validation';
+      throw validationError;
+    }
     if (!validation?.ok) {
       const validationError = new Error(`Invalid questionnaire payload: ${(validation?.errors || []).join(' ')}`);
       validationError.name = 'PayloadValidationError';
@@ -583,7 +597,8 @@ export const submitProQuestionnaire = async ({
       responseSnapshot,
       questionnaireSessionId,
       draftId: null,
-      submitContext
+      submitContext,
+      debugFailureMode: submitDebugMode
     }
   );
 

@@ -377,4 +377,61 @@ describe('submission payload transformation shape safety', () => {
     expect(Array.isArray(nullPayload.userdata.service_offerings)).toBe(true);
     expect(Array.isArray(emptyPayload.userdata.service_offerings)).toBe(true);
   });
+
+  it('normalizeServiceSelections handles strings and objects', () => {
+    expect(normalizeServiceSelections('Managed IT Services', groupedServices)).toEqual(['Managed IT Services']);
+    expect(normalizeServiceSelections([{ label: 'Endpoint Protection' }], groupedServices)).toEqual(['Endpoint Protection']);
+  });
+
+  it('normalizeServiceSelections expands CATEGORY values', () => {
+    expect(normalizeServiceSelections(['CATEGORY:Core Services'], groupedServices)).toEqual(['Managed IT Services', 'Help Desk']);
+  });
+
+  it('normalizeIndustrySelections returns arrays', () => {
+    expect(normalizeIndustrySelections({ label: 'Healthcare' })).toEqual(['Healthcare']);
+  });
+
+  it('normalizeLocationSelections returns arrays', () => {
+    expect(normalizeLocationSelections({ label: 'Chicago, IL' })).toEqual(['Chicago, IL']);
+  });
+
+  it('normalizeAdditionalPagesList always returns an object', () => {
+    expect(normalizeAdditionalPagesList(null)).toEqual({});
+    expect(normalizeAdditionalPagesList('why choose us')).toEqual({ items: ['why choose us'] });
+    expect(normalizeAdditionalPagesList(['page a'])).toEqual({ items: ['page a'] });
+  });
+
+  it('repairProSubmissionPayload does not mutate input and repairs shapes', () => {
+    const input = {
+      metadata: { business_name: 'Acme IT', businessDomain: 'acmeit.com' },
+      userdata: {
+        additional_pages_list: ['page a'],
+        team_photo_with_tags: null,
+        service_offerings: 'Managed IT Services',
+        target_industries: { label: 'Healthcare' },
+        locations: { label: 'Chicago, IL' },
+        geographic_areas: { label: 'Chicago, IL', lat: '41.8781', lon: '-87.6298' },
+        website_objectives: undefined,
+        company_description: 'x'.repeat(6000)
+      }
+    };
+    const snapshot = JSON.stringify(input);
+    const result = repairProSubmissionPayload(input);
+
+    expect(JSON.stringify(input)).toBe(snapshot);
+    expect(result.ok).toBe(true);
+    expect(result.payload.userdata.additional_pages_list).toEqual({ items: ['page a'], meet_the_team_page: { team_photo_with_tags: {} } });
+    expect(result.payload.userdata.service_offerings).toEqual(['Managed IT Services']);
+    expect(result.payload.userdata.target_industries).toEqual(['Healthcare']);
+    expect(result.payload.userdata.locations).toEqual(['Chicago, IL']);
+    expect(Array.isArray(result.payload.userdata.geographic_areas)).toBe(true);
+    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(validateSubmissionPayload(result.payload).ok).toBe(true);
+  });
+
+  it('repairProSubmissionPayload preserves required metadata validation', () => {
+    const result = repairProSubmissionPayload({ userdata: {} });
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContain('metadata_missing');
+  });
 });

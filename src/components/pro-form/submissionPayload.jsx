@@ -5,7 +5,6 @@ import {
   normalizeAdditionalPagesList,
   normalizeGeographicAreas,
   normalizeIndustrySelections,
-  normalizeLocationSelections,
   normalizeQuestionnaireResponses,
   normalizeServiceSelections,
   normalizeStringSelectionList,
