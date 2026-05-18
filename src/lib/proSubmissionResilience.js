@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { shouldSimulateSubmitFailure } from '@/lib/submitDebugFlags';
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const MAX_MESSAGE_LENGTH = 500;
@@ -35,6 +36,19 @@ export class TimeoutError extends Error {
     this.type = 'timeout';
   }
 }
+
+const createSimulatedSubmitError = (mode) => {
+  if (mode === 'network_timeout') {
+    return new TimeoutError('DEV_ONLY_SIMULATED_SUBMIT_FAILURE: network_timeout');
+  }
+
+  const error = new Error(`DEV_ONLY_SIMULATED_SUBMIT_FAILURE: ${mode}`);
+  error.name = 'DevOnlySimulatedSubmitFailure';
+  error.code = mode === 'primary_create' ? 'SIMULATED_PRIMARY_CREATE' : 'SIMULATED_FALLBACK_CREATE';
+  error.type = mode === 'primary_create' ? 'server' : 'fallback';
+  error.status = mode === 'primary_create' ? 503 : 500;
+  return error;
+};
 
 export const classifySubmitError = (error) => {
   const status = getErrorStatus(error);
@@ -162,6 +176,14 @@ export const createProFormSubmissionResilient = async (payload, options = {}) =>
     }
 
     try {
+      if (shouldSimulateSubmitFailure('primary_create')) {
+        throw createSimulatedSubmitError('primary_create');
+      }
+
+      if (shouldSimulateSubmitFailure('network_timeout')) {
+        throw createSimulatedSubmitError('network_timeout');
+      }
+
       const submission = await withTimeout(
         () => base44.entities.ProFormSubmission.create(payload),
         timeoutMs
@@ -340,6 +362,10 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
     }
 
     try {
+      if (shouldSimulateSubmitFailure('fallback_create')) {
+        throw createSimulatedSubmitError('fallback_create');
+      }
+
       const response = await base44.functions.invoke('submitProQuestionnaireFallback', {
         transformedPayload: null,
         responseSnapshot,
@@ -422,6 +448,10 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
   }
 
   try {
+    if (shouldSimulateSubmitFailure('fallback_create')) {
+      throw createSimulatedSubmitError('fallback_create');
+    }
+
     const response = await base44.functions.invoke('submitProQuestionnaireFallback', {
       transformedPayload: payload,
       responseSnapshot,

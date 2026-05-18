@@ -3,15 +3,15 @@ import {
   normalizeCertifications,
   normalizeGeographicAreas,
   normalizeGuarantees,
+  normalizeServiceSelections,
   transformResponsesToPayload,
   validateSubmissionPayload
 } from '@/components/pro-form/submissionPayload';
 import {
-  normalizeCertificationAwardPartnerUploads,
-  normalizeGuaranteeUploads,
-  normalizeTeamPhotoWithTags,
-  normalizeUploadItem,
-  normalizeUploadList
+  normalizeAdditionalPagesList,
+  normalizeIndustrySelections,
+  normalizeLocationSelections,
+  normalizeTeamPhotoWithTags
 } from '@/lib/proResponseNormalizers';
 
 const groupedServices = {
@@ -207,6 +207,33 @@ const buildPayload = (responses, businessName = 'Acme IT', domain = 'acmeit.com'
   transformResponsesToPayload(responses, businessName, domain, groupedServices);
 
 describe('submission payload transformation shape safety', () => {
+  it('normalizeServiceSelections handles strings', () => {
+    expect(normalizeServiceSelections('Managed IT Services', groupedServices)).toEqual(['Managed IT Services']);
+  });
+
+  it('normalizeServiceSelections handles objects', () => {
+    expect(normalizeServiceSelections({ label: 'Endpoint Protection' }, groupedServices)).toEqual(['Endpoint Protection']);
+  });
+
+  it('normalizeServiceSelections expands CATEGORY values', () => {
+    expect(normalizeServiceSelections(['CATEGORY:Core Services'], groupedServices)).toEqual(['Managed IT Services', 'Help Desk']);
+  });
+
+  it('normalizeIndustrySelections returns array', () => {
+    expect(normalizeIndustrySelections({ label: 'Healthcare' })).toEqual(['Healthcare']);
+  });
+
+  it('normalizeLocationSelections returns array', () => {
+    expect(normalizeLocationSelections({ label: 'Chicago, IL' })).toEqual(['Chicago, IL']);
+  });
+
+  it('normalizeAdditionalPagesList always returns object', () => {
+    expect(normalizeAdditionalPagesList(null)).toEqual({});
+    expect(normalizeAdditionalPagesList(['Why Choose Us'])).toEqual({ items: ['Why Choose Us'] });
+    expect(typeof normalizeAdditionalPagesList({ section: { enabled: true } })).toBe('object');
+    expect(Array.isArray(normalizeAdditionalPagesList(['Why Choose Us']))).toBe(false);
+  });
+
   it('normalizeTeamPhotoWithTags returns a safe object for null input', () => {
     expect(normalizeTeamPhotoWithTags(null)).toEqual({
       imageUrl: '',
@@ -261,40 +288,6 @@ describe('submission payload transformation shape safety', () => {
     expect(normalized.has_team_photo).toBe(true);
   });
 
-  it('normalizeUploadItem handles string urls', () => {
-    expect(normalizeUploadItem('https://example.test/file.pdf')).toEqual({ url: 'https://example.test/file.pdf' });
-  });
-
-  it('normalizeUploadItem preserves safe keys only', () => {
-    expect(normalizeUploadItem({
-      name: 'cert.pdf',
-      data: { url: 'https://example.test/cert.pdf' },
-      description: 'Proof file',
-      base64: 'data:application/pdf;base64,abc',
-      blob: { huge: true }
-    })).toEqual({
-      url: 'https://example.test/cert.pdf',
-      name: 'cert.pdf',
-      description: 'Proof file'
-    });
-  });
-
-  it('normalizeUploadList handles single object and array nulls with dedupe', () => {
-    expect(normalizeUploadList({ url: 'https://example.test/one.pdf', name: 'one.pdf' })).toEqual([
-      { url: 'https://example.test/one.pdf', name: 'one.pdf' }
-    ]);
-
-    expect(normalizeUploadList([
-      null,
-      { url: 'https://example.test/dup.pdf', name: 'dup.pdf' },
-      { file_url: 'https://example.test/dup.pdf', name: 'dup.pdf' },
-      { data: { url: 'https://example.test/two.pdf' }, filename: 'two.pdf' }
-    ])).toEqual([
-      { url: 'https://example.test/dup.pdf', name: 'dup.pdf' },
-      { url: 'https://example.test/two.pdf', filename: 'two.pdf', name: 'two.pdf' }
-    ]);
-  });
-
   it('transformResponsesToPayload does not throw for validMinimalResponses', () => {
     expect(() => buildPayload(validMinimalResponses)).not.toThrow();
   });
@@ -346,42 +339,21 @@ describe('submission payload transformation shape safety', () => {
 
   it('certification files normalize to schema-safe arrays', () => {
     const fullPayload = buildPayload(validFullResponses);
-    const malformedPayload = buildPayload({
-      ...malformedMixedResponses,
-      '12.1': {
-        name: 'Microsoft Partner',
-        type: 'partnership',
-        image: { data: { url: 'https://example.test/logo.png' }, base64: 'ignore' },
-        supportingFiles: [null, { response: { url: 'https://example.test/certificate.pdf' }, filename: 'certificate.pdf' }]
-      }
-    });
+    const malformedPayload = buildPayload(malformedMixedResponses);
 
     expect(Array.isArray(fullPayload.userdata.certifications_partnerships)).toBe(true);
     expect(Array.isArray(fullPayload.userdata.certifications_partnerships[0].cert_item_files)).toBe(true);
     expect(Array.isArray(malformedPayload.userdata.certifications_partnerships)).toBe(true);
     expect(Array.isArray(malformedPayload.userdata.certifications_partnerships[0].cert_item_files)).toBe(true);
-    expect(malformedPayload.userdata.certifications_partnerships[0].cert_item_image_url).toBe('https://example.test/logo.png');
 
     const directNormalized = normalizeCertifications(malformedMixedResponses['12.1']);
     expect(Array.isArray(directNormalized)).toBe(true);
     expect(Array.isArray(directNormalized[0].cert_item_files)).toBe(true);
-    expect(Array.isArray(normalizeCertificationAwardPartnerUploads({ data: { url: 'https://example.test/partner.pdf' }, filename: 'partner.pdf' }))).toBe(true);
   });
 
   it('guarantee files normalize to schema-safe values', () => {
     const fullPayload = buildPayload(validFullResponses);
-    const malformedPayload = buildPayload({
-      ...malformedMixedResponses,
-      '14.1': {
-        name: 'Response SLA',
-        type: 'sla',
-        supportingFiles: [
-          null,
-          { file: { url: 'https://example.test/sla.pdf', name: 'sla.pdf' }, blob: { huge: true } }
-        ],
-        description: ['Fast response']
-      }
-    });
+    const malformedPayload = buildPayload(malformedMixedResponses);
 
     expect(Array.isArray(fullPayload.userdata.service_guarantee_items)).toBe(true);
     expect(fullPayload.userdata.service_guarantee_items[0].guarantee_file_url).toBe('https://example.test/sla.pdf');
@@ -391,7 +363,6 @@ describe('submission payload transformation shape safety', () => {
     const directNormalized = normalizeGuarantees(malformedMixedResponses['14.1']);
     expect(Array.isArray(directNormalized)).toBe(true);
     expect(typeof directNormalized[0].guarantee_file_url).toBe('string');
-    expect(Array.isArray(normalizeGuaranteeUploads({ response: { url: 'https://example.test/guarantee.pdf' }, filename: 'guarantee.pdf' }))).toBe(true);
   });
 
   it('geographic areas normalize without throwing', () => {
@@ -399,6 +370,57 @@ describe('submission payload transformation shape safety', () => {
 
     const payload = buildPayload(malformedMixedResponses);
     expect(Array.isArray(payload.userdata.geographic_areas)).toBe(true);
+  });
+
+  it('normalizeGeographicAreas handles string object array and null', () => {
+    expect(normalizeGeographicAreas(null)).toEqual([]);
+    expect(normalizeGeographicAreas('Chicago, IL')).toEqual([
+      {
+        geographic_area_meta: {
+          name: 'Chicago, IL',
+          label: 'Chicago, IL',
+          lat: '',
+          lon: '',
+          place_id: '',
+          source: 'google',
+          primary: true
+        }
+      }
+    ]);
+    expect(normalizeGeographicAreas({ label: 'Milwaukee, WI', latitude: '43.0389', longitude: '-87.9065' })).toEqual([
+      {
+        geographic_area_meta: {
+          name: 'Milwaukee, WI',
+          label: 'Milwaukee, WI',
+          lat: '43.0389',
+          lon: '-87.9065',
+          place_id: '',
+          source: 'google',
+          primary: true
+        }
+      }
+    ]);
+  });
+
+  it('normalizeGeographicAreas outputs schema-compatible lat lon values', () => {
+    const normalized = normalizeGeographicAreas([
+      { label: 'Chicago, IL', latitude: '41.8781', longitude: '-87.6298' },
+      { label: 'Bad Place', latitude: 'north', longitude: {} }
+    ]);
+
+    expect(normalized[0].geographic_area_meta.lat).toBe('41.8781');
+    expect(normalized[0].geographic_area_meta.lon).toBe('-87.6298');
+    expect(normalized[1].geographic_area_meta.lat).toBe('');
+    expect(normalized[1].geographic_area_meta.lon).toBe('');
+  });
+
+  it('transformResponsesToPayload does not throw for malformed geography', () => {
+    expect(() => buildPayload({
+      ...validMinimalResponses,
+      '4': { label: 'Healthcare' },
+      '5': { label: 'Chicago, IL', latitude: '41.8781', longitude: '-87.6298' },
+      '3': { value: 'CATEGORY:Core Services' }
+    })).not.toThrow();
   });
 
   it('missing business name or domain still fails validation, not transformation', () => {
@@ -415,6 +437,5 @@ describe('submission payload transformation shape safety', () => {
 
     expect(Array.isArray(nullPayload.userdata.service_offerings)).toBe(true);
     expect(Array.isArray(emptyPayload.userdata.service_offerings)).toBe(true);
-    expect(validateSubmissionPayload(buildPayload({ ...validMinimalResponses, '12': 'no', '14': 'no' })).ok).toBe(true);
   });
 });

@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { getSubmitDebugFailureMode, shouldSimulateSubmitFailure } from '@/lib/submitDebugFlags';
 import {
   transformResponsesToPayload,
   validateSubmissionPayload
@@ -240,6 +241,7 @@ export const submitProQuestionnaire = async ({
     user_id: credentials?.userId || credentials?.id || null
   });
   const responseSnapshotMetadata = buildResponseSnapshotMetadata(responseSnapshot, validationStatus);
+  const debugSubmitFailureMode = getSubmitDebugFailureMode();
 
   const recordSubmitStage = async (stage, details = {}) => {
     const safeDetails = sanitizeStageDetails(details);
@@ -286,7 +288,9 @@ export const submitProQuestionnaire = async ({
     }
   };
 
-  await recordSubmitStage('submit_started');
+  await recordSubmitStage('submit_started', {
+    debugSubmitFailureMode: debugSubmitFailureMode || ''
+  });
   await createDraftEventSafe({
     createDraftEvent,
     eventType: 'submit_attempted',
@@ -311,6 +315,14 @@ export const submitProQuestionnaire = async ({
 
   try {
     await recordSubmitStage('before_payload_transform');
+    if (shouldSimulateSubmitFailure('transform')) {
+      const simulatedTransformError = new Error('DEV_ONLY_SIMULATED_SUBMIT_FAILURE: transform');
+      simulatedTransformError.name = 'DevOnlySimulatedTransformFailure';
+      simulatedTransformError.code = 'SIMULATED_TRANSFORM';
+      simulatedTransformError.type = 'schema';
+      throw simulatedTransformError;
+    }
+
     transformedPayload = transformResponsesToPayload(
       responseSnapshot,
       businessName,
@@ -432,6 +444,13 @@ export const submitProQuestionnaire = async ({
   try {
     await recordSubmitStage('before_payload_validation');
     validation = validateSubmissionPayload(transformedPayload);
+    if (shouldSimulateSubmitFailure('validation')) {
+      const validationError = new Error('DEV_ONLY_SIMULATED_SUBMIT_FAILURE: validation');
+      validationError.name = 'PayloadValidationError';
+      validationError.code = 'SIMULATED_VALIDATION';
+      validationError.type = 'validation';
+      throw validationError;
+    }
     if (!validation?.ok) {
       const validationError = new Error(`Invalid questionnaire payload: ${(validation?.errors || []).join(' ')}`);
       validationError.name = 'PayloadValidationError';
@@ -671,7 +690,7 @@ export const submitProQuestionnaire = async ({
     }
   });
 
-  if (!resilientSubmitResult.zapierSent && transformedPayload) {
+  if (!debugSubmitFailureMode && !resilientSubmitResult.zapierSent && transformedPayload) {
     await sendZapierSafe(transformedPayload);
   }
 

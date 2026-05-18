@@ -1,10 +1,12 @@
 import {
   asPlainObject,
-  asStringArray,
+  asSafeFileList,
   asTrimmedString,
-  normalizeCertificationAwardPartnerUploads,
-  normalizeGuaranteeUploads,
+  normalizeAdditionalPagesList,
+  normalizeIndustrySelections,
+  normalizeLocationSelections,
   normalizeQuestionnaireResponses,
+  normalizeStringSelectionList,
   normalizeTeamPhotoWithTags
 } from '@/lib/proResponseNormalizers';
 
@@ -30,26 +32,18 @@ const asCoordinateString = (value) => {
 };
 
 export const normalizeGeographicAreas = (locations = [], primaryIndex = 0) =>
-  locations
-    .filter(Boolean)
+  normalizeLocationSelections(locations)
     .map((location, index) => {
-      const isString = typeof location === 'string';
-      const safeLocation = isString ? {} : asPlainObject(location);
-
-      const name = isString
-        ? location
-        : safeLocation.name || safeLocation.label || '';
+      const safeLocation = typeof location === 'string' ? { label: location } : asPlainObject(location);
 
       return {
         geographic_area_meta: {
-          name: asTrimmedString(name),
-          label: asTrimmedString(
-            isString ? location : safeLocation.label || safeLocation.name || ''
-          ),
-          lat: isString ? '' : asCoordinateString(safeLocation.lat),
-          lon: isString ? '' : asCoordinateString(safeLocation.lon),
-          place_id: isString ? '' : asTrimmedString(safeLocation.place_id),
-          source: isString ? 'manual' : asTrimmedString(safeLocation.source) || 'google',
+          name: asTrimmedString(safeLocation.name || safeLocation.city || safeLocation.label),
+          label: asTrimmedString(safeLocation.label || safeLocation.name || safeLocation.city),
+          lat: asCoordinateString(safeLocation.lat ?? safeLocation.latitude),
+          lon: asCoordinateString(safeLocation.lon ?? safeLocation.longitude),
+          place_id: asTrimmedString(safeLocation.place_id || safeLocation.placeId),
+          source: asTrimmedString(safeLocation.source) || 'google',
           primary: index === Number(primaryIndex || 0)
         }
       };
@@ -60,6 +54,19 @@ export const normalizeGeographicAreas = (locations = [], primaryIndex = 0) =>
         item.geographic_area_meta.label
     );
 
+export const normalizeServiceSelections = (value, serviceOptionsGrouped = {}) => {
+  const normalizedSelections = normalizeStringSelectionList(value);
+  const expandedSelections = normalizedSelections.flatMap((selection) => {
+    if (!selection.startsWith('CATEGORY:')) return [selection];
+
+    const categoryName = selection.replace('CATEGORY:', '').trim();
+    const categoryServices = normalizeStringSelectionList(serviceOptionsGrouped[categoryName]);
+    return categoryServices.length ? categoryServices : [selection];
+  });
+
+  return normalizeStringSelectionList(expandedSelections);
+};
+
 export const normalizeCertifications = (items = []) =>
   items
     .map((item) => {
@@ -69,14 +76,12 @@ export const normalizeCertifications = (items = []) =>
       if (!itemName || !itemType) return null;
 
       const image = asPlainObject(safeItem.image);
-      const safeLogos = normalizeCertificationAwardPartnerUploads(safeItem.image || safeItem.logo || safeItem.imageUrl || image.url);
-      const primaryLogo = safeLogos[0] || {};
       return {
         cert_item_name: itemName,
         cert_item_type: itemType,
-        cert_item_image_url: asTrimmedString(primaryLogo.image_url || primaryLogo.url || safeItem.imageUrl || image.url),
-        cert_item_image_name: asTrimmedString(primaryLogo.name || image.name),
-        cert_item_files: normalizeCertificationAwardPartnerUploads(safeItem.files || safeItem.supporting_files || safeItem.supportingFiles)
+        cert_item_image_url: asTrimmedString(safeItem.imageUrl || image.url),
+        cert_item_image_name: asTrimmedString(image.name),
+        cert_item_files: asSafeFileList(safeItem.files)
       };
     })
     .filter(Boolean);
@@ -89,9 +94,8 @@ export const normalizeGuarantees = (items = []) =>
       const safeItem = asPlainObject(item);
       const guaranteeName = asTrimmedString(safeItem.name || safeItem.label);
       const guaranteeType = asTrimmedString(safeItem.type || safeItem.category);
-      const safeFiles = normalizeGuaranteeUploads(safeItem.file || safeItem.fileUrl || safeItem.supporting_files || safeItem.supportingFiles);
-      const primaryFile = safeFiles[0] || {};
-      const guaranteeFileUrl = asTrimmedString(primaryFile.file_url || primaryFile.url || safeItem.fileUrl);
+      const file = asPlainObject(safeItem.file);
+      const guaranteeFileUrl = asTrimmedString(safeItem.fileUrl || file.url);
       const guaranteeDescription = asTrimmedString(safeItem.description);
 
       if (!guaranteeName || !guaranteeType || (!guaranteeFileUrl && !guaranteeDescription)) {
@@ -102,7 +106,7 @@ export const normalizeGuarantees = (items = []) =>
         guarantee_name: guaranteeName,
         guarantee_type: guaranteeType,
         guarantee_file_url: guaranteeFileUrl,
-        guarantee_file_name: asTrimmedString(primaryFile.name || primaryFile.fileName || primaryFile.filename),
+        guarantee_file_name: asTrimmedString(file.name),
         guarantee_description: guaranteeDescription
       };
     })
@@ -115,11 +119,11 @@ export const transformResponsesToPayload = (
   serviceOptionsGrouped = {}
 ) => {
   const normalizedResponses = normalizeQuestionnaireResponses(responses);
-  const serviceSelections = asStringArray(normalizedResponses['3']);
-  const serviceOfferingsOther = asStringArray(normalizedResponses['3_other']).join(', ');
-  const targetIndustriesOther = asStringArray(normalizedResponses['4_other']).join(', ');
-  const clientChallengesOther = asStringArray(normalizedResponses['18_other']).join(', ');
-  const clientOutcomesOther = asStringArray(normalizedResponses['20_other']).join(', ');
+  const serviceSelections = normalizeServiceSelections(normalizedResponses['3'], serviceOptionsGrouped);
+  const serviceOfferingsOther = normalizeStringSelectionList(normalizedResponses['3_other']).join(', ');
+  const targetIndustriesOther = normalizeIndustrySelections(normalizedResponses['4_other']).join(', ');
+  const clientChallengesOther = normalizeStringSelectionList(normalizedResponses['18_other']).join(', ');
+  const clientOutcomesOther = normalizeStringSelectionList(normalizedResponses['20_other']).join(', ');
 
   const geographicAreas = normalizeGeographicAreas(
     normalizedResponses['5'] || [],
@@ -138,7 +142,7 @@ export const transformResponsesToPayload = (
     ? normalizeGuarantees(normalizedResponses['14.1'] || [])
     : [];
 
-  const additionalPagesList = {
+  const additionalPagesList = normalizeAdditionalPagesList({
     why_choose_us_page: {
       generate_page: normalizedResponses['1'] === 'yes',
       why_choose_us_description: normalizedResponses['1'] === 'yes' ? asTrimmedString(normalizedResponses['1.1']) : ''
@@ -148,7 +152,7 @@ export const transformResponsesToPayload = (
       team_introduction: normalizedResponses['2'] === 'yes' ? asTrimmedString(normalizedResponses['2.1']) : '',
       team_photo_with_tags: teamPhoto
     }
-  };
+  });
 
   return {
     metadata: {
@@ -159,25 +163,18 @@ export const transformResponsesToPayload = (
     },
     userdata: {
       additional_pages_list: additionalPagesList,
-      service_offerings: serviceSelections.flatMap((selection) => {
-        if (selection.startsWith('CATEGORY:')) {
-          const categoryName = selection.replace('CATEGORY:', '').trim();
-          return serviceOptionsGrouped[categoryName] || [];
-        }
-
-        return [selection];
-      }),
+      service_offerings: serviceSelections,
       service_offerings_other: serviceOfferingsOther,
-      target_industries: asStringArray(normalizedResponses['4']),
+      target_industries: normalizeIndustrySelections(normalizedResponses['4']),
       target_industries_other: targetIndustriesOther,
       geographic_areas: geographicAreas,
       company_description: asTrimmedString(normalizedResponses['6']),
       delivery_model: asTrimmedString(normalizedResponses['7']),
       delivery_model_other: asTrimmedString(normalizedResponses['7_other']),
-      pricing_packaging: asStringArray(normalizedResponses['8']),
+      pricing_packaging: normalizeStringSelectionList(normalizedResponses['8']),
       pricing_packaging_other: asTrimmedString(normalizedResponses['8_other']),
       differentiation: asTrimmedString(normalizedResponses['9']),
-      company_goals: asStringArray(normalizedResponses['10']),
+      company_goals: normalizeStringSelectionList(normalizedResponses['10']),
       company_goals_other: asTrimmedString(normalizedResponses['10_other']),
       brand_tone: asTrimmedString(normalizedResponses['11']),
       brand_tone_other: asTrimmedString(normalizedResponses['11_other']),
@@ -187,13 +184,13 @@ export const transformResponsesToPayload = (
       service_guarantee_items: serviceGuaranteeItems,
       client_acquisition: asTrimmedString(normalizedResponses['15']),
       client_acquisition_other: asTrimmedString(normalizedResponses['15_other']),
-      website_objectives: asStringArray(normalizedResponses['16']),
+      website_objectives: normalizeStringSelectionList(normalizedResponses['16']),
       website_objectives_other: asTrimmedString(normalizedResponses['16_other']),
       client_size: asTrimmedString(normalizedResponses['17']),
-      client_challenges: asStringArray(normalizedResponses['18']),
+      client_challenges: normalizeStringSelectionList(normalizedResponses['18']),
       client_challenges_other: clientChallengesOther,
       client_frustrations: asTrimmedString(normalizedResponses['19']),
-      client_outcomes: asStringArray(normalizedResponses['20']),
+      client_outcomes: normalizeStringSelectionList(normalizedResponses['20']),
       client_outcomes_other: clientOutcomesOther,
       value_description: asTrimmedString(normalizedResponses['21']),
       ideal_client: asTrimmedString(normalizedResponses['22']),
