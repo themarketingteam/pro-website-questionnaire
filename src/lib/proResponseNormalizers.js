@@ -160,6 +160,94 @@ export const asSafeTaggedFileList = (value) =>
     })
     .filter(Boolean);
 
+const MAX_TEAM_PHOTO_TAGS = 50;
+const MAX_TEAM_PHOTO_NOTES_LENGTH = 2000;
+
+const normalizeTeamPhotoTagValue = (value) => {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return asTrimmedString(value);
+  }
+
+  const safeValue = asPlainObject(value);
+  return asTrimmedString(
+    safeValue.label ||
+    safeValue.value ||
+    safeValue.name ||
+    safeValue.title ||
+    safeValue.tag
+  );
+};
+
+export const normalizeTeamPhotoWithTags = (value) => {
+  const safeDefault = {
+    imageUrl: '',
+    imageName: '',
+    taggedPeople: [],
+    files: [],
+    tags: [],
+    notes: '',
+    has_team_photo: false
+  };
+
+  if (value == null) {
+    return safeDefault;
+  }
+
+  const safeFiles = asSafeFileList(
+    typeof value === 'string'
+      ? value
+      : Array.isArray(value)
+        ? value
+        : value?.files || value?.uploadedFiles || value?.file || value
+  );
+
+  const safeObject = Array.isArray(value) ? {} : asPlainObject(value);
+  const primaryFile = safeFiles[0] || null;
+  const explicitUrl = typeof value === 'string'
+    ? asTrimmedString(value)
+    : asTrimmedString(
+      safeObject.url ||
+      safeObject.file_url ||
+      safeObject.fileUrl ||
+      safeObject.image_url ||
+      safeObject.imageUrl ||
+      safeObject.src
+    );
+
+  const imageUrl = explicitUrl || primaryFile?.url || '';
+  const imageName = asTrimmedString(
+    safeObject.name ||
+    safeObject.fileName ||
+    safeObject.filename ||
+    primaryFile?.name
+  );
+
+  const rawTags = safeObject.tags || safeObject.selectedTags || safeObject.peopleTags;
+  const tags = asArray(rawTags)
+    .flatMap((item) => {
+      if (Array.isArray(item)) return item;
+      return [item];
+    })
+    .map(normalizeTeamPhotoTagValue)
+    .filter(Boolean)
+    .filter((tag, index, array) => array.indexOf(tag) === index)
+    .slice(0, MAX_TEAM_PHOTO_TAGS);
+
+  const notes = asTrimmedString(safeObject.notes || safeObject.description).slice(0, MAX_TEAM_PHOTO_NOTES_LENGTH);
+  const explicitHasPhoto = asBoolean(safeObject.has_team_photo, false);
+  const hasTeamPhoto = explicitHasPhoto || Boolean(imageUrl || safeFiles.length);
+
+  return {
+    imageUrl,
+    imageName,
+    taggedPeople: [],
+    files: safeFiles,
+    tags,
+    notes,
+    has_team_photo: hasTeamPhoto
+  };
+};
+
 const normalizeYesNo = (questionId, value) => {
   const normalized = asTrimmedString(value).toLowerCase();
   if (normalized === 'yes' || normalized === 'no') return normalized;
@@ -224,25 +312,7 @@ export const normalizeQuestionnaireResponses = (responses) => {
     }
 
     if (OBJECT_IDS.has(questionId)) {
-      const source = asPlainObject(value);
-      const nextValue = {
-        url: asTrimmedString(source.url || source.imageUrl),
-        imageUrl: asTrimmedString(source.imageUrl || source.url),
-        name: asTrimmedString(source.name || source.fileName || source.filename),
-        tags: asArray(source.tags).map((tag) => {
-          const safeTag = asPlainObject(tag);
-          const safePerson = asPlainObject(safeTag.person);
-          return {
-            x: Number.isFinite(Number(safeTag.x)) ? Number(safeTag.x) : 0,
-            y: Number.isFinite(Number(safeTag.y)) ? Number(safeTag.y) : 0,
-            person: {
-              name: asTrimmedString(safePerson.name || safePerson.label),
-              position: asTrimmedString(safePerson.position || safePerson.title),
-              bio: asTrimmedString(safePerson.bio || safePerson.description)
-            }
-          };
-        })
-      };
+      const nextValue = normalizeTeamPhotoWithTags(value);
       if (!isPlainObject(value)) {
         addWarning(questionId, 'Normalized object answer shape.', value, 'plain_object');
       }

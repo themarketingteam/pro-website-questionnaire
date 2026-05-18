@@ -3,7 +3,8 @@ import {
   asSafeFileList,
   asStringArray,
   asTrimmedString,
-  normalizeQuestionnaireResponses
+  normalizeQuestionnaireResponses,
+  normalizeTeamPhotoWithTags
 } from '@/lib/proResponseNormalizers';
 
 export const serializeError = (error) => ({
@@ -77,37 +78,7 @@ export const normalizeCertifications = (items = []) =>
     })
     .filter(Boolean);
 
-export const normalizeTeamPhoto = (answer) => {
-  const safeAnswer = asPlainObject(answer);
-
-  if (!safeAnswer.url && !safeAnswer.imageUrl) {
-    return {
-      imageUrl: '',
-      imageName: '',
-      taggedPeople: []
-    };
-  }
-
-  return {
-    imageUrl: asTrimmedString(safeAnswer.url || safeAnswer.imageUrl),
-    imageName: asTrimmedString(safeAnswer.name || safeAnswer.fileName || safeAnswer.filename),
-    taggedPeople: (Array.isArray(safeAnswer.tags) ? safeAnswer.tags : [])
-      .map((tag) => {
-        const safeTag = asPlainObject(tag);
-        const person = asPlainObject(safeTag.person);
-        const name = asTrimmedString(person.name || person.label);
-        if (!name) return null;
-        return {
-          name,
-          position: asTrimmedString(person.position || person.title),
-          bio: asTrimmedString(person.bio || person.description),
-          x: Number.isFinite(Number(safeTag.x)) ? Number(safeTag.x) : 0,
-          y: Number.isFinite(Number(safeTag.y)) ? Number(safeTag.y) : 0
-        };
-      })
-      .filter(Boolean)
-  };
-};
+export const normalizeTeamPhoto = (answer) => normalizeTeamPhotoWithTags(answer);
 
 export const normalizeGuarantees = (items = []) =>
   items
@@ -157,7 +128,7 @@ export const transformResponsesToPayload = (
 
   const teamPhoto = normalizedResponses['2'] === 'yes'
     ? normalizeTeamPhoto(normalizedResponses['2.2'])
-    : { imageUrl: '', imageName: '', taggedPeople: [] };
+    : normalizeTeamPhotoWithTags({ has_team_photo: false });
 
   const serviceGuaranteeItems = normalizedResponses['14'] === 'yes'
     ? normalizeGuarantees(normalizedResponses['14.1'] || [])

@@ -6,6 +6,7 @@ import {
   transformResponsesToPayload,
   validateSubmissionPayload
 } from '@/components/pro-form/submissionPayload';
+import { normalizeTeamPhotoWithTags } from '@/lib/proResponseNormalizers';
 
 const groupedServices = {
   'Core Services': ['Managed IT Services', 'Help Desk'],
@@ -200,6 +201,60 @@ const buildPayload = (responses, businessName = 'Acme IT', domain = 'acmeit.com'
   transformResponsesToPayload(responses, businessName, domain, groupedServices);
 
 describe('submission payload transformation shape safety', () => {
+  it('normalizeTeamPhotoWithTags returns a safe object for null input', () => {
+    expect(normalizeTeamPhotoWithTags(null)).toEqual({
+      imageUrl: '',
+      imageName: '',
+      taggedPeople: [],
+      files: [],
+      tags: [],
+      notes: '',
+      has_team_photo: false
+    });
+  });
+
+  it('normalizeTeamPhotoWithTags preserves string urls', () => {
+    const normalized = normalizeTeamPhotoWithTags('https://example.test/team.jpg');
+
+    expect(normalized.imageUrl).toBe('https://example.test/team.jpg');
+    expect(normalized.files[0].url).toBe('https://example.test/team.jpg');
+    expect(normalized.has_team_photo).toBe(true);
+  });
+
+  it('normalizeTeamPhotoWithTags preserves safe file keys and normalized tags', () => {
+    const normalized = normalizeTeamPhotoWithTags({
+      file_url: 'https://example.test/team.jpg',
+      filename: 'team.jpg',
+      uploadedFiles: [
+        {
+          url: 'https://example.test/team.jpg',
+          filename: 'team.jpg',
+          mimeType: 'image/jpeg',
+          size: '42',
+          ignored: { nested: true }
+        },
+        null
+      ],
+      selectedTags: [' Founder ', { label: 'Founder' }, { value: 'Leadership' }, ''],
+      description: '  Team photo notes  '
+    });
+
+    expect(normalized.imageUrl).toBe('https://example.test/team.jpg');
+    expect(normalized.imageName).toBe('team.jpg');
+    expect(normalized.files).toEqual([
+      {
+        url: 'https://example.test/team.jpg',
+        filename: 'team.jpg',
+        mimeType: 'image/jpeg',
+        size: 42,
+        name: 'team.jpg'
+      }
+    ]);
+    expect(normalized.tags).toEqual(['Founder', 'Leadership']);
+    expect(normalized.notes).toBe('Team photo notes');
+    expect(normalized.has_team_photo).toBe(true);
+  });
+
   it('transformResponsesToPayload does not throw for validMinimalResponses', () => {
     expect(() => buildPayload(validMinimalResponses)).not.toThrow();
   });
@@ -210,6 +265,20 @@ describe('submission payload transformation shape safety', () => {
 
   it('transformResponsesToPayload does not throw for malformedMixedResponses', () => {
     expect(() => buildPayload(malformedMixedResponses)).not.toThrow();
+  });
+
+  it('malformed team photo data cannot block submit validation by shape alone', () => {
+    const payload = buildPayload({
+      ...validMinimalResponses,
+      '2': 'yes',
+      '2.2': {
+        uploadedFiles: [{ image_url: 'https://example.test/team-safe.jpg', blob: { huge: true } }],
+        tags: 'Founder'
+      }
+    });
+
+    expect(typeof payload.userdata.additional_pages_list.meet_the_team_page.team_photo_with_tags).toBe('object');
+    expect(validateSubmissionPayload(payload).ok).toBe(true);
   });
 
   it('service_offerings output is always an array', () => {
@@ -231,6 +300,8 @@ describe('submission payload transformation shape safety', () => {
 
     expect(typeof minimalPayload.userdata.additional_pages_list.meet_the_team_page.team_photo_with_tags).toBe('object');
     expect(typeof malformedPayload.userdata.additional_pages_list.meet_the_team_page.team_photo_with_tags).toBe('object');
+    expect(Array.isArray(minimalPayload.userdata.additional_pages_list.meet_the_team_page.team_photo_with_tags.files)).toBe(true);
+    expect(Array.isArray(malformedPayload.userdata.additional_pages_list.meet_the_team_page.team_photo_with_tags.tags)).toBe(true);
   });
 
   it('certification files normalize to schema-safe arrays', () => {
