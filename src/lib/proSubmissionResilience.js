@@ -351,10 +351,25 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
         questionnaireSessionId,
         draftId,
         primaryError: transformError || validationError,
-        submitContext
+        submitContext,
+        diagnostics: null
       });
 
       const data = response?.data;
+      if (data?.success && data?.received && data?.submissionCreated === false && data?.intakeId) {
+        return {
+          ok: true,
+          submission: null,
+          intakeId: data.intakeId,
+          receivedViaIntake: true,
+          error: null,
+          attempts: 0,
+          usedFallback: true,
+          failureKind: null,
+          primaryError: transformError || validationError,
+          zapierSent: Boolean(data?.zapierSent)
+        };
+      }
       if (data?.success && data?.submission) {
         return {
           ok: true,
@@ -410,13 +425,36 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
     const response = await base44.functions.invoke('submitProQuestionnaireFallback', {
       transformedPayload: payload,
       responseSnapshot,
+      rawResponses,
       questionnaireSessionId,
       draftId,
       primaryError: primaryResult.error,
-      submitContext
+      submitContext,
+      diagnostics: null
     });
 
     const data = response?.data;
+
+    if (data?.success && data?.received && data?.submissionCreated === false && data?.intakeId) {
+      const result = {
+        ok: true,
+        submission: null,
+        intakeId: data.intakeId,
+        receivedViaIntake: true,
+        error: null,
+        attempts: primaryResult.attempts,
+        usedFallback: true,
+        failureKind: null,
+        primaryError: primaryResult.error,
+        zapierSent: Boolean(data?.zapierSent)
+      };
+
+      if (typeof onFallbackSuccess === 'function') {
+        onFallbackSuccess(result);
+      }
+
+      return result;
+    }
 
     if (data?.success && data?.submission) {
       const result = {

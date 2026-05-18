@@ -5,8 +5,6 @@ import {
 } from '@/components/pro-form/submissionPayload';
 import { trackClarityEvent } from '@/lib/clarity';
 import {
-  buildPayloadFeatureSummary,
-  buildSubmitDiagnostics,
   createProFormSubmissionWithFallback,
   serializeSubmitError
 } from '@/lib/proSubmissionResilience';
@@ -310,7 +308,6 @@ export const submitProQuestionnaire = async ({
   });
 
   let transformedPayload;
-  let payloadSummary = buildPayloadFeatureSummary(null);
 
   try {
     await recordSubmitStage('before_payload_transform');
@@ -320,10 +317,8 @@ export const submitProQuestionnaire = async ({
       domain,
       serviceOptionsGrouped
     );
-    payloadSummary = buildPayloadFeatureSummary(transformedPayload);
     await recordSubmitStage('payload_transform_success', {
-      payloadSizeChars: safePayloadSize(transformedPayload),
-      payloadSummary
+      payloadSizeChars: safePayloadSize(transformedPayload)
     });
   } catch (error) {
     const serializedError = serializeSubmitError(error);
@@ -372,11 +367,6 @@ export const submitProQuestionnaire = async ({
       }
     });
 
-    await recordSubmitStage('fallback_submit_attempted', {
-      usedFallback: true,
-      failureKind: serializedError.failureKind
-    });
-
     const fallbackResult = await createProFormSubmissionWithFallback(null, {
       responseSnapshot,
       rawResponses: responseSnapshot,
@@ -387,46 +377,22 @@ export const submitProQuestionnaire = async ({
       submitContext
     });
 
-    const diagnostics = buildSubmitDiagnostics({
-      questionnaireSessionId,
-      businessName,
-      domain: resolvedDomain,
-      draftId: null,
-      primaryResult: {
-        ok: false,
-        failureKind: serializedError.failureKind,
-        error: serializedError,
-        usedFallback: false
-      },
-      fallbackResult,
-      submitContext,
-      payloadSummary
-    });
-
-    await recordSubmitStage('primary_create_failed', diagnostics);
-
     if (fallbackResult?.ok) {
-      await recordSubmitStage('fallback_submit_success', { usedFallback: true, diagnostics });
-      try {
-        trackClarityEvent('pro_questionnaire_submit_fallback_success', {
-          primary_failure_kind: serializedError.failureKind,
-          used_fallback: 'true',
-          session_present: String(Boolean(questionnaireSessionId)),
-          domain_present: String(Boolean(resolvedDomain && resolvedDomain !== 'unknown'))
-        });
-      } catch {
-        // no-op
-      }
+      await recordSubmitStage('fallback_success', { usedFallback: true });
       await recordSubmitStage('submit_success', { usedFallback: true });
       if (typeof onFinalSubmitSuccess === 'function') {
         onFinalSubmitSuccess({
           savedSubmission: fallbackResult.submission,
+          intakeId: fallbackResult.intakeId || '',
+          receivedViaIntake: Boolean(fallbackResult.receivedViaIntake),
           responseSnapshot,
           transformedPayload: null
         });
       }
       return {
         savedSubmission: fallbackResult.submission,
+        intakeId: fallbackResult.intakeId || '',
+        receivedViaIntake: Boolean(fallbackResult.receivedViaIntake),
         responseSnapshot,
         transformedPayload: null
       };
@@ -436,27 +402,6 @@ export const submitProQuestionnaire = async ({
       failureKind: fallbackResult?.failureKind || serializedError.failureKind,
       usedFallback: true
     });
-    await recordSubmitStage('submit_failed', {
-      failureKind: serializedError.failureKind,
-      usedFallback: true
-    });
-
-    await recordSubmitStage('fallback_submit_failed', {
-      failureKind: fallbackResult?.failureKind || serializedError.failureKind,
-      usedFallback: true,
-      diagnostics
-    });
-    try {
-      trackClarityEvent('pro_questionnaire_submit_fallback_failed', {
-        primary_failure_kind: serializedError.failureKind,
-        fallback_failure_kind: fallbackResult?.failureKind || serializedError.failureKind,
-        used_fallback: 'true',
-        session_present: String(Boolean(questionnaireSessionId)),
-        domain_present: String(Boolean(resolvedDomain && resolvedDomain !== 'unknown'))
-      });
-    } catch {
-      // no-op
-    }
     await recordSubmitStage('submit_failed', {
       failureKind: serializedError.failureKind,
       usedFallback: true
@@ -542,11 +487,6 @@ export const submitProQuestionnaire = async ({
       }
     });
 
-    await recordSubmitStage('fallback_submit_attempted', {
-      usedFallback: true,
-      failureKind: serializedError.failureKind
-    });
-
     const fallbackResult = await createProFormSubmissionWithFallback(transformedPayload, {
       maxAttempts: 3,
       timeoutMs: 15000,
@@ -559,46 +499,22 @@ export const submitProQuestionnaire = async ({
       submitContext
     });
 
-    const diagnostics = buildSubmitDiagnostics({
-      questionnaireSessionId,
-      businessName,
-      domain: resolvedDomain,
-      draftId: null,
-      primaryResult: {
-        ok: false,
-        failureKind: serializedError.failureKind,
-        error: serializedError,
-        usedFallback: false
-      },
-      fallbackResult,
-      submitContext,
-      payloadSummary
-    });
-
-    await recordSubmitStage('primary_create_failed', diagnostics);
-
     if (fallbackResult?.ok) {
-      await recordSubmitStage('fallback_submit_success', { usedFallback: true, diagnostics });
-      try {
-        trackClarityEvent('pro_questionnaire_submit_fallback_success', {
-          primary_failure_kind: serializedError.failureKind,
-          used_fallback: 'true',
-          session_present: String(Boolean(questionnaireSessionId)),
-          domain_present: String(Boolean(resolvedDomain && resolvedDomain !== 'unknown'))
-        });
-      } catch {
-        // no-op
-      }
+      await recordSubmitStage('fallback_success', { usedFallback: true });
       await recordSubmitStage('submit_success', { usedFallback: true });
       if (typeof onFinalSubmitSuccess === 'function') {
         onFinalSubmitSuccess({
           savedSubmission: fallbackResult.submission,
+          intakeId: fallbackResult.intakeId || '',
+          receivedViaIntake: Boolean(fallbackResult.receivedViaIntake),
           responseSnapshot,
           transformedPayload
         });
       }
       return {
         savedSubmission: fallbackResult.submission,
+        intakeId: fallbackResult.intakeId || '',
+        receivedViaIntake: Boolean(fallbackResult.receivedViaIntake),
         responseSnapshot,
         transformedPayload
       };
@@ -608,27 +524,6 @@ export const submitProQuestionnaire = async ({
       failureKind: fallbackResult?.failureKind || serializedError.failureKind,
       usedFallback: true
     });
-    await recordSubmitStage('submit_failed', {
-      failureKind: serializedError.failureKind,
-      usedFallback: true
-    });
-
-    await recordSubmitStage('fallback_submit_failed', {
-      failureKind: fallbackResult?.failureKind || serializedError.failureKind,
-      usedFallback: true,
-      diagnostics
-    });
-    try {
-      trackClarityEvent('pro_questionnaire_submit_fallback_failed', {
-        primary_failure_kind: serializedError.failureKind,
-        fallback_failure_kind: fallbackResult?.failureKind || serializedError.failureKind,
-        used_fallback: 'true',
-        session_present: String(Boolean(questionnaireSessionId)),
-        domain_present: String(Boolean(resolvedDomain && resolvedDomain !== 'unknown'))
-      });
-    } catch {
-      // no-op
-    }
     await recordSubmitStage('submit_failed', {
       failureKind: serializedError.failureKind,
       usedFallback: true
@@ -670,40 +565,11 @@ export const submitProQuestionnaire = async ({
 
   if (!resilientSubmitResult.ok) {
     const serialized = resilientSubmitResult.error || serializeSubmitError(null);
-    const diagnostics = buildSubmitDiagnostics({
-      questionnaireSessionId,
-      businessName,
-      domain: resolvedDomain,
-      draftId: null,
-      primaryResult: {
-        ok: false,
-        failureKind: resilientSubmitResult.failureKind,
-        error: serialized,
-        usedFallback: false
-      },
-      fallbackResult: resilientSubmitResult.usedFallback ? resilientSubmitResult : null,
-      submitContext,
-      payloadSummary
-    });
-
-    await recordSubmitStage('primary_create_failed', diagnostics);
-    try {
-      trackClarityEvent('pro_questionnaire_submit_primary_failed', {
-        failure_kind: resilientSubmitResult.failureKind || 'unknown',
-        status: serialized?.status ?? '',
-        used_fallback: 'false',
-        session_present: String(Boolean(questionnaireSessionId)),
-        domain_present: String(Boolean(resolvedDomain && resolvedDomain !== 'unknown'))
-      });
-    } catch {
-      // no-op
-    }
 
     await recordSubmitStage('submission_create_failed', {
       failureKind: resilientSubmitResult.failureKind,
       usedFallback: resilientSubmitResult.usedFallback,
-      error: serialized,
-      diagnostics
+      error: serialized
     });
 
     const submitFailure = new SubmitFlowError({
@@ -743,30 +609,10 @@ export const submitProQuestionnaire = async ({
       error: serialized
     });
 
-    if (resilientSubmitResult.usedFallback) {
-      await recordSubmitStage('fallback_submit_failed', {
-        failureKind: resilientSubmitResult.failureKind,
-        usedFallback: true,
-        diagnostics
-      });
-      try {
-        trackClarityEvent('pro_questionnaire_submit_fallback_failed', {
-          primary_failure_kind: serialized?.failureKind || resilientSubmitResult.primaryError?.failureKind || 'unknown',
-          fallback_failure_kind: resilientSubmitResult.failureKind || 'unknown',
-          used_fallback: 'true',
-          session_present: String(Boolean(questionnaireSessionId)),
-          domain_present: String(Boolean(resolvedDomain && resolvedDomain !== 'unknown'))
-        });
-      } catch {
-        // no-op
-      }
-    } else {
-      await recordSubmitStage('submit_failed', {
-        failureKind: resilientSubmitResult.failureKind,
-        usedFallback: false,
-        diagnostics
-      });
-    }
+    await recordSubmitStage(resilientSubmitResult.usedFallback ? 'fallback_failed' : 'submit_failed', {
+      failureKind: resilientSubmitResult.failureKind,
+      usedFallback: resilientSubmitResult.usedFallback
+    });
 
     if (typeof onFinalSubmitFailure === 'function') {
       onFinalSubmitFailure({
@@ -782,47 +628,22 @@ export const submitProQuestionnaire = async ({
   }
 
   const savedSubmission = resilientSubmitResult.submission;
-  const successDiagnostics = buildSubmitDiagnostics({
-    questionnaireSessionId,
-    businessName,
-    domain: resolvedDomain,
-    draftId: null,
-    primaryResult: resilientSubmitResult.usedFallback
-      ? {
-          ok: false,
-          failureKind: resilientSubmitResult.primaryError?.failureKind || 'unknown',
-          error: resilientSubmitResult.primaryError || null,
-          usedFallback: false
-        }
-      : { ok: true },
-    fallbackResult: resilientSubmitResult.usedFallback ? resilientSubmitResult : null,
-    submitContext,
-    payloadSummary
-  });
-
+  const receivedViaIntake = Boolean(resilientSubmitResult.receivedViaIntake);
+  const intakeId = resilientSubmitResult.intakeId || '';
   await recordSubmitStage('submission_create_success', {
-    usedFallback: resilientSubmitResult.usedFallback,
-    diagnostics: successDiagnostics
+    usedFallback: resilientSubmitResult.usedFallback
   });
 
   if (resilientSubmitResult.usedFallback) {
-    await recordSubmitStage('fallback_submit_success', { usedFallback: true, diagnostics: successDiagnostics });
-    try {
-      trackClarityEvent('pro_questionnaire_submit_fallback_success', {
-        primary_failure_kind: resilientSubmitResult.primaryError?.failureKind || 'unknown',
-        used_fallback: 'true',
-        session_present: String(Boolean(questionnaireSessionId)),
-        domain_present: String(Boolean(resolvedDomain && resolvedDomain !== 'unknown'))
-      });
-    } catch {
-      // no-op
-    }
+    await recordSubmitStage('fallback_success', { usedFallback: true });
     await createDraftEventSafe({
       createDraftEvent,
-      eventType: 'submit_fallback_success',
+      eventType: receivedViaIntake ? 'submit_received_via_intake' : 'submit_fallback_success',
       value: {
         status: 'submitted',
         used_fallback: true,
+        received_via_intake: receivedViaIntake,
+        intake_id: intakeId,
         final_submission_id: savedSubmission?.id || ''
       }
     });
@@ -861,6 +682,8 @@ export const submitProQuestionnaire = async ({
   if (typeof onFinalSubmitSuccess === 'function') {
     onFinalSubmitSuccess({
       savedSubmission,
+      intakeId,
+      receivedViaIntake,
       responseSnapshot,
       transformedPayload
     });
@@ -868,6 +691,8 @@ export const submitProQuestionnaire = async ({
 
   return {
     savedSubmission,
+    intakeId,
+    receivedViaIntake,
     responseSnapshot,
     transformedPayload
   };
