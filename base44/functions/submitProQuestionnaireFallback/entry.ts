@@ -109,7 +109,11 @@ Deno.serve(async (req) => {
     const transformedPayload = body?.transformedPayload;
     const rawResponses = body?.rawResponses || body?.responseSnapshot || null;
     const questionnaireSessionId = body?.questionnaireSessionId;
-    const primaryError = body?.primaryError || null;
+    const transformFailed = Boolean(body?.transformFailed);
+    const validationFailed = Boolean(body?.validationFailed);
+    const transformError = body?.transformError || null;
+    const validationError = body?.validationError || null;
+    const primaryError = body?.primaryError || validationError || transformError || null;
     const submitContext = body?.submitContext || {};
     const diagnostics = body?.diagnostics || {};
 
@@ -121,7 +125,79 @@ Deno.serve(async (req) => {
       ? normalizePayload(transformedPayload, questionnaireSessionId, primaryError)
       : null;
 
-    if (normalizedPayload?.metadata?.business_name && normalizedPayload?.metadata?.businessDomain) {
+    const shouldSkipFinalCreate =
+      transformFailed ||
+      validationFailed ||
+      !normalizedPayload?.metadata?.business_name ||
+      !normalizedPayload?.metadata?.businessDomain ||
+      !normalizedPayload?.userdata ||
+      typeof normalizedPayload.userdata !== 'object' ||
+      Array.isArray(normalizedPayload.userdata);
+
+    if (shouldSkipFinalCreate) {
+      const fallbackError =
+        transformFailed
+          ? transformError
+          : validationFailed
+            ? validationError
+            : {
+                message: 'Submission payload unavailable for server create',
+                failureKind: 'validation',
+                status: 400,
+                code: 'NO_VALID_TRANSFORMED_PAYLOAD'
+              };
+
+      const intakeReason =
+        transformFailed
+          ? 'payload_transform_failed'
+          : validationFailed
+            ? 'payload_validation_failed'
+            : 'pro_form_submission_create_failed';
+
+      try {
+        const intake = await upsertIntake(
+          base44,
+          questionnaireSessionId,
+          buildIntakePayload({
+            questionnaireSessionId,
+            normalizedPayload,
+            rawResponses,
+            primaryError,
+            fallbackError,
+            diagnostics,
+            submitContext,
+            status: 'received_intake',
+            intakeReason,
+            linkedSubmissionId: '',
+            source: 'server_fallback_intake',
+            zapierSent: false
+          })
+        );
+
+        return Response.json({
+          success: true,
+          received: true,
+          submissionCreated: false,
+          intakeId: intake?.id || '',
+          usedFallback: true,
+          zapierSent: false
+        });
+      } catch (intakeError) {
+        return Response.json({
+          success: false,
+          received: false,
+          usedFallback: true,
+          error: {
+            message: truncate(intakeError?.message || 'Fallback intake failed', 500),
+            failureKind: classifyError(intakeError),
+            status: intakeError?.status ?? intakeError?.response?.status ?? null,
+            code: truncate(intakeError?.code || '', 200)
+          }
+        }, { status: 500 });
+      }
+    }
+
+    if (!shouldSkipFinalCreate) {
       try {
         const submission = await base44.asServiceRole.entities.ProFormSubmission.create(normalizedPayload);
         await upsertIntake(
@@ -213,7 +289,7 @@ Deno.serve(async (req) => {
           normalizedPayload,
           rawResponses,
           primaryError,
-          fallbackError: { message: 'Submission payload unavailable for server create', failureKind: 'validation', status: 400, code: 'NO_TRANSFORMED_PAYLOAD' },
+          fallbackError: { message: 'Submission payload unavailable for server create', failureKind: 'validation', status: 400, code: 'NO_VALID_TRANSFORMED_PAYLOAD' },
           diagnostics,
           submitContext,
           status: 'received_intake',
