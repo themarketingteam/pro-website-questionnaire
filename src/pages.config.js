@@ -50,13 +50,11 @@
 import React, { lazy } from 'react';
 import __Layout from './Layout.jsx';
 
-const Home = lazy(() => import('./pages/Home'));
 const ProQuestionnaire = lazy(() => import('./pages/ProQuestionnaire'));
 const ThankYou = lazy(() => import('./pages/ThankYou'));
 
 
 export const PAGES = {
-    "Home": Home,
     "ProQuestionnaire": ProQuestionnaire,
     "ThankYou": ThankYou,
 }
