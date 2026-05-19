@@ -710,7 +710,19 @@ export const submitProQuestionnaire = async ({
     }
   });
 
-  if (!resilientSubmitResult.zapierSent && transformedPayload) {
+  if (receivedViaIntake) {
+    await createDraftEventSafe({
+      createDraftEvent,
+      eventType: 'submit_received_via_intake_zapier_skipped',
+      value: {
+        status: 'received_intake',
+        intake_id: intakeId,
+        reason: 'No final ProFormSubmission was created; normal final-submission Zapier payload skipped.'
+      }
+    });
+  }
+
+  if (!receivedViaIntake && !resilientSubmitResult.zapierSent && transformedPayload) {
     await sendZapierSafe(transformedPayload);
   }
 
