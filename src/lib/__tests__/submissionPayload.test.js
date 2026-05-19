@@ -429,8 +429,8 @@ describe('submission payload transformation shape safety', () => {
       geographic_area_meta: {
         name: 'Chicago, IL',
         label: 'Chicago, IL',
-        lat: '',
-        lon: '',
+        lat: '41.8781',
+        lon: '-87.6298',
         place_id: '',
         source: 'manual',
         primary: true
