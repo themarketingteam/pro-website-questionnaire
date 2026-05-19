@@ -24,6 +24,20 @@ vi.mock('@/api/base44Client', () => {
           }
 
           if (name === 'submitProQuestionnaireFallback') {
+            const shouldReturnIntake = Boolean(payload?.transformFailed || payload?.validationFailed || !payload?.transformedPayload);
+
+            if (shouldReturnIntake) {
+              return {
+                data: {
+                  success: true,
+                  received: true,
+                  submissionCreated: false,
+                  intakeId: 'fallback-intake-id',
+                  zapierSent: false
+                }
+              };
+            }
+
             return {
               data: {
                 success: true,
