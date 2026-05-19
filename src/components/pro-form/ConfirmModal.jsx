@@ -83,7 +83,8 @@ export default function ConfirmModal({
     try {
       await onConfirm(businessName, cleanDomainForSubmission(domain));
     } catch (err) {
-      setSubmitError(err?.userMessage || "We saved your progress, but final submission could not complete.\n\nPlease try submitting again. If it still does not work, send this recovery code to support so we can recover your questionnaire: unknown-session");
+      const recoveryCode = err?.recoveryCode || 'unknown-session';
+      setSubmitError(err?.userMessage || getSafeRecoveryMessage(recoveryCode));
     } finally {
       submitAttemptRef.current = false;
     }
