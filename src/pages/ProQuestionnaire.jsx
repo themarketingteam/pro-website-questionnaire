@@ -256,9 +256,28 @@ export default function ProQuestionnaire() {
 
         // Only update validation for questions that don't already have a validation status
         // This preserves persisted validation statuses (including AI validation for textareas)
+        const initialStatusUpdates = {};
+
+        QUESTIONS.forEach((q) => {
+          if (q.type === 'yes_no' && responses[q.id] && !validationStatus[q.id]) {
+            initialStatusUpdates[q.id] = computeYesNoParentStatusFromResponses(
+              q,
+              responses[q.id],
+              responses,
+              validationStatus
+            );
+          }
+        });
+
+        Object.entries(initialStatusUpdates).forEach(([questionId, status]) => {
+          if (status) {
+            dispatch(setValidationStatus({ questionId, status }));
+          }
+        });
+
         const questionsToValidate = [];
         QUESTIONS.forEach(q => {
-          if (responses[q.id] && q.type !== 'textarea' && !validationStatus[q.id]) {
+          if (responses[q.id] && q.type !== 'textarea' && q.type !== 'yes_no' && !validationStatus[q.id]) {
             questionsToValidate.push({ id: q.id, value: responses[q.id] });
           }
           if (q.conditionalChildren) {
@@ -460,6 +479,77 @@ export default function ProQuestionnaire() {
     return true;
   };
 
+  const computeYesNoParentStatusFromResponses = (question, parentAnswer, allResponses, currentValidationStatus = {}) => {
+    if (!question || question.type !== 'yes_no') return '';
+
+    if (parentAnswer === 'no') {
+      return 'complete';
+    }
+
+    if (parentAnswer !== 'yes') {
+      return 'incomplete';
+    }
+
+    const requiredChildren = (question.conditionalChildren || []).filter(
+      (child) => child.requiredIfParentYes === true
+    );
+
+    if (requiredChildren.length === 0) {
+      return 'complete';
+    }
+
+    let anyNeedsWork = false;
+
+    for (const child of requiredChildren) {
+      const childStatus = currentValidationStatus[child.id] || '';
+      const childAnswer = allResponses?.[child.id];
+      const childQuestion = getQuestionById(QUESTIONS, child.id);
+
+      if (childStatus === 'needs_work') {
+        anyNeedsWork = true;
+        continue;
+      }
+
+      if (childStatus === 'complete') {
+        continue;
+      }
+
+      if (childQuestion?.type === 'textarea') {
+        if (!String(childAnswer || '').trim()) return 'incomplete';
+        return 'incomplete';
+      }
+
+      if (childQuestion?.type === 'multi_certification') {
+        const items = Array.isArray(childAnswer) ? childAnswer : [];
+        const validItems = items.filter((item) => {
+          return item?.saved === true || (String(item?.name || '').trim() && item?.type && item?.saved !== false);
+        });
+        if (validItems.length === 0) return 'incomplete';
+        continue;
+      }
+
+      if (childQuestion?.type === 'multi_guarantee') {
+        const items = Array.isArray(childAnswer) ? childAnswer : [];
+        const validItems = items.filter((item) => {
+          return item?.saved === true || (
+            String(item?.name || '').trim() &&
+            item?.type &&
+            (item?.file || String(item?.description || '').trim()) &&
+            item?.saved !== false
+          );
+        });
+        if (validItems.length === 0) return 'incomplete';
+        continue;
+      }
+
+      if (!childAnswer) {
+        return 'incomplete';
+      }
+    }
+
+    return anyNeedsWork ? 'needs_work' : 'complete';
+  };
+
   // No more cookie saving - Redux persist handles everything automatically
 
   const updateResponse = useCallback((questionId, value) => {
@@ -615,11 +705,12 @@ export default function ProQuestionnaire() {
       if (parentId) {
         const parentQuestion = getQuestionById(QUESTIONS, parentId);
         const parentAnswer = responses[parentId];
-        const childStatuses = {};
-        (parentQuestion?.conditionalChildren || [])
-          .filter(c => doesChildParticipateInParentCompletion(c))
-          .forEach(c => { childStatuses[c.id] = newStatusSnapshot[c.id] || ''; });
-        const parentNext = computeParentValidationStatus(parentQuestion, parentAnswer, childStatuses);
+        const parentNext = computeYesNoParentStatusFromResponses(
+          parentQuestion,
+          parentAnswer,
+          responses,
+          newStatusSnapshot
+        );
         if (parentNext) {
           const changed = setValidationStatusIfChanged(parentId, parentNext, validationStatus);
           if (changed) {
@@ -660,15 +751,24 @@ export default function ProQuestionnaire() {
           return;
         }
         if (value === 'yes') {
-          const childStatuses = {};
-          (question.conditionalChildren || [])
-            .filter(c => doesChildParticipateInParentCompletion(c))
-            .forEach(c => { childStatuses[c.id] = validationStatus[c.id] || ''; });
-          const parentNext = computeParentValidationStatus(question, value, childStatuses);
+          const parentNext = computeYesNoParentStatusFromResponses(
+            question,
+            value,
+            allResponses,
+            validationStatus
+          );
+
           const changed = setValidationStatusIfChanged(questionId, parentNext, validationStatus);
+
           if (changed) {
-            try { if (devDiagEnabled && devDiagEnabled()) trackParentStatusChange(questionId, parentNext, undefined); } catch {}
+            try {
+              if (devDiagEnabled && devDiagEnabled()) {
+                trackParentStatusChange(questionId, parentNext, undefined);
+              }
+            } catch {}
           }
+
+          break;
         }
         break;
       }
