@@ -8,6 +8,8 @@
     "preview": "vite preview",
     "test": "vitest run --config src/vitest.config.js --passWithNoTests",
     "test:watch": "vitest --config src/vitest.config.js --passWithNoTests",
+    "test:submit-hardening": "vitest run --config src/vitest.config.js src/test/proResponseNormalizers.test.js src/test/submissionPayload.test.js src/lib/__tests__/submissionPayload.test.js src/test/proSubmissionResilience.test.js src/test/clarity.test.js --reporter=dot --no-coverage",
+    "test:all": "vitest run --config src/vitest.config.js --reporter=dot --no-coverage",
     "lint": "echo 'No lint script configured'",
     "check": "npm run lint && npm run test && npm run build"
   }
