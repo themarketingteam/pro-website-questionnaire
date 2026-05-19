@@ -165,6 +165,8 @@ describe('proSubmissionResilience', () => {
       questionnaireSessionId: 'session_456',
       draftId: 'draft_456',
       submitContext: { source: 'test' },
+      maxAttempts: 1,
+      timeoutMs: 100,
       baseDelayMs: 10
     });
 
