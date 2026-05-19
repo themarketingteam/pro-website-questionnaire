@@ -177,14 +177,17 @@ export const repairProSubmissionPayload = (payload) => {
   repairedPayload.userdata = asPlainObject(repairedPayload.userdata);
 
   const originalAdditionalPages = repairedPayload.userdata.additional_pages_list;
-  const repairedAdditionalPages = normalizeAdditionalPagesList(originalAdditionalPages);
+  const repairedAdditionalPagesBase = normalizeAdditionalPagesList(originalAdditionalPages);
+  const repairedAdditionalPages = asPlainObject(repairedAdditionalPagesBase);
 
   if (!isPlainObject(originalAdditionalPages)) {
     warnings.push('additional_pages_list_repaired_to_object');
   }
 
   const existingMeetTheTeamPage = asPlainObject(repairedAdditionalPages.meet_the_team_page);
-  const originalTeamPhoto = existingMeetTheTeamPage.team_photo_with_tags ?? repairedPayload.userdata.team_photo_with_tags;
+  const originalTeamPhoto =
+    existingMeetTheTeamPage.team_photo_with_tags ??
+    repairedPayload.userdata.team_photo_with_tags;
 
   const repairedTeamPhoto = asPlainObject(originalTeamPhoto);
 
@@ -192,13 +195,31 @@ export const repairProSubmissionPayload = (payload) => {
     warnings.push('team_photo_repaired_to_object');
   }
 
+  const repairedMeetTheTeamPage = {
+    ...existingMeetTheTeamPage,
+    team_photo_with_tags: repairedTeamPhoto
+  };
+
   repairedPayload.userdata.additional_pages_list = {
     ...repairedAdditionalPages,
-    meet_the_team_page: {
-      ...existingMeetTheTeamPage,
-      team_photo_with_tags: repairedTeamPhoto
-    }
+    meet_the_team_page: repairedMeetTheTeamPage
   };
+
+  if (
+    Array.isArray(originalAdditionalPages) &&
+    !Array.isArray(repairedPayload.userdata.additional_pages_list.items)
+  ) {
+    repairedPayload.userdata.additional_pages_list.items = normalizeStringSelectionList(originalAdditionalPages);
+    warnings.push('additional_pages_items_restored');
+  }
+
+  if (
+    typeof originalAdditionalPages === 'string' &&
+    !Array.isArray(repairedPayload.userdata.additional_pages_list.items)
+  ) {
+    repairedPayload.userdata.additional_pages_list.items = normalizeStringSelectionList(originalAdditionalPages);
+    warnings.push('additional_pages_items_restored');
+  }
 
   repairedPayload.userdata.team_photo_with_tags = repairedTeamPhoto;
 
