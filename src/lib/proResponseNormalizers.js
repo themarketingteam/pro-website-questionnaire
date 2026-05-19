@@ -133,29 +133,17 @@ const toFiniteNumberOrNull = (value) => {
 
 const firstDefined = (...values) => values.find((value) => value !== undefined && value !== null && value !== '');
 
+const assignIfPresent = (target, key, value) => {
+  if (value === undefined || value === null || value === '') return;
+  target[key] = value;
+};
+
 export const normalizeGeographicAreas = (value) => {
   return asArray(value)
     .map((item) => {
       if (typeof item === 'string' || typeof item === 'number') {
         const label = asTrimmedString(item);
-        return label
-          ? {
-              label,
-              name: label,
-              city: '',
-              state: '',
-              region: '',
-              county: '',
-              zip: '',
-              radius: null,
-              latitude: null,
-              longitude: null,
-              place_id: '',
-              source: 'manual',
-              type: '',
-              primary: false
-            }
-          : null;
+        return label ? { label } : null;
       }
 
       const safeItem = asPlainObject(item);
@@ -186,57 +174,45 @@ export const normalizeGeographicAreas = (value) => {
         meta.city
       ));
 
-      const latitude = toFiniteNumberOrNull(firstDefined(
-        safeItem.latitude,
-        safeItem.lat,
-        meta.latitude,
-        meta.lat
-      ));
+      const normalized = {};
 
-      const longitude = toFiniteNumberOrNull(firstDefined(
-        safeItem.longitude,
-        safeItem.lon,
-        safeItem.lng,
-        meta.longitude,
-        meta.lon,
-        meta.lng
-      ));
+      assignIfPresent(normalized, 'label', label);
+      assignIfPresent(normalized, 'name', name);
+      assignIfPresent(normalized, 'city', asTrimmedString(firstDefined(safeItem.city, meta.city)));
+      assignIfPresent(normalized, 'state', asTrimmedString(firstDefined(safeItem.state, meta.state)));
+      assignIfPresent(normalized, 'region', asTrimmedString(firstDefined(safeItem.region, meta.region)));
+      assignIfPresent(normalized, 'county', asTrimmedString(firstDefined(safeItem.county, meta.county)));
+      assignIfPresent(normalized, 'zip', asTrimmedString(firstDefined(
+        safeItem.zip,
+        safeItem.postalCode,
+        safeItem.postal_code,
+        meta.zip,
+        meta.postalCode,
+        meta.postal_code
+      )));
 
-      const radius = toFiniteNumberOrNull(firstDefined(
-        safeItem.radius,
-        meta.radius
-      ));
+      const latitude = toFiniteNumberOrNull(firstDefined(safeItem.latitude, safeItem.lat, meta.latitude, meta.lat));
+      const longitude = toFiniteNumberOrNull(firstDefined(safeItem.longitude, safeItem.lon, safeItem.lng, meta.longitude, meta.lon, meta.lng));
+      const radius = toFiniteNumberOrNull(firstDefined(safeItem.radius, meta.radius));
 
-      const normalized = {
-        label,
-        name,
-        city: asTrimmedString(firstDefined(safeItem.city, meta.city)),
-        state: asTrimmedString(firstDefined(safeItem.state, meta.state)),
-        region: asTrimmedString(firstDefined(safeItem.region, meta.region)),
-        county: asTrimmedString(firstDefined(safeItem.county, meta.county)),
-        zip: asTrimmedString(firstDefined(
-          safeItem.zip,
-          safeItem.postalCode,
-          safeItem.postal_code,
-          meta.zip,
-          meta.postalCode,
-          meta.postal_code
-        )),
-        radius,
-        latitude,
-        longitude,
-        place_id: asTrimmedString(firstDefined(
-          safeItem.place_id,
-          safeItem.placeId,
-          meta.place_id,
-          meta.placeId
-        )),
-        source: asTrimmedString(firstDefined(safeItem.source, meta.source)) || 'manual',
-        type: asTrimmedString(firstDefined(safeItem.type, meta.type)),
-        primary: asBoolean(firstDefined(safeItem.primary, meta.primary), false)
-      };
+      if (latitude != null) normalized.latitude = latitude;
+      if (longitude != null) normalized.longitude = longitude;
+      if (radius != null) normalized.radius = radius;
 
-      return normalized.label || normalized.name ? normalized : null;
+      assignIfPresent(normalized, 'place_id', asTrimmedString(firstDefined(
+        safeItem.place_id,
+        safeItem.placeId,
+        meta.place_id,
+        meta.placeId
+      )));
+      assignIfPresent(normalized, 'source', asTrimmedString(firstDefined(safeItem.source, meta.source)));
+      assignIfPresent(normalized, 'type', asTrimmedString(firstDefined(safeItem.type, meta.type)));
+
+      if (safeItem.primary !== undefined || meta.primary !== undefined) {
+        normalized.primary = asBoolean(firstDefined(safeItem.primary, meta.primary), false);
+      }
+
+      return Object.keys(normalized).length ? normalized : null;
     })
     .filter(Boolean);
 };
@@ -280,9 +256,24 @@ export const asPlainObject = (value) => (isPlainObject(value) ? value : {});
 
 const pickSafeFileShape = (value, extraKeys = []) => {
   const source = asPlainObject(value);
+  if (!Object.keys(source).length) return null;
+
+  const nestedSource = asPlainObject(
+    source.file ||
+    source.upload ||
+    source.response ||
+    source.data ||
+    source.asset
+  );
+
   const safeFile = {};
   const allowedKeys = [
     'url',
+    'file_url',
+    'fileUrl',
+    'image_url',
+    'imageUrl',
+    'src',
     'name',
     'fileName',
     'filename',
@@ -294,36 +285,62 @@ const pickSafeFileShape = (value, extraKeys = []) => {
   ];
 
   allowedKeys.forEach((key) => {
-    const currentValue = source[key];
+    const currentValue = source[key] ?? nestedSource[key];
     if (currentValue == null) return;
 
     if (key === 'size') {
       const size = Number(currentValue);
-      if (Number.isFinite(size)) safeFile[key] = size;
+      if (Number.isFinite(size)) safeFile.size = size;
       return;
     }
 
     if (key === 'tags' && Array.isArray(currentValue)) {
       const tags = asStringArray(currentValue);
-      if (tags.length) safeFile[key] = tags;
+      if (tags.length) safeFile.tags = tags;
       return;
     }
 
     const normalized = asTrimmedString(currentValue);
-    if (normalized) safeFile[key] = normalized;
+    if (!normalized) return;
+
+    if (['file_url', 'fileUrl', 'image_url', 'imageUrl', 'src'].includes(key)) {
+      if (!safeFile.url) safeFile.url = normalized;
+      return;
+    }
+
+    safeFile[key] = normalized;
   });
 
-  if (!safeFile.url) {
-    safeFile.url = asTrimmedString(
-      source.url || source.file_url || source.fileUrl || source.imageUrl || source.src
-    );
-  }
+  const fallbackUrl = asTrimmedString(
+    source.url ||
+    source.file_url ||
+    source.fileUrl ||
+    source.image_url ||
+    source.imageUrl ||
+    source.src ||
+    nestedSource.url ||
+    nestedSource.file_url ||
+    nestedSource.fileUrl ||
+    nestedSource.image_url ||
+    nestedSource.imageUrl ||
+    nestedSource.src
+  );
 
-  if (!safeFile.name) {
-    safeFile.name = asTrimmedString(
-      source.name || source.fileName || source.filename || source.originalName || source.label
-    );
-  }
+  const fallbackName = asTrimmedString(
+    source.name ||
+    source.fileName ||
+    source.filename ||
+    source.originalName ||
+    source.label ||
+    nestedSource.name ||
+    nestedSource.fileName ||
+    nestedSource.filename ||
+    nestedSource.originalName ||
+    nestedSource.label
+  );
+
+  if (fallbackUrl && !safeFile.url) safeFile.url = fallbackUrl;
+  if (fallbackName && !safeFile.name) safeFile.name = fallbackName;
 
   return Object.keys(safeFile).length ? safeFile : null;
 };
@@ -370,9 +387,9 @@ const normalizeTaggedPerson = (value) => {
   const y = toFiniteNumberOrNull(safeValue.y);
 
   const normalizedPerson = {
-    name: asTrimmedString(person.name || safeValue.name || safeValue.label),
-    position: asTrimmedString(person.position || person.title || safeValue.position || safeValue.title),
-    bio: asTrimmedString(person.bio || safeValue.bio)
+  name: asTrimmedString(person.name || safeValue.name || safeValue.label),
+  position: asTrimmedString(person.position || person.title || safeValue.position || safeValue.title),
+  bio: asTrimmedString(person.bio || safeValue.bio)
   };
 
   const hasPersonData = Boolean(
@@ -396,6 +413,17 @@ const normalizeTaggedPeople = (value) => {
   return asArray(value)
     .map(normalizeTaggedPerson)
     .filter(Boolean);
+};
+
+const isTaggedPersonShape = (item) => {
+  const safeItem = asPlainObject(item);
+  return (
+    safeItem.x !== undefined ||
+    safeItem.y !== undefined ||
+    safeItem.person !== undefined ||
+    safeItem.position !== undefined ||
+    safeItem.bio !== undefined
+  );
 };
 
 const normalizeTeamPhotoTagValue = (value) => {
@@ -457,15 +485,20 @@ export const normalizeTeamPhotoWithTags = (value) => {
     primaryFile?.name
   );
 
-  const rawTagSource = safeObject.taggedPeople || safeObject.tags || safeObject.peopleTags || [];
-  const rawTagArray = asArray(rawTagSource);
+  const rawTagArray = [
+    ...asArray(safeObject.taggedPeople),
+    ...asArray(safeObject.peopleTags),
+    ...asArray(safeObject.tags),
+    ...asArray(safeObject.selectedTags),
+    ...asArray(safeObject.selected_tags)
+  ];
 
   const taggedPeople = normalizeTaggedPeople(
-    rawTagArray.filter((item) => item && typeof item === 'object')
+    rawTagArray.filter((item) => item && typeof item === 'object' && isTaggedPersonShape(item))
   );
 
   const tags = rawTagArray
-    .filter((item) => typeof item !== 'object' || item == null)
+    .filter((item) => !(item && typeof item === 'object' && isTaggedPersonShape(item)))
     .map(normalizeTeamPhotoTagValue)
     .filter(Boolean)
     .filter((tag, index, array) => array.indexOf(tag) === index)

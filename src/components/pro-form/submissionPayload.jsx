@@ -4,7 +4,7 @@ import {
   asSafeFileList,
   asTrimmedString,
   normalizeAdditionalPagesList,
-  normalizeGeographicAreas,
+  normalizeGeographicAreas as normalizeGeographicAreasRaw,
   normalizeIndustrySelections,
   normalizeQuestionnaireResponses,
   normalizeServiceSelections,
@@ -21,8 +21,8 @@ export const serializeError = (error) => ({
 });
 
 
-export const normalizeGeographicAreasForPayload = (locations = [], primaryIndex = 0) =>
-  normalizeGeographicAreas(locations)
+export const normalizeGeographicAreas = (locations = [], primaryIndex = 0) =>
+  normalizeGeographicAreasRaw(locations)
     .map((location, index) => {
       const safeLocation = asPlainObject(location);
 
@@ -43,6 +43,8 @@ export const normalizeGeographicAreasForPayload = (locations = [], primaryIndex 
         item.geographic_area_meta.name ||
         item.geographic_area_meta.label
     );
+
+export const normalizeGeographicAreasForPayload = normalizeGeographicAreas;
 
 export const normalizeCertifications = (items = []) =>
   asArray(items)
@@ -136,7 +138,8 @@ export const normalizeGuarantees = (items = []) =>
         safeItem.url ||
         safeItem.guarantee_file_url ||
         file.url ||
-        file.file_url
+        file.file_url ||
+        file.fileUrl
       );
 
       const guaranteeFileName = asTrimmedString(

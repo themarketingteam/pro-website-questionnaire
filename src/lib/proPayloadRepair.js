@@ -177,19 +177,30 @@ export const repairProSubmissionPayload = (payload) => {
   repairedPayload.userdata = asPlainObject(repairedPayload.userdata);
 
   const originalAdditionalPages = repairedPayload.userdata.additional_pages_list;
-  repairedPayload.userdata.additional_pages_list = normalizeAdditionalPagesList(originalAdditionalPages);
-  if (originalAdditionalPages !== repairedPayload.userdata.additional_pages_list && !isPlainObject(originalAdditionalPages)) {
+  const repairedAdditionalPages = normalizeAdditionalPagesList(originalAdditionalPages);
+
+  if (!isPlainObject(originalAdditionalPages)) {
     warnings.push('additional_pages_list_repaired_to_object');
   }
 
-  const meetTheTeamPage = asPlainObject(repairedPayload.userdata.additional_pages_list.meet_the_team_page);
-  const originalTeamPhoto = meetTheTeamPage.team_photo_with_tags ?? repairedPayload.userdata.team_photo_with_tags;
-  meetTheTeamPage.team_photo_with_tags = asPlainObject(originalTeamPhoto);
+  const existingMeetTheTeamPage = asPlainObject(repairedAdditionalPages.meet_the_team_page);
+  const originalTeamPhoto = existingMeetTheTeamPage.team_photo_with_tags ?? repairedPayload.userdata.team_photo_with_tags;
+
+  const repairedTeamPhoto = asPlainObject(originalTeamPhoto);
+
   if (!isPlainObject(originalTeamPhoto)) {
     warnings.push('team_photo_repaired_to_object');
   }
-  repairedPayload.userdata.additional_pages_list.meet_the_team_page = meetTheTeamPage;
-  repairedPayload.userdata.team_photo_with_tags = meetTheTeamPage.team_photo_with_tags;
+
+  repairedPayload.userdata.additional_pages_list = {
+    ...repairedAdditionalPages,
+    meet_the_team_page: {
+      ...existingMeetTheTeamPage,
+      team_photo_with_tags: repairedTeamPhoto
+    }
+  };
+
+  repairedPayload.userdata.team_photo_with_tags = repairedTeamPhoto;
 
   STRING_ARRAY_FIELDS.forEach((field) => {
     const originalValue = repairedPayload.userdata[field];
