@@ -44,6 +44,30 @@ describe('proResponseNormalizers', () => {
     }, 'Acme', 'acme.com', { Security: ['Firewall Management'] })).not.toThrow();
   });
 
+  it('preserves structured uploads for certifications and guarantees', () => {
+    const normalized = normalizeQuestionnaireResponses({
+      '12.1': [{
+        name: 'Microsoft Partner',
+        type: 'partnership',
+        image: { url: 'https://example.test/logo.png', file_url: 'https://example.test/logo-file.png' },
+        supporting_files: [{ url: 'https://example.test/support.pdf' }],
+        cert_item_files: [{ url: 'https://example.test/cert.pdf' }]
+      }],
+      '14.1': [{
+        name: 'Response SLA',
+        type: 'sla',
+        file: { fileUrl: 'https://example.test/sla.pdf', fileName: 'sla.pdf' },
+        description: 'Fast response'
+      }]
+    });
+
+    expect(normalized['12.1'][0].image.url).toBe('https://example.test/logo.png');
+    expect(normalized['12.1'][0].supporting_files[0].url).toBe('https://example.test/support.pdf');
+    expect(normalized['12.1'][0].cert_item_files[0].url).toBe('https://example.test/cert.pdf');
+    expect(normalized['14.1'][0].file.fileUrl).toBe('https://example.test/sla.pdf');
+    expect(normalized['14.1'][0].description).toBe('Fast response');
+  });
+
   it('handles service selections with object entries', () => {
     const payload = transformResponsesToPayload({
       '3': [{ value: 'CATEGORY:Security' }, { label: 'Help Desk' }]

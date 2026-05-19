@@ -1,6 +1,7 @@
 import {
   asArray,
   asPlainObject,
+  asTrimmedString,
   normalizeAdditionalPagesList,
   normalizeGeographicAreas,
   normalizeIndustrySelections,
@@ -36,12 +37,26 @@ const isPlainObject = (value) => {
 };
 
 const isFileLikeObject = (value) => {
-  if (!value || typeof value !== 'object') return false;
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+
   const tag = value?.constructor?.name || '';
-  return ['File', 'Blob', 'ArrayBuffer'].includes(tag)
-    || typeof value.arrayBuffer === 'function'
-    || typeof value.stream === 'function'
-    || typeof value.slice === 'function';
+
+  if (['File', 'Blob', 'ArrayBuffer'].includes(tag)) return true;
+
+  if (typeof File !== 'undefined' && value instanceof File) return true;
+  if (typeof Blob !== 'undefined' && value instanceof Blob) return true;
+  if (typeof ArrayBuffer !== 'undefined' && value instanceof ArrayBuffer) return true;
+
+  const hasBinaryMethods =
+    typeof value.arrayBuffer === 'function' ||
+    typeof value.stream === 'function';
+
+  const hasFileMetadata =
+    typeof value.size === 'number' ||
+    typeof value.type === 'string' ||
+    typeof value.name === 'string';
+
+  return hasBinaryMethods && hasFileMetadata;
 };
 
 const cloneWithoutMutation = (value, seen = new WeakMap()) => {
@@ -168,6 +183,52 @@ export const validateRequiredSubmissionMetadata = (payload) => {
   return errors;
 };
 
+const normalizeGeographicAreasForPayloadRepair = (value) => {
+  return asArray(value)
+    .flatMap((item, index) => {
+      const safeItem = asPlainObject(item);
+      const existingMeta = asPlainObject(safeItem.geographic_area_meta);
+
+      if (Object.keys(existingMeta).length > 0) {
+        const repairedMeta = {
+          name: asTrimmedString(existingMeta.name || existingMeta.label),
+          label: asTrimmedString(existingMeta.label || existingMeta.name),
+          lat: asTrimmedString(existingMeta.lat ?? existingMeta.latitude ?? ''),
+          lon: asTrimmedString(existingMeta.lon ?? existingMeta.lng ?? existingMeta.longitude ?? ''),
+          place_id: asTrimmedString(existingMeta.place_id || existingMeta.placeId),
+          source: asTrimmedString(existingMeta.source) || 'manual',
+          primary: Boolean(existingMeta.primary)
+        };
+
+        if (!repairedMeta.name && !repairedMeta.label) return [];
+
+        return [{ geographic_area_meta: repairedMeta }];
+      }
+
+      const normalizedRawAreas = normalizeGeographicAreas(item);
+
+      return normalizedRawAreas
+        .map((area, rawIndex) => {
+          const safeArea = asPlainObject(area);
+
+          const repairedMeta = {
+            name: asTrimmedString(safeArea.name || safeArea.label || safeArea.city),
+            label: asTrimmedString(safeArea.label || safeArea.name || safeArea.city),
+            lat: safeArea.latitude != null ? String(safeArea.latitude) : '',
+            lon: safeArea.longitude != null ? String(safeArea.longitude) : '',
+            place_id: asTrimmedString(safeArea.place_id || safeArea.placeId),
+            source: asTrimmedString(safeArea.source) || 'manual',
+            primary: Boolean(safeArea.primary) || (index === 0 && rawIndex === 0)
+          };
+
+          if (!repairedMeta.name && !repairedMeta.label) return null;
+
+          return { geographic_area_meta: repairedMeta };
+        })
+        .filter(Boolean);
+    });
+};
+
 export const repairProSubmissionPayload = (payload) => {
   const warnings = [];
   const clonedPayload = cloneWithoutMutation(payload) || {};
@@ -245,7 +306,9 @@ export const repairProSubmissionPayload = (payload) => {
   OBJECT_ARRAY_FIELDS.forEach((field) => {
     const originalValue = repairedPayload.userdata[field];
 
-    if (field === 'geographic_areas' || field === 'service_areas') {
+    if (field === 'geographic_areas') {
+      repairedPayload.userdata[field] = normalizeGeographicAreasForPayloadRepair(originalValue);
+    } else if (field === 'service_areas') {
       repairedPayload.userdata[field] = normalizeGeographicAreas(originalValue);
     } else {
       repairedPayload.userdata[field] = asArray(originalValue)

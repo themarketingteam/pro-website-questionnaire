@@ -308,9 +308,30 @@ export const validateSubmissionPayload = (payload) => {
     }
   }
 
+  const geographicAreas = payload.userdata?.geographic_areas;
+
+  if (Array.isArray(geographicAreas)) {
+    geographicAreas.forEach((item, index) => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        errors.push(`userdata.geographic_areas[${index}] must be an object.`);
+        return;
+      }
+
+      if (!item.geographic_area_meta || typeof item.geographic_area_meta !== 'object' || Array.isArray(item.geographic_area_meta)) {
+        errors.push(`userdata.geographic_areas[${index}].geographic_area_meta must be an object.`);
+      }
+    });
+  }
+
   const teamPhoto = payload.userdata?.additional_pages_list?.meet_the_team_page?.team_photo_with_tags;
   if (!teamPhoto || typeof teamPhoto !== 'object') {
     errors.push('userdata.additional_pages_list.meet_the_team_page.team_photo_with_tags must be an object.');
+  }
+
+  const taggedPeople = teamPhoto?.taggedPeople;
+
+  if (taggedPeople != null && !Array.isArray(taggedPeople)) {
+    errors.push('userdata.additional_pages_list.meet_the_team_page.team_photo_with_tags.taggedPeople must be an array when provided.');
   }
 
   return { ok: errors.length === 0, errors };

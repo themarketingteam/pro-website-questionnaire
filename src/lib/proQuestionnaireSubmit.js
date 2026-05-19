@@ -133,9 +133,44 @@ export const createDraftEventSafe = async ({
   }
 };
 
-export const sendZapierSafe = async (transformedPayload) => {
+const withClientTimeout = (promiseFactory, timeoutMs = 5000) => {
+  let timeoutId;
+  const timerApi = typeof window !== 'undefined' ? window : globalThis;
+
+  return new Promise((resolve, reject) => {
+    timeoutId = timerApi.setTimeout(() => {
+      reject(new Error(`Client operation timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    Promise.resolve()
+      .then(() => promiseFactory())
+      .then((result) => {
+        timerApi.clearTimeout(timeoutId);
+        resolve(result);
+      })
+      .catch((error) => {
+        timerApi.clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+};
+
+export const sendZapierSafe = async (transformedPayload, options = {}) => {
+  const timeoutMs = options.timeoutMs || 5000;
+
   try {
-    await base44.functions.invoke('sendToZapier', transformedPayload);
+    const response = await withClientTimeout(
+      () => base44.functions.invoke('sendToZapier', transformedPayload),
+      timeoutMs
+    );
+
+    if (response?.data?.success === false) {
+      return {
+        ok: false,
+        error: serializeSubmitError(response.data.error || new Error('Zapier function returned success:false'))
+      };
+    }
+
     return { ok: true };
   } catch (error) {
     console.error(
@@ -723,7 +758,31 @@ export const submitProQuestionnaire = async ({
   }
 
   if (!receivedViaIntake && !resilientSubmitResult.zapierSent && transformedPayload) {
-    await sendZapierSafe(transformedPayload);
+    sendZapierSafe(transformedPayload, { timeoutMs: 5000 })
+      .then((zapierResult) => {
+        if (!zapierResult.ok) {
+          createDraftEventSafe({
+            createDraftEvent,
+            eventType: 'zapier_delivery_failed_after_submit',
+            value: {
+              status: 'zapier_failed',
+              final_submission_id: savedSubmission?.id || '',
+              failureKind: zapierResult.error?.failureKind || 'unknown'
+            }
+          });
+        }
+      })
+      .catch((error) => {
+        createDraftEventSafe({
+          createDraftEvent,
+          eventType: 'zapier_delivery_failed_after_submit',
+          value: {
+            status: 'zapier_failed',
+            final_submission_id: savedSubmission?.id || '',
+            failureKind: serializeSubmitError(error).failureKind
+          }
+        });
+      });
   }
 
   await recordSubmitStage('submit_success', {

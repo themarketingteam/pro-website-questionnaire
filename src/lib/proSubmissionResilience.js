@@ -25,7 +25,12 @@ const getErrorMessage = (error) => {
   return truncateString(error?.message ?? String(error ?? 'Unknown error'), MAX_MESSAGE_LENGTH);
 };
 
-const delay = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+const getTimerApi = () => {
+  if (typeof window !== 'undefined' && typeof window.setTimeout === 'function') return window;
+  return globalThis;
+};
+
+const delay = (ms) => new Promise((resolve) => getTimerApi().setTimeout(resolve, ms));
 
 const createDevSimulatedError = (mode) => {
   const error = new Error(`DEV_ONLY_SIMULATED_SUBMIT_FAILURE: ${mode}`);
@@ -139,23 +144,60 @@ export const isRetryableSubmitError = (error) => {
 
 export const withTimeout = (promiseFactory, timeoutMs = DEFAULT_TIMEOUT_MS) => {
   let timeoutId;
+  const timerApi = getTimerApi();
 
   return new Promise((resolve, reject) => {
-    timeoutId = window.setTimeout(() => {
+    timeoutId = timerApi.setTimeout(() => {
       reject(new TimeoutError(`Request timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
     Promise.resolve()
       .then(() => promiseFactory())
       .then((result) => {
-        window.clearTimeout(timeoutId);
+        timerApi.clearTimeout(timeoutId);
         resolve(result);
       })
       .catch((error) => {
-        window.clearTimeout(timeoutId);
+        timerApi.clearTimeout(timeoutId);
         reject(error);
       });
   });
+};
+
+const invokeSubmitFallbackWithRetry = async (body, options = {}) => {
+  const {
+    attempts = 2,
+    timeoutMs = 15000,
+    baseDelayMs = 750,
+    debugFailureMode = null
+  } = options;
+
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      if (import.meta.env.DEV && debugFailureMode === 'fallback_create') {
+        throw createDevSimulatedError('fallback_create');
+      }
+
+      return await withTimeout(
+        () => base44.functions.invoke('submitProQuestionnaireFallback', body),
+        timeoutMs
+      );
+    } catch (error) {
+      lastError = error;
+      const willRetry = attempt < attempts && isRetryableSubmitError(error);
+
+      if (!willRetry) {
+        throw error;
+      }
+
+      const jitter = Math.floor(Math.random() * 200);
+      await delay(baseDelayMs * attempt + jitter);
+    }
+  }
+
+  throw lastError || new Error('Fallback submission failed');
 };
 
 export const createProFormSubmissionResilient = async (payload, options = {}) => {
@@ -361,11 +403,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
     }
 
     try {
-      if (import.meta.env.DEV && debugFailureMode === 'fallback_create') {
-        throw createDevSimulatedError('fallback_create');
-      }
-
-      const response = await base44.functions.invoke('submitProQuestionnaireFallback', {
+      const response = await invokeSubmitFallbackWithRetry({
         transformedPayload: null,
         responseSnapshot,
         rawResponses,
@@ -378,6 +416,10 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
         primaryError: transformError || validationError,
         submitContext,
         diagnostics: null
+      }, {
+        attempts: 2,
+        timeoutMs: resilientOptions.timeoutMs || DEFAULT_TIMEOUT_MS,
+        debugFailureMode
       });
 
       const data = response?.data;
@@ -450,19 +492,23 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
   }
 
   try {
-    if (import.meta.env.DEV && debugFailureMode === 'fallback_create') {
-      throw createDevSimulatedError('fallback_create');
-    }
-
-    const response = await base44.functions.invoke('submitProQuestionnaireFallback', {
+    const response = await invokeSubmitFallbackWithRetry({
       transformedPayload: payload,
       responseSnapshot,
       rawResponses,
+      transformFailed,
+      transformError,
+      validationFailed,
+      validationError,
       questionnaireSessionId,
       draftId,
-      primaryError: primaryResult.error,
+      primaryError: primaryResult.error || transformError || validationError,
       submitContext,
       diagnostics: null
+    }, {
+      attempts: 2,
+      timeoutMs: resilientOptions.timeoutMs || DEFAULT_TIMEOUT_MS,
+      debugFailureMode
     });
 
     const data = response?.data;

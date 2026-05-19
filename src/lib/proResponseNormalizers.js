@@ -405,6 +405,9 @@ const normalizeTaggedPerson = (value) => {
   return {
     x,
     y,
+    name: normalizedPerson.name,
+    position: normalizedPerson.position,
+    bio: normalizedPerson.bio,
     person: normalizedPerson
   };
 };
@@ -540,7 +543,8 @@ const normalizeYesNo = (questionId, value) => {
 const MULTI_SELECT_IDS = new Set(['3', '3_other', '4', '4_other', '8', '10', '16', '18', '18_other', '20', '20_other']);
 const TEXT_IDS = new Set(['1.1', '2.1', '6', '7', '7_other', '8_other', '9', '10_other', '11', '11_other', '13', '15', '15_other', '16_other', '17', '19', '21', '22', '23.1', '24', '24_other', '25.1']);
 const YES_NO_IDS = new Set(['1', '2', '12', '14', '23', '25']);
-const FILE_LIST_IDS = new Set(['12.1', '14.1']);
+const FILE_LIST_IDS = new Set([]);
+const STRUCTURED_UPLOAD_LIST_IDS = new Set(['12.1', '14.1']);
 const OBJECT_IDS = new Set(['2.2']);
 const GEOGRAPHIC_IDS = new Set(['5']);
 
@@ -578,6 +582,27 @@ export const normalizeQuestionnaireResponses = (responses) => {
       if (!Array.isArray(value)) {
         addWarning(questionId, 'Normalized file list answer shape.', value, 'safe_file_list');
       }
+      normalizedResponses[questionId] = nextValue;
+      return;
+    }
+
+    if (STRUCTURED_UPLOAD_LIST_IDS.has(questionId)) {
+      const nextValue = asArray(value)
+        .map((item) => {
+          if (typeof item === 'string') {
+            const normalized = asTrimmedString(item);
+            return normalized ? { url: normalized } : null;
+          }
+
+          const safeItem = asPlainObject(item);
+          return Object.keys(safeItem).length ? safeItem : null;
+        })
+        .filter(Boolean);
+
+      if (!Array.isArray(value)) {
+        addWarning(questionId, 'Normalized structured upload answer shape.', value, 'structured_upload_list');
+      }
+
       normalizedResponses[questionId] = nextValue;
       return;
     }

@@ -425,6 +425,17 @@ describe('submission payload transformation shape safety', () => {
     expect(result.payload.userdata.target_industries).toEqual(['Healthcare']);
     expect(result.payload.userdata.locations).toEqual(['Chicago, IL']);
     expect(Array.isArray(result.payload.userdata.geographic_areas)).toBe(true);
+    expect(result.payload.userdata.geographic_areas[0]).toEqual({
+      geographic_area_meta: {
+        name: 'Chicago, IL',
+        label: 'Chicago, IL',
+        lat: '',
+        lon: '',
+        place_id: '',
+        source: 'manual',
+        primary: true
+      }
+    });
     expect(result.warnings.length).toBeGreaterThan(0);
     expect(validateSubmissionPayload(result.payload).ok).toBe(true);
   });
