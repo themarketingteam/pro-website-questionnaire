@@ -746,13 +746,18 @@ export const submitProQuestionnaire = async ({
   });
 
   if (receivedViaIntake) {
-    await createDraftEventSafe({
+    createDraftEventSafe({
       createDraftEvent,
-      eventType: 'submit_received_via_intake_zapier_skipped',
+      eventType: 'submit_received_via_intake',
       value: {
         status: 'received_intake',
-        intake_id: intakeId,
-        reason: 'No final ProFormSubmission was created; normal final-submission Zapier payload skipped.'
+        intake_id: intakeId || resilientSubmitResult?.intakeId || '',
+        questionnaire_session_id: questionnaireSessionId || '',
+        business_name: businessName || '',
+        domain: domain || credentials?.domain || domainParam || '',
+        used_fallback: true,
+        zapier_skipped: true,
+        reason: 'Client was allowed to continue because a durable intake record was created instead of a final ProFormSubmission.'
       }
     });
   }
