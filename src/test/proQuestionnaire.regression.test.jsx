@@ -18,44 +18,6 @@ import {
   createSaveDraftSnapshot
 } from '@/lib/draftPersistence';
 
-// Mock base44 SDK
-vi.mock('@/api/base44Client', () => {
-  return {
-    base44: {
-      functions: {
-        invoke: vi.fn(),
-      },
-      entities: {
-        ProFormSubmission: { create: vi.fn().mockResolvedValue({ id: 'x' }) },
-        ProFormDraft: {
-          filter: vi.fn().mockResolvedValue([]),
-          list: vi.fn().mockResolvedValue([]),
-          create: vi.fn().mockResolvedValue({ id: 'draft-1' }),
-          update: vi.fn().mockResolvedValue({ id: 'draft-1' })
-        },
-        ProFormDraftEvent: {
-          create: vi.fn().mockResolvedValue({ id: 'event-1' }),
-          update: vi.fn().mockResolvedValue({ id: 'event-1' }),
-          filter: vi.fn().mockResolvedValue([]),
-          list: vi.fn().mockResolvedValue([])
-        },
-        ProFormSubmissionIntake: {
-          create: vi.fn().mockResolvedValue({ id: 'intake-1' }),
-          update: vi.fn().mockResolvedValue({ id: 'intake-1' }),
-          filter: vi.fn().mockResolvedValue([]),
-          list: vi.fn().mockResolvedValue([])
-        }
-      },
-      auth: {
-        isAuthenticated: vi.fn().mockResolvedValue(true),
-        me: vi.fn().mockResolvedValue({ email: 'test@example.com' }),
-      },
-      analytics: { track: vi.fn() },
-      connectors: { connectAppUser: vi.fn(), disconnectAppUser: vi.fn() },
-      users: { inviteUser: vi.fn() }
-    },
-  };
-});
 
 let base44;
 beforeAll(async () => {
@@ -164,8 +126,9 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
         responses: { '23': 'yes', '23.1': 'text' },
         validationStatus: {},
         touchedQuestions: {},
-        expandedQuestions: { '23': true },
+        expandedQuestions: { '23': true, '23.1': true },
         credentials: {},
+        textValidationMeta: {}
       },
     };
 
@@ -174,8 +137,9 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     const submit = await screen.findByRole('button', { name: /submit questionnaire/i });
     await user.click(submit);
 
-    const status = store.getState().form.validationStatus['23.1'];
-    expect(status).toBe('incomplete');
+    await waitFor(() => {
+      expect(store.getState().form.validationStatus['23.1']).toBe('incomplete');
+    });
   });
 
   it('Q24 normal radio option completes after one click', async () => {

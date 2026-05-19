@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom';
-import { vi } from 'vitest';
+import { cleanup } from '@testing-library/react';
+import { afterEach, vi } from 'vitest';
 
 vi.mock('@/api/base44Client', () => {
   const createMockEntity = () => ({
@@ -102,4 +103,12 @@ Object.defineProperty(window, 'matchMedia', {
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
   })),
+});
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+  vi.clearAllTimers();
+  localStorage.clear();
+  sessionStorage.clear();
 });

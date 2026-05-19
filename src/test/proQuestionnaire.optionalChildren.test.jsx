@@ -7,46 +7,6 @@ import ProQuestionnaire from '@/pages/ProQuestionnaire';
 import { renderWithStore } from './utils/renderWithStore';
 import { QUESTIONS } from '@/components/pro-form/questionData';
 
-// Mock base44 SDK
-vi.mock('@/api/base44Client', () => {
-return {
-  base44: {
-    functions: {
-      invoke: vi.fn().mockResolvedValue({ status: 200, data: { status: 'complete', message: 'ok', characterCount: 5 } }),
-    },
-    entities: {
-      ProFormSubmission: {
-        create: vi.fn().mockResolvedValue({ id: 'submission-test-id' })
-      },
-      ProFormDraft: {
-        create: vi.fn().mockResolvedValue({ id: 'draft-test-id' }),
-        update: vi.fn().mockResolvedValue({ id: 'draft-test-id' }),
-        filter: vi.fn().mockResolvedValue([]),
-        list: vi.fn().mockResolvedValue([])
-      },
-      ProFormDraftEvent: {
-        create: vi.fn().mockResolvedValue({ id: 'draft-event-test-id' }),
-        update: vi.fn().mockResolvedValue({ id: 'draft-event-test-id' }),
-        filter: vi.fn().mockResolvedValue([]),
-        list: vi.fn().mockResolvedValue([])
-      },
-      ProFormSubmissionIntake: {
-        create: vi.fn().mockResolvedValue({ id: 'intake-test-id' }),
-        update: vi.fn().mockResolvedValue({ id: 'intake-test-id' }),
-        filter: vi.fn().mockResolvedValue([]),
-        list: vi.fn().mockResolvedValue([])
-      }
-    },
-    auth: {
-      isAuthenticated: vi.fn().mockResolvedValue(true),
-      me: vi.fn().mockResolvedValue({ email: 'test@example.com' }),
-    },
-    analytics: { track: vi.fn() },
-    connectors: { connectAppUser: vi.fn(), disconnectAppUser: vi.fn() },
-    users: { inviteUser: vi.fn() }
-  },
-};
-});
 
 function getQ(id) {
   return QUESTIONS.find(q => q.id === id) || QUESTIONS.flatMap(q => q.conditionalChildren || []).find(c => c.id === id);
