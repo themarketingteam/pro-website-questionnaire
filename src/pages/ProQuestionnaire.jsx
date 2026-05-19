@@ -98,6 +98,11 @@ export default function ProQuestionnaire() {
   const draftSaveTimeoutRef = useRef(null);
   const draftTextEventTimeoutsRef = useRef({});
   const draftRecordIdRef = useRef('');
+  const isTestMode = import.meta.env.MODE === 'test';
+  const draftSaveDelayMs = isTestMode ? 0 : 600;
+  const draftTextEventDelayMs = isTestMode ? 0 : 1000;
+  const expandLinkedQuestionDelayMs = isTestMode ? 0 : 500;
+  const clearAllReloadDelayMs = isTestMode ? 0 : 100;
   const hasFinalSubmittedRef = useRef(false);
   const lastChangedQuestionIdRef = useRef('');
   const [questionnaireSessionId] = useState(() => getOrCreateQuestionnaireSessionId());
@@ -215,6 +220,16 @@ export default function ProQuestionnaire() {
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+
+      if (draftSaveTimeoutRef.current) {
+        clearTimeout(draftSaveTimeoutRef.current);
+        draftSaveTimeoutRef.current = null;
+      }
+
+      Object.values(draftTextEventTimeoutsRef.current).forEach((timeoutId) => {
+        clearTimeout(timeoutId);
+      });
+      draftTextEventTimeoutsRef.current = {};
     };
   }, [
     questionnaireSessionId,
@@ -392,7 +407,7 @@ export default function ProQuestionnaire() {
           error: serializeError(error)
         });
       }
-    }, 600);
+    }, draftSaveDelayMs);
   }, [
     questionnaireSessionId,
     responses,
@@ -402,7 +417,8 @@ export default function ProQuestionnaire() {
     credentials,
     businessNameParam,
     domainParam,
-    saveDraftSnapshot
+    saveDraftSnapshot,
+    draftSaveDelayMs
   ]);
 
   const createDraftEvent = useCallback(async ({
@@ -461,7 +477,7 @@ export default function ProQuestionnaire() {
           questionId,
           value
         });
-      }, 1000);
+      }, draftTextEventDelayMs);
 
       return;
     }
@@ -471,7 +487,7 @@ export default function ProQuestionnaire() {
       questionId,
       value
     });
-  }, [createDraftEvent]);
+  }, [createDraftEvent, draftTextEventDelayMs]);
 
   // Helper: dispatch only when status meaningfully changes
   const setValidationStatusIfChanged = (qid, next, snapshot) => {
@@ -968,7 +984,7 @@ export default function ProQuestionnaire() {
 
     // Scroll to top and refresh
     window.scrollTo(0, 0);
-    setTimeout(() => window.location.reload(), 100);
+    setTimeout(() => window.location.reload(), clearAllReloadDelayMs);
   };
 
   const isQuestionComplete = (questionId) => {
@@ -1640,7 +1656,7 @@ export default function ProQuestionnaire() {
                           q12Element.scrollIntoView({ behavior: 'smooth', block: 'center' });
                           setTimeout(() => {
                             dispatch(setExpandedQuestion({ questionId: '12', expanded: true }));
-                          }, 500);
+                          }, expandLinkedQuestionDelayMs);
                         }
                       }}
                     />;
