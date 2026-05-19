@@ -33,13 +33,40 @@ Deno.serve(async (req) => {
     }
 
     // Forward the request to Zapier
-    const zapierResponse = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+    let zapierResponse;
+
+    try {
+      zapierResponse = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        console.error('Zapier webhook timed out');
+
+        return Response.json(
+          {
+            success: false,
+            error: 'Zapier webhook timed out'
+          },
+          {
+            status: 504,
+            headers: corsHeaders
+          }
+        );
+      }
+
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const responseText = await zapierResponse.text();
 
