@@ -110,6 +110,13 @@ const AuthenticatedApp = () => {
           }
         />
       ))}
+      <Route path="/admin/submit-intake" element={
+        <AdminOnly>
+          <LayoutWrapper currentPageName={"admin/submit-intake"}>
+            <AdminSubmitIntake />
+          </LayoutWrapper>
+        </AdminOnly>
+      } />
       <Route path="/admin/draft-recovery" element={
         <AdminOnly>
           <LayoutWrapper currentPageName={"admin/draft-recovery"}>
