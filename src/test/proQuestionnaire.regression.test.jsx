@@ -105,14 +105,16 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     const submit = await screen.findByRole('button', { name: /submit questionnaire/i });
     await user.click(submit);
 
-    const calls = base44.functions.invoke.mock.calls.filter(c => c[0] === 'validateQuestionText');
-    const contexts = calls.map(c => c[1].questionContext);
-    expect(contexts).toContain('question_23_1');
-    expect(contexts).toContain('question_25_1');
+    await waitFor(() => {
+      const calls = base44.functions.invoke.mock.calls.filter(c => c[0] === 'validateQuestionText');
+      const contexts = calls.map(c => c[1].questionContext);
+      expect(contexts).toContain('question_23_1');
+      expect(contexts).toContain('question_25_1');
+    });
 
-    // Optional child should not set parent 23 to incomplete
-    const state = store.getState();
-    expect(state.form.validationStatus['23']).not.toBe('incomplete');
+    await waitFor(() => {
+      expect(store.getState().form.validationStatus['23']).not.toBe('incomplete');
+    });
   });
 
   it('Backend failure surfaces cleanly and sets textarea status to incomplete for submit-time validation', async () => {

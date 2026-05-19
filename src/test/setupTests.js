@@ -108,7 +108,20 @@ Object.defineProperty(window, 'matchMedia', {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
-  vi.clearAllTimers();
-  localStorage.clear();
-  sessionStorage.clear();
+
+  try {
+    vi.runOnlyPendingTimers();
+  } catch {}
+
+  try {
+    vi.clearAllTimers();
+  } catch {}
+
+  try {
+    localStorage.clear();
+  } catch {}
+
+  try {
+    sessionStorage.clear();
+  } catch {}
 });

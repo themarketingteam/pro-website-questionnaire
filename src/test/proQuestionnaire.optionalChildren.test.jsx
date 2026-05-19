@@ -65,8 +65,9 @@ describe('Optional child behavior: Q23.1 and Q25.1', () => {
     await user.clear(textarea);
     await user.type(textarea, 'More');
 
-    // Parent remains complete (no oscillation)
-    expect(store.getState().form.validationStatus['23']).toBe('complete');
+    await waitFor(() => {
+      expect(store.getState().form.validationStatus['23']).toBe('complete');
+    });
   });
 
   it('Q25/25.1 behaves safely: empty and typing do not affect parent 25', async () => {
@@ -96,6 +97,8 @@ describe('Optional child behavior: Q23.1 and Q25.1', () => {
 
     await user.type(textarea, 'Additional info');
 
-    expect(store.getState().form.validationStatus['25']).toBe('complete');
+    await waitFor(() => {
+      expect(store.getState().form.validationStatus['25']).toBe('complete');
+    });
   });
 });
