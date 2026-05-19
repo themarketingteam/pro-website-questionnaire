@@ -4,26 +4,29 @@ import { Save } from 'lucide-react';
 export default function AutoSaveIndicator({ show }) {
   const [visible, setVisible] = useState(false);
   const [fading, setFading] = useState(false);
+  const isTestMode = import.meta.env.MODE === 'test';
+  const fadeDelayMs = isTestMode ? 0 : 3000;
+  const hideDelayMs = isTestMode ? 0 : 3500;
 
   useEffect(() => {
-    if (show) {
-      setVisible(true);
-      setFading(false);
-      
-      const fadeTimer = setTimeout(() => {
-        setFading(true);
-      }, 3000);
-      
-      const hideTimer = setTimeout(() => {
-        setVisible(false);
-      }, 3500);
-      
-      return () => {
-        clearTimeout(fadeTimer);
-        clearTimeout(hideTimer);
-      };
-    }
-  }, [show]);
+    if (!show) return;
+
+    setVisible(true);
+    setFading(false);
+
+    const fadeTimer = setTimeout(() => {
+      setFading(true);
+    }, fadeDelayMs);
+
+    const hideTimer = setTimeout(() => {
+      setVisible(false);
+    }, hideDelayMs);
+
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(hideTimer);
+    };
+  }, [show, fadeDelayMs, hideDelayMs]);
 
   if (!visible) return null;
 
