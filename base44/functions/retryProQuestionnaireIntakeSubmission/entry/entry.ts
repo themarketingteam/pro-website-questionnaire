@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-const parsePayload = (value: unknown) => {
+const parsePayload = (value) => {
   if (!value) return null;
   if (typeof value === 'object') return value;
   if (typeof value !== 'string') return null;
@@ -11,8 +11,8 @@ const parsePayload = (value: unknown) => {
   }
 };
 
-const safeError = (error: unknown) => {
-  const safe = (error ?? {}) as Record<string, unknown> & { response?: { status?: number } };
+const safeError = (error) => {
+  const safe = (error ?? {});
   return {
     message: typeof safe.message === 'string' ? safe.message : 'Unknown error',
     status: typeof safe.status === 'number' ? safe.status : safe.response?.status ?? null,
@@ -20,7 +20,7 @@ const safeError = (error: unknown) => {
   };
 };
 
-const incrementRetryCount = (value: unknown) => {
+const incrementRetryCount = (value) => {
   const count = Number(value);
   return Number.isFinite(count) ? count + 1 : 1;
 };
@@ -62,6 +62,28 @@ Deno.serve(async (req) => {
         linkedSubmissionId: intake.linked_submission_id,
         intakeId: intake.id
       });
+    }
+
+    if (intake.questionnaire_session_id) {
+      const existingSubmissions = await base44.asServiceRole.entities.ProFormSubmission.filter({
+        'metadata.questionnaire_session_id': intake.questionnaire_session_id
+      });
+      if (Array.isArray(existingSubmissions) && existingSubmissions.length > 0 && !forceRetry) {
+        const existingSubmission = existingSubmissions[0];
+        await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
+          status: 'retry_success',
+          linked_submission_id: existingSubmission.id,
+          retry_error_json: '',
+          last_retry_at: new Date().toISOString(),
+          retry_count: incrementRetryCount(intake.retry_count)
+        });
+        return Response.json({
+          success: true,
+          alreadySubmitted: true,
+          linkedSubmissionId: existingSubmission.id,
+          intakeId: intake.id
+        });
+      }
     }
 
     const transformedPayload = parsePayload(intake.transformed_payload_json);

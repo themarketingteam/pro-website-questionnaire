@@ -11,15 +11,15 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const webhookUrl = Deno.env.get('ZAPIER_WEBHOOK_URL');
+    const webhookUrl = Deno.env.get('ZAPIER_WEBHOOK_URL')?.trim();
 
     if (!webhookUrl) {
-      console.error('Zapier webhook is not configured');
+      console.error('Zapier webhook URL is not configured');
 
       return Response.json(
         {
           success: false,
-          error: 'Zapier webhook is not configured'
+          error: 'Zapier webhook URL is not configured'
         },
         {
           status: 500,
