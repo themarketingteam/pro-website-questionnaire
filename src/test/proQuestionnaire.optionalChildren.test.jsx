@@ -15,7 +15,27 @@ return {
       invoke: vi.fn().mockResolvedValue({ status: 200, data: { status: 'complete', message: 'ok', characterCount: 5 } }),
     },
     entities: {
-      ProFormSubmission: { create: vi.fn().mockResolvedValue({ id: 'x' }) }
+      ProFormSubmission: {
+        create: vi.fn().mockResolvedValue({ id: 'submission-test-id' })
+      },
+      ProFormDraft: {
+        create: vi.fn().mockResolvedValue({ id: 'draft-test-id' }),
+        update: vi.fn().mockResolvedValue({ id: 'draft-test-id' }),
+        filter: vi.fn().mockResolvedValue([]),
+        list: vi.fn().mockResolvedValue([])
+      },
+      ProFormDraftEvent: {
+        create: vi.fn().mockResolvedValue({ id: 'draft-event-test-id' }),
+        update: vi.fn().mockResolvedValue({ id: 'draft-event-test-id' }),
+        filter: vi.fn().mockResolvedValue([]),
+        list: vi.fn().mockResolvedValue([])
+      },
+      ProFormSubmissionIntake: {
+        create: vi.fn().mockResolvedValue({ id: 'intake-test-id' }),
+        update: vi.fn().mockResolvedValue({ id: 'intake-test-id' }),
+        filter: vi.fn().mockResolvedValue([]),
+        list: vi.fn().mockResolvedValue([])
+      }
     },
     auth: {
       isAuthenticated: vi.fn().mockResolvedValue(true),

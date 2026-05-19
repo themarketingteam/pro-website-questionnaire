@@ -29,10 +29,22 @@ vi.mock('@/api/base44Client', () => {
         ProFormSubmission: { create: vi.fn().mockResolvedValue({ id: 'x' }) },
         ProFormDraft: {
           filter: vi.fn().mockResolvedValue([]),
+          list: vi.fn().mockResolvedValue([]),
           create: vi.fn().mockResolvedValue({ id: 'draft-1' }),
           update: vi.fn().mockResolvedValue({ id: 'draft-1' })
         },
-        ProFormDraftEvent: { create: vi.fn().mockResolvedValue({ id: 'event-1' }) }
+        ProFormDraftEvent: {
+          create: vi.fn().mockResolvedValue({ id: 'event-1' }),
+          update: vi.fn().mockResolvedValue({ id: 'event-1' }),
+          filter: vi.fn().mockResolvedValue([]),
+          list: vi.fn().mockResolvedValue([])
+        },
+        ProFormSubmissionIntake: {
+          create: vi.fn().mockResolvedValue({ id: 'intake-1' }),
+          update: vi.fn().mockResolvedValue({ id: 'intake-1' }),
+          filter: vi.fn().mockResolvedValue([]),
+          list: vi.fn().mockResolvedValue([])
+        }
       },
       auth: {
         isAuthenticated: vi.fn().mockResolvedValue(true),
