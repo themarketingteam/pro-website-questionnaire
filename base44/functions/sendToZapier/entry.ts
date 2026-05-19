@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
       clearTimeout(timeoutId);
     }
 
-    const responseText = await zapierResponse.text();
+    await zapierResponse.text();
 
     if (!zapierResponse.ok) {
       console.error('Zapier webhook failed');
@@ -71,8 +71,6 @@ Deno.serve(async (req) => {
       return Response.json({
         success: false,
         error: 'Zapier webhook failed',
-        zapierStatus: zapierResponse.status,
-        zapierBody: responseText,
       }, {
         status: 502,
         headers: corsHeaders
@@ -82,15 +80,14 @@ Deno.serve(async (req) => {
     return Response.json({
       success: true,
       message: 'Data sent to Zapier successfully',
-      zapierResponse: responseText,
     }, { headers: corsHeaders });
 
   } catch (error) {
-    console.error('Error in sendToZapier function:', error.message);
+    console.error('Error in sendToZapier function');
 
     return Response.json({
       success: false,
-      error: error.message,
+      error: 'Zapier webhook request failed',
     }, {
       status: 500,
       headers: corsHeaders
