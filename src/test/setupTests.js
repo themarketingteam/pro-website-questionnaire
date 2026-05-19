@@ -105,13 +105,9 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-afterEach(async () => {
+afterEach(() => {
   cleanup();
-
-  try {
-    await Promise.resolve();
-    await Promise.resolve();
-  } catch {}
+  vi.clearAllMocks();
 
   try {
     vi.runOnlyPendingTimers();
@@ -124,8 +120,6 @@ afterEach(async () => {
   try {
     vi.useRealTimers();
   } catch {}
-
-  vi.clearAllMocks();
 
   try {
     localStorage.clear();
