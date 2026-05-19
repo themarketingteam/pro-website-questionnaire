@@ -21,6 +21,9 @@ export default function ConfirmModal({
   initialBusinessName = '', 
   initialDomain = '' 
 }) {
+  const getSafeRecoveryMessage = (recoveryCode = 'unknown-session') => (
+    `We saved your progress, but final submission could not complete. Please try submitting again. If it still does not work, send this recovery code to support so we can recover your questionnaire: ${recoveryCode}`
+  );
   const [businessName, setBusinessName] = useState(initialBusinessName);
   const [domain, setDomain] = useState(initialDomain);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);

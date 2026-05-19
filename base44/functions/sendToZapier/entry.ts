@@ -5,25 +5,21 @@ Deno.serve(async (req) => {
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
 
-  // Handle OPTIONS preflight request
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
   try {
-    // Get the payload from the request
     const payload = await req.json();
-    
-
-    const webhookUrl = Deno.env.get('ZAPIER_WEBHOOK_URL');
+    const webhookUrl = Deno.env.get('ZAPIER_WEBHOOK_URL')?.trim();
 
     if (!webhookUrl) {
-      console.error('Zapier webhook is not configured');
+      console.error('ZAPIER_WEBHOOK_URL is not configured');
 
       return Response.json(
         {
           success: false,
-          error: 'Zapier webhook is not configured'
+          error: 'Zapier webhook URL is not configured'
         },
         {
           status: 500,
@@ -32,7 +28,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Forward the request to Zapier
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
 
@@ -72,15 +67,15 @@ Deno.serve(async (req) => {
 
     if (!zapierResponse.ok) {
       console.error('Zapier webhook failed');
-      
+
       return Response.json({
         success: false,
         error: 'Zapier webhook failed',
         zapierStatus: zapierResponse.status,
         zapierBody: responseText,
-      }, { 
+      }, {
         status: 502,
-        headers: corsHeaders 
+        headers: corsHeaders
       });
     }
 
@@ -92,13 +87,13 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Error in sendToZapier function:', error.message);
-    
+
     return Response.json({
       success: false,
       error: error.message,
-    }, { 
+    }, {
       status: 500,
-      headers: corsHeaders 
+      headers: corsHeaders
     });
   }
 });
