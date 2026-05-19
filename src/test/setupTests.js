@@ -105,15 +105,13 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-afterEach(async () => {
-  try {
-    await act(async () => {
-      vi.runOnlyPendingTimers();
-    });
-  } catch {}
-
+afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+
+  try {
+    vi.runOnlyPendingTimers();
+  } catch {}
 
   try {
     vi.clearAllTimers();
