@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { validateSubmissionPayload } from '@/components/pro-form/submissionPayload';
+import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
+import { sendZapierSafe } from '@/lib/proQuestionnaireSubmit';
 
 // Default payload template (editable)
 const initialPayload = {
@@ -215,21 +218,46 @@ export default function AdminSubmitIntake() {
   const handleSubmit = async () => {
     try {
       setSubmitting(true);
-      const res = await base44.entities.ProFormSubmission.create(payload);
-      setSubmittedId(res?.id || res?.data?.id || null);
+      setSaveError('');
+
+      const repairResult = repairProSubmissionPayload(payload);
+      const repairedPayload = repairResult.payload;
+
+      if (!repairResult.ok) {
+        const message = repairResult.errors?.join('; ') || 'Payload repair failed.';
+        setSaveError(message);
+        toast.error('Submission payload is not valid.');
+        return;
+      }
+
+      const validation = validateSubmissionPayload(repairedPayload);
+
+      if (!validation.ok) {
+        const message = validation.errors?.join('; ') || 'Submission payload is not valid.';
+        setSaveError(message);
+        toast.error('Submission payload is not valid.');
+        return;
+      }
+
+      const res = await base44.entities.ProFormSubmission.create(repairedPayload);
+      const submissionId = res?.id || res?.data?.id || null;
+
+      setSubmittedId(submissionId);
+      setPayload(repairedPayload);
+      setRawJson(JSON.stringify(repairedPayload, null, 2));
       toast.success('Submission saved');
 
-      // Also forward to Zapier (non-fatal, like main form)
-      try {
-        const zapRes = await base44.functions.invoke('sendToZapier', payload);
-        if (zapRes?.data?.success) {
-          console.log('✅ Sent to Zapier successfully');
-        } else {
-          console.warn('⚠️ Zapier send returned non-success', zapRes?.data);
-        }
-      } catch (zErr) {
-        console.error('❌ Zapier send failed (non-fatal):', zErr?.message || zErr);
-      }
+      sendZapierSafe(repairedPayload, { timeoutMs: 5000 })
+        .then((zapierResult) => {
+          if (zapierResult?.ok) {
+            console.log('✅ Sent to Zapier successfully');
+          } else {
+            console.warn('⚠️ Zapier send failed after admin submission', zapierResult?.error);
+          }
+        })
+        .catch((error) => {
+          console.warn('⚠️ Zapier send failed after admin submission', error);
+        });
     } catch (e) {
       toast.error(e?.message || 'Submission failed');
     } finally {
