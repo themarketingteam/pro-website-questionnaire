@@ -6,6 +6,9 @@ vi.mock('@/api/base44Client', () => ({
       ProFormSubmission: {
         create: vi.fn()
       }
+    },
+    functions: {
+      invoke: vi.fn()
     }
   }
 }));
@@ -15,6 +18,7 @@ import {
   TimeoutError,
   classifySubmitError,
   createProFormSubmissionResilient,
+  createProFormSubmissionWithFallback,
   isRetryableSubmitError,
   serializeSubmitError
 } from '@/lib/proSubmissionResilience';
@@ -96,5 +100,83 @@ describe('proSubmissionResilience', () => {
     expect(result.ok).toBe(false);
     expect(result.attempts).toBe(1);
     expect(base44.entities.ProFormSubmission.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes transform and validation flags to fallback for null payload path', async () => {
+    base44.functions.invoke.mockResolvedValueOnce({
+      data: {
+        success: true,
+        received: true,
+        submissionCreated: false,
+        intakeId: 'intake_123',
+        zapierSent: false
+      }
+    });
+
+    const transformError = { message: 'transform failed' };
+    const validationError = { message: 'validation failed' };
+
+    const result = await createProFormSubmissionWithFallback(null, {
+      responseSnapshot: { step: 1 },
+      rawResponses: { q1: 'a' },
+      transformFailed: true,
+      transformError,
+      validationFailed: true,
+      validationError,
+      questionnaireSessionId: 'session_123',
+      draftId: 'draft_123',
+      submitContext: { source: 'test' }
+    });
+
+    expect(result.ok).toBe(true);
+    expect(base44.functions.invoke).toHaveBeenCalledWith('submitProQuestionnaireFallback', expect.objectContaining({
+      transformedPayload: null,
+      transformFailed: true,
+      transformError,
+      validationFailed: true,
+      validationError,
+      questionnaireSessionId: 'session_123',
+      draftId: 'draft_123'
+    }));
+  });
+
+  it('passes transform and validation flags to fallback for payload path', async () => {
+    base44.entities.ProFormSubmission.create.mockRejectedValueOnce({ status: 503, message: 'Server unavailable' });
+    base44.functions.invoke.mockResolvedValueOnce({
+      data: {
+        success: true,
+        received: true,
+        submissionCreated: false,
+        intakeId: 'intake_456',
+        zapierSent: false
+      }
+    });
+
+    const transformError = { message: 'transform warning' };
+    const validationError = { message: 'validation warning' };
+
+    const result = await createProFormSubmissionWithFallback({ metadata: {}, userdata: {} }, {
+      responseSnapshot: { step: 2 },
+      rawResponses: { q2: 'b' },
+      transformFailed: false,
+      transformError,
+      validationFailed: true,
+      validationError,
+      questionnaireSessionId: 'session_456',
+      draftId: 'draft_456',
+      submitContext: { source: 'test' },
+      baseDelayMs: 10
+    });
+
+    expect(result.ok).toBe(true);
+    expect(base44.functions.invoke).toHaveBeenCalledWith('submitProQuestionnaireFallback', expect.objectContaining({
+      transformedPayload: { metadata: {}, userdata: {} },
+      transformFailed: false,
+      transformError,
+      validationFailed: true,
+      validationError,
+      questionnaireSessionId: 'session_456',
+      draftId: 'draft_456'
+    }));
   });
 });
