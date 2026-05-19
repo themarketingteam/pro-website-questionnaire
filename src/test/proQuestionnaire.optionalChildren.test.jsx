@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 
 import userEvent from '@testing-library/user-event';
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
@@ -74,9 +74,9 @@ describe('Optional child behavior: Q23.1 and Q25.1', () => {
     // Child visible and empty
     expect(await screen.findByText(getQ('23.1').title)).toBeInTheDocument();
 
-    // Parent status should be computed as complete (no required children)
-    const state = store.getState();
-    expect(state.form.validationStatus['23']).toBe('complete');
+    await waitFor(() => {
+      expect(store.getState().form.validationStatus['23']).toBe('complete');
+    });
   });
 
   it('Typing into 23.1 and clearing it never oscillates parent 23 status from complete', async () => {
@@ -93,14 +93,12 @@ describe('Optional child behavior: Q23.1 and Q25.1', () => {
 
     const { store } = renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
 
-    // Locate the 23.1 textarea using its section container (by child title)
-    const childHeading = await screen.findByText(getQ('23.1').title);
-    const container = childHeading.closest('section, div');
-    const scope = container ? within(container) : screen;
-    const textarea = await scope.findByPlaceholderText(/enter your response/i);
+    const wrapper = await screen.findByTestId('question-wrapper-23.1');
+    const textarea = await within(wrapper).findByPlaceholderText(/enter your response/i);
 
-    // Initial parent status is complete
-    expect(store.getState().form.validationStatus['23']).toBe('complete');
+    await waitFor(() => {
+      expect(store.getState().form.validationStatus['23']).toBe('complete');
+    });
 
     // Type and clear repeatedly
     await user.type(textarea, 'Some notes');
@@ -129,14 +127,12 @@ describe('Optional child behavior: Q23.1 and Q25.1', () => {
     expect(await screen.findByText(getQ('25').title)).toBeInTheDocument();
     expect(await screen.findByText(getQ('25.1').title)).toBeInTheDocument();
 
-    // Parent is complete initially
-    expect(store.getState().form.validationStatus['25']).toBe('complete');
+    await waitFor(() => {
+      expect(store.getState().form.validationStatus['25']).toBe('complete');
+    });
 
-    // Type into 25.1 and ensure parent stays complete
-    const childHeading = await screen.findByText(getQ('25.1').title);
-    const container = childHeading.closest('section, div');
-    const scope = container ? within(container) : screen;
-    const textarea = await scope.findByPlaceholderText(/enter your response/i);
+    const wrapper = await screen.findByTestId('question-wrapper-25.1');
+    const textarea = await within(wrapper).findByPlaceholderText(/enter your response/i);
 
     await user.type(textarea, 'Additional info');
 

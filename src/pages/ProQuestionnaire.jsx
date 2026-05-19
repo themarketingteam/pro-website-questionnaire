@@ -68,16 +68,19 @@ const DeferredSectionLoader = () => (
   </div>
 );
 
+const EMPTY_OBJECT = Object.freeze({});
+const EMPTY_ARRAY = Object.freeze([]);
+
 export default function ProQuestionnaire() {
   const dispatch = useDispatch();
   const standardContentClass = 'w-full max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto';
   const wideContentClass = 'w-full max-w-4xl lg:max-w-6xl xl:max-w-7xl 2xl:max-w-[1440px] mx-auto';
-  const responses = useSelector((state) => state.form.responses);
-  const validationStatus = useSelector((state) => state.form.validationStatus);
-  const textValidationMeta = useSelector((state) => state.form.textValidationMeta || {});
-  const touchedQuestions = useSelector((state) => state.form.touchedQuestions);
-  const expandedQuestions = useSelector((state) => state.form.expandedQuestions);
-  const credentials = useSelector((state) => state.form.credentials);
+  const responses = useSelector((state) => state.form.responses || EMPTY_OBJECT);
+  const validationStatus = useSelector((state) => state.form.validationStatus || EMPTY_OBJECT);
+  const textValidationMeta = useSelector((state) => state.form.textValidationMeta || EMPTY_OBJECT);
+  const touchedQuestions = useSelector((state) => state.form.touchedQuestions || EMPTY_OBJECT);
+  const expandedQuestions = useSelector((state) => state.form.expandedQuestions || EMPTY_OBJECT);
+  const credentials = useSelector((state) => state.form.credentials || EMPTY_OBJECT);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const finalSubmitInFlightRef = useRef(false);
   const [showAutoSave, setShowAutoSave] = useState(0);

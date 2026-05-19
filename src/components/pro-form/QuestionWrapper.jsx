@@ -46,7 +46,7 @@ export default function QuestionWrapper({
   };
 
   return (
-    <div id={id} className={`space-y-4 ${isExpanded ? 'my-[5%]' : 'mb-[3%]'} relative`}>
+    <div id={id} data-testid={number ? `question-wrapper-${number}` : undefined} className={`space-y-4 ${isExpanded ? 'my-[5%]' : 'mb-[3%]'} relative`}>
       {/* Status icon: inline on mobile, absolute on desktop */}
       {!isSubQuestion && showStatusIcon && (
         <div className="md:absolute md:-left-[50px] md:top-0 inline-flex md:block mb-1 md:mb-0">
