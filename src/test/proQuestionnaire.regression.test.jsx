@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 
 import userEvent from '@testing-library/user-event';
@@ -37,6 +37,10 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     base44.entities.ProFormDraft.update.mockResolvedValue({ id: 'draft-1' });
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('Q23 answered Yes, then 23.1 expanded: renders without crash or loop', async () => {
     const preloaded = {
       form: {
@@ -49,10 +53,8 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     };
     renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
 
-    // Parent present
-    expect(await screen.findByText(getQ('23').title)).toBeInTheDocument();
-    // Child 23.1 visible when parent expanded+yes
-    expect(await screen.findByText(getQ('23').conditionalChildren[0].title)).toBeInTheDocument();
+    expect(await screen.findByTestId('question-wrapper-23')).toBeInTheDocument();
+    expect(await screen.findByTestId('question-wrapper-23.1')).toBeInTheDocument();
   });
 
   it('Persisted state with Q23=yes and 23.1 expanded rehydrates safely', async () => {
@@ -68,8 +70,8 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
 
     renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
 
-    expect(await screen.findByText(getQ('23').title)).toBeInTheDocument();
-    expect(await screen.findByText(getQ('23').conditionalChildren[0].title)).toBeInTheDocument();
+    expect(await screen.findByTestId('question-wrapper-23')).toBeInTheDocument();
+    expect(await screen.findByTestId('question-wrapper-23.1')).toBeInTheDocument();
   });
 
   it('Final validation uses canonical validateQuestionText payloads and keeps parent intact for optional child', async () => {
@@ -474,7 +476,6 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
 
   it('pending autosave after submit does not overwrite submitted status back to draft', async () => {
     vi.useFakeTimers();
-
     const hasFinalSubmittedRef = { current: false };
     const saveDraftSnapshot = vi.fn().mockResolvedValue({});
     const draftSaveTimeoutRef = { current: null };
@@ -507,7 +508,6 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     await vi.runAllTimersAsync();
 
     expect(saveDraftSnapshot).not.toHaveBeenCalled();
-    vi.useRealTimers();
   });
 
   it('formatting helpers never return [object Object] for complex answers', () => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 
 import userEvent from '@testing-library/user-event';
@@ -17,6 +17,10 @@ describe('Optional child behavior: Q23.1 and Q25.1', () => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('23.1 empty does not mark parent 23 incomplete (parent remains complete)', async () => {
     const preloaded = {
       form: {
@@ -29,10 +33,8 @@ describe('Optional child behavior: Q23.1 and Q25.1', () => {
     };
     const { store } = renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
 
-    // Parent visible
-    expect(await screen.findByText(getQ('23').title)).toBeInTheDocument();
-    // Child visible and empty
-    expect(await screen.findByText(getQ('23.1').title)).toBeInTheDocument();
+    expect(await screen.findByTestId('question-wrapper-23')).toBeInTheDocument();
+    expect(await screen.findByTestId('question-wrapper-23.1')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(store.getState().form.validationStatus['23']).toBe('complete');
@@ -84,15 +86,13 @@ describe('Optional child behavior: Q23.1 and Q25.1', () => {
 
     const { store } = renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
 
-    // Parent and child visible
-    expect(await screen.findByText(getQ('25').title)).toBeInTheDocument();
-    expect(await screen.findByText(getQ('25.1').title)).toBeInTheDocument();
+    expect(await screen.findByTestId('question-wrapper-25')).toBeInTheDocument();
+    const wrapper = await screen.findByTestId('question-wrapper-25.1');
 
     await waitFor(() => {
       expect(store.getState().form.validationStatus['25']).toBe('complete');
     });
 
-    const wrapper = await screen.findByTestId('question-wrapper-25.1');
     const textarea = await within(wrapper).findByPlaceholderText(/enter your response/i);
 
     await user.type(textarea, 'Additional info');
