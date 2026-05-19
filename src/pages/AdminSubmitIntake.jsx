@@ -245,18 +245,20 @@ export default function AdminSubmitIntake() {
       setSubmittedId(submissionId);
       setPayload(repairedPayload);
       setRawJson(JSON.stringify(repairedPayload, null, 2));
-      toast.success('Submission saved');
+      toast.success(`Submission saved${submissionId ? ` (id: ${submissionId})` : ''}`);
 
       sendZapierSafe(repairedPayload, { timeoutMs: 5000 })
         .then((zapierResult) => {
           if (zapierResult?.ok) {
-            console.log('✅ Sent to Zapier successfully');
+            toast.success('Saved. Zapier delivery was also queued successfully.');
           } else {
-            console.warn('⚠️ Zapier send failed after admin submission', zapierResult?.error);
+            toast.warning?.('Submission saved, but Zapier delivery failed. Please check logs.');
+            console.warn('Admin Zapier send failed after save', zapierResult?.error);
           }
         })
         .catch((error) => {
-          console.warn('⚠️ Zapier send failed after admin submission', error);
+          toast.warning?.('Submission saved, but Zapier delivery failed. Please check logs.');
+          console.warn('Admin Zapier send failed after save', error);
         });
     } catch (e) {
       toast.error(e?.message || 'Submission failed');
