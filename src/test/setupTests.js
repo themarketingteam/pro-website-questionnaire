@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { act, cleanup } from '@testing-library/react';
+import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
 vi.mock('@/api/base44Client', () => {
@@ -105,15 +105,16 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-afterEach(async () => {
+afterEach(() => {
+  cleanup();
+
   try {
-    await act(async () => {
-      vi.runOnlyPendingTimers();
-    });
+    vi.clearAllMocks();
   } catch {}
 
-  cleanup();
-  vi.clearAllMocks();
+  try {
+    vi.runOnlyPendingTimers();
+  } catch {}
 
   try {
     vi.clearAllTimers();

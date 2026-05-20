@@ -3,6 +3,9 @@ import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vite
 import { screen, waitFor } from '@testing-library/react';
 
 import userEvent from '@testing-library/user-event';
+
+const setupUser = () => userEvent.setup({ pointerEventsCheck: 0 });
+
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
 import { renderWithStore } from './utils/renderWithStore';
 import { QUESTIONS } from '@/components/pro-form/questionData';
@@ -75,7 +78,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
   });
 
   it('Final validation uses canonical validateQuestionText payloads and keeps parent intact for optional child', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
 
     const invoke = base44.functions.invoke;
     invoke.mockImplementation(async (_name, payload) => {
@@ -120,7 +123,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
   });
 
   it('Backend failure surfaces cleanly and sets textarea status to incomplete for submit-time validation', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
 
     const invoke = base44.functions.invoke;
     invoke.mockImplementationOnce(async () => { throw new Error('network down'); });
@@ -147,7 +150,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
   });
 
   it('Q24 normal radio option completes after one click', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const preloaded = {
       form: {
         responses: {},
@@ -169,7 +172,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
   });
 
   it('Q24 Other requires custom text and normal option stays complete when switching back', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const preloaded = {
       form: {
         responses: {},
@@ -203,7 +206,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
   });
 
   it('submit-time validation blocks incomplete returned statuses', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
 
     const invoke = base44.functions.invoke;
     invoke.mockImplementation(async (name) => {
@@ -265,7 +268,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
   });
 
   it('does not open the confirmation modal when final required textarea validation fails', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
 
     const invoke = base44.functions.invoke;
     invoke.mockImplementation(async (name) => {
@@ -345,7 +348,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
   });
 
   it('writes a recoverable local backup when the database save fails', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const createMock = base44.entities.ProFormSubmission.create;
     createMock.mockRejectedValueOnce(new Error('db down'));
 
@@ -390,7 +393,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
   });
 
   it('does not block success when Zapier fails after a successful database save', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const createMock = base44.entities.ProFormSubmission.create;
     createMock.mockResolvedValueOnce({ id: 'saved-ok' });
 

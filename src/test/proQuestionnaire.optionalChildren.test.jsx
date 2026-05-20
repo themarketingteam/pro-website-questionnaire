@@ -3,6 +3,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 
 import userEvent from '@testing-library/user-event';
+
+const setupUser = () => userEvent.setup({ pointerEventsCheck: 0 });
+
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
 import { renderWithStore } from './utils/renderWithStore';
 import { QUESTIONS } from '@/components/pro-form/questionData';
@@ -42,7 +45,7 @@ describe('Optional child behavior: Q23.1 and Q25.1', () => {
   });
 
   it('Typing into 23.1 and clearing it never oscillates parent 23 status from complete', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const preloaded = {
       form: {
         responses: { '23': 'yes', '23.1': '' },
@@ -73,7 +76,7 @@ describe('Optional child behavior: Q23.1 and Q25.1', () => {
   });
 
   it('Q25/25.1 behaves safely: empty and typing do not affect parent 25', async () => {
-    const user = userEvent.setup();
+    const user = setupUser();
     const preloaded = {
       form: {
         responses: { '25': 'yes', '25.1': '' },
