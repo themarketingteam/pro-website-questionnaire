@@ -161,8 +161,8 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     };
 
     const { store } = renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
-    await user.click(await screen.findByText(getQ('24').title));
-    await user.click(await screen.findByLabelText('Schedule a Consultation'));
+    const q24wrapper = await screen.findByTestId('question-wrapper-24');
+    await user.click(within(q24wrapper).getByLabelText('Schedule a Consultation'));
 
     await waitFor(() => {
       expect(store.getState().form.validationStatus['24']).toBe('complete');
@@ -183,20 +183,20 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     };
 
     const { store } = renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
-    await user.click(await screen.findByText(getQ('24').title));
-    await user.click(await screen.findByLabelText('Other'));
+    const q24wrapper = await screen.findByTestId('question-wrapper-24');
+    await user.click(within(q24wrapper).getByLabelText('Other'));
 
     await waitFor(() => {
       expect(store.getState().form.validationStatus['24']).toBe('incomplete');
     });
 
-    await user.type(screen.getByPlaceholderText(/what action would you like client's to take on your website/i), 'Book a strategy call');
+    await user.type(within(q24wrapper).getByPlaceholderText(/what action would you like client's to take on your website/i), 'Book a strategy call');
 
     await waitFor(() => {
       expect(store.getState().form.validationStatus['24']).toBe('complete');
     });
 
-    await user.click(await screen.findByLabelText('Schedule a Consultation'));
+    await user.click(within(q24wrapper).getByLabelText('Schedule a Consultation'));
 
     await waitFor(() => {
       expect(store.getState().form.validationStatus['24']).toBe('complete');
