@@ -1,11 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
-
 import userEvent from '@testing-library/user-event';
-
-const setupUser = () => userEvent.setup({ pointerEventsCheck: 0 });
-
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
 import { renderWithStore } from './utils/renderWithStore';
 import { QUESTIONS } from '@/components/pro-form/questionData';
@@ -20,6 +16,8 @@ import {
   createFindExistingDraftBySessionId,
   createSaveDraftSnapshot
 } from '@/lib/draftPersistence';
+
+const setupUser = () => userEvent.setup({ pointerEventsCheck: 0 });
 
 
 let base44;

@@ -1,14 +1,12 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
-
 import userEvent from '@testing-library/user-event';
-
-const setupUser = () => userEvent.setup({ pointerEventsCheck: 0 });
-
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
 import { renderWithStore } from './utils/renderWithStore';
 import { QUESTIONS } from '@/components/pro-form/questionData';
+
+const setupUser = () => userEvent.setup({ pointerEventsCheck: 0 });
 
 
 function getQ(id) {
