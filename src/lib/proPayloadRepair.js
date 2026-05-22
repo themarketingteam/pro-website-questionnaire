@@ -21,6 +21,34 @@ const STRING_ARRAY_FIELDS = [
   'locations'
 ];
 
+// Scalar string fields in userdata that must always be a plain string (never array/object)
+const SCALAR_STRING_FIELDS = [
+  'service_offerings_other',
+  'target_industries_other',
+  'delivery_model',
+  'delivery_model_other',
+  'pricing_packaging_other',
+  'differentiation',
+  'company_goals_other',
+  'brand_tone',
+  'brand_tone_other',
+  'sales_process',
+  'client_acquisition',
+  'client_acquisition_other',
+  'website_objectives_other',
+  'client_size',
+  'client_challenges_other',
+  'client_frustrations',
+  'client_outcomes_other',
+  'value_description',
+  'ideal_client',
+  'avoided_clients',
+  'primary_cta',
+  'primary_cta_other',
+  'additional_notes',
+  'company_description'
+];
+
 const OBJECT_ARRAY_FIELDS = [
   'certifications_partnerships',
   'service_guarantee_items',
@@ -318,6 +346,18 @@ export const repairProSubmissionPayload = (payload) => {
 
     if (!Array.isArray(originalValue)) {
       warnings.push(`${field}_repaired_to_object_array`);
+    }
+  });
+
+  // Coerce scalar string fields — e.g. pricing_packaging_other stored as [""] must become ""
+  SCALAR_STRING_FIELDS.forEach((field) => {
+    const originalValue = repairedPayload.userdata[field];
+    if (originalValue === undefined) return;
+    if (typeof originalValue !== 'string') {
+      repairedPayload.userdata[field] = Array.isArray(originalValue)
+        ? originalValue.map((item) => asTrimmedString(item)).filter(Boolean).join(', ')
+        : asTrimmedString(originalValue);
+      warnings.push(`${field}_coerced_to_string`);
     }
   });
 
