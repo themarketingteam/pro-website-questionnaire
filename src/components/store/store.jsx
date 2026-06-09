@@ -1,5 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
-import { persistStore, persistReducer, createMigrate, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
+import { persistStore, persistReducer, createMigrate, createTransform, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
 import storage from 'redux-persist/lib/storage'; // defaults to localStorage
 import formReducer from './formSlice';
 
@@ -10,15 +10,33 @@ const migrations = {
   3: (state) => normalizePersistedStateV3(state),
 };
 
+// This transform runs on EVERY rehydrate (not just migrations), ensuring
+// corrupted or stale v3 states are always sanitized before entering Redux.
+const normalizationTransform = createTransform(
+  // outbound (before persist) — no-op
+  (inboundState) => inboundState,
+  // inbound (after rehydrate from storage) — always normalize
+  (outboundState, key) => {
+    if (key === 'form') {
+      try {
+        return normalizePersistedStateV3(outboundState);
+      } catch (e) {
+        console.error('[store] normalizationTransform failed, using raw state:', e);
+        return outboundState;
+      }
+    }
+    return outboundState;
+  }
+);
+
 const persistConfig = {
   key: 'pro-questionnaire-root',
   version: 3,
   storage,
   whitelist: ['responses', 'validationStatus', 'touchedQuestions', 'expandedQuestions', 'textValidationMeta'],
   migrate: createMigrate(migrations, { debug: false }),
-  // Ensure nested objects are properly serialized
+  transforms: [normalizationTransform],
   serialize: true,
-  // Add debug logging
   debug: false
 };
 

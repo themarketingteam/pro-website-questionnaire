@@ -6,7 +6,15 @@ function uniqArray(arr) {
 }
 
 export function normalizePersistedState(state) {
-  if (!state || typeof state !== 'object') return state;
+  if (!state || typeof state !== 'object') {
+    return {
+      responses: {},
+      validationStatus: {},
+      touchedQuestions: {},
+      expandedQuestions: {},
+      textValidationMeta: {}
+    };
+  }
 
   const knownIds = new Set(getAllQuestionIds(QUESTIONS));
   const allowedResponseKeys = new Set();
@@ -234,6 +242,18 @@ export function normalizePersistedState(state) {
 
 // v3 migration: aggressively sanitize optional conditional children and self-heal bad sessions
 export function normalizePersistedStateV3(state) {
+  // Guard: if state is completely missing or malformed, return a safe empty baseline
+  // so that transformResponsesToPayload never receives undefined/null responses
+  if (!state || typeof state !== 'object') {
+    return {
+      responses: {},
+      validationStatus: {},
+      touchedQuestions: {},
+      expandedQuestions: {},
+      textValidationMeta: {}
+    };
+  }
+
   const base = normalizePersistedState(state);
   if (!base || typeof base !== 'object') return base;
 
