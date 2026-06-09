@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import QuestionnaireIntakeRecovery from '@/components/admin/QuestionnaireIntakeRecovery';
 import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
@@ -42,8 +42,63 @@ const formatDate = (value) => {
   return date.toLocaleString();
 };
 
+const parseJson = (value) => {
+  try {
+    if (!value) return null;
+    if (typeof value === 'object') return value;
+    return JSON.parse(value);
+  } catch { return null; }
+};
+
+function DraftAiRepairSection({ draft }) {
+  const report = parseJson(draft.ai_repair_report_json);
+  const repairError = parseJson(draft.ai_repair_error_json);
+
+  if (!draft.ai_repair_status && !report) return null;
+
+  const aiStatusStyles = {
+    completed: 'bg-green-100 text-green-700',
+    repair_ready: 'bg-indigo-100 text-indigo-700',
+    needs_human_review: 'bg-amber-100 text-amber-800',
+    running: 'bg-slate-100 text-slate-600'
+  };
+
+  return (
+    <div className="space-y-2 rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 text-sm">
+      <p className="font-semibold text-indigo-900">AI Repair Result</p>
+      {draft.ai_repair_status && (
+        <p><span className="font-medium">Status:</span>{' '}
+          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${aiStatusStyles[draft.ai_repair_status] || 'bg-slate-100 text-slate-600'}`}>
+            {draft.ai_repair_status}
+          </span>
+        </p>
+      )}
+      {draft.last_ai_repair_at && <p><span className="font-medium">Last Repair:</span> {new Date(draft.last_ai_repair_at).toLocaleString()}</p>}
+      {draft.ai_repair_applied && <p className="text-green-700 font-medium">✓ Repair was applied</p>}
+      {report && (
+        <div className="space-y-1">
+          <p><span className="font-medium">Decision:</span> <code className="bg-white px-1 rounded">{report.decision}</code></p>
+          {report.diagnosis && <p><span className="font-medium">Diagnosis:</span> {report.diagnosis}</p>}
+          {Array.isArray(report.changed_paths) && report.changed_paths.length > 0 && (
+            <p><span className="font-medium">Changed paths:</span> {report.changed_paths.length}</p>
+          )}
+        </div>
+      )}
+      {repairError && (
+        <p className="text-red-700 text-xs">{repairError.message || JSON.stringify(repairError)}</p>
+      )}
+    </div>
+  );
+}
+
 function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySuccess }) {
   const [retrying, setRetrying] = useState(false);
+  const [aiRepairing, setAiRepairing] = useState(false);
+  const [localDraft, setLocalDraft] = useState(draft);
+
+  // Keep localDraft in sync when parent reloads
+  React.useEffect(() => { setLocalDraft(draft); }, [draft]);
+
   const parsedResponses = safeJsonParse(draft.responses_json, {});
   const parsedValidation = safeJsonParse(draft.validation_status_json, {});
 
@@ -75,7 +130,8 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
     setRetrying(true);
     try {
       const result = await base44.functions.invoke('retryProQuestionnaireIntakeSubmission', {
-        session_id: draft.session_id
+        questionnaireSessionId: draft.session_id,
+        session_id: draft.session_id // backward-compat alias
       });
       if (result.data?.success) {
         toast.success(`Submission succeeded for ${draft.business_name || draft.session_id}`);
@@ -99,6 +155,42 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
     await navigator.clipboard.writeText(JSON.stringify(parsedResponses, null, 2));
     toast.success('Raw responses copied');
   };
+
+  const copyAiRepairedPayload = async () => {
+    if (!localDraft.ai_repaired_payload_json) { toast.error('No AI repaired payload available'); return; }
+    await navigator.clipboard.writeText(localDraft.ai_repaired_payload_json);
+    toast.success('AI repaired payload copied');
+  };
+
+  const copyAiReport = async () => {
+    if (!localDraft.ai_repair_report_json) { toast.error('No AI repair report available'); return; }
+    await navigator.clipboard.writeText(localDraft.ai_repair_report_json);
+    toast.success('AI repair report copied');
+  };
+
+  const handleAiRepair = async (e) => {
+    e.stopPropagation();
+    setAiRepairing(true);
+    try {
+      const result = await base44.functions.invoke('repairProQuestionnaireIntakeSubmission', {
+        draftId: draft.id,
+        mode: 'repair_only'
+      });
+      if (result.data?.success) {
+        toast.success('AI repair completed — repaired payload saved to draft');
+        onRetrySuccess?.(); // reload parent list to get updated draft fields
+      } else {
+        toast.error(result.data?.errors?.[0] || result.data?.error?.message || 'AI repair failed');
+      }
+    } catch (err) {
+      toast.error(err?.message || 'AI repair failed');
+    } finally {
+      setAiRepairing(false);
+    }
+  };
+
+  const isDraftOnly = draft.status === 'draft';
+  const isFailedSubmit = draft.status === 'submit_failed' || draft.status === 'submit_attempted';
 
   return (
     <Card className="overflow-hidden">
@@ -173,25 +265,64 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
             <Button
               type="button"
               onClick={handleRetry}
-              disabled={retrying}
+              disabled={retrying || aiRepairing}
               className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
             >
               <RefreshCw className={`w-4 h-4 ${retrying ? 'animate-spin' : ''}`} />
               {retrying ? 'Retrying...' : 'Retry Submission'}
             </Button>
-            <Button type="button" variant="outline" onClick={copySubmissionPayload} className="gap-2">
+
+            {/* AI Repair Draft JSON — safe for all draft statuses */}
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+              disabled={retrying || aiRepairing}
+              onClick={handleAiRepair}
+              title="Runs AI repair on the draft JSON. Does NOT create a final submission."
+            >
+              <Wrench className={`w-4 h-4 ${aiRepairing ? 'animate-spin' : ''}`} />
+              {aiRepairing ? 'Repairing...' : 'AI Repair Draft JSON'}
+            </Button>
+
+            <Button type="button" variant="outline" onClick={copySubmissionPayload} className="gap-2" disabled={retrying || aiRepairing}>
               <Copy className="w-4 h-4" /> Copy Submission Payload
             </Button>
-            <Button type="button" variant="outline" onClick={copyRawResponses} className="gap-2">
+            <Button type="button" variant="outline" onClick={copyRawResponses} className="gap-2" disabled={retrying || aiRepairing}>
               <Copy className="w-4 h-4" /> Copy Raw Responses
             </Button>
+            {localDraft.ai_repaired_payload_json && (
+              <Button type="button" variant="outline" onClick={copyAiRepairedPayload} className="gap-2 border-indigo-200 text-indigo-700">
+                <Copy className="w-4 h-4" /> Copy AI Repaired Payload
+              </Button>
+            )}
+            {localDraft.ai_repair_report_json && (
+              <Button type="button" variant="outline" onClick={copyAiReport} className="gap-2 border-indigo-200 text-indigo-700">
+                <Copy className="w-4 h-4" /> Copy AI Report
+              </Button>
+            )}
           </div>
+
+          {/* Safety notice for submit-failed drafts */}
+          {isFailedSubmit && (
+            <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
+              <strong>Note:</strong> AI Repair Draft JSON saves the repaired payload to this draft record but does NOT create a ProFormSubmission. To retry a failed submission, use the <strong>Questionnaire Intake Recovery</strong> section above, or click <strong>Retry Submission</strong> to attempt directly.
+            </div>
+          )}
+          {isDraftOnly && (
+            <div className="text-xs text-slate-600 bg-slate-100 border border-slate-200 rounded p-2">
+              This draft has not been submitted yet. AI Repair stores a corrected payload — no submission will be created.
+            </div>
+          )}
 
           {repairWarnings.length > 0 && (
             <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-              <span className="font-semibold">Repair warnings:</span> {repairWarnings.join(', ')}
+              <span className="font-semibold">Deterministic repair warnings:</span> {repairWarnings.join(', ')}
             </div>
           )}
+
+          {/* AI Repair status panel */}
+          <DraftAiRepairSection draft={localDraft} />
 
           <div className="space-y-2">
             <p className="text-sm font-semibold text-slate-700">

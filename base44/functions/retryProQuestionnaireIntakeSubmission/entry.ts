@@ -1,14 +1,10 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 const parsePayload = (value) => {
   if (!value) return null;
   if (typeof value === 'object') return value;
   if (typeof value !== 'string') return null;
-  try {
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
+  try { return JSON.parse(value); } catch { return null; }
 };
 
 const safeError = (error) => {
@@ -36,13 +32,14 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const intakeId = typeof body?.intakeId === 'string' ? body.intakeId : '';
-    // Accept both questionnaireSessionId (new) and session_id (legacy alias from ProFormDraftRecovery UI)
+
+    // Accept both questionnaireSessionId (canonical) and session_id (alias for backward compat
+    // with ProFormDraftRecovery.jsx which previously sent session_id)
     const questionnaireSessionId =
       typeof body?.questionnaireSessionId === 'string' ? body.questionnaireSessionId :
       typeof body?.session_id === 'string' ? body.session_id : '';
+
     const forceRetry = Boolean(body?.forceRetry);
-    // useAiRepair: if true and direct create fails, escalate to AI repair function
-    const useAiRepair = Boolean(body?.useAiRepair);
 
     if (!intakeId && !questionnaireSessionId) {
       return Response.json({ success: false, error: { message: 'intakeId or questionnaireSessionId is required' } }, { status: 400 });
@@ -61,12 +58,7 @@ Deno.serve(async (req) => {
     }
 
     if (intake.linked_submission_id && !forceRetry) {
-      return Response.json({
-        success: true,
-        alreadySubmitted: true,
-        linkedSubmissionId: intake.linked_submission_id,
-        intakeId: intake.id
-      });
+      return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: intake.linked_submission_id, intakeId: intake.id });
     }
 
     if (intake.questionnaire_session_id) {
@@ -82,12 +74,7 @@ Deno.serve(async (req) => {
           last_retry_at: new Date().toISOString(),
           retry_count: incrementRetryCount(intake.retry_count)
         });
-        return Response.json({
-          success: true,
-          alreadySubmitted: true,
-          linkedSubmissionId: existingSubmission.id,
-          intakeId: intake.id
-        });
+        return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: existingSubmission.id, intakeId: intake.id });
       }
     }
 
@@ -100,7 +87,6 @@ Deno.serve(async (req) => {
         last_retry_at: new Date().toISOString(),
         retry_count: incrementRetryCount(intake.retry_count)
       });
-
       return Response.json({ success: false, error: { message: 'Malformed transformed payload JSON' }, intakeId: intake.id }, { status: 400 });
     }
 
@@ -122,12 +108,7 @@ Deno.serve(async (req) => {
     if (intake.linked_submission_id && forceRetry) {
       const linkedList = await base44.asServiceRole.entities.ProFormSubmission.filter({ id: intake.linked_submission_id });
       if (Array.isArray(linkedList) && linkedList.length > 0) {
-        return Response.json({
-          success: true,
-          alreadySubmitted: true,
-          linkedSubmissionId: intake.linked_submission_id,
-          intakeId: intake.id
-        });
+        return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: intake.linked_submission_id, intakeId: intake.id });
       }
     }
 
@@ -140,47 +121,15 @@ Deno.serve(async (req) => {
         last_retry_at: new Date().toISOString(),
         retry_count: incrementRetryCount(intake.retry_count)
       });
-
-      return Response.json({
-        success: true,
-        linkedSubmissionId: submission.id,
-        intakeId: intake.id
-      });
+      return Response.json({ success: true, linkedSubmissionId: submission.id, intakeId: intake.id });
     } catch (error) {
       const serialized = safeError(error);
-
-      // If useAiRepair is requested, escalate to the AI repair function instead of failing
-      if (useAiRepair) {
-        try {
-          const repairRes = await fetch(
-            `https://base44.app/api/apps/${Deno.env.get('BASE44_APP_ID')}/functions/repairProQuestionnaireIntakeSubmission`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': req.headers.get('Authorization') || ''
-              },
-              body: JSON.stringify({
-                intakeId: intake.id,
-                mode: 'repair_and_retry',
-                forceRetry: true
-              })
-            }
-          );
-          const repairData = await repairRes.json();
-          return Response.json({ ...repairData, escalatedToAiRepair: true, intakeId: intake.id });
-        } catch (repairErr) {
-          // Escalation itself failed — fall through to normal failure response
-        }
-      }
-
       await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
         status: 'retry_failed',
         retry_error_json: JSON.stringify(serialized),
         last_retry_at: new Date().toISOString(),
         retry_count: incrementRetryCount(intake.retry_count)
       });
-
       return Response.json({ success: false, error: serialized, intakeId: intake.id }, { status: 500 });
     }
   } catch (error) {
