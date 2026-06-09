@@ -14,6 +14,9 @@ import { Badge } from '@/components/ui/badge';
 import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import QuestionnaireIntakeRecovery from '@/components/admin/QuestionnaireIntakeRecovery';
+import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
+import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
+import { SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 
 const safeJsonParse = (value, fallback = {}) => {
   try {
@@ -43,9 +46,29 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
   const [retrying, setRetrying] = useState(false);
   const parsedResponses = safeJsonParse(draft.responses_json, {});
   const parsedValidation = safeJsonParse(draft.validation_status_json, {});
-  const parsedMappedPayload = safeJsonParse(draft.mapped_payload_json, {});
-  const parsedMetadata = safeJsonParse(draft.metadata_json, {});
-  const parsedUserdata = safeJsonParse(draft.userdata_json, {});
+
+  // Build the final submission payload exactly as it would be sent to ProFormSubmission.create()
+  // Step 1: transform raw responses → raw payload
+  // Step 2: run through repairProSubmissionPayload (same as the real submit path)
+  const { finalSubmissionPayload, repairWarnings } = useMemo(() => {
+    try {
+      const businessName = draft.business_name || '';
+      const domain = draft.domain || '';
+      const rawPayload = transformResponsesToPayload(
+        parsedResponses,
+        businessName,
+        domain,
+        SERVICE_OPTIONS_GROUPED
+      );
+      const { payload, warnings } = repairProSubmissionPayload(rawPayload);
+      return { finalSubmissionPayload: payload, repairWarnings: warnings };
+    } catch (err) {
+      return {
+        finalSubmissionPayload: { error: `Failed to build payload: ${err?.message}` },
+        repairWarnings: []
+      };
+    }
+  }, [parsedResponses, draft.business_name, draft.domain]);
 
   const handleRetry = async (e) => {
     e.stopPropagation();
@@ -67,29 +90,14 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
     }
   };
 
-  const copyResponses = async () => {
-    await navigator.clipboard.writeText(JSON.stringify(parsedResponses, null, 2));
-    toast.success('Responses JSON copied');
+  const copySubmissionPayload = async () => {
+    await navigator.clipboard.writeText(JSON.stringify(finalSubmissionPayload, null, 2));
+    toast.success('Submission payload copied');
   };
 
-  const copyRecoveryBundle = async () => {
-    const recoveryBundle = {
-      session_id: draft.session_id,
-      business_name: draft.business_name,
-      domain: draft.domain,
-      status: draft.status,
-      last_saved_at: draft.last_saved_at,
-      submitted_at: draft.submitted_at,
-      final_submission_id: draft.final_submission_id,
-      metadata: parsedMetadata,
-      userdata: parsedUserdata,
-      mapped_payload: parsedMappedPayload,
-      responses: parsedResponses,
-      validation_status: parsedValidation
-    };
-
-    await navigator.clipboard.writeText(JSON.stringify(recoveryBundle, null, 2));
-    toast.success('Recovery bundle copied');
+  const copyRawResponses = async () => {
+    await navigator.clipboard.writeText(JSON.stringify(parsedResponses, null, 2));
+    toast.success('Raw responses copied');
   };
 
   return (
@@ -171,18 +179,27 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
               <RefreshCw className={`w-4 h-4 ${retrying ? 'animate-spin' : ''}`} />
               {retrying ? 'Retrying...' : 'Retry Submission'}
             </Button>
-            <Button type="button" variant="outline" onClick={copyResponses} className="gap-2">
-              <Copy className="w-4 h-4" /> Copy JSON
+            <Button type="button" variant="outline" onClick={copySubmissionPayload} className="gap-2">
+              <Copy className="w-4 h-4" /> Copy Submission Payload
             </Button>
-            <Button type="button" variant="outline" onClick={copyRecoveryBundle} className="gap-2">
-              <Copy className="w-4 h-4" /> Copy Recovery Bundle
+            <Button type="button" variant="outline" onClick={copyRawResponses} className="gap-2">
+              <Copy className="w-4 h-4" /> Copy Raw Responses
             </Button>
           </div>
 
+          {repairWarnings.length > 0 && (
+            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+              <span className="font-semibold">Repair warnings:</span> {repairWarnings.join(', ')}
+            </div>
+          )}
+
           <div className="space-y-2">
-            <p className="text-sm font-medium text-slate-700">Parsed Responses</p>
-            <pre className="bg-slate-950 text-slate-100 rounded-lg p-4 text-xs overflow-auto max-h-[28rem] whitespace-pre-wrap break-words">
-              {JSON.stringify(parsedResponses, null, 2)}
+            <p className="text-sm font-semibold text-slate-700">
+              Final Submission Payload{' '}
+              <span className="font-normal text-slate-500">(metadata + userdata — exactly as sent to the submission endpoint)</span>
+            </p>
+            <pre className="bg-slate-950 text-slate-100 rounded-lg p-4 text-xs overflow-auto max-h-[40rem] whitespace-pre-wrap break-words">
+              {JSON.stringify(finalSubmissionPayload, null, 2)}
             </pre>
           </div>
         </div>
