@@ -82,6 +82,49 @@
     },
     "notes": {
       "type": "string"
+    },
+    "ai_repair_status": {
+      "type": "string",
+      "description": "Current AI repair lifecycle status (e.g. pending, running, completed, failed, skipped)"
+    },
+    "ai_repair_attempt_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of AI repair attempts made for this intake record"
+    },
+    "last_ai_repair_at": {
+      "type": "string",
+      "description": "ISO timestamp of the most recent AI repair attempt"
+    },
+    "ai_repair_error_json": {
+      "type": "string",
+      "description": "Serialized error details if the AI repair attempt itself failed"
+    },
+    "ai_repair_report_json": {
+      "type": "string",
+      "description": "Full JSON report returned by the pro_submission_repair_agent (decision, diagnosis, changed_paths, warnings, etc.)"
+    },
+    "ai_repaired_payload_json": {
+      "type": "string",
+      "description": "Serialized repaired payload produced by the pro_submission_repair_agent"
+    },
+    "ai_repair_applied": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if the AI-repaired payload was accepted and used in a submission attempt"
+    },
+    "ai_repair_retry_attempted": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if a submission retry was attempted using the AI-repaired payload"
+    },
+    "ai_repair_retry_result_json": {
+      "type": "string",
+      "description": "Serialized result of the submission retry that used the AI-repaired payload"
+    },
+    "ai_repair_source": {
+      "type": "string",
+      "description": "Source context that triggered the AI repair (e.g. admin_manual, scheduled_job, retry_hook)"
     }
   },
   "required": [
