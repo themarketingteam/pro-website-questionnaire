@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Copy, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import QuestionnaireIntakeRecovery from '@/components/admin/QuestionnaireIntakeRecovery';
 
@@ -39,12 +39,33 @@ const formatDate = (value) => {
   return date.toLocaleString();
 };
 
-function DraftRow({ draft, expanded, onToggle, hasDuplicateSession }) {
+function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySuccess }) {
+  const [retrying, setRetrying] = useState(false);
   const parsedResponses = safeJsonParse(draft.responses_json, {});
   const parsedValidation = safeJsonParse(draft.validation_status_json, {});
   const parsedMappedPayload = safeJsonParse(draft.mapped_payload_json, {});
   const parsedMetadata = safeJsonParse(draft.metadata_json, {});
   const parsedUserdata = safeJsonParse(draft.userdata_json, {});
+
+  const handleRetry = async (e) => {
+    e.stopPropagation();
+    setRetrying(true);
+    try {
+      const result = await base44.functions.invoke('retryProQuestionnaireIntakeSubmission', {
+        session_id: draft.session_id
+      });
+      if (result.data?.success) {
+        toast.success(`Submission succeeded for ${draft.business_name || draft.session_id}`);
+        onRetrySuccess?.();
+      } else {
+        toast.error(`Retry failed: ${result.data?.error || 'Unknown error'}`);
+      }
+    } catch (err) {
+      toast.error(`Retry failed: ${err?.message || 'Unknown error'}`);
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   const copyResponses = async () => {
     await navigator.clipboard.writeText(JSON.stringify(parsedResponses, null, 2));
@@ -141,6 +162,15 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession }) {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              onClick={handleRetry}
+              disabled={retrying}
+              className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              <RefreshCw className={`w-4 h-4 ${retrying ? 'animate-spin' : ''}`} />
+              {retrying ? 'Retrying...' : 'Retry Submission'}
+            </Button>
             <Button type="button" variant="outline" onClick={copyResponses} className="gap-2">
               <Copy className="w-4 h-4" /> Copy JSON
             </Button>
@@ -168,6 +198,9 @@ export default function ProFormDraftRecovery() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [expandedId, setExpandedId] = useState('');
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const reloadDrafts = () => setRefreshKey((k) => k + 1);
 
   useEffect(() => {
     let mounted = true;
@@ -202,7 +235,7 @@ export default function ProFormDraftRecovery() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [refreshKey]);
 
   const duplicateSessionIds = useMemo(() => {
     const sessionCounts = drafts.reduce((acc, draft) => {
@@ -298,6 +331,7 @@ export default function ProFormDraftRecovery() {
                 expanded={expandedId === draft.id}
                 onToggle={() => setExpandedId(expandedId === draft.id ? '' : draft.id)}
                 hasDuplicateSession={duplicateSessionIds.has(draft.session_id)}
+                onRetrySuccess={reloadDrafts}
               />
             ))
           )}
