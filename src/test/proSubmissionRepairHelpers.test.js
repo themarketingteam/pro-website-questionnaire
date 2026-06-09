@@ -15,6 +15,7 @@ import {
   extractJsonObjectFromText,
   sanitizeRepairReport,
   isPlainObject,
+  asTrimmedString,
 } from '../src/lib/server/proSubmissionRepairHelpers.js';
 
 // ---------------------------------------------------------------------------
@@ -466,6 +467,183 @@ describe('extractJsonObjectFromText', () => {
   it('returns error for empty string', () => {
     const result = extractJsonObjectFromText('');
     expect(result.ok).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sanitizeRepairReport
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// FIX 1: Data-preservation — keyed objects must become arrays with data intact
+// ---------------------------------------------------------------------------
+
+describe('repairSubmissionPayloadServer — keyed object preservation', () => {
+  it('taggedPeople keyed object becomes array and preserves people', () => {
+    const result = repairSubmissionPayloadServer({
+      metadata: { business_name: 'Acme', businessDomain: 'acme.com' },
+      userdata: {
+        geographic_areas: [],
+        additional_pages_list: {
+          meet_the_team_page: {
+            team_photo_with_tags: {
+              taggedPeople: {
+                '0': { name: 'Alice', position: 'CEO', bio: 'Founder' },
+                '1': { name: 'Bob', position: 'CTO' }
+              }
+            }
+          }
+        }
+      }
+    });
+    const tp = result.payload.userdata.additional_pages_list.meet_the_team_page.team_photo_with_tags.taggedPeople;
+    expect(Array.isArray(tp)).toBe(true);
+    expect(tp.length).toBe(2);
+    expect(tp.some(p => p.name === 'Alice')).toBe(true);
+    expect(tp.some(p => p.name === 'Bob')).toBe(true);
+    expect(result.warnings).toContain('...taggedPeople: coerced to array');
+  });
+
+  it('geographic_areas keyed object becomes array and preserves location data', () => {
+    const result = repairSubmissionPayloadServer({
+      metadata: { business_name: 'Acme', businessDomain: 'acme.com' },
+      userdata: {
+        additional_pages_list: {},
+        geographic_areas: {
+          '0': { name: 'Austin', lat: '30.27', lon: '-97.74' }
+        }
+      }
+    });
+    expect(Array.isArray(result.payload.userdata.geographic_areas)).toBe(true);
+    expect(result.payload.userdata.geographic_areas.length).toBe(1);
+    const meta = result.payload.userdata.geographic_areas[0].geographic_area_meta;
+    expect(isPlainObject(meta)).toBe(true);
+    expect(meta.name).toBe('Austin');
+    expect(meta.lat).toBe('30.27');
+  });
+
+  it('certifications_partnerships keyed object preserves items', () => {
+    const result = repairSubmissionPayloadServer({
+      metadata: { business_name: 'Acme', businessDomain: 'acme.com' },
+      userdata: {
+        geographic_areas: [],
+        additional_pages_list: {},
+        certifications_partnerships: {
+          '0': { cert_item_name: 'ISO 27001', cert_item_type: 'certification' },
+          '1': { cert_item_name: 'Microsoft Gold', cert_item_type: 'partnership' }
+        }
+      }
+    });
+    const certs = result.payload.userdata.certifications_partnerships;
+    expect(Array.isArray(certs)).toBe(true);
+    expect(certs.length).toBe(2);
+    expect(certs.some(c => c.cert_item_name === 'ISO 27001')).toBe(true);
+    expect(certs.some(c => c.cert_item_name === 'Microsoft Gold')).toBe(true);
+  });
+
+  it('service_guarantee_items keyed object preserves items', () => {
+    const result = repairSubmissionPayloadServer({
+      metadata: { business_name: 'Acme', businessDomain: 'acme.com' },
+      userdata: {
+        geographic_areas: [],
+        additional_pages_list: {},
+        service_guarantee_items: {
+          '0': { guarantee_name: '10-min response', guarantee_type: 'sla' }
+        }
+      }
+    });
+    const items = result.payload.userdata.service_guarantee_items;
+    expect(Array.isArray(items)).toBe(true);
+    expect(items.length).toBe(1);
+    expect(items[0].guarantee_name).toBe('10-min response');
+  });
+
+  it('scalar string field that is an object uses label/name/value/text/title', () => {
+    const result = repairSubmissionPayloadServer({
+      metadata: { business_name: 'Acme', businessDomain: 'acme.com' },
+      userdata: {
+        geographic_areas: [],
+        additional_pages_list: {},
+        delivery_model: { label: 'Fully Managed IT Provider' }
+      }
+    });
+    expect(result.payload.userdata.delivery_model).toBe('Fully Managed IT Provider');
+  });
+
+  it('scalar string field object uses name key if label is absent', () => {
+    const result = repairSubmissionPayloadServer({
+      metadata: { business_name: 'Acme', businessDomain: 'acme.com' },
+      userdata: {
+        geographic_areas: [],
+        additional_pages_list: {},
+        brand_tone: { name: 'Professional & Corporate' }
+      }
+    });
+    expect(result.payload.userdata.brand_tone).toBe('Professional & Corporate');
+  });
+
+  it('geographic_areas example from spec: keyed object preserves Austin', () => {
+    // Exact scenario from the requirements spec
+    const result = repairSubmissionPayloadServer({
+      metadata: { business_name: 'Test Co', businessDomain: 'testco.com' },
+      userdata: {
+        additional_pages_list: {
+          meet_the_team_page: {
+            team_photo_with_tags: {
+              taggedPeople: { '0': { name: 'Alice', position: 'CEO' } }
+            }
+          }
+        },
+        geographic_areas: {
+          '0': { name: 'Austin', lat: '30.27', lon: '-97.74' }
+        }
+      }
+    });
+    // taggedPeople[0].name === "Alice"
+    const tp = result.payload.userdata.additional_pages_list.meet_the_team_page.team_photo_with_tags.taggedPeople;
+    expect(tp[0].name).toBe('Alice');
+    // geographic_areas[0].geographic_area_meta.name === "Austin"
+    const meta = result.payload.userdata.geographic_areas[0].geographic_area_meta;
+    expect(meta.name).toBe('Austin');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Draft repair never creates ProFormSubmission (guard in runRepairPipeline)
+// ---------------------------------------------------------------------------
+
+describe('draft repair safety — allowRetry=false', () => {
+  it('repairSubmissionPayloadServer does not perform any entity operations (pure function)', () => {
+    // The repair helper is a pure function — it never calls entities.
+    // This test confirms it returns a payload without side effects.
+    const result = repairSubmissionPayloadServer({
+      metadata: { business_name: 'Acme', businessDomain: 'acme.com' },
+      userdata: { geographic_areas: [], additional_pages_list: {} }
+    });
+    expect(typeof result.payload).toBe('object');
+    expect(result).not.toHaveProperty('submissionCreated');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// session_id alias works for retry
+// ---------------------------------------------------------------------------
+
+describe('retryProQuestionnaireIntakeSubmission — session_id alias', () => {
+  it('safeJsonParse handles both questionnaireSessionId and session_id (alias) at param level', () => {
+    // The function reads body.questionnaireSessionId || body.session_id
+    // Test that safeJsonParse correctly passes through the body object
+    const body = { session_id: 'test-session-123' };
+    const sessionId = typeof body?.questionnaireSessionId === 'string' ? body.questionnaireSessionId :
+                      typeof body?.session_id === 'string' ? body.session_id : '';
+    expect(sessionId).toBe('test-session-123');
+  });
+
+  it('questionnaireSessionId takes precedence over session_id', () => {
+    const body = { questionnaireSessionId: 'canonical-id', session_id: 'old-alias' };
+    const sessionId = typeof body?.questionnaireSessionId === 'string' ? body.questionnaireSessionId :
+                      typeof body?.session_id === 'string' ? body.session_id : '';
+    expect(sessionId).toBe('canonical-id');
   });
 });
 

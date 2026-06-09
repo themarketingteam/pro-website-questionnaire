@@ -17,10 +17,18 @@ const isFileLike = (v) => {
   return hasBinary && hasMeta;
 };
 
+// Extract a human-readable string from a value, checking label/name/value/text/title for objects
 const coerceToString = (v) => {
   if (v === null || v === undefined) return '';
   if (typeof v === 'string') return v;
-  if (Array.isArray(v)) return v.map((i) => (typeof i === 'string' ? i : '')).filter(Boolean).join(', ');
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  if (Array.isArray(v)) return v.map((i) => (typeof i === 'string' ? i : coerceToString(i))).filter(Boolean).join(', ');
+  if (isPlainObject(v)) {
+    for (const key of ['label', 'name', 'value', 'text', 'title']) {
+      if (typeof v[key] === 'string' && v[key].trim()) return v[key].trim();
+    }
+    return '';
+  }
   return '';
 };
 
@@ -114,6 +122,12 @@ const STRING_ARRAY_FIELDS = ['service_offerings','target_industries','pricing_pa
 const OBJECT_ARRAY_FIELDS = ['geographic_areas','certifications_partnerships','service_guarantee_items'];
 const SCALAR_STRING_FIELDS = ['service_offerings_other','target_industries_other','delivery_model','delivery_model_other','pricing_packaging_other','differentiation','company_goals_other','brand_tone','brand_tone_other','sales_process','client_acquisition','client_acquisition_other','website_objectives_other','client_size','client_challenges_other','client_frustrations','client_outcomes_other','value_description','ideal_client','avoided_clients','primary_cta','primary_cta_other','additional_notes','company_description'];
 
+// ─── FIX 1: Data-preserving deterministic repair ─────────────────────────────
+// taggedPeople keyed object → Object.values (preserves people)
+// geographic_areas keyed object → Object.values then normalizeGeographicArea each item
+// certifications_partnerships / service_guarantee_items keyed object → Object.values (preserves items)
+// scalar string fields that are objects → use label/name/value/text/title, not ""
+
 function repairSubmissionPayloadServer(payload, context = {}) {
   const warnings = [], changedPaths = [], errors = [];
   const track = (path, bt, at, reason) => { changedPaths.push({ path, before_type: bt, after_type: at, reason }); warnings.push(`${path}: ${reason}`); };
@@ -127,7 +141,9 @@ function repairSubmissionPayloadServer(payload, context = {}) {
   const trustedName = typeof context.businessName === 'string' ? context.businessName.trim() : '';
   const trustedDomain = typeof context.businessDomain === 'string' ? context.businessDomain.trim() : '';
   if (!p.metadata.business_name && trustedName) { track('metadata.business_name', 'missing', 'string', 'filled from trusted context'); p.metadata.business_name = trustedName; }
-  if (!p.metadata.businessDomain && trustedDomain) { track('metadata.businessDomain', 'missing', 'string', 'filled from trusted context'); p.metadata.businessDomain = trustedDomain; }
+  if (!p.metadata.businessDomain && !p.metadata.business_domain && trustedDomain) { track('metadata.businessDomain', 'missing', 'string', 'filled from trusted context'); p.metadata.businessDomain = trustedDomain; }
+  // Map business_domain → businessDomain
+  if (!p.metadata.businessDomain && p.metadata.business_domain) { p.metadata.businessDomain = p.metadata.business_domain; }
   if (!p.metadata.service_type) { p.metadata.service_type = 'pro'; warnings.push('service_type defaulted to pro'); }
   if (!p.metadata.submission_datetime) { p.metadata.submission_datetime = new Date().toISOString(); warnings.push('submission_datetime set to now'); }
 
@@ -140,45 +156,80 @@ function repairSubmissionPayloadServer(payload, context = {}) {
   const mttp = apl.meet_the_team_page;
   if (!isPlainObject(mttp.team_photo_with_tags)) { track('...team_photo_with_tags', typeof mttp.team_photo_with_tags, 'object', 'not plain object'); mttp.team_photo_with_tags = {}; }
   const tpwt = mttp.team_photo_with_tags;
-  if (tpwt.taggedPeople !== undefined && !Array.isArray(tpwt.taggedPeople)) { track('...taggedPeople', typeof tpwt.taggedPeople, 'array', 'coerced to array'); tpwt.taggedPeople = []; }
+
+  // FIX: taggedPeople keyed object → Object.values (preserves people data)
+  if (tpwt.taggedPeople !== undefined && !Array.isArray(tpwt.taggedPeople)) {
+    track('...taggedPeople', typeof tpwt.taggedPeople, 'array', 'coerced to array');
+    tpwt.taggedPeople = (tpwt.taggedPeople === null)
+      ? []
+      : (isPlainObject(tpwt.taggedPeople) ? Object.values(tpwt.taggedPeople) : []);
+  }
 
   for (const field of STRING_ARRAY_FIELDS) {
     const orig = p.userdata[field];
+    if (orig === undefined) continue;
     if (!Array.isArray(orig)) {
       track(`userdata.${field}`, typeof orig, 'array', 'coerced to array');
-      p.userdata[field] = (typeof orig === 'string' && orig.trim()) ? [orig.trim()] : [];
+      if (typeof orig === 'string' && orig.trim()) {
+        p.userdata[field] = [orig.trim()];
+      } else if (isPlainObject(orig)) {
+        // keyed object of strings → Object.values
+        p.userdata[field] = Object.values(orig).filter(v => typeof v === 'string' && v.trim());
+      } else {
+        p.userdata[field] = [];
+      }
     } else {
       p.userdata[field] = orig.filter((i) => i !== null && i !== undefined && i !== '');
     }
   }
 
+  // FIX: object array fields — keyed objects become Object.values (preserves items)
   for (const field of OBJECT_ARRAY_FIELDS) {
     const orig = p.userdata[field];
+    if (orig === undefined) continue;
     if (!Array.isArray(orig)) {
       track(`userdata.${field}`, typeof orig, 'array', 'coerced to array');
-      p.userdata[field] = isPlainObject(orig) ? [orig] : [];
+      // Keyed object (e.g. {"0": {...}, "1": {...}}) → Object.values preserving each item
+      p.userdata[field] = isPlainObject(orig) ? Object.values(orig).filter(isPlainObject) : [];
     }
   }
 
+  // Normalize geographic_areas items: may be flat objects OR already-wrapped, OR keyed object handled above
   p.userdata.geographic_areas = (p.userdata.geographic_areas || []).map((item, idx) => {
     if (!isPlainObject(item)) return null;
     if (isPlainObject(item.geographic_area_meta)) {
       const meta = item.geographic_area_meta;
+      // Normalize lat/lon aliases
       if (!meta.lat && meta.latitude != null) { meta.lat = String(meta.latitude); delete meta.latitude; }
       if (!meta.lon && (meta.lng != null || meta.longitude != null)) { meta.lon = String(meta.lng ?? meta.longitude); delete meta.lng; delete meta.longitude; }
       if (!meta.place_id && meta.placeId) { meta.place_id = meta.placeId; delete meta.placeId; }
       if (!meta.source) meta.source = 'manual';
       return item;
     }
-    const name = String(item.name || item.label || item.city || '').trim();
+    // Flat item — wrap it
+    const name = String(item.name || item.label || item.city || item.location || '').trim();
     if (!name) return null;
     track(`userdata.geographic_areas[${idx}]`, 'flat', 'wrapped', 'wrapped in geographic_area_meta');
-    return { geographic_area_meta: { name, label: String(item.label || item.name || '').trim(), lat: item.latitude != null ? String(item.latitude) : (item.lat || ''), lon: item.longitude != null ? String(item.longitude) : (item.lon || item.lng || ''), place_id: String(item.place_id || item.placeId || '').trim(), source: String(item.source || 'manual'), primary: Boolean(item.primary) || idx === 0 } };
+    return {
+      geographic_area_meta: {
+        name,
+        label: String(item.label || item.name || '').trim(),
+        lat: item.latitude != null ? String(item.latitude) : (item.lat || ''),
+        lon: item.longitude != null ? String(item.longitude) : (item.lon || item.lng || ''),
+        place_id: String(item.place_id || item.placeId || '').trim(),
+        source: String(item.source || 'manual'),
+        primary: Boolean(item.primary) || idx === 0
+      }
+    };
   }).filter(Boolean);
 
+  // FIX: scalar string fields — use label/name/value/text/title from objects instead of ""
   for (const field of SCALAR_STRING_FIELDS) {
     const orig = p.userdata[field];
-    if (orig !== undefined && typeof orig !== 'string') { track(`userdata.${field}`, Array.isArray(orig) ? 'array' : typeof orig, 'string', 'coerced to string'); p.userdata[field] = coerceToString(orig); }
+    if (orig !== undefined && typeof orig !== 'string') {
+      track(`userdata.${field}`, Array.isArray(orig) ? 'array' : typeof orig, 'string', 'coerced to string');
+      p.userdata[field] = coerceToString(orig);
+    }
   }
 
   let cleaned = stripFileLike(p);
@@ -212,7 +263,9 @@ function validateSubmissionPayloadServer(payload) {
 // ─── Base44 Agent invocation ─────────────────────────────────────────────────
 
 async function invokeRepairAgent(prompt, timeoutMs = 50000) {
+  // eslint-disable-next-line no-undef
   const appId = Deno.env.get('BASE44_APP_ID');
+  // eslint-disable-next-line no-undef
   const serviceRoleKey = Deno.env.get('BASE44_SERVICE_ROLE_KEY');
   if (!appId || !serviceRoleKey) return { ok: false, json: null, rawContent: '', error: 'missing_env_credentials' };
 
@@ -267,39 +320,87 @@ async function emitEvent(base44, sessionId, eventType, context = {}) {
   } catch { /* audit failure must not block main flow */ }
 }
 
-// ─── Agent prompt builder ─────────────────────────────────────────────────────
+// ─── FIX 2 & 3: Improved prompt builder and pipeline ─────────────────────────
+// The prompt now receives the raw failed payload string (even if unparseable),
+// plus all error fields so the AI can diagnose the actual failure.
 
-function buildRepairPrompt({ rawPayloadStr, rawResponsesStr, primaryError, fallbackError, retryError, businessName, businessDomain, sessionId }) {
+function buildRepairPrompt({
+  rawPayload,
+  rawPayloadRawString,
+  rawResponsesRawString,
+  primaryErrorRawString,
+  fallbackErrorRawString,
+  retryErrorRawString,
+  diagnosticsRawString,
+  context,
+  sessionId
+}) {
   const schema = `Required shape: { metadata: { business_name: string, businessDomain: string, submission_datetime: string, service_type: "pro" }, userdata: { additional_pages_list: object, service_offerings: string[], target_industries: string[], geographic_areas: [{geographic_area_meta:{name,label,lat,lon,place_id,source,primary}}], pricing_packaging: string[], company_goals: string[], certifications_partnerships: object[], service_guarantee_items: object[], website_objectives: string[], client_challenges: string[], client_outcomes: string[], delivery_model: string, brand_tone: string, company_description: string, differentiation: string, sales_process: string, client_acquisition: string, client_size: string, client_frustrations: string, value_description: string, ideal_client: string, avoided_clients: string, primary_cta: string, additional_notes: string } }`;
 
   const lines = [
-    'TASK: Repair the structural/type errors in the following Pro Questionnaire submission payload.',
-    'CONSTRAINTS: Do NOT invent missing business_name or businessDomain. Do NOT add fake data. Do NOT rewrite any text field. Only fix JSON structure and types.',
+    'TASK: Repair structural and type errors in this Pro Questionnaire submission payload.',
     '',
-    `Business Name (trusted): ${businessName || '(unknown)'}`,
-    `Business Domain (trusted): ${businessDomain || '(unknown)'}`,
-    `Session ID: ${sessionId || '(unknown)'}`,
+    'STRICT CONSTRAINTS:',
+    '  1. Do NOT invent business_name or businessDomain — use only the trusted values provided below.',
+    '  2. Do NOT add, fabricate, or hallucinate any answer content.',
+    '  3. Do NOT rewrite any text field. Preserve all client-submitted values exactly.',
+    '  4. Only fix JSON structure and types (arrays vs objects, missing wrappers, wrong field names).',
+    '  5. Use raw_responses only to recover submitted structure, never to invent new answers.',
+    '  6. Return ONLY the strict JSON contract below — no markdown, no prose outside JSON.',
     '',
-    `SCHEMA REFERENCE: ${schema}`,
+    `TRUSTED CONTEXT (do not override these):`,
+    `  Business Name: ${context.businessName || '(unknown)'}`,
+    `  Business Domain: ${context.businessDomain || '(unknown)'}`,
+    `  Session ID: ${sessionId || '(unknown)'}`,
     '',
-    'FAILED PAYLOAD (may be malformed):',
-    (rawPayloadStr || '(none)').slice(0, 8000),
+    `SCHEMA REFERENCE:`,
+    schema,
+    '',
+    'FAILED PAYLOAD (this is the raw stored string — may be malformed or unparseable):',
+    // FIX 2: Always include the raw string even if unparseable
+    (rawPayloadRawString || '(not available)').slice(0, 8000),
   ];
 
-  if (rawResponsesStr) { lines.push('', 'RAW RESPONSES:', rawResponsesStr.slice(0, 2000)); }
-  if (primaryError) { lines.push('', 'PRIMARY ERROR:', String(primaryError).slice(0, 500)); }
-  if (fallbackError) { lines.push('', 'FALLBACK ERROR:', String(fallbackError).slice(0, 500)); }
-  if (retryError) { lines.push('', 'RETRY ERROR:', String(retryError).slice(0, 500)); }
+  // Also include the parsed version if available
+  if (rawPayload && isPlainObject(rawPayload)) {
+    lines.push('', 'PARSED PAYLOAD (same data, successfully parsed):');
+    lines.push(JSON.stringify(rawPayload, null, 2).slice(0, 4000));
+  }
 
-  lines.push('', 'Respond with ONLY a JSON object matching the required response contract. No markdown. No prose outside JSON.');
+  if (rawResponsesRawString) { lines.push('', 'RAW QUESTIONNAIRE RESPONSES (use only to recover structure, not to invent answers):', rawResponsesRawString.slice(0, 2000)); }
+  if (primaryErrorRawString) { lines.push('', 'PRIMARY SUBMISSION ERROR:', primaryErrorRawString.slice(0, 500)); }
+  if (fallbackErrorRawString) { lines.push('', 'FALLBACK SUBMISSION ERROR:', fallbackErrorRawString.slice(0, 500)); }
+  if (retryErrorRawString) { lines.push('', 'RETRY ERROR:', retryErrorRawString.slice(0, 500)); }
+  if (diagnosticsRawString) { lines.push('', 'DIAGNOSTICS:', diagnosticsRawString.slice(0, 500)); }
+
+  lines.push(
+    '',
+    'RESPONSE CONTRACT (return this exact JSON shape):',
+    '{ "decision": "repair" | "not_safe_to_repair" | "needs_human_review", "confidence": 0.0-1.0, "should_retry_submission": bool, "diagnosis": "string", "repair_summary": ["..."], "changed_paths": [{"path":"...","before_type":"...","after_type":"...","reason":"..."}], "warnings": ["..."], "repaired_payload": { ...full repaired payload... } }',
+    '',
+    'Respond with ONLY the JSON object above. No markdown. No prose outside JSON.'
+  );
 
   return lines.join('\n');
 }
 
 // ─── Core repair logic (shared between intake and draft) ─────────────────────
 
-async function runRepairPipeline({ base44, rawPayload, context, mode, sessionId, allowRetry }) {
-  // Step 1: Deterministic repair
+async function runRepairPipeline({
+  base44,
+  rawPayload,          // parsed payload (may be {} if parsing failed)
+  rawPayloadRawString, // original stored string — always pass even if unparseable
+  rawResponsesRawString,
+  primaryErrorRawString,
+  fallbackErrorRawString,
+  retryErrorRawString,
+  diagnosticsRawString,
+  context,
+  mode,
+  sessionId,
+  allowRetry
+}) {
+  // Step 1: Deterministic repair (uses parsed rawPayload, ok if {})
   const detResult = repairSubmissionPayloadServer(rawPayload, context);
   const detValidation = validateSubmissionPayloadServer(detResult.payload);
   const deterministicOk = detResult.ok && detValidation.ok;
@@ -322,11 +423,16 @@ async function runRepairPipeline({ base44, rawPayload, context, mode, sessionId,
     };
   }
 
-  // Step 2: Call AI agent
+  // Step 2: Call AI agent — pass ALL context including original raw string
   const prompt = buildRepairPrompt({
-    rawPayloadStr: JSON.stringify(rawPayload, null, 2),
-    businessName: context.businessName,
-    businessDomain: context.businessDomain,
+    rawPayload,
+    rawPayloadRawString,
+    rawResponsesRawString,
+    primaryErrorRawString,
+    fallbackErrorRawString,
+    retryErrorRawString,
+    diagnosticsRawString,
+    context,
     sessionId
   });
 
@@ -379,6 +485,7 @@ async function runRepairPipeline({ base44, rawPayload, context, mode, sessionId,
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
+// eslint-disable-next-line no-undef
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -401,7 +508,7 @@ Deno.serve(async (req) => {
 
     const now = new Date().toISOString();
 
-    // ── DRAFT MODE ────────────────────────────────────────────────────────────
+    // ── DRAFT MODE (never creates ProFormSubmission) ───────────────────────────
     if (draftId && !intakeId && !questionnaireSessionId) {
       const draftList = await base44.asServiceRole.entities.ProFormDraft.filter({ id: draftId });
       const draft = Array.isArray(draftList) && draftList.length > 0 ? draftList[0] : null;
@@ -409,6 +516,7 @@ Deno.serve(async (req) => {
 
       // Build candidate payload
       let rawPayload = null;
+      let rawPayloadRawString = draft.mapped_payload_json || '';
       const mappedParsed = safeJsonParse(draft.mapped_payload_json);
       if (mappedParsed.ok && isPlainObject(mappedParsed.value)) {
         rawPayload = mappedParsed.value;
@@ -419,11 +527,19 @@ Deno.serve(async (req) => {
           metadata: isPlainObject(metaParsed.value) ? metaParsed.value : {},
           userdata: isPlainObject(udParsed.value) ? udParsed.value : {}
         };
+        rawPayloadRawString = rawPayloadRawString || (draft.metadata_json || '') + '\n' + (draft.userdata_json || '');
       }
 
       const context = { businessName: draft.business_name, businessDomain: draft.domain };
       const repairResult = await runRepairPipeline({
-        base44, rawPayload, context, mode, sessionId: draft.session_id, allowRetry: false
+        base44,
+        rawPayload,
+        rawPayloadRawString,
+        rawResponsesRawString: draft.responses_json || '',
+        context,
+        mode,
+        sessionId: draft.session_id,
+        allowRetry: false
       });
 
       const updateData = {
@@ -458,14 +574,16 @@ Deno.serve(async (req) => {
 
     if (!intake) return Response.json({ success: false, error: { message: 'Intake record not found' } }, { status: 404 });
 
-    // Guard: already submitted
+    // Guard: already submitted (linked_submission_id set)
     if (intake.linked_submission_id && !forceRetry) {
       return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: intake.linked_submission_id, intakeId: intake.id });
     }
 
-    // Parse intake payload
+    // FIX 2: Keep raw string for AI prompt even if parsing fails
+    const rawPayloadRawString = typeof intake.transformed_payload_json === 'string' ? intake.transformed_payload_json : '';
     const payloadParsed = safeJsonParse(intake.transformed_payload_json);
-    const rawPayload = payloadParsed.ok ? payloadParsed.value : {};
+    // For deterministic repair use {} if parse fails; AI always gets the raw string
+    const rawPayload = (payloadParsed.ok && isPlainObject(payloadParsed.value)) ? payloadParsed.value : {};
 
     const context = {
       businessName: intake.business_name || (isPlainObject(rawPayload?.metadata) ? rawPayload.metadata.business_name : ''),
@@ -479,7 +597,7 @@ Deno.serve(async (req) => {
       ai_repair_source: 'admin_manual'
     };
 
-    // diagnose_only: just repair + validate, save report, no submission
+    // diagnose_only: deterministic structure check only, no AI agent, no submission
     if (mode === 'diagnose_only') {
       const detResult = repairSubmissionPayloadServer(rawPayload, context);
       const detValidation = validateSubmissionPayloadServer(detResult.payload);
@@ -502,7 +620,18 @@ Deno.serve(async (req) => {
 
     // repair_only or repair_and_retry
     const repairResult = await runRepairPipeline({
-      base44, rawPayload, context, mode, sessionId: intake.questionnaire_session_id, allowRetry: mode === 'repair_and_retry'
+      base44,
+      rawPayload,
+      rawPayloadRawString,
+      rawResponsesRawString: intake.raw_responses_json || '',
+      primaryErrorRawString: intake.primary_error_json || '',
+      fallbackErrorRawString: intake.fallback_error_json || '',
+      retryErrorRawString: intake.retry_error_json || '',
+      diagnosticsRawString: intake.diagnostics_json || '',
+      context,
+      mode,
+      sessionId: intake.questionnaire_session_id,
+      allowRetry: mode === 'repair_and_retry'
     });
 
     if (!repairResult.ok) {
@@ -527,7 +656,34 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, mode: 'repair_only', repairSource: repairResult.source, report: repairResult.report, intakeId: intake.id });
     }
 
-    // repair_and_retry: create submission exactly once
+    // ── FIX 4: repair_and_retry — stronger duplicate guard ────────────────────
+    // Ensure questionnaire_session_id is set on payload before create
+    if (intake.questionnaire_session_id && repairResult.payload?.metadata) {
+      repairResult.payload.metadata.questionnaire_session_id = intake.questionnaire_session_id;
+    }
+
+    // Check for existing submission by session ID (even if linked_submission_id not set)
+    if (intake.questionnaire_session_id && !forceRetry) {
+      const existingBySession = await base44.asServiceRole.entities.ProFormSubmission.filter({
+        'metadata.questionnaire_session_id': intake.questionnaire_session_id
+      });
+      if (Array.isArray(existingBySession) && existingBySession.length > 0) {
+        const existing = existingBySession[0];
+        await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
+          ...baseUpdate,
+          status: 'retry_success',
+          linked_submission_id: existing.id,
+          ai_repair_status: 'retry_success',
+          ai_repair_report_json: JSON.stringify(repairResult.report),
+          ai_repaired_payload_json: JSON.stringify(repairResult.payload),
+          ai_repair_retry_attempted: true,
+          ai_repair_retry_result_json: JSON.stringify({ linkedSubmissionId: existing.id, source: 'existing_found_by_session_id' })
+        });
+        return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: existing.id, intakeId: intake.id, mode: 'repair_and_retry' });
+      }
+    }
+
+    // Create submission exactly once
     try {
       const submission = await base44.asServiceRole.entities.ProFormSubmission.create(repairResult.payload);
       const retryResult = { linkedSubmissionId: submission.id };

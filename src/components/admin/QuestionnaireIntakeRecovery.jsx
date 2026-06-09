@@ -220,16 +220,17 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
                 {retrying ? <><Loader2 className="w-3 h-3 animate-spin" /> Retrying...</> : <><RefreshCw className="w-3 h-3" /> Retry Submission</>}
               </Button>
 
-              {/* AI Diagnose */}
+              {/* Diagnose Structure — deterministic only, no AI agent, no submission */}
               <Button
                 size="sm"
                 variant="outline"
                 className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
                 disabled={retrying || aiRunning}
                 onClick={() => onAiAction(intake, 'diagnose_only')}
+                title="Runs deterministic structure validation only. Does not call the AI agent or create a submission."
               >
                 {aiRunning === 'diagnose_only' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Stethoscope className="w-3 h-3" />}
-                AI Diagnose
+                Diagnose Structure
               </Button>
 
               {/* AI Repair Only */}
@@ -334,7 +335,7 @@ export default function QuestionnaireIntakeRecovery() {
     // Keep row expanded while running
     setExpandedId(intake.id);
     try {
-      const modeLabels = { diagnose_only: 'Diagnosis', repair_only: 'Repair', repair_and_retry: 'Repair + Retry' };
+      const modeLabels = { diagnose_only: 'Diagnose Structure', repair_only: 'AI Repair Only', repair_and_retry: 'AI Repair + Retry' };
       const response = await base44.functions.invoke('repairProQuestionnaireIntakeSubmission', {
         intakeId: intake.id,
         questionnaireSessionId: intake.questionnaire_session_id,

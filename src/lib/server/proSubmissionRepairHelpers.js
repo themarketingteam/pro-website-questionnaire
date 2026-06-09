@@ -391,9 +391,12 @@ export function repairSubmissionPayloadServer(rawPayload, context = {}) {
   }
   const tpwt = mttp.team_photo_with_tags;
 
-  if (tpwt.taggedPeople != null && !Array.isArray(tpwt.taggedPeople)) {
+  // taggedPeople null → [], keyed object → Object.values (preserves people data)
+  if (tpwt.taggedPeople !== undefined && !Array.isArray(tpwt.taggedPeople)) {
     const before = typeof tpwt.taggedPeople;
-    tpwt.taggedPeople = isPlainObject(tpwt.taggedPeople) ? Object.values(tpwt.taggedPeople) : [];
+    tpwt.taggedPeople = (tpwt.taggedPeople === null)
+      ? []
+      : (isPlainObject(tpwt.taggedPeople) ? Object.values(tpwt.taggedPeople) : []);
     track('...team_photo_with_tags.taggedPeople', before, 'array', 'coerced to array');
     warnings.push('taggedPeople_coerced_to_array');
   }

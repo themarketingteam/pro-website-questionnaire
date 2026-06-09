@@ -262,15 +262,18 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              onClick={handleRetry}
-              disabled={retrying || aiRepairing}
-              className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <RefreshCw className={`w-4 h-4 ${retrying ? 'animate-spin' : ''}`} />
-              {retrying ? 'Retrying...' : 'Retry Submission'}
-            </Button>
+            {/* FIX 7: Only show Retry Submission for submit_failed / submit_attempted, not for draft-only */}
+            {isFailedSubmit && (
+              <Button
+                type="button"
+                onClick={handleRetry}
+                disabled={retrying || aiRepairing}
+                className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <RefreshCw className={`w-4 h-4 ${retrying ? 'animate-spin' : ''}`} />
+                {retrying ? 'Retrying...' : 'Retry Submission'}
+              </Button>
+            )}
 
             {/* AI Repair Draft JSON — safe for all draft statuses */}
             <Button

@@ -1,17 +1,32 @@
+/**
+ * retryProQuestionnaireIntakeSubmission
+ *
+ * CANONICAL retry function. Accepts:
+ *   - intakeId          — direct record ID lookup
+ *   - questionnaireSessionId — canonical session ID
+ *   - session_id        — backward-compat alias for questionnaireSessionId
+ *   - forceRetry        — bypass duplicate guard
+ *   - useAiRepair       — not yet implemented; returns a clear message directing
+ *                         caller to repairProQuestionnaireIntakeSubmission instead
+ */
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 const parsePayload = (value) => {
   if (!value) return null;
   if (typeof value === 'object') return value;
   if (typeof value !== 'string') return null;
-  try { return JSON.parse(value); } catch { return null; }
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 };
 
 const safeError = (error) => {
   const safe = (error ?? {});
   return {
     message: typeof safe.message === 'string' ? safe.message : 'Unknown error',
-    status: typeof safe.status === 'number' ? safe.status : safe.response?.status ?? null,
+    status: typeof safe.status === 'number' ? safe.status : (safe.response?.status ?? null),
     code: typeof safe.code === 'string' ? safe.code : ''
   };
 };
@@ -21,6 +36,7 @@ const incrementRetryCount = (value) => {
   return Number.isFinite(count) ? count + 1 : 1;
 };
 
+// eslint-disable-next-line no-undef
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -32,17 +48,24 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const intakeId = typeof body?.intakeId === 'string' ? body.intakeId : '';
-
-    // Accept both questionnaireSessionId (canonical) and session_id (alias for backward compat
-    // with ProFormDraftRecovery.jsx which previously sent session_id)
+    // FIX 5: Accept both questionnaireSessionId and session_id alias
     const questionnaireSessionId =
       typeof body?.questionnaireSessionId === 'string' ? body.questionnaireSessionId :
       typeof body?.session_id === 'string' ? body.session_id : '';
-
     const forceRetry = Boolean(body?.forceRetry);
 
+    // FIX 6: useAiRepair is not yet implemented — return clear message
+    if (body?.useAiRepair === true) {
+      return Response.json({
+        success: false,
+        error: {
+          message: 'useAiRepair is not supported in retryProQuestionnaireIntakeSubmission. Use repairProQuestionnaireIntakeSubmission with mode="repair_and_retry" instead.'
+        }
+      }, { status: 400 });
+    }
+
     if (!intakeId && !questionnaireSessionId) {
-      return Response.json({ success: false, error: { message: 'intakeId or questionnaireSessionId is required' } }, { status: 400 });
+      return Response.json({ success: false, error: { message: 'intakeId or questionnaireSessionId (or session_id) is required' } }, { status: 400 });
     }
 
     const intakeList = intakeId
@@ -57,10 +80,17 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: { message: 'Intake record not found' } }, { status: 404 });
     }
 
+    // Guard: linked_submission_id already set
     if (intake.linked_submission_id && !forceRetry) {
-      return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: intake.linked_submission_id, intakeId: intake.id });
+      return Response.json({
+        success: true,
+        alreadySubmitted: true,
+        linkedSubmissionId: intake.linked_submission_id,
+        intakeId: intake.id
+      });
     }
 
+    // Guard: existing submission by session ID
     if (intake.questionnaire_session_id) {
       const existingSubmissions = await base44.asServiceRole.entities.ProFormSubmission.filter({
         'metadata.questionnaire_session_id': intake.questionnaire_session_id
@@ -74,8 +104,27 @@ Deno.serve(async (req) => {
           last_retry_at: new Date().toISOString(),
           retry_count: incrementRetryCount(intake.retry_count)
         });
-        return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: existingSubmission.id, intakeId: intake.id });
+        return Response.json({
+          success: true,
+          alreadySubmitted: true,
+          linkedSubmissionId: existingSubmission.id,
+          intakeId: intake.id
+        });
       }
+    }
+
+    // Guard: forceRetry — verify the existing linked submission actually exists
+    if (intake.linked_submission_id && forceRetry) {
+      const linkedList = await base44.asServiceRole.entities.ProFormSubmission.filter({ id: intake.linked_submission_id });
+      if (Array.isArray(linkedList) && linkedList.length > 0) {
+        return Response.json({
+          success: true,
+          alreadySubmitted: true,
+          linkedSubmissionId: intake.linked_submission_id,
+          intakeId: intake.id
+        });
+      }
+      // Linked submission no longer exists — allow retry to proceed
     }
 
     const transformedPayload = parsePayload(intake.transformed_payload_json);
@@ -83,11 +132,20 @@ Deno.serve(async (req) => {
     if (!transformedPayload) {
       await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
         status: 'retry_failed',
-        retry_error_json: JSON.stringify({ message: 'Malformed transformed payload JSON' }),
+        retry_error_json: JSON.stringify({
+          message: 'Malformed transformed payload JSON — use repairProQuestionnaireIntakeSubmission with mode="repair_and_retry" to recover this record.'
+        }),
         last_retry_at: new Date().toISOString(),
         retry_count: incrementRetryCount(intake.retry_count)
       });
-      return Response.json({ success: false, error: { message: 'Malformed transformed payload JSON' }, intakeId: intake.id }, { status: 400 });
+
+      return Response.json({
+        success: false,
+        error: {
+          message: 'Malformed transformed payload JSON. Use repairProQuestionnaireIntakeSubmission with mode="repair_and_retry" to recover.'
+        },
+        intakeId: intake.id
+      }, { status: 400 });
     }
 
     const metadata = typeof transformedPayload.metadata === 'object' && transformedPayload.metadata ? transformedPayload.metadata : {};
@@ -95,7 +153,7 @@ Deno.serve(async (req) => {
     const businessDomain = typeof metadata.businessDomain === 'string' ? metadata.businessDomain.trim() : '';
 
     if (!businessName || !businessDomain) {
-      const error = { message: 'Missing required metadata fields' };
+      const error = { message: 'Missing required metadata fields (business_name or businessDomain)' };
       await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
         status: 'retry_failed',
         retry_error_json: JSON.stringify(error),
@@ -105,11 +163,9 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error, intakeId: intake.id }, { status: 400 });
     }
 
-    if (intake.linked_submission_id && forceRetry) {
-      const linkedList = await base44.asServiceRole.entities.ProFormSubmission.filter({ id: intake.linked_submission_id });
-      if (Array.isArray(linkedList) && linkedList.length > 0) {
-        return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: intake.linked_submission_id, intakeId: intake.id });
-      }
+    // Ensure questionnaire_session_id is stamped on payload metadata
+    if (intake.questionnaire_session_id && transformedPayload.metadata) {
+      transformedPayload.metadata.questionnaire_session_id = intake.questionnaire_session_id;
     }
 
     try {
@@ -121,7 +177,12 @@ Deno.serve(async (req) => {
         last_retry_at: new Date().toISOString(),
         retry_count: incrementRetryCount(intake.retry_count)
       });
-      return Response.json({ success: true, linkedSubmissionId: submission.id, intakeId: intake.id });
+
+      return Response.json({
+        success: true,
+        linkedSubmissionId: submission.id,
+        intakeId: intake.id
+      });
     } catch (error) {
       const serialized = safeError(error);
       await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
@@ -130,6 +191,7 @@ Deno.serve(async (req) => {
         last_retry_at: new Date().toISOString(),
         retry_count: incrementRetryCount(intake.retry_count)
       });
+
       return Response.json({ success: false, error: serialized, intakeId: intake.id }, { status: 500 });
     }
   } catch (error) {
