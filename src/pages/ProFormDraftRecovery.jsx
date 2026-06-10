@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Wrench } from 'lucide-react';
+import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Wrench, Pencil } from 'lucide-react';
+import DraftEditPanel from '@/components/admin/DraftEditPanel';
 import { toast } from 'sonner';
 import QuestionnaireIntakeRecovery from '@/components/admin/QuestionnaireIntakeRecovery';
 import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
@@ -95,9 +96,10 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
   const [retrying, setRetrying] = useState(false);
   const [aiRepairing, setAiRepairing] = useState(false);
   const [localDraft, setLocalDraft] = useState(draft);
+  const [editing, setEditing] = useState(false);
 
-  // Keep localDraft in sync when parent reloads
-  React.useEffect(() => { setLocalDraft(draft); }, [draft]);
+  // Keep localDraft in sync when parent reloads (but not while editing to avoid clobbering)
+  React.useEffect(() => { if (!editing) setLocalDraft(draft); }, [draft, editing]);
 
   const parsedResponses = safeJsonParse(draft.responses_json, {});
   const parsedValidation = safeJsonParse(draft.validation_status_json, {});
@@ -129,15 +131,23 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
     e.stopPropagation();
     setRetrying(true);
     try {
-      const result = await base44.functions.invoke('retryProQuestionnaireIntakeSubmission', {
-        questionnaireSessionId: draft.session_id,
-        session_id: draft.session_id // backward-compat alias
-      });
+      // If mapped_payload_json is set (manually edited), use direct draft-based retry.
+      // Otherwise fall back to session-based intake lookup.
+      const params = localDraft.mapped_payload_json
+        ? { draftId: localDraft.id }
+        : { questionnaireSessionId: localDraft.session_id, session_id: localDraft.session_id };
+
+      const result = await base44.functions.invoke('retryProQuestionnaireIntakeSubmission', params);
       if (result.data?.success) {
-        toast.success(`Submission succeeded for ${draft.business_name || draft.session_id}`);
+        toast.success(
+          result.data?.alreadySubmitted
+            ? `Already submitted — linked to ${result.data.linkedSubmissionId}`
+            : `Submission succeeded for ${localDraft.business_name || localDraft.session_id}`
+        );
         onRetrySuccess?.();
       } else {
-        toast.error(`Retry failed: ${result.data?.error || 'Unknown error'}`);
+        const errMsg = result.data?.error?.message || result.data?.error || 'Unknown error';
+        toast.error(`Retry failed: ${errMsg}`);
       }
     } catch (err) {
       toast.error(`Retry failed: ${err?.message || 'Unknown error'}`);
@@ -146,8 +156,23 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
     }
   };
 
+  // The "active" payload: manually edited mapped_payload_json takes priority over computed
+  const activeFinalPayload = useMemo(() => {
+    if (localDraft.mapped_payload_json) {
+      try {
+        const p = typeof localDraft.mapped_payload_json === 'string'
+          ? JSON.parse(localDraft.mapped_payload_json)
+          : localDraft.mapped_payload_json;
+        return p;
+      } catch { /* fall through */ }
+    }
+    return finalSubmissionPayload;
+  }, [localDraft.mapped_payload_json, finalSubmissionPayload]);
+
+  const isMappedPayloadOverride = !!localDraft.mapped_payload_json;
+
   const copySubmissionPayload = async () => {
-    await navigator.clipboard.writeText(JSON.stringify(finalSubmissionPayload, null, 2));
+    await navigator.clipboard.writeText(JSON.stringify(activeFinalPayload, null, 2));
     toast.success('Submission payload copied');
   };
 
@@ -247,21 +272,52 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
         <div className="border-t bg-slate-50/60 p-4 space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2 text-sm">
-              <p><span className="font-medium">User Name:</span> {draft.user_name || '—'}</p>
-              <p><span className="font-medium">User ID:</span> {draft.user_id || '—'}</p>
-              <p><span className="font-medium">Submit Attempted:</span> {formatDate(draft.submit_attempted_at)}</p>
-              <p><span className="font-medium">Submitted At:</span> {formatDate(draft.submitted_at)}</p>
-              <p><span className="font-medium">Final Submission ID:</span> {draft.final_submission_id || '—'}</p>
+              <p><span className="font-medium">Business Name:</span> {localDraft.business_name || '—'}</p>
+              <p><span className="font-medium">Domain:</span> {localDraft.domain || '—'}</p>
+              <p><span className="font-medium">User Name:</span> {localDraft.user_name || '—'}</p>
+              <p><span className="font-medium">User Email:</span> {localDraft.user_email || '—'}</p>
+              <p><span className="font-medium">User ID:</span> {localDraft.user_id || '—'}</p>
+              <p><span className="font-medium">Final Submission ID:</span> {localDraft.final_submission_id || '—'}</p>
             </div>
             <div className="space-y-2 text-sm">
-              <p><span className="font-medium">Current Question:</span> {draft.current_question_id || '—'}</p>
-              <p><span className="font-medium">Last Changed At:</span> {formatDate(draft.last_changed_at)}</p>
-              <p><span className="font-medium">Save Error:</span> {draft.save_error || '—'}</p>
-              <p><span className="font-medium">Submit Error:</span> {draft.submit_error || '—'}</p>
+              <p><span className="font-medium">Submit Attempted:</span> {formatDate(localDraft.submit_attempted_at)}</p>
+              <p><span className="font-medium">Submitted At:</span> {formatDate(localDraft.submitted_at)}</p>
+              <p><span className="font-medium">Current Question:</span> {localDraft.current_question_id || '—'}</p>
+              <p><span className="font-medium">Last Changed At:</span> {formatDate(localDraft.last_changed_at)}</p>
+              <p><span className="font-medium">Save Error:</span> {localDraft.save_error || '—'}</p>
+              <p><span className="font-medium">Submit Error:</span> {localDraft.submit_error || '—'}</p>
             </div>
           </div>
 
+          {/* Edit panel */}
+          {editing ? (
+            <DraftEditPanel
+              draft={localDraft}
+              computedPayload={finalSubmissionPayload}
+              onSaved={(updated) => {
+                setLocalDraft(prev => ({ ...prev, ...updated }));
+                setEditing(false);
+                toast.success('Draft updated — payload preview refreshed');
+              }}
+              onCancel={() => setEditing(false)}
+            />
+          ) : null}
+
           <div className="flex flex-wrap gap-2">
+            {/* Edit Draft — always available */}
+            {!editing && (
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2 border-slate-300 text-slate-700 hover:bg-slate-100"
+                onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+                disabled={retrying || aiRepairing}
+              >
+                <Pencil className="w-4 h-4" />
+                Edit Draft
+              </Button>
+            )}
+
             {/* FIX 7: Only show Retry Submission for submit_failed / submit_attempted, not for draft-only */}
             {isFailedSubmit && (
               <Button
@@ -328,12 +384,17 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
           <DraftAiRepairSection draft={localDraft} />
 
           <div className="space-y-2">
-            <p className="text-sm font-semibold text-slate-700">
-              Final Submission Payload{' '}
-              <span className="font-normal text-slate-500">(metadata + userdata — exactly as sent to the submission endpoint)</span>
-            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-semibold text-slate-700">Final Submission Payload</p>
+              {isMappedPayloadOverride ? (
+                <Badge className="bg-blue-100 text-blue-800 text-xs">Manually edited — mapped_payload_json</Badge>
+              ) : (
+                <Badge className="bg-slate-100 text-slate-600 text-xs">Computed from responses_json</Badge>
+              )}
+              <span className="text-xs text-slate-500">(used by Retry Submission)</span>
+            </div>
             <pre className="bg-slate-950 text-slate-100 rounded-lg p-4 text-xs overflow-auto max-h-[40rem] whitespace-pre-wrap break-words">
-              {JSON.stringify(finalSubmissionPayload, null, 2)}
+              {JSON.stringify(activeFinalPayload, null, 2)}
             </pre>
           </div>
         </div>
