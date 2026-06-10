@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Wrench, Pencil } from 'lucide-react';
+import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Wrench, Pencil, Stethoscope, Loader2 } from 'lucide-react';
 import DraftEditPanel from '@/components/admin/DraftEditPanel';
 import { toast } from 'sonner';
 import QuestionnaireIntakeRecovery from '@/components/admin/QuestionnaireIntakeRecovery';
@@ -94,9 +94,12 @@ function DraftAiRepairSection({ draft }) {
 
 function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySuccess }) {
   const [retrying, setRetrying] = useState(false);
-  const [aiRepairing, setAiRepairing] = useState(false);
+  // aiRunning: null | 'diagnose_only' | 'repair_only' | 'repair_and_retry'
+  const [aiRunning, setAiRunning] = useState(null);
   const [localDraft, setLocalDraft] = useState(draft);
   const [editing, setEditing] = useState(false);
+
+  const isWorking = retrying || !!aiRunning;
 
   // Keep localDraft in sync when parent reloads (but not while editing to avoid clobbering)
   React.useEffect(() => { if (!editing) setLocalDraft(draft); }, [draft, editing]);
@@ -156,6 +159,40 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
     }
   };
 
+  const handleAiAction = async (e, mode) => {
+    e.stopPropagation();
+    setAiRunning(mode);
+    const modeLabels = {
+      diagnose_only: 'AI Diagnose',
+      repair_only: 'AI Repair Only',
+      repair_and_retry: 'AI Repair + Retry'
+    };
+    try {
+      const result = await base44.functions.invoke('repairProQuestionnaireIntakeSubmission', {
+        draftId: localDraft.id,
+        mode,
+        autoRetry: mode === 'repair_and_retry',
+        forceRetry: false
+      });
+      const data = result?.data;
+      if (data?.success) {
+        if (data?.linkedSubmissionId) {
+          toast.success(`AI Repair + Retry succeeded — Submission: ${data.linkedSubmissionId}`);
+        } else {
+          toast.success(`${modeLabels[mode]} completed`);
+        }
+        onRetrySuccess?.();
+      } else {
+        const errMsg = data?.error?.message || data?.errors?.[0] || `${modeLabels[mode]} failed`;
+        toast.error(errMsg);
+      }
+    } catch (err) {
+      toast.error(err?.message || `${modeLabels[mode]} failed`);
+    } finally {
+      setAiRunning(null);
+    }
+  };
+
   // The "active" payload: manually edited mapped_payload_json takes priority over computed
   const activeFinalPayload = useMemo(() => {
     if (localDraft.mapped_payload_json) {
@@ -193,29 +230,6 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
     toast.success('AI repair report copied');
   };
 
-  const handleAiRepair = async (e) => {
-    e.stopPropagation();
-    setAiRepairing(true);
-    try {
-      const result = await base44.functions.invoke('repairProQuestionnaireIntakeSubmission', {
-        draftId: draft.id,
-        mode: 'repair_only'
-      });
-      if (result.data?.success) {
-        toast.success('AI repair completed — repaired payload saved to draft');
-        onRetrySuccess?.(); // reload parent list to get updated draft fields
-      } else {
-        toast.error(result.data?.errors?.[0] || result.data?.error?.message || 'AI repair failed');
-      }
-    } catch (err) {
-      toast.error(err?.message || 'AI repair failed');
-    } finally {
-      setAiRepairing(false);
-    }
-  };
-
-  const isDraftOnly = draft.status === 'draft';
-  const isFailedSubmit = draft.status === 'submit_failed' || draft.status === 'submit_attempted';
 
   return (
     <Card className="overflow-hidden">
@@ -303,76 +317,100 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
             />
           ) : null}
 
-          <div className="flex flex-wrap gap-2">
-            {/* Edit Draft — always available */}
-            {!editing && (
-              <Button
-                type="button"
-                variant="outline"
-                className="gap-2 border-slate-300 text-slate-700 hover:bg-slate-100"
-                onClick={(e) => { e.stopPropagation(); setEditing(true); }}
-                disabled={retrying || aiRepairing}
-              >
-                <Pencil className="w-4 h-4" />
-                Edit Draft
-              </Button>
-            )}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</p>
+            <div className="flex flex-wrap gap-2">
+              {/* Edit Draft — always available */}
+              {!editing && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 border-slate-300 text-slate-700 hover:bg-slate-100"
+                  onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+                  disabled={isWorking}
+                >
+                  <Pencil className="w-3 h-3" />
+                  Edit Draft
+                </Button>
+              )}
 
-            {/* FIX 7: Only show Retry Submission for submit_failed / submit_attempted, not for draft-only */}
-            {isFailedSubmit && (
+              {/* Retry Submission — all statuses (draft may also need direct submit) */}
               <Button
                 type="button"
+                size="sm"
                 onClick={handleRetry}
-                disabled={retrying || aiRepairing}
+                disabled={isWorking}
                 className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
               >
-                <RefreshCw className={`w-4 h-4 ${retrying ? 'animate-spin' : ''}`} />
+                {retrying ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                 {retrying ? 'Retrying...' : 'Retry Submission'}
               </Button>
-            )}
 
-            {/* AI Repair Draft JSON — safe for all draft statuses */}
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-              disabled={retrying || aiRepairing}
-              onClick={handleAiRepair}
-              title="Runs AI repair on the draft JSON. Does NOT create a final submission."
-            >
-              <Wrench className={`w-4 h-4 ${aiRepairing ? 'animate-spin' : ''}`} />
-              {aiRepairing ? 'Repairing...' : 'AI Repair Draft JSON'}
-            </Button>
+              {/* AI Diagnose — runs diagnostics only, no changes, no submission */}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
+                disabled={isWorking}
+                onClick={(e) => handleAiAction(e, 'diagnose_only')}
+                title="Runs structure validation only. Does not change the draft or create a submission."
+              >
+                {aiRunning === 'diagnose_only' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Stethoscope className="w-3 h-3" />}
+                {aiRunning === 'diagnose_only' ? 'Diagnosing...' : 'AI Diagnose'}
+              </Button>
 
-            <Button type="button" variant="outline" onClick={copySubmissionPayload} className="gap-2" disabled={retrying || aiRepairing}>
-              <Copy className="w-4 h-4" /> Copy Submission Payload
-            </Button>
-            <Button type="button" variant="outline" onClick={copyRawResponses} className="gap-2" disabled={retrying || aiRepairing}>
-              <Copy className="w-4 h-4" /> Copy Raw Responses
-            </Button>
-            {localDraft.ai_repaired_payload_json && (
-              <Button type="button" variant="outline" onClick={copyAiRepairedPayload} className="gap-2 border-indigo-200 text-indigo-700">
-                <Copy className="w-4 h-4" /> Copy AI Repaired Payload
+              {/* AI Repair Only — repairs and saves to draft, does NOT create submission */}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="gap-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                disabled={isWorking}
+                onClick={(e) => handleAiAction(e, 'repair_only')}
+                title="Diagnoses and repairs the draft payload. Does NOT create a final submission."
+              >
+                {aiRunning === 'repair_only' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
+                {aiRunning === 'repair_only' ? 'Repairing...' : 'AI Repair Only'}
               </Button>
-            )}
-            {localDraft.ai_repair_report_json && (
-              <Button type="button" variant="outline" onClick={copyAiReport} className="gap-2 border-indigo-200 text-indigo-700">
-                <Copy className="w-4 h-4" /> Copy AI Report
+
+              {/* AI Repair + Retry — diagnose, repair, then create submission */}
+              <Button
+                type="button"
+                size="sm"
+                className="gap-2 bg-indigo-700 hover:bg-indigo-800 text-white"
+                disabled={isWorking}
+                onClick={(e) => handleAiAction(e, 'repair_and_retry')}
+                title="Diagnoses, repairs, then attempts to create a final ProFormSubmission."
+              >
+                {aiRunning === 'repair_and_retry' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
+                {aiRunning === 'repair_and_retry' ? 'Running...' : 'AI Repair + Retry ⚡'}
               </Button>
-            )}
+            </div>
+
+            <p className="text-xs text-slate-400">⚡ AI Repair + Retry will attempt to create a final ProFormSubmission if repair succeeds.</p>
+
+            {/* Copy utilities */}
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button type="button" variant="outline" size="sm" onClick={copySubmissionPayload} className="gap-2" disabled={isWorking}>
+                <Copy className="w-3 h-3" /> Copy Endpoint Payload
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={copyRawResponses} className="gap-2" disabled={isWorking}>
+                <Copy className="w-3 h-3" /> Copy Raw Draft Data
+              </Button>
+              {localDraft.ai_repaired_payload_json && (
+                <Button type="button" variant="outline" size="sm" onClick={copyAiRepairedPayload} className="gap-2 border-indigo-200 text-indigo-700">
+                  <Copy className="w-3 h-3" /> Copy AI Repaired Payload
+                </Button>
+              )}
+              {localDraft.ai_repair_report_json && (
+                <Button type="button" variant="outline" size="sm" onClick={copyAiReport} className="gap-2 border-indigo-200 text-indigo-700">
+                  <Copy className="w-3 h-3" /> Copy AI Report
+                </Button>
+              )}
+            </div>
           </div>
-
-          {/* Safety notice for submit-failed drafts */}
-          {isFailedSubmit && (
-            <div className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
-              <strong>Note:</strong> AI Repair Draft JSON saves the repaired payload to this draft record but does NOT create a ProFormSubmission. To retry a failed submission, use the <strong>Questionnaire Intake Recovery</strong> section above, or click <strong>Retry Submission</strong> to attempt directly.
-            </div>
-          )}
-          {isDraftOnly && (
-            <div className="text-xs text-slate-600 bg-slate-100 border border-slate-200 rounded p-2">
-              This draft has not been submitted yet. AI Repair stores a corrected payload — no submission will be created.
-            </div>
-          )}
 
           {repairWarnings.length > 0 && (
             <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
