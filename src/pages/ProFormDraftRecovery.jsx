@@ -241,8 +241,8 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
         <CardContent className="p-4">
           <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_auto_1fr_1fr_1fr] items-start">
             <div>
-              <p className="font-medium text-slate-900">{draft.business_name || 'Unnamed business'}</p>
-              <p className="text-sm text-slate-500 break-all">{draft.domain || '—'}</p>
+              <p className="font-medium text-slate-900">{localDraft.business_name || 'Unnamed business'}</p>
+              <p className="text-sm text-slate-500 break-all">{localDraft.domain || '—'}</p>
             </div>
             <div>
               <p className="text-sm text-slate-500">User Email</p>
