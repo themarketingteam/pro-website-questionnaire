@@ -72,9 +72,9 @@ export default function DraftEditPanel({ draft, computedPayload, onSaved, onCanc
         mapped_payload_json: JSON.stringify(parsedPayload),
       };
 
-      const updated = await base44.entities.ProFormDraft.update(draft.id, updates);
+      await base44.entities.ProFormDraft.update(draft.id, updates);
       toast.success('Draft saved successfully');
-      onSaved?.(updated);
+      onSaved?.({ ...draft, ...updates });
     } catch (err) {
       toast.error(`Save failed: ${err?.message || 'Unknown error'}`);
     } finally {
