@@ -25,6 +25,30 @@ const incrementRetryCount = (value) => {
   return Number.isFinite(count) ? count + 1 : 1;
 };
 
+// Fire the payload to the Zapier webhook so retries reach the same downstream
+// workflow as normal client submissions. Non-fatal: never breaks the retry.
+const sendToZapierSafe = async (payload) => {
+  try {
+    const webhookUrl = Deno.env.get('ZAPIER_WEBHOOK_URL')?.trim();
+    if (!webhookUrl) return { ok: false, error: 'not_configured' };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      return { ok: res.ok, status: res.status };
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  } catch (error) {
+    return { ok: false, error: error?.message || 'zapier_send_failed' };
+  }
+};
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -119,6 +143,7 @@ Deno.serve(async (req) => {
         final_submission_id: submission.id,
         submitted_at: new Date().toISOString()
       });
+      await sendToZapierSafe(draftPayload);
       return Response.json({ success: true, linkedSubmissionId: submission.id, draftId });
     }
 
@@ -220,6 +245,7 @@ Deno.serve(async (req) => {
         retry_count: incrementRetryCount(intake.retry_count)
       });
 
+      await sendToZapierSafe(transformedPayload);
       return Response.json({
         success: true,
         linkedSubmissionId: submission.id,

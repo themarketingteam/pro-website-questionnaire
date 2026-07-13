@@ -8,6 +8,30 @@ const isPlainObject = (v) => {
   return p === Object.prototype || p === null;
 };
 
+// Fire the payload to the Zapier webhook so repair-and-retry submissions reach
+// the same downstream workflow as normal client submissions. Non-fatal.
+const sendToZapierSafe = async (payload) => {
+  try {
+    const webhookUrl = Deno.env.get('ZAPIER_WEBHOOK_URL')?.trim();
+    if (!webhookUrl) return { ok: false, error: 'not_configured' };
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
+    try {
+      const res = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+      return { ok: res.ok, status: res.status };
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  } catch (error) {
+    return { ok: false, error: error?.message || 'zapier_send_failed' };
+  }
+};
+
 const isFileLike = (v) => {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
   const tag = v?.constructor?.name || '';
@@ -701,6 +725,7 @@ Deno.serve(async (req) => {
         last_retry_at: now,
         retry_count: (Number(intake.retry_count) || 0) + 1
       });
+      await sendToZapierSafe(repairResult.payload);
       await emitEvent(base44, intake.questionnaire_session_id, 'ai_repair_retry_succeeded', context);
       return Response.json({ success: true, mode: 'repair_and_retry', linkedSubmissionId: submission.id, repairSource: repairResult.source, report: repairResult.report, intakeId: intake.id });
     } catch (createErr) {

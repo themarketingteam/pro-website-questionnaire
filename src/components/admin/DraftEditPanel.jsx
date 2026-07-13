@@ -65,9 +65,23 @@ export default function DraftEditPanel({ draft, computedPayload, onSaved, onCanc
 
     setSaving(true);
     try {
+      const trimmedName = businessName.trim();
+      const trimmedDomain = domain.trim();
+
+      // Sync the business name + domain from the input fields into the payload
+      // metadata so the draft record fields AND the JSON payload stay in sync.
+      if (parsedPayload && typeof parsedPayload === 'object' && !Array.isArray(parsedPayload)) {
+        const metadata = (typeof parsedPayload.metadata === 'object' && parsedPayload.metadata)
+          ? parsedPayload.metadata
+          : {};
+        metadata.business_name = trimmedName;
+        metadata.businessDomain = trimmedDomain;
+        parsedPayload.metadata = metadata;
+      }
+
       const updates = {
-        business_name: businessName.trim(),
-        domain: domain.trim(),
+        business_name: trimmedName,
+        domain: trimmedDomain,
         user_email: userEmail.trim(),
         mapped_payload_json: JSON.stringify(parsedPayload),
       };
