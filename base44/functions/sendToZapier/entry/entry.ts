@@ -11,22 +11,7 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json();
-    const webhookUrl = Deno.env.get('ZAPIER_WEBHOOK_URL')?.trim();
-
-    if (!webhookUrl) {
-      console.error('Zapier webhook URL is not configured');
-
-      return Response.json(
-        {
-          success: false,
-          error: 'Zapier webhook URL is not configured'
-        },
-        {
-          status: 500,
-          headers: corsHeaders
-        }
-      );
-    }
+    const webhookUrl = 'https://hooks.zapier.com/hooks/catch/25964219/uas7p60/';
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);

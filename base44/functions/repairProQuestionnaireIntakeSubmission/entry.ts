@@ -12,8 +12,7 @@ const isPlainObject = (v) => {
 // the same downstream workflow as normal client submissions. Non-fatal.
 const sendToZapierSafe = async (payload) => {
   try {
-    const webhookUrl = Deno.env.get('ZAPIER_WEBHOOK_URL')?.trim();
-    if (!webhookUrl) return { ok: false, error: 'not_configured' };
+    const webhookUrl = 'https://hooks.zapier.com/hooks/catch/25964219/uas7p60/';
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
     try {
