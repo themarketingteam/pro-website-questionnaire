@@ -285,38 +285,26 @@ function validateSubmissionPayloadServer(payload) {
 
 // ─── Base44 Agent invocation ─────────────────────────────────────────────────
 
-async function invokeRepairAgent(prompt, timeoutMs = 50000) {
-  // eslint-disable-next-line no-undef
-  const appId = Deno.env.get('BASE44_APP_ID');
-  // eslint-disable-next-line no-undef
-  const serviceRoleKey = Deno.env.get('BASE44_SERVICE_ROLE_KEY');
-  if (!appId || !serviceRoleKey) return { ok: false, json: null, rawContent: '', error: 'missing_env_credentials' };
-
-  const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${serviceRoleKey}` };
-  const base = `https://base44.app/api/apps/${appId}/agents/conversations`;
-
-  let convId;
+async function invokeRepairAgent(base44, prompt, timeoutMs = 50000) {
+  let conversation;
   try {
-    const r = await fetch(base, { method: 'POST', headers, body: JSON.stringify({ agent_name: 'pro_submission_repair_agent', metadata: { source: 'repair_function' } }) });
-    if (!r.ok) return { ok: false, json: null, rawContent: '', error: `create_conv_${r.status}` };
-    const c = await r.json();
-    convId = c?.id;
-    if (!convId) return { ok: false, json: null, rawContent: '', error: 'no_conversation_id' };
-  } catch (e) { return { ok: false, json: null, rawContent: '', error: `create_conv_exception: ${e.message}` }; }
+    conversation = await base44.asServiceRole.agents.createConversation({
+      agent_name: 'pro_submission_repair_agent',
+      metadata: { source: 'repair_function' }
+    });
+    if (!conversation?.id) return { ok: false, json: null, rawContent: '', error: 'no_conversation_id' };
+  } catch (e) { return { ok: false, json: null, rawContent: '', error: `create_conv_exception: ${e?.message}` }; }
 
   try {
-    const r = await fetch(`${base}/${convId}/messages`, { method: 'POST', headers, body: JSON.stringify({ role: 'user', content: prompt }) });
-    if (!r.ok) return { ok: false, json: null, rawContent: '', error: `send_msg_${r.status}` };
-  } catch (e) { return { ok: false, json: null, rawContent: '', error: `send_msg_exception: ${e.message}` }; }
+    await base44.asServiceRole.agents.addMessage(conversation, { role: 'user', content: prompt });
+  } catch (e) { return { ok: false, json: null, rawContent: '', error: `send_msg_exception: ${e?.message}` }; }
 
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     await new Promise((r) => setTimeout(r, 1500));
     try {
-      const r = await fetch(`${base}/${convId}`, { headers });
-      if (!r.ok) continue;
-      const conv = await r.json();
-      const msgs = Array.isArray(conv.messages) ? conv.messages : [];
+      const conv = await base44.asServiceRole.agents.getConversation(conversation.id);
+      const msgs = Array.isArray(conv?.messages) ? conv.messages : [];
       const last = msgs[msgs.length - 1];
       if (last?.role === 'assistant' && last.content && last.streaming === false) {
         const extracted = extractJsonObjectFromText(last.content);
@@ -324,7 +312,7 @@ async function invokeRepairAgent(prompt, timeoutMs = 50000) {
           ? { ok: true, json: extracted.value, rawContent: last.content, error: null }
           : { ok: false, json: null, rawContent: last.content, error: `json_extraction: ${extracted.error}` };
       }
-    } catch { /* continue */ }
+    } catch { /* continue polling */ }
   }
   return { ok: false, json: null, rawContent: '', error: 'agent_timeout' };
 }
@@ -460,7 +448,7 @@ async function runRepairPipeline({
   });
 
   await emitEvent(base44, sessionId, 'ai_repair_started', context);
-  const agentResult = await invokeRepairAgent(prompt, 50000);
+  const agentResult = await invokeRepairAgent(base44, prompt, 50000);
 
   if (!agentResult.ok || !isPlainObject(agentResult.json)) {
     await emitEvent(base44, sessionId, 'ai_repair_failed', context);
