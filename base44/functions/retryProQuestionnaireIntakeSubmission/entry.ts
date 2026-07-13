@@ -123,11 +123,13 @@ Deno.serve(async (req) => {
             final_submission_id: existing.id,
             submitted_at: new Date().toISOString()
           });
+          await sendToZapierSafe(draftPayload);
           return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: existing.id, draftId });
         }
       }
 
       if (draft.final_submission_id && !forceRetry) {
+        await sendToZapierSafe(draftPayload);
         return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: draft.final_submission_id, draftId });
       }
 
@@ -164,6 +166,8 @@ Deno.serve(async (req) => {
     }
 
     if (intake.linked_submission_id && !forceRetry) {
+      const earlyPayload = parsePayload(intake.transformed_payload_json);
+      if (earlyPayload) await sendToZapierSafe(earlyPayload);
       return Response.json({
         success: true,
         alreadySubmitted: true,
@@ -185,6 +189,8 @@ Deno.serve(async (req) => {
           last_retry_at: new Date().toISOString(),
           retry_count: incrementRetryCount(intake.retry_count)
         });
+        const earlyPayload = parsePayload(intake.transformed_payload_json);
+        if (earlyPayload) await sendToZapierSafe(earlyPayload);
         return Response.json({
           success: true,
           alreadySubmitted: true,
@@ -225,6 +231,7 @@ Deno.serve(async (req) => {
     if (intake.linked_submission_id && forceRetry) {
       const linkedList = await base44.asServiceRole.entities.ProFormSubmission.filter({ id: intake.linked_submission_id });
       if (Array.isArray(linkedList) && linkedList.length > 0) {
+        await sendToZapierSafe(transformedPayload);
         return Response.json({
           success: true,
           alreadySubmitted: true,

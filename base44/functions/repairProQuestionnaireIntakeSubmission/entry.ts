@@ -562,12 +562,24 @@ Deno.serve(async (req) => {
       };
       await base44.asServiceRole.entities.ProFormDraft.update(draft.id, updateData);
 
+      // For repair_and_retry, always fire the payload to Zapier — every button press.
+      // Zapier deduplicates on its end, so repeated sends are safe.
+      let zapierSent = false;
+      if (mode === 'repair_and_retry') {
+        const zapPayload = repairResult.payload || rawPayload;
+        if (zapPayload) {
+          const zapResult = await sendToZapierSafe(zapPayload);
+          zapierSent = zapResult.ok;
+        }
+      }
+
       return Response.json({
         success: true,
         draftMode: true,
         submissionCreated: false,
         repairSource: repairResult.source,
         repairOk: repairResult.ok,
+        zapierSent,
         report: repairResult.report,
         hasRepairedPayload: Boolean(repairResult.payload),
         errors: repairResult.errors
@@ -587,6 +599,8 @@ Deno.serve(async (req) => {
 
     // Guard: already submitted (linked_submission_id set)
     if (intake.linked_submission_id && !forceRetry) {
+      const earlyParsed = safeJsonParse(intake.transformed_payload_json);
+      if (earlyParsed.ok && isPlainObject(earlyParsed.value)) await sendToZapierSafe(earlyParsed.value);
       return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: intake.linked_submission_id, intakeId: intake.id });
     }
 
@@ -690,6 +704,7 @@ Deno.serve(async (req) => {
           ai_repair_retry_attempted: true,
           ai_repair_retry_result_json: JSON.stringify({ linkedSubmissionId: existing.id, source: 'existing_found_by_session_id' })
         });
+        await sendToZapierSafe(repairResult.payload);
         return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: existing.id, intakeId: intake.id, mode: 'repair_and_retry' });
       }
     }
