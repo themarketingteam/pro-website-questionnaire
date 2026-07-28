@@ -117,6 +117,7 @@ const AuthenticatedApp = () => {
           </LayoutWrapper>
         </AdminOnly>
       } />
+      {/* Public operations route: intentionally not wrapped in AdminOnly. */}
       <Route path="/admin/draft-recovery" element={
         <LayoutWrapper currentPageName={"admin/draft-recovery"}>
           <ProFormDraftRecovery />
