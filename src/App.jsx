@@ -118,11 +118,9 @@ const AuthenticatedApp = () => {
         </AdminOnly>
       } />
       <Route path="/admin/draft-recovery" element={
-        <AdminOnly>
-          <LayoutWrapper currentPageName={"admin/draft-recovery"}>
-            <ProFormDraftRecovery />
-          </LayoutWrapper>
-        </AdminOnly>
+        <LayoutWrapper currentPageName={"admin/draft-recovery"}>
+          <ProFormDraftRecovery />
+        </LayoutWrapper>
       } />
       <Route path="/admin/questionnaire-intake-recovery" element={
         <AdminOnly>
