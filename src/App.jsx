@@ -13,6 +13,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AdminSubmitIntake from './pages/AdminSubmitIntake';
 import ProFormDraftRecovery from './pages/ProFormDraftRecovery';
 import QuestionnaireIntakeRecoveryPage from './pages/QuestionnaireIntakeRecovery';
+import DraftRecoveryPasswordGate from '@/components/admin/DraftRecoveryPasswordGate';
 
 const ADMIN_EMAILS = ['benjamin.hines8@gmail.com'];
 
@@ -117,11 +118,13 @@ const AuthenticatedApp = () => {
           </LayoutWrapper>
         </AdminOnly>
       } />
-      {/* Keep this recovery route public and intentionally outside AdminOnly. */}
+      {/* Password-only access is verified server-side by a Base44 function. */}
       <Route path="/admin/draft-recovery" element={
-        <LayoutWrapper currentPageName={"admin/draft-recovery"}>
-          <ProFormDraftRecovery />
-        </LayoutWrapper>
+        <DraftRecoveryPasswordGate>
+          <LayoutWrapper currentPageName={"admin/draft-recovery"}>
+            <ProFormDraftRecovery />
+          </LayoutWrapper>
+        </DraftRecoveryPasswordGate>
       } />
       <Route path="/admin/questionnaire-intake-recovery" element={
         <AdminOnly>
