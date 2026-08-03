@@ -400,7 +400,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     });
   });
 
-  it('does not block success when Zapier fails after a successful database save', async () => {
+  it('does not block success on Zapier failure and retains responseSnapshot after Redux reset', async () => {
     window.history.replaceState(
       {},
       '',
@@ -445,6 +445,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     };
 
     const submittedResponses = preloaded.form.responses;
+    const submissionPath = window.location.pathname;
     const { store } = renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
 
     fireEvent.click(
@@ -461,6 +462,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
 
     expect(await screen.findByText(/thank you/i)).toBeInTheDocument();
     expect(store.getState().form.responses).toEqual({});
+    expect(window.location.pathname).toBe(submissionPath);
 
     fireEvent.click(
       screen.getByRole('button', {

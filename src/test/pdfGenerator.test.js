@@ -150,7 +150,7 @@ describe('useQuestionnairePdfDownload', () => {
       props.formData
     );
     expect(toastErrorMock).toHaveBeenCalledWith(
-      'Failed to generate PDF. Please try again.'
+      'An error occurred while generating the PDF.'
     );
   });
 

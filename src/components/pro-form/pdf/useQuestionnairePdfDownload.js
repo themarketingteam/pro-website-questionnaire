@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { generatePDF } from '../PDFGenerator';
 
 const PDF_FAILURE_MESSAGE = 'Failed to generate PDF. Please try again.';
+const PDF_EXCEPTION_MESSAGE = 'An error occurred while generating the PDF.';
 
 export const useQuestionnairePdfDownload = ({
   formData,
@@ -42,7 +43,7 @@ export const useQuestionnairePdfDownload = ({
       return result;
     } catch (error) {
       console.error('[Questionnaire PDF] generation failed:', error);
-      toast.error(PDF_FAILURE_MESSAGE);
+      toast.error(PDF_EXCEPTION_MESSAGE);
       return { success: false, error };
     } finally {
       isDownloadInProgressRef.current = false;
