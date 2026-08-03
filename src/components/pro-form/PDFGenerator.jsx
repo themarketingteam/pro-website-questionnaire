@@ -2,7 +2,8 @@ import React from 'react';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { QUESTIONS } from './questionData';
-import { formatAnswerForDisplay, escapeHtml } from './answerFormatting';
+import { escapeHtml } from './answerFormatting';
+import { formatAnswerForPdf } from './pdf/pdfAnswerFormatting';
 import { trackClarityEvent } from '@/lib/clarity';
 
 export const generatePDF = async (formData, businessName, domain) => {
@@ -44,7 +45,7 @@ export const generatePDF = async (formData, businessName, domain) => {
     acc[question.section].push({
       id: question.id,
       title: question.title,
-      answer: formatAnswerForDisplay(question.id, answer, otherValue, formData),
+      answer: formatAnswerForPdf(question.id, answer, otherValue, formData),
       hasConditional: question.conditionalChildren && answer === 'yes'
     });
 
@@ -56,7 +57,7 @@ export const generatePDF = async (formData, businessName, domain) => {
         acc[question.section].push({
           id: child.id,
           title: child.title,
-          answer: formatAnswerForDisplay(child.id, childAnswer, childOther, formData),
+          answer: formatAnswerForPdf(child.id, childAnswer, childOther, formData),
           isChild: true
         });
       });
