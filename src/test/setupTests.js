@@ -88,7 +88,74 @@ vi.mock('@/api/base44Client', () => {
   };
 });
 
-const global = globalThis;
+const createMemoryStorage = () => {
+  const storage = {};
+
+  Object.defineProperties(storage, {
+    length: {
+      configurable: true,
+      get: () => Object.keys(storage).length,
+    },
+    clear: {
+      configurable: true,
+      value: () => {
+        Object.keys(storage).forEach((key) => delete storage[key]);
+      },
+    },
+    getItem: {
+      configurable: true,
+      value: (key) =>
+        Object.prototype.hasOwnProperty.call(storage, key)
+          ? storage[key]
+          : null,
+    },
+    key: {
+      configurable: true,
+      value: (index) => Object.keys(storage)[index] ?? null,
+    },
+    removeItem: {
+      configurable: true,
+      value: (key) => delete storage[key],
+    },
+    setItem: {
+      configurable: true,
+      value: (key, value) => {
+        Object.defineProperty(storage, String(key), {
+          configurable: true,
+          enumerable: true,
+          writable: true,
+          value: String(value),
+        });
+      },
+    },
+  });
+
+  return storage;
+};
+
+// Node's experimental Web Storage globals can shadow jsdom with undefined values.
+Object.defineProperty(globalThis, 'localStorage', {
+  configurable: true,
+  value: createMemoryStorage(),
+});
+Object.defineProperty(globalThis, 'sessionStorage', {
+  configurable: true,
+  value: createMemoryStorage(),
+});
+
+// nwsapi (used by jsdom) recursively queries these selectors while evaluating
+// the inline :has(input:focus) rule in MultiGeographicQuestion.
+const nativeQuerySelector = Element.prototype.querySelector;
+Element.prototype.querySelector = function querySelector(selector) {
+  if (
+    selector === ':scope input:focus' ||
+    selector === ':scope input:focus-visible'
+  ) {
+    return null;
+  }
+
+  return nativeQuerySelector.call(this, selector);
+};
 
 // Basic matchMedia mock for components that might use it
 Object.defineProperty(window, 'matchMedia', {

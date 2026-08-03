@@ -43,10 +43,9 @@ const ReduxDataValidator = lazy(() => import('@/components/pro-form/ReduxDataVal
 import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import { trackValidationDispatch, trackParentStatusChange, devDiagEnabled } from '@/lib/devDiagnostics';
-import { getQuestionById, getParentQuestionByChildId, getAllQuestionIds, isChildQuestion, computeParentValidationStatus } from '@/components/pro-form/questionUtils';
-import { doesChildParticipateInParentCompletion } from '@/components/pro-form/schemaPolicies';
+import { getQuestionById, getParentQuestionByChildId, getAllQuestionIds, isChildQuestion } from '@/components/pro-form/questionUtils';
 import { serializeError } from '@/components/pro-form/submissionPayload';
-import { submitProQuestionnaire, serializeSubmitError } from '@/lib/proQuestionnaireSubmit';
+import { submitProQuestionnaire } from '@/lib/proQuestionnaireSubmit';
 import {
   identifyClarityUser,
   setClarityTags,
@@ -69,7 +68,6 @@ const DeferredSectionLoader = () => (
 );
 
 const EMPTY_OBJECT = Object.freeze({});
-const EMPTY_ARRAY = Object.freeze([]);
 
 export default function ProQuestionnaire() {
   const dispatch = useDispatch();
@@ -1411,13 +1409,19 @@ export default function ProQuestionnaire() {
         serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
         onFinalSubmitSuccess: ({ responseSnapshot }) => {
           hasFinalSubmittedRef.current = true;
-          dispatch(resetForm());
-          toast.success('Questionnaire submitted successfully!');
-          setSubmittedBusinessName(businessName);
-          setSubmittedDomain(domain);
-          setSubmittedFormData(responseSnapshot);
+
+          // Preserve the exact submitted values for post-reset PDF generation.
+          const submittedBusinessNameSnapshot = businessName;
+          const submittedDomainSnapshot = domain;
+          const submittedResponseSnapshot = responseSnapshot;
+
+          setSubmittedBusinessName(submittedBusinessNameSnapshot);
+          setSubmittedDomain(submittedDomainSnapshot);
+          setSubmittedFormData(submittedResponseSnapshot);
           setShowConfirmModal(false);
           setShowThankYouModal(true);
+          dispatch(resetForm());
+          toast.success('Questionnaire submitted successfully!');
         },
         onFinalSubmitFailure: () => {}
       });

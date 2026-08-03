@@ -2,6 +2,8 @@ import React, { useEffect } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 
 export default function ThankYou() {
+  // This legacy route has no submitted response snapshot after the form reset,
+  // so its PDF download remains intentionally available only in ThankYouModal.
   const urlParams = new URLSearchParams(window.location.search);
   const businessName = urlParams.get('businessName') || 'your business';
 

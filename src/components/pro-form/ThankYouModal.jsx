@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { CheckCircle2, Download, Loader2 } from 'lucide-react';
-import { generatePDF } from './PDFGenerator';
-import { toast } from 'sonner';
+import { useQuestionnairePdfDownload } from './pdf/useQuestionnairePdfDownload';
 
 export default function ThankYouModal({ businessName, domain, formData }) {
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const { isGeneratingPDF, downloadPDF: handleDownloadPDF } =
+    useQuestionnairePdfDownload({ formData, businessName, domain });
+
   // Set document title and prevent body scroll
   useEffect(() => {
     document.body.style.overflow = 'hidden';
@@ -12,23 +13,6 @@ export default function ThankYouModal({ businessName, domain, formData }) {
       document.body.style.overflow = 'unset';
     };
   }, []);
-
-  const handleDownloadPDF = async () => {
-    setIsGeneratingPDF(true);
-    try {
-      const result = await generatePDF(formData, businessName, domain);
-      if (result.success) {
-        toast.success(`PDF downloaded: ${result.filename}`);
-      } else {
-        toast.error('Failed to generate PDF. Please try again.');
-      }
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      toast.error('An error occurred while generating the PDF.');
-    } finally {
-      setIsGeneratingPDF(false);
-    }
-  };
 
   return (
     <div className="fixed inset-0 bg-gradient-to-b from-gray-100 to-white z-50 flex items-center justify-center p-6">

@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
 import { renderWithStore } from './utils/renderWithStore';
@@ -16,6 +16,15 @@ import {
   createFindExistingDraftBySessionId,
   createSaveDraftSnapshot
 } from '@/lib/draftPersistence';
+
+const { generateQuestionnairePdfMock } = vi.hoisted(() => ({
+  generateQuestionnairePdfMock: vi.fn(),
+}));
+
+vi.mock('@/components/pro-form/PDFGenerator', () => ({
+  default: vi.fn(),
+  generatePDF: generateQuestionnairePdfMock,
+}));
 
 const setupUser = () => userEvent.setup({ pointerEventsCheck: 0 });
 
@@ -33,6 +42,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    window.history.replaceState({}, '', '/');
     base44.entities.ProFormDraft.filter.mockResolvedValue([]);
     base44.entities.ProFormDraft.create.mockResolvedValue({ id: 'draft-1' });
     base44.entities.ProFormDraft.update.mockResolvedValue({ id: 'draft-1' });
@@ -391,7 +401,15 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
   });
 
   it('does not block success when Zapier fails after a successful database save', async () => {
-    const user = setupUser();
+    window.history.replaceState(
+      {},
+      '',
+      '/?businessName=Snapshot%20Company&domainName=snapshot.example'
+    );
+    generateQuestionnairePdfMock.mockResolvedValue({
+      success: true,
+      filename: 'retained-responses.pdf',
+    });
     const createMock = base44.entities.ProFormSubmission.create;
     createMock.mockResolvedValueOnce({ id: 'saved-ok' });
 
@@ -426,17 +444,37 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
       },
     };
 
-    renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
+    const submittedResponses = preloaded.form.responses;
+    const { store } = renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
 
-    await user.click(await screen.findByRole('button', { name: /submit questionnaire/i }));
-    await user.click(await screen.findByRole('button', { name: /confirm & submit/i }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: /submit questionnaire/i })
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: /confirm & submit/i })
+    );
 
     await waitFor(() => {
       expect(base44.entities.ProFormSubmission.create).toHaveBeenCalled();
       expect(base44.functions.invoke).toHaveBeenCalledWith('sendToZapier', expect.any(Object));
     });
 
-    expect(screen.getByText(/thank you/i)).toBeInTheDocument();
+    expect(await screen.findByText(/thank you/i)).toBeInTheDocument();
+    expect(store.getState().form.responses).toEqual({});
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /download your responses \(pdf\)/i,
+      })
+    );
+
+    await waitFor(() => {
+      expect(generateQuestionnairePdfMock).toHaveBeenCalledWith(
+        submittedResponses,
+        'Snapshot Company',
+        'snapshot.example'
+      );
+    });
   });
 
   it('prevents duplicate draft creation by reusing the saved draft record id', async () => {

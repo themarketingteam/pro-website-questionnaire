@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { X, Download, Loader2 } from 'lucide-react';
 import { QUESTIONS } from './questionData';
-import { generatePDF } from './PDFGenerator';
 import { formatAnswerForDisplay } from './answerFormatting';
-import { toast } from 'sonner';
+import { useQuestionnairePdfDownload } from './pdf/useQuestionnairePdfDownload';
 
 const cleanDomainForSubmission = (domainStr) => {
   let cleaned = domainStr.trim();
@@ -26,32 +25,30 @@ export default function ConfirmModal({
   );
   const [businessName, setBusinessName] = useState(initialBusinessName);
   const [domain, setDomain] = useState(initialDomain);
-  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const submitAttemptRef = useRef(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const businessNameRef = useRef(null);
   const domainRef = useRef(null);
 
-  const handleDownloadPDF = async () => {
-    if (!businessName.trim()) {
-      toast.error('Please enter a business name before downloading.');
-      return;
-    }
-    setIsGeneratingPDF(true);
-    try {
-      const result = await generatePDF(formData, businessName, cleanDomainForSubmission(domain));
-      if (result.success) {
-        toast.success(`PDF downloaded: ${result.filename}`);
-      } else {
-        toast.error('Failed to generate PDF. Please try again.');
-      }
-    } catch (error) {
-      toast.error('An error occurred while generating the PDF.');
-    } finally {
-      setIsGeneratingPDF(false);
-    }
-  };
+  const validatePdfDownload = useCallback(
+    () =>
+      businessName.trim()
+        ? { ok: true }
+        : {
+            ok: false,
+            message: 'Please enter a business name before downloading.',
+          },
+    [businessName]
+  );
+
+  const { isGeneratingPDF, downloadPDF: handleDownloadPDF } =
+    useQuestionnairePdfDownload({
+      formData,
+      businessName,
+      domain: cleanDomainForSubmission(domain),
+      validateBeforeDownload: validatePdfDownload,
+    });
 
   const validate = () => {
     const errors = {};
@@ -89,8 +86,6 @@ export default function ConfirmModal({
       submitAttemptRef.current = false;
     }
   };
-
-  const isFormValid = businessName.trim().length > 0 && domain.trim().length > 0;
 
   // Prevent body scroll
   useEffect(() => {
