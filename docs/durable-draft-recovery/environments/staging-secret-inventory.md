@@ -2,7 +2,7 @@
 
 - Status: **NAMES_RESERVED_VALUES_NOT_CONFIGURED**
 - Inventory date: 2026-08-05
-- Inventory rows: **39 names**
+- Inventory rows: **48 names**
 - Current production Base44 secret names observed: **4**
 - Current staging Base44 secret names observed: **0**
 
@@ -53,8 +53,35 @@ The four production names observed through the names-only Base44 secret command 
 | 37 | `BASE44_LEGACY_SDK_IMPORTS` | Non-secret Vite compatibility build switch | No | No | No | Yes; non-secret build setting only |
 | 38 | `STAGING_TEST_DATA_PREFIX` | Synthetic fixture namespace and cleanup selector | Later | No | Yes | No |
 | 39 | `STAGING_CLEANUP_TOKEN_SECRET` | Future narrowly scoped cleanup-job authorization | Later | No | Yes | No |
+| 40 | `PRO_DRAFT_ENVIRONMENT` | Backend durable-draft environment boundary | Yes | Yes | Yes | No |
+| 41 | `PRO_DRAFT_V2_SERVER_ENABLED` | Backend durable-draft V2 activation flag | Yes (`false`) | Yes (`false` until approved activation) | No initially | Yes, only the safe value `false` |
+| 42 | `PRO_DRAFT_V2_KILL_SWITCH` | Backend emergency disable override | Yes (`true`) | Yes (`true` until approved activation) | No initially | Yes, only the safe value `true` |
+| 43 | `PRO_DRAFT_PUBLIC_EMAIL_RECOVERY_ENABLED` | Backend public email-recovery gate | Yes (`false`) | Yes (`false` until its implementation is accepted) | No initially | Yes, only the safe value `false` |
+| 44 | `PRO_DRAFT_EMAIL_OTP_ENABLED` | Future backend OTP gate | Yes (`false`) | Yes (`false`) | No initially | Yes, only the safe value `false` |
+| 45 | `PRO_DRAFT_MAGIC_LINK_ENABLED` | Future backend magic-link gate | Yes (`false`) | Yes (`false`) | No initially | Yes, only the safe value `false` |
+| 46 | `PRO_DRAFT_EXTERNAL_SIDE_EFFECTS_MODE` | Environment-constrained external-side-effect routing | Yes (`disabled`) | Yes (`disabled` until approved activation) | Yes when side effects are enabled | Yes, only the safe value `disabled` |
+| 47 | `PRO_DRAFT_DIAGNOSTICS_ENABLED` | Safe backend configuration diagnostics gate | Yes (`false` initially) | Yes (`false`) | No initially | Yes, only the safe value `false` |
+| 48 | `PRO_DRAFT_BUILD_SHA` | Safe backend build identifier/fingerprint | Yes | Yes | Prefer Yes | Yes only for the same immutable build |
 
 `ALLOW_PRODUCTION_DEPLOY=false` is a non-sensitive safe default, not authorization. All app IDs remain outside Git even though identifiers are not access credentials.
+
+## Backend runtime configuration classification
+
+All nine `PRO_DRAFT_*` names below are ordinary configuration values; none is a secret. They must still be supplied through environment-specific configuration because an incorrect value can cross an authorization or side-effect boundary. Only exact lowercase values from the documented contract are accepted.
+
+| Name | Classification | Fail-closed/default behavior | Present before staging deployment | Must differ from production | Must remain off until later work |
+| --- | --- | --- | --- | --- | --- |
+| `PRO_DRAFT_ENVIRONMENT` | Ordinary configuration | Missing/invalid becomes `unknown`; V2 is disabled | Yes, exactly `staging` | Yes | N/A |
+| `PRO_DRAFT_V2_SERVER_ENABLED` | Ordinary configuration | Missing/invalid is disabled; committed example is `false` | Yes | No initially | Yes, until separate V2 activation |
+| `PRO_DRAFT_V2_KILL_SWITCH` | Ordinary configuration | Committed safe setting is `true`; a missing/malformed control cannot enable V2 | Yes | No initially | Keep on until separate V2 activation |
+| `PRO_DRAFT_PUBLIC_EMAIL_RECOVERY_ENABLED` | Ordinary configuration | Missing/invalid is disabled; default `false` | Yes | No initially | Yes, through the public-recovery implementation batch |
+| `PRO_DRAFT_EMAIL_OTP_ENABLED` | Ordinary configuration | Missing/invalid is disabled; default `false` | Yes | No initially | Yes, until a separately accepted OTP release |
+| `PRO_DRAFT_MAGIC_LINK_ENABLED` | Ordinary configuration | Missing/invalid is disabled; default `false` | Yes | No initially | Yes, until a separately accepted magic-link release |
+| `PRO_DRAFT_EXTERNAL_SIDE_EFFECTS_MODE` | Ordinary configuration | Missing/invalid normalizes to `disabled` and invalidates V2 configuration | Yes, exactly `disabled` initially | Yes when enabled | Keep `disabled` until environment routing is certified |
+| `PRO_DRAFT_DIAGNOSTICS_ENABLED` | Ordinary configuration | Missing/invalid is disabled; staging and production examples are `false` | Yes | No initially | Remains off until backend diagnostics are separately approved |
+| `PRO_DRAFT_BUILD_SHA` | Ordinary configuration | Missing/unsafe value becomes an empty safe identifier | Yes, immutable build placeholder replaced outside Git | Prefer Yes | N/A |
+
+Frontend `VITE_PRO_DRAFT_*` controls are browser-visible configuration and cannot authorize any backend operation. Backend controls cannot silently enable client UI.
 
 ## Rotation, ownership, and value-safe validation
 
@@ -71,6 +98,7 @@ The four production names observed through the names-only Base44 secret command 
 | File/PDF (30-32) | Rotate cleanup authorization if introduced; configuration changes require destination review | Data/storage owner | Write synthetic marker, read metadata only, cleanup it, and prove no production URL/app ID is accepted |
 | Telemetry (33-35) | Separate project/property identifiers; rotate tokens if a future private ingest token is added | Observability + Privacy owner | Inspect environment label/project fingerprint and run synthetic event; production property denylist must pass |
 | Build/test cleanup (36-39) | App version changes per release; rotate cleanup authorization on schedule/incident | Release owner + QA/data owner | Inspect non-secret build metadata; cleanup dry run selects only `environment=staging` plus `test_run_id`/prefix |
+| Durable-draft runtime configuration (40-48) | Revalidate on every build/deploy and every activation or rollback; build SHA changes per immutable build | Release owner + Application owner | Compare only recognized environment/mode names, safe booleans, and build fingerprints; never dump the full environment |
 
 ## Current gaps and prohibitions
 
@@ -79,5 +107,6 @@ The four production names observed through the names-only Base44 secret command 
 - Production analytics IDs, the production Places key, recovery password, OpenAI key, service-role material, and webhook URL must not be copied.
 - `VITE_*` values are exposed to the browser. They must never contain a private credential.
 - A missing redirect, webhook, AI, CAPTCHA, or environment declaration must suppress the related side effect; it must not select production.
+- All backend runtime names 40-48 must exist with reviewed staging values before any later staging deployment. This inventory does not set them.
 
 No secret was created, changed, copied, rotated, printed, or committed during this inventory.
