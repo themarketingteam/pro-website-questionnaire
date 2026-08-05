@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "workspace:check": "node scripts/ensure-durable-draft-workspace.mjs --mode check --branch feature/durable-draft-recovery",
+    "workspace:repair": "node scripts/ensure-durable-draft-workspace.mjs --mode repair --branch feature/durable-draft-recovery"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.39",
