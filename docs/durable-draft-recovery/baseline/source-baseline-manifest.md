@@ -91,3 +91,10 @@ The peeled tag, local backup branch, remote peeled tag, and remote backup branch
 - Validation classification: `BASELINE_CERTIFIED_WITH_KNOWN_TEST_FAILURES`
 - Validation timestamp (UTC): `2026-08-05T19:01:05Z`
 - Build-manifest SHA-256: `fa7824d49f628c6228b1640a2ba71f4e19fe096731eae7544abb2aaf4670d98b`
+
+## Rollback rehearsal
+
+- Rollback runbook: [source-and-application-rollback.md](../runbooks/source-and-application-rollback.md)
+- Rehearsal report: [source-rollback-rehearsal.md](./source-rollback-rehearsal.md)
+- Rehearsal classification: `ROLLBACK_SOURCE_READY_WITH_KNOWN_BASELINE_FAILURES`
+- Rehearsal timestamp (UTC): `2026-08-05T19:08:08Z`
