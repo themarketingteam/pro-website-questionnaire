@@ -46,6 +46,109 @@ const requireCondition = (condition, message) => {
 const packagePath = path.join(repositoryRoot, 'package.json');
 const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
 const scripts = packageJson.scripts || {};
+const requiredFoundationFiles = [
+  '.github/workflows/durable-draft-quality.yml',
+  '.github/workflows/durable-draft-staging-e2e.yml',
+  '.node-version',
+  'scripts/build-ci-summary.mjs',
+  'scripts/scan-ci-source-safety.mjs',
+];
+
+for (const file of requiredFoundationFiles) {
+  requireCondition(
+    existsSync(path.join(repositoryRoot, file)),
+    `required CI foundation file is missing: ${file}`,
+  );
+}
+
+const nodeVersionPath = path.join(repositoryRoot, '.node-version');
+if (existsSync(nodeVersionPath)) {
+  requireCondition(
+    readFileSync(nodeVersionPath, 'utf8').trim() === '22.23.1',
+    '.node-version must pin the approved Node 22 LTS patch',
+  );
+}
+
+const qualityWorkflowPath = path.join(
+  repositoryRoot,
+  '.github/workflows/durable-draft-quality.yml',
+);
+if (existsSync(qualityWorkflowPath)) {
+  const qualityWorkflow = readFileSync(qualityWorkflowPath, 'utf8');
+  for (const jobId of [
+    'source-safety',
+    'unit-quality',
+    'build',
+    'e2e-harness',
+    'pending-requirements-report',
+  ]) {
+    requireCondition(
+      qualityWorkflow.includes(`  ${jobId}:`),
+      `quality workflow is missing required job: ${jobId}`,
+    );
+  }
+  for (const command of [
+    'npm run lint',
+    'npm run typecheck',
+    'npm run test:ci',
+    'npm run test:baseline-characterization',
+    'npm run test:e2e:harness',
+    'npm run test:base44-target',
+    'npm run test:manifest',
+  ]) {
+    requireCondition(
+      qualityWorkflow.includes(command),
+      `quality workflow is missing authoritative command: ${command}`,
+    );
+  }
+  requireCondition(
+    !qualityWorkflow.includes('continue-on-error'),
+    'quality workflow must not use continue-on-error',
+  );
+  requireCondition(
+    !/\b(?:npx base44 deploy|npm run deploy:base44)/.test(qualityWorkflow),
+    'quality workflow must never deploy Base44',
+  );
+  requireCondition(
+    !qualityWorkflow.includes('test:e2e:pending-strict'),
+    'strict pending enforcement is deferred from foundation CI',
+  );
+}
+
+const stagingWorkflowPath = path.join(
+  repositoryRoot,
+  '.github/workflows/durable-draft-staging-e2e.yml',
+);
+if (existsSync(stagingWorkflowPath)) {
+  const stagingWorkflow = readFileSync(stagingWorkflowPath, 'utf8');
+  const triggerSection = stagingWorkflow.split('\npermissions:')[0];
+  requireCondition(
+    triggerSection.includes('  workflow_dispatch:'),
+    'staging E2E workflow must support manual dispatch',
+  );
+  requireCondition(
+    !/\n  (?:pull_request|push|schedule):/.test(triggerSection),
+    'staging E2E workflow must remain manual-only',
+  );
+  requireCondition(
+    stagingWorkflow.includes('secrets.PRO_DRAFT_STAGING_URL'),
+    'staging E2E URL must come from the approved GitHub secret',
+  );
+  requireCondition(
+    !stagingWorkflow.includes("E2E_ALLOW_WRITES: 'true'"),
+    'staging E2E writes must remain disabled in foundation CI',
+  );
+  requireCondition(
+    !/mspsuccesswebsites\.com|qtrypzzcjebvfcihiynt\.supabase\.co/.test(
+      stagingWorkflow,
+    ),
+    'staging E2E workflow must not contain a production hostname',
+  );
+  requireCondition(
+    !/\b(?:npx base44 deploy|npm run deploy:base44)/.test(stagingWorkflow),
+    'staging E2E workflow must never deploy Base44',
+  );
+}
 const requiredScripts = [
   'test',
   'test:watch',

@@ -59,7 +59,7 @@ npm run test:e2e:staging
 
 `test:e2e:staging` fails with `MISSING_E2E_BASE_URL` before Playwright if the URL is absent. The smoke requires the runtime marker `staging`, the persistent staging banner, durable draft V2 `false`, and kill switch `true`. A URL pointing at the wrong environment therefore fails even if its hostname was not previously documented.
 
-The current staging registration says no site deployment has occurred, so this command is blocked until a separately authorized deployment produces a verified staging URL. Never substitute or guess a Base44 URL.
+The current staging registration says no site deployment has occurred, so this command is blocked until a separately authorized deployment produces a verified staging URL. Never substitute or guess a Base44 URL. The manual GitHub workflow and its secret/branch-protection rules are documented in [GitHub Actions and branch protection](./github-actions-and-branch-protection.md).
 
 ## Browser and device matrix
 
@@ -77,6 +77,6 @@ The current staging registration says no site deployment has occurred, so this c
 
 Playwright stores screenshots only on failure and retains failed-run traces and videos. The safe fixture attaches redacted console/page-error and network-failure summaries. Network records contain only method, resource type, redacted URL, status/failure class, and safety classification—never request bodies or headers.
 
-`access_token`, `recoveryCode`, `draftAccessToken`, and `userEmail` query values are redacted. Authorization, cookie, and set-cookie text is removed from captured messages. HTML reports, `test-results`, traces, videos, authentication state, and generated evidence directories are ignored by Git. Review artifacts as potentially sensitive operational evidence and store approved copies only in the restricted release-evidence system.
+Safe network/artifact URL summaries remove every query parameter and fragment. The lower-level URL redactor also replaces `access_token`, `recoveryCode`, `draftAccessToken`, and `userEmail` values when a diagnostic specifically exercises query redaction. Authorization, cookie, and set-cookie text is removed from captured messages. HTML reports, `test-results`, traces, videos, authentication state, and generated evidence directories are ignored by Git. Review artifacts as potentially sensitive operational evidence and store approved copies only in the restricted release-evidence system.
 
 The current harness does not authenticate, submit, email, upload, call Zapier, or create Base44 records. Future production-disabled smoke testing requires a separately approved prompt, explicit production flag, production target review, and continued write prohibition.

@@ -52,7 +52,7 @@ export const redactText = (value, maxLength = 500) => {
 export const safeUrlSummary = (value) => {
   try {
     const url = new URL(redactUrl(value));
-    return `${url.origin}${url.pathname}${url.search}`;
+    return `${url.origin}${url.pathname}`;
   } catch {
     return '<invalid-url>';
   }

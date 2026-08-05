@@ -1,0 +1,302 @@
+name: Durable Draft Quality
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - feature/durable-draft-recovery
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: durable-draft-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-safety:
+    name: Source safety
+    runs-on: ubuntu-latest
+    outputs:
+      baseline_status: ${{ steps.baseline.outputs.baseline_status }}
+    steps:
+      - name: Checkout complete history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up approved Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify immutable baseline and backup references
+        id: baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_sha='27ddc347d55db00796a0e3e19ac343245519b01e'
+          tag_ref='refs/tags/pre-durable-draft-recovery-2026-08-05^{commit}'
+          backup_ref='refs/remotes/origin/backup/pre-durable-draft-recovery-2026-08-05^{commit}'
+          tag_sha="$(git rev-parse --verify "$tag_ref")"
+          backup_sha="$(git rev-parse --verify "$backup_ref")"
+          if [[ "$tag_sha" != "$expected_sha" || "$backup_sha" != "$expected_sha" ]]; then
+            echo 'BASELINE_OR_BACKUP_REFERENCE_MISMATCH' >&2
+            exit 1
+          fi
+          echo 'baseline_status=verified' >> "$GITHUB_OUTPUT"
+
+      - name: Scan changed files without printing matched content
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          base_ref='origin/main'
+          if [[ "$EVENT_NAME" == 'pull_request' ]]; then
+            base_ref="$PR_BASE_SHA"
+          elif [[ "$EVENT_NAME" == 'push' ]]; then
+            base_ref="$PUSH_BASE_SHA"
+          fi
+          node scripts/scan-ci-source-safety.mjs --base "$base_ref" --head "$HEAD_SHA"
+
+      - name: Run deployment-target static tests
+        run: npm run test:base44-target
+
+      - name: Validate authoritative test manifest
+        run: npm run test:manifest
+
+  unit-quality:
+    name: Unit quality
+    runs-on: ubuntu-latest
+    outputs:
+      baseline-characterization: ${{ steps.quality.outputs.baseline_characterization }}
+      lint: ${{ steps.quality.outputs.lint }}
+      normal-tests: ${{ steps.quality.outputs.normal_tests }}
+      typecheck: ${{ steps.quality.outputs.typecheck }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up approved Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run all unit-quality gates
+        id: quality
+        shell: bash
+        run: |
+          mkdir -p test-results/ci/unit-quality
+          set +e
+          npm run lint 2>&1 | tee test-results/ci/unit-quality/lint.log
+          lint_status=${PIPESTATUS[0]}
+          npm run typecheck 2>&1 | tee test-results/ci/unit-quality/typecheck.log
+          typecheck_status=${PIPESTATUS[0]}
+          npm run test:ci 2>&1 | tee test-results/ci/unit-quality/normal-tests.log
+          normal_status=${PIPESTATUS[0]}
+          npm run test:baseline-characterization 2>&1 | tee test-results/ci/unit-quality/baseline-characterization.log
+          characterization_status=${PIPESTATUS[0]}
+          set -e
+          echo "lint=$lint_status" >> "$GITHUB_OUTPUT"
+          echo "typecheck=$typecheck_status" >> "$GITHUB_OUTPUT"
+          echo "normal_tests=$normal_status" >> "$GITHUB_OUTPUT"
+          echo "baseline_characterization=$characterization_status" >> "$GITHUB_OUTPUT"
+          if (( lint_status != 0 || typecheck_status != 0 || normal_status != 0 || characterization_status != 0 )); then
+            exit 1
+          fi
+
+      - name: Upload unit-quality reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: durable-draft-unit-quality-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/ci/unit-quality/
+          if-no-files-found: warn
+          retention-days: 14
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up approved Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Build with durable draft V2 disabled
+        env:
+          VITE_APP_BUILD_SHA: ${{ github.sha }}
+          VITE_APP_BUILD_TIME: '2000-01-01T00:00:00Z'
+          VITE_APP_ENVIRONMENT: staging
+          VITE_PRO_DRAFT_DIAGNOSTICS_ENABLED: 'false'
+          VITE_PRO_DRAFT_EMAIL_OTP_ENABLED: 'false'
+          VITE_PRO_DRAFT_MAGIC_LINK_ENABLED: 'false'
+          VITE_PRO_DRAFT_PUBLIC_EMAIL_RECOVERY_ENABLED: 'false'
+          VITE_PRO_DRAFT_V2_ENABLED: 'false'
+          VITE_PRO_DRAFT_V2_KILL_SWITCH: 'true'
+          VITE_STAGING_BANNER_ENABLED: 'true'
+        run: npm run build
+
+      - name: Scan built assets for secret patterns
+        run: node scripts/scan-ci-source-safety.mjs --directory dist
+
+      - name: Create build manifest
+        shell: bash
+        run: |
+          mkdir -p test-results/ci/build
+          {
+            echo "commit_sha=${GITHUB_SHA}"
+            echo 'environment=staging'
+            echo 'durable_draft_v2_enabled=false'
+            echo 'no_deploy=true'
+          } > test-results/ci/build/build-metadata.txt
+          find dist -type f -exec sha256sum {} + | sort > test-results/ci/build/dist-sha256.txt
+
+      - name: Upload build manifest
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: durable-draft-build-manifest-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/ci/build/
+          if-no-files-found: warn
+          retention-days: 14
+
+  e2e-harness:
+    name: E2E harness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up approved Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run fixture mechanics only
+        env:
+          E2E_ALLOW_PRODUCTION: 'false'
+          E2E_ALLOW_WRITES: 'false'
+          E2E_TEST_RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}-harness
+        run: npm run test:e2e:harness -- --project=chromium-desktop
+
+      - name: Upload Playwright failure evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: durable-draft-e2e-harness-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+  pending-requirements-report:
+    name: Pending requirements report
+    runs-on: ubuntu-latest
+    outputs:
+      pending_count: ${{ steps.pending.outputs.pending_count }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up approved Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Produce non-strict text and JSON reports
+        id: pending
+        shell: bash
+        run: |
+          mkdir -p test-results/ci/pending
+          node scripts/report-pending-draft-v2-tests.mjs --format=text | tee test-results/ci/pending/pending-draft-v2.txt
+          node scripts/report-pending-draft-v2-tests.mjs --format=json > test-results/ci/pending/pending-draft-v2.json
+          pending_count="$(node --input-type=module -e "import { readFileSync } from 'node:fs'; const report = JSON.parse(readFileSync('test-results/ci/pending/pending-draft-v2.json', 'utf8')); process.stdout.write(String(report.pendingCount));")"
+          echo "pending_count=$pending_count" >> "$GITHUB_OUTPUT"
+          {
+            echo '## Pending durable-draft V2 requirements'
+            echo
+            echo "Pending scenarios: **$pending_count**"
+            echo
+            echo 'Strict enforcement remains deferred to the authorized implementation gate.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload pending-requirements reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: durable-draft-pending-requirements-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/ci/pending/
+          if-no-files-found: error
+          retention-days: 30
+
+  quality-summary:
+    name: Quality summary
+    if: always()
+    needs:
+      - source-safety
+      - unit-quality
+      - build
+      - e2e-harness
+      - pending-requirements-report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Write safe job summary
+        env:
+          CI_SUMMARY_ARTIFACTS: durable-draft-unit-quality-${{ github.run_id }}-${{ github.run_attempt }},durable-draft-build-manifest-${{ github.run_id }}-${{ github.run_attempt }},durable-draft-e2e-harness-${{ github.run_id }}-${{ github.run_attempt }},durable-draft-pending-requirements-${{ github.run_id }}-${{ github.run_attempt }}
+          CI_SUMMARY_BASELINE_STATUS: ${{ needs['source-safety'].outputs.baseline_status }}
+          CI_SUMMARY_BUILD_RESULT: ${{ needs.build.result }}
+          CI_SUMMARY_COMMIT_SHA: ${{ github.sha }}
+          CI_SUMMARY_E2E_RESULT: ${{ needs['e2e-harness'].result }}
+          CI_SUMMARY_ENVIRONMENT: ci
+          CI_SUMMARY_NO_DEPLOY: 'true'
+          CI_SUMMARY_PENDING_COUNT: ${{ needs['pending-requirements-report'].outputs.pending_count }}
+          CI_SUMMARY_UNIT_RESULT: ${{ needs['unit-quality'].result }}
+        run: node scripts/build-ci-summary.mjs

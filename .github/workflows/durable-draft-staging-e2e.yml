@@ -1,0 +1,254 @@
+name: Durable Draft Staging E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      browser_scope:
+        description: Browser coverage for the read-only staging smoke
+        required: true
+        default: smoke
+        type: choice
+        options:
+          - smoke
+          - desktop
+          - all
+      allow_writes:
+        description: Reserved for a later gate; effective writes remain disabled
+        required: true
+        default: false
+        type: boolean
+      test_label:
+        description: Safe audit label using letters, digits, spaces, dot, dash, or underscore
+        required: true
+        default: manual-staging-e2e
+        type: string
+      commit_sha:
+        description: Optional commit; defaults to the current feature branch revision
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: durable-draft-staging-e2e
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Staging preflight
+    runs-on: ubuntu-latest
+    outputs:
+      baseline_status: ${{ steps.baseline.outputs.baseline_status }}
+      browser_matrix: ${{ steps.matrix.outputs.browser_matrix }}
+      commit_sha: ${{ steps.commit.outputs.commit_sha }}
+      pending_count: ${{ steps.pending.outputs.pending_count }}
+    steps:
+      - name: Checkout requested feature revision
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.commit_sha || 'feature/durable-draft-recovery' }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up approved Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Record resolved commit
+        id: commit
+        shell: bash
+        run: echo "commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Validate safe manual inputs
+        env:
+          TEST_LABEL: ${{ inputs.test_label }}
+        run: |
+          node --input-type=module -e "const label = String(process.env.TEST_LABEL || ''); if (!/^[A-Za-z0-9._ -]{1,64}$/.test(label)) throw new Error('INVALID_STAGING_E2E_TEST_LABEL');"
+
+      - name: Validate secret staging URL without printing it
+        env:
+          E2E_ALLOW_PRODUCTION: 'false'
+          E2E_ALLOW_WRITES: 'false'
+          E2E_BASE_URL: ${{ secrets.PRO_DRAFT_STAGING_URL }}
+          E2E_TARGET_ENVIRONMENT: staging
+        run: |
+          node --input-type=module -e "import { resolveE2ETarget } from './tests/e2e/helpers/targetSafety.js'; const target = resolveE2ETarget(process.env); if (target.environment !== 'staging' || target.allowProduction || target.allowWrites) throw new Error('UNSAFE_STAGING_E2E_TARGET');"
+
+      - name: Verify baseline tag
+        id: baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_sha='27ddc347d55db00796a0e3e19ac343245519b01e'
+          actual_sha="$(git rev-parse --verify 'refs/tags/pre-durable-draft-recovery-2026-08-05^{commit}')"
+          if [[ "$actual_sha" != "$expected_sha" ]]; then
+            echo 'BASELINE_TAG_MISMATCH' >&2
+            exit 1
+          fi
+          echo 'baseline_status=verified' >> "$GITHUB_OUTPUT"
+
+      - name: Select Linux browser matrix
+        id: matrix
+        shell: bash
+        env:
+          BROWSER_SCOPE: ${{ inputs.browser_scope }}
+        run: |
+          set -euo pipefail
+          case "$BROWSER_SCOPE" in
+            smoke)
+              matrix='[{"project":"chromium-desktop","browser":"chromium"}]'
+              ;;
+            desktop)
+              matrix='[{"project":"chromium-desktop","browser":"chromium"},{"project":"firefox-desktop","browser":"firefox"},{"project":"webkit-desktop","browser":"webkit"}]'
+              ;;
+            all)
+              matrix='[{"project":"chromium-desktop","browser":"chromium"},{"project":"firefox-desktop","browser":"firefox"},{"project":"webkit-desktop","browser":"webkit"},{"project":"mobile-chromium","browser":"chromium"},{"project":"mobile-webkit","browser":"webkit"}]'
+              ;;
+            *)
+              echo 'INVALID_BROWSER_SCOPE' >&2
+              exit 1
+              ;;
+          esac
+          echo "browser_matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+      - name: Count pending V2 scenarios
+        id: pending
+        run: |
+          pending_count="$(node --input-type=module -e "import { scanPendingDraftV2Tests } from './scripts/report-pending-draft-v2-tests.mjs'; process.stdout.write(String(scanPendingDraftV2Tests().pendingCount));")"
+          echo "pending_count=$pending_count" >> "$GITHUB_OUTPUT"
+
+      - name: Record enforced read-only policy
+        shell: bash
+        env:
+          REQUESTED_WRITES: ${{ inputs.allow_writes }}
+        run: |
+          {
+            echo '## Staging E2E preflight'
+            echo
+            echo "Requested write input: \`$REQUESTED_WRITES\`"
+            echo 'Effective write mode: `false`'
+            echo 'Final submission, SES, Zapier, deployment, and domain operations remain disabled.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  staging-e2e:
+    name: Staging smoke (${{ matrix.project }})
+    needs: preflight
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.preflight.outputs.browser_matrix) }}
+    steps:
+      - name: Checkout validated commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.preflight.outputs.commit_sha }}
+          persist-credentials: false
+
+      - name: Set up approved Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install selected Playwright browser
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Run read-only staging smoke
+        env:
+          E2E_ALLOW_PRODUCTION: 'false'
+          E2E_ALLOW_WRITES: 'false'
+          E2E_BASE_URL: ${{ secrets.PRO_DRAFT_STAGING_URL }}
+          E2E_TARGET_ENVIRONMENT: staging
+          E2E_TEST_RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.project }}
+        run: npm run test:e2e:staging -- --project=${{ matrix.project }}
+
+      - name: Upload redacted staging evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: durable-draft-staging-e2e-${{ matrix.project }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+  edge:
+    name: Optional Microsoft Edge smoke
+    if: inputs.browser_scope == 'all'
+    needs: preflight
+    runs-on: windows-latest
+    steps:
+      - name: Checkout validated commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.preflight.outputs.commit_sha }}
+          persist-credentials: false
+
+      - name: Set up approved Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install Microsoft Edge channel
+        run: npx playwright install msedge
+
+      - name: Run read-only Edge staging smoke
+        env:
+          E2E_ALLOW_PRODUCTION: 'false'
+          E2E_ALLOW_WRITES: 'false'
+          E2E_BASE_URL: ${{ secrets.PRO_DRAFT_STAGING_URL }}
+          E2E_TARGET_ENVIRONMENT: staging
+          E2E_TEST_RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}-msedge
+        run: npm run test:e2e:edge
+
+      - name: Upload Edge evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: durable-draft-staging-edge-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+  staging-summary:
+    name: Staging E2E summary
+    if: always()
+    needs:
+      - preflight
+      - staging-e2e
+      - edge
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout summary script
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.preflight.outputs.commit_sha || 'feature/durable-draft-recovery' }}
+          persist-credentials: false
+
+      - name: Write safe staging summary
+        env:
+          CI_SUMMARY_ARTIFACTS: durable-draft-staging-e2e-browser-artifacts,durable-draft-staging-edge-when-all
+          CI_SUMMARY_BASELINE_STATUS: ${{ needs.preflight.outputs.baseline_status }}
+          CI_SUMMARY_BUILD_RESULT: skipped
+          CI_SUMMARY_COMMIT_SHA: ${{ needs.preflight.outputs.commit_sha }}
+          CI_SUMMARY_E2E_RESULT: ${{ needs['staging-e2e'].result == 'success' && (needs.edge.result == 'success' || needs.edge.result == 'skipped') && 'success' || 'failure' }}
+          CI_SUMMARY_ENVIRONMENT: staging
+          CI_SUMMARY_NO_DEPLOY: 'true'
+          CI_SUMMARY_PENDING_COUNT: ${{ needs.preflight.outputs.pending_count }}
+          CI_SUMMARY_UNIT_RESULT: skipped
+        run: node scripts/build-ci-summary.mjs
