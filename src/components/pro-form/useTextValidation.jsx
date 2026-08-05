@@ -1,13 +1,20 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 
-export function useTextValidation(value, questionId, debounceMs = 3000, isManualValidating = false, setIsManualValidating = null, initialStatus = 'neutral', externalStatus = null) {
+const VALIDATION_UNAVAILABLE_MESSAGE =
+  "We couldn't validate this answer right now. Please try again. Your response has been preserved.";
+const TRANSIENT_RETRY_DELAY_MS = 300;
+
+export function useTextValidation(value, questionId, initialStatus = 'neutral', externalStatus = null) {
   const [validationState, setValidationState] = useState({
-    status: initialStatus, // 'green', 'yellow', 'red', 'neutral'
+    status: initialStatus, // 'green', 'yellow', 'red', 'neutral', 'error'
     message: '',
     charCount: 0,
     expectedRange: null
   });
+  const [isValidating, setIsValidating] = useState(false);
+  const validationInFlightRef = useRef(false);
+  const lastValidatedValueRef = useRef(value);
   
   // Sync from Redux status changes (e.g., submit-time results, resets)
   useEffect(() => {
@@ -19,26 +26,11 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
     }));
   }, [externalStatus]);
 
-  // Manual validation trigger - ONLY validation method now
-  useEffect(() => {
-    if (isManualValidating && value && value.trim().length > 0) {
-      if (import.meta.env.DEV) {
-        console.log(`🔘 [Q${questionId}] Manual validation effect triggered`);
-      }
-      validateText(value, questionId).finally(() => {
-        if (setIsManualValidating) {
-          setIsManualValidating(false);
-        }
-      });
-    }
-  }, [isManualValidating]);
-
-  // Track the last validated value
-  const lastValidatedValueRef = useRef(value);
-
   // Update char count on value change, reset validation if content changes
   useEffect(() => {
-    if (!value || value.trim().length === 0) {
+    const textValue = typeof value === 'string' ? value : String(value ?? '');
+
+    if (textValue.trim().length === 0) {
       setValidationState({
         status: 'neutral',
         message: '',
@@ -48,24 +40,34 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
       lastValidatedValueRef.current = '';
     } else {
       // If value changed from last validated value, reset to neutral
-      if (lastValidatedValueRef.current && value !== lastValidatedValueRef.current) {
+      if (lastValidatedValueRef.current && textValue !== lastValidatedValueRef.current) {
         setValidationState({
           status: 'neutral',
           message: '',
-          charCount: value.length,
+          charCount: textValue.length,
           expectedRange: null
         });
       } else {
         // Just update char count without changing status
         setValidationState(prev => ({
           ...prev,
-          charCount: value.length
+          charCount: textValue.length
         }));
       }
     }
   }, [value]);
 
-  const validateText = async (text, qId) => {
+  const validateNow = useCallback(async () => {
+    const text = typeof value === 'string' ? value : String(value ?? '');
+    const qId = String(questionId ?? '');
+
+    if (!text.trim() || !qId || validationInFlightRef.current) {
+      return null;
+    }
+
+    validationInFlightRef.current = true;
+    setIsValidating(true);
+
     try {
       if (import.meta.env.DEV) {
         console.log(`🔍 [Q${qId}] Starting validation via backend function`);
@@ -74,40 +76,68 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
       
       // Call backend function instead of direct agent access
       const questionKey = `question_${qId.replace('.', '_')}`;
-      const response = await base44.functions.invoke('validateQuestionText', {
-        text: text,
-        questionContext: questionKey
-      });
+      let response;
+      let lastInvokeError;
+
+      // Validation is read-only, so one short automatic retry is safe and removes
+      // the most common live failure mode: a transient function/network hiccup.
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          response = await base44.functions.invoke('validateQuestionText', {
+            text,
+            questionContext: questionKey
+          });
+
+          if (response?.status && response.status >= 500) {
+            throw new Error(response?.data?.error || 'Validation service unavailable');
+          }
+
+          lastInvokeError = null;
+          break;
+        } catch (error) {
+          lastInvokeError = error;
+          if (attempt === 0) {
+            await new Promise(resolve => setTimeout(resolve, TRANSIENT_RETRY_DELAY_MS));
+          }
+        }
+      }
+
+      if (lastInvokeError) {
+        throw lastInvokeError;
+      }
 
       if (import.meta.env.DEV) {
         console.log(`📨 [Q${qId}] Backend response status:`, response.status);
       }
 
-      if (response.status !== 200) {
-        throw new Error(response.data?.error || 'Validation failed');
+      if (response?.status && response.status !== 200) {
+        throw new Error(response?.data?.error || 'Validation failed');
       }
 
-      const result = response.data;
+      const result = response?.data;
+      const statusMap = {
+        complete: 'green',
+        needs_work: 'yellow',
+        incomplete: 'red'
+      };
+
+      if (!result || !statusMap[result.status]) {
+        throw new Error('Validation returned an invalid response');
+      }
+
       if (import.meta.env.DEV) {
         console.log(`✅ [Q${qId}] Validation status:`, result?.status);
       }
 
-      // Map validation status to UI status
-      const statusMap = {
-        'complete': 'green',
-        'needs_work': 'yellow',
-        'incomplete': 'red'
-      };
-
       setValidationState({
-        status: statusMap[result.status] || 'neutral',
+        status: statusMap[result.status],
         message: result.message || '',
-        charCount: result.characterCount || text.length,
+        charCount: result.characterCount ?? text.length,
         expectedRange: result.expectedRange || null
       });
 
-      // Update last validated value
       lastValidatedValueRef.current = text;
+      return result;
 
     } catch (error) {
       console.error(`❌ [Q${qId}] Validation error:`, error);
@@ -118,15 +148,25 @@ export function useTextValidation(value, questionId, debounceMs = 3000, isManual
           error: error
         });
       }
-      // Fallback to neutral on error
+
+      // A transport/function failure must be visible. A separate error state keeps
+      // the outage from being persisted as a judgment about the client's answer.
       setValidationState({
-        status: 'neutral',
-        message: '',
+        status: 'error',
+        message: VALIDATION_UNAVAILABLE_MESSAGE,
         charCount: text.length,
         expectedRange: null
       });
+      return null;
+    } finally {
+      validationInFlightRef.current = false;
+      setIsValidating(false);
     }
-  };
+  }, [questionId, value]);
 
-  return validationState;
+  return {
+    ...validationState,
+    isValidating,
+    validateNow
+  };
 }

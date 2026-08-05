@@ -763,31 +763,21 @@ export const submitProQuestionnaire = async ({
   }
 
   if (!receivedViaIntake && !resilientSubmitResult.zapierSent && transformedPayload) {
-    sendZapierSafe(transformedPayload, { timeoutMs: 5000 })
-      .then((zapierResult) => {
-        if (!zapierResult.ok) {
-          createDraftEventSafe({
-            createDraftEvent,
-            eventType: 'zapier_delivery_failed_after_submit',
-            value: {
-              status: 'zapier_failed',
-              final_submission_id: savedSubmission?.id || '',
-              failureKind: zapierResult.error?.failureKind || 'unknown'
-            }
-          });
+    // Keep the public page alive until the backend accepts or rejects delivery.
+    // Fire-and-forget requests can be cancelled when the thank-you view replaces
+    // the questionnaire immediately after submission on the published site.
+    const zapierResult = await sendZapierSafe(transformedPayload, { timeoutMs: 10000 });
+    if (!zapierResult.ok) {
+      await createDraftEventSafe({
+        createDraftEvent,
+        eventType: 'zapier_delivery_failed_after_submit',
+        value: {
+          status: 'zapier_failed',
+          final_submission_id: savedSubmission?.id || '',
+          failureKind: zapierResult.error?.failureKind || 'unknown'
         }
-      })
-      .catch((error) => {
-        createDraftEventSafe({
-          createDraftEvent,
-          eventType: 'zapier_delivery_failed_after_submit',
-          value: {
-            status: 'zapier_failed',
-            final_submission_id: savedSubmission?.id || '',
-            failureKind: serializeSubmitError(error).failureKind
-          }
-        });
       });
+    }
   }
 
   await recordSubmitStage('submit_success', {

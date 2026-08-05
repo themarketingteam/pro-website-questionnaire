@@ -8,15 +8,116 @@ const isPlainObject = (v) => {
   return p === Object.prototype || p === null;
 };
 
-// Fire the payload to the Zapier webhook so repair-and-retry submissions reach
-// the same downstream workflow as normal client submissions. Non-fatal.
+const ZAPIER_WEBHOOK_FALLBACK_URL = 'https://hooks.zapier.com/hooks/catch/23529934/uas7p60/';
+
+const isValidZapierWebhookUrl = (value) => {
+  if (typeof value !== 'string' || !value.trim()) return false;
+
+  try {
+    const url = new URL(value.trim());
+    const normalizedUrl = `${url.origin}${url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`}`;
+    return normalizedUrl === ZAPIER_WEBHOOK_FALLBACK_URL &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash;
+  } catch {
+    return false;
+  }
+};
+
+const resolveZapierWebhookUrl = () => {
+  let configuredUrl = '';
+  try {
+    configuredUrl = Deno.env.get('ZAPIER_WEBHOOK_URL')?.trim() || '';
+  } catch {
+    configuredUrl = '';
+  }
+
+  if (!isValidZapierWebhookUrl(configuredUrl)) return ZAPIER_WEBHOOK_FALLBACK_URL;
+  return configuredUrl.endsWith('/') ? configuredUrl : `${configuredUrl}/`;
+};
+
+const ZAPIER_WEBHOOK_URL = resolveZapierWebhookUrl();
+
+const DRAFT_RECOVERY_SECRET_NAME = 'DRAFT_RECOVERY_PASSWORD';
+const DRAFT_RECOVERY_GRANT_SCOPE = 'draft-recovery';
+const DRAFT_RECOVERY_GRANT_VERSION = 1;
+const DRAFT_RECOVERY_GRANT_TTL_SECONDS = 7 * 24 * 60 * 60;
+const draftRecoveryEncoder = new TextEncoder();
+
+const draftRecoveryFromBase64Url = (value) => {
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+};
+
+const importDraftRecoverySigningKey = (secret) => crypto.subtle.importKey(
+  'raw',
+  draftRecoveryEncoder.encode(secret),
+  { name: 'HMAC', hash: 'SHA-256' },
+  false,
+  ['verify']
+);
+
+const verifyDraftRecoveryGrant = async (token) => {
+  if (typeof token !== 'string' || !token) return false;
+
+  let configuredPassword = '';
+  try {
+    configuredPassword = Deno.env.get(DRAFT_RECOVERY_SECRET_NAME) || '';
+  } catch {
+    configuredPassword = '';
+  }
+  if (!configuredPassword) return false;
+
+  const [encodedPayload, encodedSignature, ...extraParts] = token.split('.');
+  if (!encodedPayload || !encodedSignature || extraParts.length > 0) return false;
+
+  try {
+    const signingKey = await importDraftRecoverySigningKey(configuredPassword);
+    const signatureIsValid = await crypto.subtle.verify(
+      'HMAC',
+      signingKey,
+      draftRecoveryFromBase64Url(encodedSignature),
+      draftRecoveryEncoder.encode(encodedPayload)
+    );
+    if (!signatureIsValid) return false;
+
+    const payload = JSON.parse(new TextDecoder().decode(draftRecoveryFromBase64Url(encodedPayload)));
+    const now = Math.floor(Date.now() / 1000);
+    return payload?.version === DRAFT_RECOVERY_GRANT_VERSION &&
+      payload?.scope === DRAFT_RECOVERY_GRANT_SCOPE &&
+      Number.isFinite(payload?.issuedAt) &&
+      Number.isFinite(payload?.expiresAt) &&
+      payload.issuedAt <= now + 60 &&
+      payload.expiresAt > now &&
+      payload.expiresAt <= payload.issuedAt + DRAFT_RECOVERY_GRANT_TTL_SECONDS;
+  } catch {
+    return false;
+  }
+};
+
+const authorizeDraftRecoveryRequest = async (base44, body) => {
+  try {
+    const user = await base44.auth.me();
+    if (user?.role === 'admin') return 'admin';
+  } catch {
+    // Public callers do not have a Base44 user session.
+  }
+
+  return await verifyDraftRecoveryGrant(body?.recoveryGrant) ? 'recovery_grant' : '';
+};
+
+// Deliver repair-and-retry payloads to the required Zapier workflow. Delivery
+// failures are returned to the admin UI instead of being reported as success.
 const sendToZapierSafe = async (payload) => {
   try {
-    const webhookUrl = 'https://hooks.zapier.com/hooks/catch/25964219/uas7p60/';
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
     try {
-      const res = await fetch(webhookUrl, {
+      const res = await fetch(ZAPIER_WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -500,13 +601,17 @@ async function runRepairPipeline({
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-
-    if (user?.role !== 'admin') {
-      return Response.json({ success: false, error: { message: 'Forbidden: Admin access required' } }, { status: 403 });
-    }
-
     const body = await req.json().catch(() => ({}));
+    const authorizationMode = await authorizeDraftRecoveryRequest(base44, body);
+
+    if (!authorizationMode) {
+      console.warn('AI repair rejected: missing admin session or valid recovery grant');
+      return Response.json({
+        success: false,
+        error: { message: 'Forbidden: Admin session or valid draft recovery access is required' }
+      }, { status: 403 });
+    }
+    console.info('AI repair authorized', { authorizationMode });
     const intakeId = typeof body?.intakeId === 'string' ? body.intakeId : '';
     const questionnaireSessionId = typeof body?.questionnaireSessionId === 'string' ? body.questionnaireSessionId : '';
     const draftId = typeof body?.draftId === 'string' ? body.draftId : '';
@@ -565,12 +670,31 @@ Deno.serve(async (req) => {
       // For repair_and_retry, always fire the payload to Zapier — every button press.
       // Zapier deduplicates on its end, so repeated sends are safe.
       let zapierSent = false;
+      let zapierResult = null;
       if (mode === 'repair_and_retry') {
         const zapPayload = repairResult.payload || rawPayload;
         if (zapPayload) {
-          const zapResult = await sendToZapierSafe(zapPayload);
-          zapierSent = zapResult.ok;
+          zapierResult = await sendToZapierSafe(zapPayload);
+          zapierSent = zapierResult.ok;
         }
+      }
+
+      if (mode === 'repair_and_retry' && !zapierSent) {
+        const detail = zapierResult?.error || (zapierResult?.status ? `HTTP ${zapierResult.status}` : 'no submission payload was available');
+        return Response.json({
+          success: false,
+          draftMode: true,
+          submissionCreated: false,
+          repairSource: repairResult.source,
+          repairOk: repairResult.ok,
+          zapierSent: false,
+          zapierStatus: zapierResult?.status ?? null,
+          zapierEndpoint: ZAPIER_WEBHOOK_URL,
+          error: { message: `Zapier delivery failed: ${detail}` },
+          report: repairResult.report,
+          hasRepairedPayload: Boolean(repairResult.payload),
+          errors: repairResult.errors
+        });
       }
 
       return Response.json({
@@ -580,6 +704,7 @@ Deno.serve(async (req) => {
         repairSource: repairResult.source,
         repairOk: repairResult.ok,
         zapierSent,
+        zapierEndpoint: mode === 'repair_and_retry' ? ZAPIER_WEBHOOK_URL : undefined,
         report: repairResult.report,
         hasRepairedPayload: Boolean(repairResult.payload),
         errors: repairResult.errors
@@ -600,8 +725,30 @@ Deno.serve(async (req) => {
     // Guard: already submitted (linked_submission_id set)
     if (intake.linked_submission_id && !forceRetry) {
       const earlyParsed = safeJsonParse(intake.transformed_payload_json);
-      if (earlyParsed.ok && isPlainObject(earlyParsed.value)) await sendToZapierSafe(earlyParsed.value);
-      return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: intake.linked_submission_id, intakeId: intake.id });
+      const earlyPayload = earlyParsed.ok && isPlainObject(earlyParsed.value) ? earlyParsed.value : null;
+      const zapierResult = earlyPayload ? await sendToZapierSafe(earlyPayload) : { ok: false, error: 'no submission payload was available' };
+      if (!zapierResult.ok) {
+        const detail = zapierResult.error || (zapierResult.status ? `HTTP ${zapierResult.status}` : 'unknown error');
+        return Response.json({
+          success: false,
+          alreadySubmitted: true,
+          linkedSubmissionId: intake.linked_submission_id,
+          intakeId: intake.id,
+          zapierSent: false,
+          zapierStatus: zapierResult.status ?? null,
+          zapierEndpoint: ZAPIER_WEBHOOK_URL,
+          error: { message: `Zapier delivery failed: ${detail}` }
+        });
+      }
+      return Response.json({
+        success: true,
+        alreadySubmitted: true,
+        linkedSubmissionId: intake.linked_submission_id,
+        intakeId: intake.id,
+        zapierSent: true,
+        zapierStatus: zapierResult.status,
+        zapierEndpoint: ZAPIER_WEBHOOK_URL
+      });
     }
 
     // FIX 2: Keep raw string for AI prompt even if parsing fails
@@ -704,8 +851,31 @@ Deno.serve(async (req) => {
           ai_repair_retry_attempted: true,
           ai_repair_retry_result_json: JSON.stringify({ linkedSubmissionId: existing.id, source: 'existing_found_by_session_id' })
         });
-        await sendToZapierSafe(repairResult.payload);
-        return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: existing.id, intakeId: intake.id, mode: 'repair_and_retry' });
+        const zapierResult = await sendToZapierSafe(repairResult.payload);
+        if (!zapierResult.ok) {
+          const detail = zapierResult.error || (zapierResult.status ? `HTTP ${zapierResult.status}` : 'unknown error');
+          return Response.json({
+            success: false,
+            alreadySubmitted: true,
+            linkedSubmissionId: existing.id,
+            intakeId: intake.id,
+            mode: 'repair_and_retry',
+            zapierSent: false,
+            zapierStatus: zapierResult.status ?? null,
+            zapierEndpoint: ZAPIER_WEBHOOK_URL,
+            error: { message: `Zapier delivery failed: ${detail}` }
+          });
+        }
+        return Response.json({
+          success: true,
+          alreadySubmitted: true,
+          linkedSubmissionId: existing.id,
+          intakeId: intake.id,
+          mode: 'repair_and_retry',
+          zapierSent: true,
+          zapierStatus: zapierResult.status,
+          zapierEndpoint: ZAPIER_WEBHOOK_URL
+        });
       }
     }
 
@@ -727,9 +897,35 @@ Deno.serve(async (req) => {
         last_retry_at: now,
         retry_count: (Number(intake.retry_count) || 0) + 1
       });
-      await sendToZapierSafe(repairResult.payload);
+      const zapierResult = await sendToZapierSafe(repairResult.payload);
+      if (!zapierResult.ok) {
+        const detail = zapierResult.error || (zapierResult.status ? `HTTP ${zapierResult.status}` : 'unknown error');
+        return Response.json({
+          success: false,
+          mode: 'repair_and_retry',
+          linkedSubmissionId: submission.id,
+          submissionCreated: true,
+          repairSource: repairResult.source,
+          report: repairResult.report,
+          intakeId: intake.id,
+          zapierSent: false,
+          zapierStatus: zapierResult.status ?? null,
+          zapierEndpoint: ZAPIER_WEBHOOK_URL,
+          error: { message: `Submission was created, but Zapier delivery failed: ${detail}` }
+        });
+      }
       await emitEvent(base44, intake.questionnaire_session_id, 'ai_repair_retry_succeeded', context);
-      return Response.json({ success: true, mode: 'repair_and_retry', linkedSubmissionId: submission.id, repairSource: repairResult.source, report: repairResult.report, intakeId: intake.id });
+      return Response.json({
+        success: true,
+        mode: 'repair_and_retry',
+        linkedSubmissionId: submission.id,
+        repairSource: repairResult.source,
+        report: repairResult.report,
+        intakeId: intake.id,
+        zapierSent: true,
+        zapierStatus: zapierResult.status,
+        zapierEndpoint: ZAPIER_WEBHOOK_URL
+      });
     } catch (createErr) {
       const errObj = { message: createErr?.message || 'create_failed', status: createErr?.status || null };
       await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {

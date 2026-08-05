@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { AlertCircle, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import { useTextValidation } from './useTextValidation';
 
@@ -7,15 +7,11 @@ export default function TextareaQuestion({
   onChange, 
   placeholder = "Enter your response...", 
   rows = 6,
-  questionContext = "General question",
   questionId = "",
-  debounceMs = 500,
   onValidationChange,
   currentValidationStatus = 'neutral',
   onTouched
 }) {
-  const [isManualValidating, setIsManualValidating] = useState(false);
-  
   // Map parent validation status to internal status
   const statusMap = {
     'complete': 'green',
@@ -26,15 +22,16 @@ export default function TextareaQuestion({
   };
   const initialStatus = statusMap[currentValidationStatus] || 'neutral';
   
-  const validation = useTextValidation(value, questionId, debounceMs, isManualValidating, setIsManualValidating, initialStatus, currentValidationStatus);
+  const validation = useTextValidation(value, questionId, initialStatus, currentValidationStatus);
 
-  const handleManualValidate = () => {
-    if (!value || value.trim().length === 0) return;
+  const handleManualValidate = async () => {
+    const textValue = typeof value === 'string' ? value : String(value ?? '');
+    if (!textValue.trim()) return;
     if (import.meta.env.DEV) {
       console.log(`🔘 [Q${questionId}] Manual validation triggered`);
     }
-    setIsManualValidating(true);
     if (onTouched) onTouched();
+    await validation.validateNow();
   };
 
   // Stable parent callback + deduped notifications
@@ -62,6 +59,7 @@ export default function TextareaQuestion({
   const getStatusIcon = () => {
     switch (validation.status) {
       case 'red':
+      case 'error':
         return <AlertCircle className="w-4 h-4 text-red-600" />;
       case 'yellow':
         return <AlertTriangle className="w-4 h-4 text-amber-600" />;
@@ -75,6 +73,7 @@ export default function TextareaQuestion({
   const getStatusBorderClass = () => {
     switch (validation.status) {
       case 'red':
+      case 'error':
         return 'border-red-500 focus:ring-red-500';
       case 'yellow':
         return 'border-amber-500 focus:ring-amber-500';
@@ -88,6 +87,7 @@ export default function TextareaQuestion({
   const getStatusBgClass = () => {
     switch (validation.status) {
       case 'red':
+      case 'error':
         return 'bg-red-50 border-red-200 text-red-800';
       case 'yellow':
         return 'bg-amber-50 border-amber-200 text-amber-800';
@@ -139,10 +139,10 @@ export default function TextareaQuestion({
       <button
         type="button"
         onClick={handleManualValidate}
-        disabled={isManualValidating || !value || value.trim().length === 0}
+        disabled={validation.isValidating || !value || String(value).trim().length === 0}
         className="px-4 py-2 bg-[#1C82DE] hover:bg-[#075DA7] text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
       >
-        {isManualValidating ? (
+        {validation.isValidating ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
             Validating...

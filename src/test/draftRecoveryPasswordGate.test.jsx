@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { base44 } from '@/api/base44Client';
-import DraftRecoveryPasswordGate from '@/components/admin/DraftRecoveryPasswordGate';
+import DraftRecoveryPasswordGate, { useDraftRecoveryAccess } from '@/components/admin/DraftRecoveryPasswordGate';
 
 const STORAGE_KEY = 'pro_draft_recovery_access_v1';
 
@@ -24,6 +24,11 @@ const renderGate = () => render(
     <div>Protected draft recovery</div>
   </DraftRecoveryPasswordGate>
 );
+
+const ProtectedGrant = () => {
+  const { recoveryGrant } = useDraftRecoveryAccess();
+  return <div>Recovery grant: {recoveryGrant}</div>;
+};
 
 describe('DraftRecoveryPasswordGate', () => {
   it('does not mount protected content before password verification', async () => {
@@ -86,5 +91,21 @@ describe('DraftRecoveryPasswordGate', () => {
         token: 'saved-grant'
       });
     });
+  });
+
+  it('provides the verified grant to public recovery actions', async () => {
+    const expiresAt = Date.now() + 60_000;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: 'saved-grant', expiresAt }));
+    base44.functions.invoke.mockResolvedValueOnce({
+      data: { authorized: true, expiresAt }
+    });
+
+    render(
+      <DraftRecoveryPasswordGate>
+        <ProtectedGrant />
+      </DraftRecoveryPasswordGate>
+    );
+
+    expect(await screen.findByText('Recovery grant: saved-grant')).toBeInTheDocument();
   });
 });

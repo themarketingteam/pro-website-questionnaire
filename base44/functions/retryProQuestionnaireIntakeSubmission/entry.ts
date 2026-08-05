@@ -25,15 +25,117 @@ const incrementRetryCount = (value) => {
   return Number.isFinite(count) ? count + 1 : 1;
 };
 
-// Fire the payload to the Zapier webhook so retries reach the same downstream
-// workflow as normal client submissions. Non-fatal: never breaks the retry.
+const ZAPIER_WEBHOOK_FALLBACK_URL = 'https://hooks.zapier.com/hooks/catch/23529934/uas7p60/';
+
+const isValidZapierWebhookUrl = (value) => {
+  if (typeof value !== 'string' || !value.trim()) return false;
+
+  try {
+    const url = new URL(value.trim());
+    const normalizedUrl = `${url.origin}${url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`}`;
+    return normalizedUrl === ZAPIER_WEBHOOK_FALLBACK_URL &&
+      !url.username &&
+      !url.password &&
+      !url.search &&
+      !url.hash;
+  } catch {
+    return false;
+  }
+};
+
+const resolveZapierWebhookUrl = () => {
+  let configuredUrl = '';
+  try {
+    configuredUrl = Deno.env.get('ZAPIER_WEBHOOK_URL')?.trim() || '';
+  } catch {
+    configuredUrl = '';
+  }
+
+  if (!isValidZapierWebhookUrl(configuredUrl)) return ZAPIER_WEBHOOK_FALLBACK_URL;
+  return configuredUrl.endsWith('/') ? configuredUrl : `${configuredUrl}/`;
+};
+
+const ZAPIER_WEBHOOK_URL = resolveZapierWebhookUrl();
+
+const DRAFT_RECOVERY_SECRET_NAME = 'DRAFT_RECOVERY_PASSWORD';
+const DRAFT_RECOVERY_GRANT_SCOPE = 'draft-recovery';
+const DRAFT_RECOVERY_GRANT_VERSION = 1;
+const DRAFT_RECOVERY_GRANT_TTL_SECONDS = 7 * 24 * 60 * 60;
+const draftRecoveryEncoder = new TextEncoder();
+
+const draftRecoveryFromBase64Url = (value) => {
+  const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
+  const binary = atob(padded);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+};
+
+const importDraftRecoverySigningKey = (secret) => crypto.subtle.importKey(
+  'raw',
+  draftRecoveryEncoder.encode(secret),
+  { name: 'HMAC', hash: 'SHA-256' },
+  false,
+  ['verify']
+);
+
+const verifyDraftRecoveryGrant = async (token) => {
+  if (typeof token !== 'string' || !token) return false;
+
+  let configuredPassword = '';
+  try {
+    configuredPassword = Deno.env.get(DRAFT_RECOVERY_SECRET_NAME) || '';
+  } catch {
+    configuredPassword = '';
+  }
+  if (!configuredPassword) return false;
+
+  const [encodedPayload, encodedSignature, ...extraParts] = token.split('.');
+  if (!encodedPayload || !encodedSignature || extraParts.length > 0) return false;
+
+  try {
+    const signingKey = await importDraftRecoverySigningKey(configuredPassword);
+    const signatureIsValid = await crypto.subtle.verify(
+      'HMAC',
+      signingKey,
+      draftRecoveryFromBase64Url(encodedSignature),
+      draftRecoveryEncoder.encode(encodedPayload)
+    );
+    if (!signatureIsValid) return false;
+
+    const payload = JSON.parse(new TextDecoder().decode(draftRecoveryFromBase64Url(encodedPayload)));
+    const now = Math.floor(Date.now() / 1000);
+    return payload?.version === DRAFT_RECOVERY_GRANT_VERSION &&
+      payload?.scope === DRAFT_RECOVERY_GRANT_SCOPE &&
+      Number.isFinite(payload?.issuedAt) &&
+      Number.isFinite(payload?.expiresAt) &&
+      payload.issuedAt <= now + 60 &&
+      payload.expiresAt > now &&
+      payload.expiresAt <= payload.issuedAt + DRAFT_RECOVERY_GRANT_TTL_SECONDS;
+  } catch {
+    return false;
+  }
+};
+
+const authorizeDraftRecoveryRequest = async (base44, body) => {
+  try {
+    const user = await base44.auth.me();
+    if (user?.role === 'admin') return 'admin';
+  } catch {
+    // Public callers do not have a Base44 user session.
+  }
+
+  return await verifyDraftRecoveryGrant(body?.recoveryGrant) ? 'recovery_grant' : '';
+};
+
+// Deliver the payload to the required Zapier workflow and report the result to
+// the caller. The admin UI must not report a successful retry when Zapier did
+// not accept the request.
 const sendToZapierSafe = async (payload) => {
   try {
-    const webhookUrl = 'https://hooks.zapier.com/hooks/catch/25964219/uas7p60/';
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
     try {
-      const res = await fetch(webhookUrl, {
+      const res = await fetch(ZAPIER_WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -48,16 +150,53 @@ const sendToZapierSafe = async (payload) => {
   }
 };
 
+const respondAfterZapierDelivery = async (payload, successData) => {
+  if (!payload) {
+    return Response.json({
+      ...successData,
+      success: false,
+      zapierSent: false,
+      zapierEndpoint: ZAPIER_WEBHOOK_URL,
+      error: { message: 'Zapier delivery failed: no submission payload was available' }
+    });
+  }
+
+  const zapierResult = await sendToZapierSafe(payload);
+  if (!zapierResult.ok) {
+    const detail = zapierResult.error || (zapierResult.status ? `HTTP ${zapierResult.status}` : 'unknown error');
+    return Response.json({
+      ...successData,
+      success: false,
+      zapierSent: false,
+      zapierStatus: zapierResult.status ?? null,
+      zapierEndpoint: ZAPIER_WEBHOOK_URL,
+      error: { message: `Zapier delivery failed: ${detail}` }
+    });
+  }
+
+  return Response.json({
+    ...successData,
+    success: true,
+    zapierSent: true,
+    zapierStatus: zapierResult.status,
+    zapierEndpoint: ZAPIER_WEBHOOK_URL
+  });
+};
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
-    const user = await base44.auth.me();
-
-    if (user?.role !== 'admin') {
-      return Response.json({ success: false, error: { message: 'Forbidden: Admin access required' } }, { status: 403 });
-    }
-
     const body = await req.json().catch(() => ({}));
+    const authorizationMode = await authorizeDraftRecoveryRequest(base44, body);
+
+    if (!authorizationMode) {
+      console.warn('Retry rejected: missing admin session or valid recovery grant');
+      return Response.json({
+        success: false,
+        error: { message: 'Forbidden: Admin session or valid draft recovery access is required' }
+      }, { status: 403 });
+    }
+    console.info('Retry authorized', { authorizationMode });
 
     // Guard: useAiRepair must go through repairProQuestionnaireIntakeSubmission
     if (body?.useAiRepair === true) {
@@ -123,14 +262,20 @@ Deno.serve(async (req) => {
             final_submission_id: existing.id,
             submitted_at: new Date().toISOString()
           });
-          await sendToZapierSafe(draftPayload);
-          return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: existing.id, draftId });
+          return await respondAfterZapierDelivery(draftPayload, {
+            alreadySubmitted: true,
+            linkedSubmissionId: existing.id,
+            draftId
+          });
         }
       }
 
       if (draft.final_submission_id && !forceRetry) {
-        await sendToZapierSafe(draftPayload);
-        return Response.json({ success: true, alreadySubmitted: true, linkedSubmissionId: draft.final_submission_id, draftId });
+        return await respondAfterZapierDelivery(draftPayload, {
+          alreadySubmitted: true,
+          linkedSubmissionId: draft.final_submission_id,
+          draftId
+        });
       }
 
       // Stamp session_id onto payload metadata for deduplication
@@ -144,8 +289,10 @@ Deno.serve(async (req) => {
         final_submission_id: submission.id,
         submitted_at: new Date().toISOString()
       });
-      await sendToZapierSafe(draftPayload);
-      return Response.json({ success: true, linkedSubmissionId: submission.id, draftId });
+      return await respondAfterZapierDelivery(draftPayload, {
+        linkedSubmissionId: submission.id,
+        draftId
+      });
     }
 
     // --- Intake-based retry path (original) ---
@@ -167,9 +314,7 @@ Deno.serve(async (req) => {
 
     if (intake.linked_submission_id && !forceRetry) {
       const earlyPayload = parsePayload(intake.transformed_payload_json);
-      if (earlyPayload) await sendToZapierSafe(earlyPayload);
-      return Response.json({
-        success: true,
+      return await respondAfterZapierDelivery(earlyPayload, {
         alreadySubmitted: true,
         linkedSubmissionId: intake.linked_submission_id,
         intakeId: intake.id
@@ -190,9 +335,7 @@ Deno.serve(async (req) => {
           retry_count: incrementRetryCount(intake.retry_count)
         });
         const earlyPayload = parsePayload(intake.transformed_payload_json);
-        if (earlyPayload) await sendToZapierSafe(earlyPayload);
-        return Response.json({
-          success: true,
+        return await respondAfterZapierDelivery(earlyPayload, {
           alreadySubmitted: true,
           linkedSubmissionId: existingSubmission.id,
           intakeId: intake.id
@@ -231,9 +374,7 @@ Deno.serve(async (req) => {
     if (intake.linked_submission_id && forceRetry) {
       const linkedList = await base44.asServiceRole.entities.ProFormSubmission.filter({ id: intake.linked_submission_id });
       if (Array.isArray(linkedList) && linkedList.length > 0) {
-        await sendToZapierSafe(transformedPayload);
-        return Response.json({
-          success: true,
+        return await respondAfterZapierDelivery(transformedPayload, {
           alreadySubmitted: true,
           linkedSubmissionId: intake.linked_submission_id,
           intakeId: intake.id
@@ -251,9 +392,7 @@ Deno.serve(async (req) => {
         retry_count: incrementRetryCount(intake.retry_count)
       });
 
-      await sendToZapierSafe(transformedPayload);
-      return Response.json({
-        success: true,
+      return await respondAfterZapierDelivery(transformedPayload, {
         linkedSubmissionId: submission.id,
         intakeId: intake.id
       });

@@ -277,7 +277,7 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
   );
 }
 
-export default function QuestionnaireIntakeRecovery() {
+export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('received_intake');
@@ -314,7 +314,8 @@ export default function QuestionnaireIntakeRecovery() {
       const response = await base44.functions.invoke('retryProQuestionnaireIntakeSubmission', {
         intakeId: intake.id,
         questionnaireSessionId: intake.questionnaire_session_id,
-        forceRetry: false
+        forceRetry: false,
+        ...(recoveryGrant ? { recoveryGrant } : {})
       });
       const data = response?.data;
       if (data?.success) {
@@ -324,7 +325,7 @@ export default function QuestionnaireIntakeRecovery() {
       }
       await loadRecords();
     } catch (error) {
-      toast.error(error?.message || 'Retry failed');
+      toast.error(error?.response?.data?.error?.message || error?.response?.data?.error || error?.message || 'Retry failed');
     } finally {
       setRetryingId('');
     }
@@ -341,7 +342,8 @@ export default function QuestionnaireIntakeRecovery() {
         questionnaireSessionId: intake.questionnaire_session_id,
         mode,
         autoRetry: mode === 'repair_and_retry',
-        forceRetry: false
+        forceRetry: false,
+        ...(recoveryGrant ? { recoveryGrant } : {})
       });
       const data = response?.data;
       if (data?.success) {
@@ -355,7 +357,7 @@ export default function QuestionnaireIntakeRecovery() {
       }
       await loadRecords();
     } catch (err) {
-      toast.error(err?.message || 'AI action failed');
+      toast.error(err?.response?.data?.error?.message || err?.response?.data?.error || err?.message || 'AI action failed');
     } finally {
       setAiRunning(null);
     }

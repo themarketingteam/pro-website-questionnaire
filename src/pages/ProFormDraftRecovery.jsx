@@ -15,6 +15,7 @@ import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Wrench, Pencil,
 import DraftEditPanel from '@/components/admin/DraftEditPanel';
 import { toast } from 'sonner';
 import QuestionnaireIntakeRecovery from '@/components/admin/QuestionnaireIntakeRecovery';
+import { useDraftRecoveryAccess } from '@/components/admin/DraftRecoveryPasswordGate';
 import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
 import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
 import { SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
@@ -92,7 +93,7 @@ function DraftAiRepairSection({ draft }) {
   );
 }
 
-function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySuccess }) {
+function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySuccess, recoveryGrant }) {
   const [retrying, setRetrying] = useState(false);
   // aiRunning: null | 'diagnose_only' | 'repair_only' | 'repair_and_retry'
   const [aiRunning, setAiRunning] = useState(null);
@@ -137,8 +138,12 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
       // If mapped_payload_json is set (manually edited), use direct draft-based retry.
       // Otherwise fall back to session-based intake lookup.
       const params = localDraft.mapped_payload_json
-        ? { draftId: localDraft.id }
-        : { questionnaireSessionId: localDraft.session_id, session_id: localDraft.session_id };
+        ? { draftId: localDraft.id, recoveryGrant }
+        : {
+            questionnaireSessionId: localDraft.session_id,
+            session_id: localDraft.session_id,
+            recoveryGrant
+          };
 
       const result = await base44.functions.invoke('retryProQuestionnaireIntakeSubmission', params);
       if (result.data?.success) {
@@ -153,7 +158,11 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
         toast.error(`Retry failed: ${errMsg}`);
       }
     } catch (err) {
-      toast.error(`Retry failed: ${err?.message || 'Unknown error'}`);
+      const errorMessage = err?.response?.data?.error?.message
+        || err?.response?.data?.error
+        || err?.message
+        || 'Unknown error';
+      toast.error(`Retry failed: ${errorMessage}`);
     } finally {
       setRetrying(false);
     }
@@ -172,7 +181,8 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
         draftId: localDraft.id,
         mode,
         autoRetry: mode === 'repair_and_retry',
-        forceRetry: false
+        forceRetry: false,
+        recoveryGrant
       });
       const data = result?.data;
       if (data?.success) {
@@ -187,7 +197,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
         toast.error(errMsg);
       }
     } catch (err) {
-      toast.error(err?.message || `${modeLabels[mode]} failed`);
+      toast.error(err?.response?.data?.error?.message || err?.response?.data?.error || err?.message || `${modeLabels[mode]} failed`);
     } finally {
       setAiRunning(null);
     }
@@ -442,6 +452,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
 }
 
 export default function ProFormDraftRecovery() {
+  const { recoveryGrant } = useDraftRecoveryAccess();
   const [drafts, setDrafts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -556,7 +567,7 @@ export default function ProFormDraftRecovery() {
           </CardContent>
         </Card>
 
-        <QuestionnaireIntakeRecovery />
+        <QuestionnaireIntakeRecovery recoveryGrant={recoveryGrant} />
 
         <div className="space-y-4">
           {error && (
@@ -582,6 +593,7 @@ export default function ProFormDraftRecovery() {
                 onToggle={() => setExpandedId(expandedId === draft.id ? '' : draft.id)}
                 hasDuplicateSession={duplicateSessionIds.has(draft.session_id)}
                 onRetrySuccess={reloadDrafts}
+                recoveryGrant={recoveryGrant}
               />
             ))
           )}

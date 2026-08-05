@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { KeyRound, Loader2, LockKeyhole } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
@@ -6,6 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 
 const STORAGE_KEY = 'pro_draft_recovery_access_v1';
+
+export const DraftRecoveryAccessContext = createContext({ recoveryGrant: '' });
+
+export const useDraftRecoveryAccess = () => useContext(DraftRecoveryAccessContext);
 
 const readSavedGrant = () => {
   try {
@@ -35,6 +39,7 @@ const getErrorStatus = (error) => error?.status || error?.response?.status;
 
 export default function DraftRecoveryPasswordGate({ children }) {
   const [accessState, setAccessState] = useState('checking');
+  const [recoveryGrant, setRecoveryGrant] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -59,17 +64,20 @@ export default function DraftRecoveryPasswordGate({ children }) {
 
         if (!active) return;
         if (data?.authorized) {
+          setRecoveryGrant(savedGrant.token);
           setAccessState('authorized');
           return;
         }
 
         window.localStorage.removeItem(STORAGE_KEY);
+        setRecoveryGrant('');
         setError(data?.error || 'Your saved access has expired. Enter the password again.');
       } catch (verifyError) {
         if (!active) return;
         if ([401, 403].includes(getErrorStatus(verifyError))) {
           window.localStorage.removeItem(STORAGE_KEY);
         }
+        setRecoveryGrant('');
         setError(getErrorMessage(
           verifyError,
           'Unable to verify saved access. Please enter the password again.'
@@ -104,6 +112,7 @@ export default function DraftRecoveryPasswordGate({ children }) {
         token: data.token,
         expiresAt: data.expiresAt
       }));
+      setRecoveryGrant(data.token);
       setPassword('');
       setAccessState('authorized');
     } catch (submitError) {
@@ -114,7 +123,13 @@ export default function DraftRecoveryPasswordGate({ children }) {
     }
   };
 
-  if (accessState === 'authorized') return children;
+  if (accessState === 'authorized') {
+    return (
+      <DraftRecoveryAccessContext.Provider value={{ recoveryGrant }}>
+        {children}
+      </DraftRecoveryAccessContext.Provider>
+    );
+  }
 
   if (accessState === 'checking') {
     return (
