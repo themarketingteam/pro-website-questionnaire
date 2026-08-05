@@ -84,3 +84,10 @@ The peeled tag, local backup branch, remote peeled tag, and remote backup branch
 ```text
 27ddc347d55db00796a0e3e19ac343245519b01e
 ```
+
+## Baseline validation
+
+- Validation report: [source-baseline-validation.md](./source-baseline-validation.md)
+- Validation classification: `BASELINE_CERTIFIED_WITH_KNOWN_TEST_FAILURES`
+- Validation timestamp (UTC): `2026-08-05T19:01:05Z`
+- Build-manifest SHA-256: `fa7824d49f628c6228b1640a2ba71f4e19fe096731eae7544abb2aaf4670d98b`
