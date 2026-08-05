@@ -24,13 +24,32 @@ This checklist is fail-closed. `READY` means current evidence exists; `NOT_READY
 | 11 | No production domain is attached | `MANUAL_VERIFICATION_REQUIRED` | Creation-time dashboard evidence showed only the generated free Base44 URL. No documented CLI state command exists; capture a fresh Domains screenshot/report before deployment. |
 | 12 | Synthetic fixtures are ready | `NOT_READY` | Fixtures must be irreversibly synthetic/de-identified and include `test_run_id` plus `environment=staging`. |
 | 13 | Cleanup procedure is ready | `NOT_READY` | Implement dry-run/select/delete/report behavior scoped by staging app ID, environment marker, and test-run ID; test that production IDs cannot be selected. |
-| 14 | Visible staging banner is implemented | `NOT_READY` | `VITE_APP_ENVIRONMENT` is reserved, but no visible persistent staging banner/watermark exists. |
+| 14 | Visible staging banner is implemented | `READY` | The application shell renders the exact persistent warning only when environment is `staging` and the banner flag is exactly `true`. Focused tests and local previews cover questionnaire, thank-you, and admin routes. |
 | 15 | Production IDs are denylisted | `NOT_READY` | Deployment target IDs are cross-checked, but webhook, analytics, Maps, asset, storage, email, migration, and cleanup production identifiers are not comprehensively denylisted. |
-| 16 | Feature flags are staging-only | `NOT_READY` | No centralized staging side-effect flags or fail-closed environment-policy module exists. |
+| 16 | Feature flags are environment-isolated and fail closed | `READY` | Central frontend/backend runtime modules require recognized environments and exact lowercase controls. V2/recovery defaults remain off, client/server authorization is independent, and kill switches override ordinary enable flags. |
 | 17 | Rollback/delete-staging procedure is documented and rehearsed | `NOT_READY` | Draft procedure appears below; owner approval and a non-destructive rehearsal/evidence record are still required. |
 | 18 | `npx base44 whoami` succeeds | `READY` | Authenticated check succeeded before this prompt's read-only CLI operations. |
 | 19 | No production deploy wrapper is invoked | `READY` | Neither deployment wrapper nor any deploy/push command was executed. This must remain true until a separate authorization. |
 | 20 | Deployment has an evidence directory/report | `NOT_READY` | Define an immutable evidence path containing revision, guard output, tests/build, side-effect proofs, dashboard checks, approver, timestamps, rollback reference, and post-deploy smoke results. |
+| 21 | Safe build metadata is present | `READY` | Frozen metadata exposes only environment, sanitized SHA/time, and safe feature booleans. Missing SHA/time becomes `unknown`; no app ID, URL, token, email, or recovery code is included. |
+| 22 | Runtime markers are machine-verifiable | `READY` | One route-independent shell exposes safe `data-*` markers. Local staging and production previews produced the expected environment/build/disabled-feature values. |
+
+## Environment-identification verification
+
+The following local verification is implementation evidence only. It does not authorize a staging deployment.
+
+| Verification | Result | Evidence |
+| --- | --- | --- |
+| Focused banner/runtime tests | `PASS` | `src/test/environmentIdentification.test.jsx`: 12 tests pass; combined with the Prompt 1 frontend runtime tests, 31/31 pass. |
+| Staging questionnaire route | `PASS` | Local preview `/` rendered exactly one banner with the required text and `data-app-environment=staging`. |
+| Staging thank-you route | `PASS` | Local preview `/thank-you` rendered exactly one banner with the required text. |
+| Staging admin route | `PASS` | Local preview `/admin/draft-recovery` rendered exactly one banner without changing its authorization gate. |
+| Production banner isolation | `PASS` | Production preview rendered zero staging banners even when `VITE_STAGING_BANNER_ENABLED=true` was deliberately supplied. |
+| Production runtime markers | `PASS` | Environment reported `production`; V2, public email recovery, OTP, and magic link reported `false`; kill switch reported `true`. |
+| Production bundle warning text | `PASS` | The staging warning string exists in bundled code because the component is compiled, but rendered-DOM verification proves it is absent under production configuration. |
+| Compiled secret scan | `PASS` | No AWS/recovery secret names with values, token fixture values, or real Zapier/Slack webhook URL matched the production output scan. |
+
+Native Vite `VITE_*` replacement supplies build SHA/time once per build. `vite.config.js` remains unchanged, preserving the Base44 plugin and `BASE44_LEGACY_SDK_IMPORTS` behavior without exposing `process.env` through `define`.
 
 ## Current read-only staging state
 

@@ -33,6 +33,45 @@ All `VITE_*` values are compiled into or exposed to the browser. They are config
 
 Client V2 is effective only when the environment is recognized, `VITE_PRO_DRAFT_V2_ENABLED=true`, the enable and kill-switch controls are well formed, and `VITE_PRO_DRAFT_V2_KILL_SWITCH=false`. Public email recovery, OTP, and magic link each additionally require their own exact `true` flag.
 
+## Environment identification and build metadata
+
+The route-independent application shell owns environment identification. It is mounted once inside the existing router and above routed content; it does not add a router, Redux provider, route authorization rule, or questionnaire-state dependency.
+
+The staging banner renders the exact text `STAGING — Test environment. Do not enter real client information.` only when both conditions are true:
+
+1. `VITE_APP_ENVIRONMENT=staging`
+2. `VITE_STAGING_BANNER_ENABLED=true`
+
+Production never renders the banner, including when a query parameter contains `staging` or the raw banner flag is accidentally `true`. The banner cannot be dismissed, remains sticky at the top without covering modal layers, and uses the stable selector `data-testid="staging-environment-banner"` with `role="status"`. An `unknown` environment may render a separate safe configuration warning in development/test builds; production builds do not render that warning or infer that `unknown` means production.
+
+`src/lib/buildMetadata.js` exports one frozen `buildMetadata` object with exactly:
+
+- `environment`
+- `buildSha`
+- `buildTime`
+- `draftV2Enabled`
+- `draftV2KillSwitch`
+- `publicEmailRecoveryEnabled`
+- `otpEnabled`
+- `magicLinkEnabled`
+
+Absent or rejected build SHA/time values become `unknown`. Metadata is derived from the safe runtime summary and never includes app IDs, backend URLs, tokens, email, recovery codes, credentials, webhook URLs, or arbitrary environment values.
+
+The single application shell exposes these safe machine-readable markers:
+
+- `data-app-environment`
+- `data-build-sha`
+- `data-build-time`
+- `data-draft-v2-enabled`
+- `data-draft-v2-kill-switch`
+- `data-public-email-recovery-enabled`
+- `data-otp-enabled`
+- `data-magic-link-enabled`
+
+Boolean marker values are exactly `true` or `false`. Markers are not repeated on questions or routes. Native Vite replacement injects the named `VITE_*` build values; `vite.config.js` does not expose all process environment variables and does not execute Git commands during reload.
+
+Automated verification must assert the staging text and one banner on questionnaire, thank-you, and admin routes; zero banners in production even with an accidental raw banner flag; safe marker values in both environments; and absence of secret-bearing values from the shell and compiled output.
+
 ## Backend variables
 
 These values are ordinary server runtime configuration. None is a secret, but none may be inferred from frontend state.
@@ -101,6 +140,9 @@ No production enablement value is committed by this baseline.
 ## Implementation locations
 
 - Frontend: `src/lib/proDraftRuntimeConfig.js`
+- Safe build metadata: `src/lib/buildMetadata.js`
+- Environment banner: `src/components/common/EnvironmentBanner.jsx`
+- Route-independent markers/shell: `src/components/common/AppRuntimeShell.jsx`
 - Backend shared source: `base44/functions/_shared/proDraftRuntimeConfig/entry.ts`
 - Examples: `.env.local.example`, `.env.staging.example`, `.env.production.example`
 
