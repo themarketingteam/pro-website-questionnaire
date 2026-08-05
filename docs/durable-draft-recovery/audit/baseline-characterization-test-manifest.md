@@ -77,7 +77,7 @@ Every row below passed in the dedicated 27-test run. “Pass” means the curren
 | Check | Result | Evidence |
 | --- | --- | --- |
 | `npm ci` | Pass | 774 packages installed and 775 audited from the committed lockfile; npm reported the existing 29 dependency advisories. |
-| Normal Vitest suite | Expected baseline failure remains visible | 29/31 files and 351/356 tests passed. The five known failures remain two existing helper-contract mismatches plus Q24 status, failure-backup, and geographic zero-type failures. The 18 target-safety tests pass and no characterization file was collected. |
+| Normal Vitest suite | Expected baseline failure remains visible | 30/32 files and 360/365 tests passed. The five known failures remain two existing helper-contract mismatches plus Q24 status, failure-backup, and geographic zero-type failures. The 18 target-safety and 9 fixture-helper tests pass; no characterization file was collected. |
 | Baseline characterization | Pass | 5/5 files and 27/27 tests passed after the clean install. |
 | `npm run lint` | Expected baseline failure unchanged | 54 findings: 34 errors and 20 warnings; none point to a new baseline harness file. |
 | `npm run typecheck` | Expected baseline failure unchanged | 264 TypeScript diagnostics, matching the recorded source baseline; none point to a new baseline harness file. |

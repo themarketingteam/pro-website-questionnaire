@@ -2,7 +2,7 @@
 
 - Status: local foundation implemented; staging execution awaits an explicit deployed staging URL
 - Date: 2026-08-05
-- Scope: read-only questionnaire-shell smoke validation
+- Scope: read-only questionnaire-shell smoke and fixture-mechanics validation
 
 ## Safety contract
 
@@ -41,7 +41,9 @@ Browser installation is never part of `npm ci`. Run the five-project local smoke
 npm run test:e2e:smoke
 ```
 
-Use `npm run test:e2e`, `npm run test:e2e:headed`, or `npm run test:e2e:debug` for the complete current E2E set, headed inspection, or Playwright debugging. Local runs use zero retries; CI may use one retry and must still preserve the first failure evidence.
+Use `npm run test:e2e:harness` for storage/network/lifecycle/concurrency fixture mechanics. `npm run test:e2e:pending-report` lists future V2 scenarios without failing foundation work; `npm run test:e2e:pending-strict` is the release guard and intentionally fails while any remain pending. See `browser-failure-fixtures.md` for the full mode API and activation rules.
+
+Use `npm run test:e2e`, `npm run test:e2e:headed`, or `npm run test:e2e:debug` for the complete current E2E set, headed inspection, or Playwright debugging. Local runs use zero retries; CI may use one retry and must still preserve the first failure evidence. Skipped V2 tests are visible release debt, not passing recovery evidence.
 
 ## Staging use
 

@@ -21,7 +21,7 @@ All criteria marked release blocking in the traceability matrix must pass before
 
 The repository-root `package.json` is the sole command authority. On the exact candidate commit, `npm run test:manifest`, `npm run test:ci`, and `npm run check` must each exit `0`. `npm run check` executes lint, typecheck, the normal CI suite, and the production build and reports every result. Missing tests cannot pass through `--passWithNoTests`.
 
-Normal release tests use `*.test.js`/`.test.jsx`. Temporary `*.baseline-characterization.test.js`/`.jsx` files reproduce known defects and are explicitly excluded from `test:ci`; a passing characterization is not evidence that the desired behavior works. A separately reviewed Playwright foundation now exists under `tests/e2e/*.spec.js`, but its read-only shell smoke is only harness validation. Native-browser criteria remain `BLOCKED` until every requirement-level scenario and required staging/production-safe evidence below passes.
+Normal release tests use `*.test.js`/`.test.jsx`. Temporary `*.baseline-characterization.test.js`/`.jsx` files reproduce known defects and are explicitly excluded from `test:ci`; a passing characterization is not evidence that the desired behavior works. A separately reviewed Playwright foundation now exists under `tests/e2e/*.spec.js`, but its shell and `[HARNESS]` fixture-mechanics checks are only harness validation. `npm run test:e2e:pending-report` must list every deferred V2 scenario during foundation work, and `npm run test:e2e:pending-strict` must exit `0` on a release candidate. Native-browser criteria remain `BLOCKED` until all pending tests are activated and every requirement-level scenario and required staging/production-safe evidence below passes.
 
 ## 1. Source and rollback
 

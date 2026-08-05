@@ -64,6 +64,9 @@ const requiredScripts = [
   'test:e2e:debug',
   'test:e2e:install',
   'test:e2e:edge',
+  'test:e2e:harness',
+  'test:e2e:pending-report',
+  'test:e2e:pending-strict',
   'check',
 ];
 
@@ -120,6 +123,16 @@ requireCondition(
   'test:e2e:install must install browsers only when explicitly invoked',
 );
 requireCondition(
+  scripts['test:e2e:pending-report']
+    === 'node scripts/report-pending-draft-v2-tests.mjs',
+  'test:e2e:pending-report must use the pending V2 reporter',
+);
+requireCondition(
+  scripts['test:e2e:pending-strict']
+    === 'node scripts/report-pending-draft-v2-tests.mjs --fail-on-pending',
+  'test:e2e:pending-strict must fail when V2 scenarios remain pending',
+);
+requireCondition(
   typeof packageJson.devDependencies?.['@playwright/test'] === 'string',
   '@playwright/test must be a root development dependency',
 );
@@ -136,6 +149,8 @@ const requiredDirectories = [
   'src/test/utils',
   'tests/e2e',
   'tests/e2e/fixtures',
+  'tests/e2e/draft-v2',
+  'tests/e2e/harness',
   'tests/e2e/helpers',
   'tests/e2e/smoke',
 ];
