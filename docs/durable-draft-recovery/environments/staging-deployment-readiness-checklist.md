@@ -138,3 +138,24 @@ Capture sanitized, dated evidence for:
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**
 
 Do not run `deploy:base44:staging`, `deploy:base44:production`, direct Base44 deploy commands, function/entity/agent/connector/auth/site pushes, secret writes, OAuth authorization, data import, domain attachment, email, or production webhook calls until every blocker is resolved and a separate prompt authorizes the exact deployment.
+
+## Prompt 4 preflight evidence
+
+The authorized first-deployment workflow stopped at **TEST_BLOCKED** on `2026-08-05T22:03:12Z` for candidate revision `22d97755a101cdeb3b3d1d1ff41b1695a4dd1fc9`.
+
+| Gate | Command | Exit/result |
+| --- | --- | --- |
+| Dependencies | `npm ci` | `0`; 770 packages installed, 29 audit findings reported |
+| Target identity | guarded verifier with `--required-environment=staging` | `0`; `PASS`; registered staging fingerprint; feature branch |
+| Authentication | `npx base44 whoami` | `0`; authenticated identity intentionally omitted |
+| Normal tests | `npx vitest run --config src/vitest.config.js --reporter=dot --no-coverage --silent` | `1`; 26/28 files and 274/277 tests passed; one failed import suite and three regression failures |
+| Baseline characterization | `npm run test:baseline-characterization` | `0`; 27/27 passed |
+| Runtime configuration | focused frontend/backend runtime suite | `0`; 41/41 passed |
+| Banner/runtime markers | focused environment-identification suite | `0`; 12/12 passed |
+| External side effects | focused side-effect suite | `0`; 26/26 passed using fake adapters only |
+| Target-guard tests | `npm run test:base44-target` | `0`; 16/16 passed |
+| Lint | `npm run lint` | `1`; 34 errors and 20 warnings |
+| Typecheck | `npm run typecheck` | `2`; 264 TypeScript errors |
+| Build | `npm run build` | `0` |
+
+Gate 5 remains `NOT_READY`, and no exception is approved. Consequently the workflow did not create an ignored staging environment file, set backend values, invoke the guarded deployment wrapper, or begin browser smoke testing. Names-only post-checks confirmed zero staging secrets and zero remote functions. No webhook, SES request, production data, production app, production domain, or Git remote changed.

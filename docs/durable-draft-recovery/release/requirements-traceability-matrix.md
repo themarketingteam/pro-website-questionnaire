@@ -119,3 +119,9 @@ This overlay records current-baseline evidence without advancing the authoritati
 ## Documentation-only statement
 
 This matrix plans future code, test, staging, production-disabled, and production-enabled evidence. It creates no tests or source modules, modifies no package script or schema, and performs no Base44 deployment, application creation, data access, email delivery, domain movement, or release enablement.
+
+## Prompt 4 staging evidence attempt
+
+`EV-STG-REL-001` was attempted on `2026-08-05T22:03:12Z` against revision `22d97755a101cdeb3b3d1d1ff41b1695a4dd1fc9` and is classified **TEST_BLOCKED**, not certified.
+
+Target identity, authentication, dependency installation, baseline characterization, runtime configuration, banner markers, external-side-effect policy, target-guard tests, and the production build passed. The normal suite, lint, and typecheck remained nonzero. The staging readiness checklist treats those results as release-blocking without an approved exception, so no runtime secrets were configured, no application resources or site were deployed, and no browser/network smoke evidence exists. `DR-REL-001` remains `Planned`; the status `STAGING_BASELINE_DEPLOYED_DRAFT_V2_DISABLED` was not reached.

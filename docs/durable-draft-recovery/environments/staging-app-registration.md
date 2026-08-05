@@ -73,3 +73,17 @@ Current app name, custom-domain, connector-authorization, site/default-shell, an
 ## Next required step
 
 **Implement and test the staging side-effect controls and resolve every `NOT_READY` or `MANUAL_VERIFICATION_REQUIRED` checklist item before any staging deployment.**
+
+## Prompt 4 deployment preflight — blocked
+
+- Attempted at: `2026-08-05T22:03:12Z`
+- Candidate revision: `22d97755a101cdeb3b3d1d1ff41b1695a4dd1fc9`
+- Result: **TEST_BLOCKED**
+- First staging deployment date: **NOT DEPLOYED**
+- Staging URL: **NOT CAPTURED; NO DEPLOYMENT OCCURRED**
+
+The staging and production fingerprints were re-read from their separate ignored link files. The staging fingerprint still matches this registration, differs from production, and the guarded staging verification returned `PASS`. Authentication also passed.
+
+Deployment did not proceed because required source gates were nonzero: the normal suite reported `3 failed | 274 passed` plus one failed import suite, lint reported `34 errors` and `20 warnings`, and typecheck reported `264` errors. The baseline-characterization (`27/27`), runtime-config (`41/41`), banner (`12/12`), side-effect (`26/26`), and target-guard (`16/16`) suites passed; `npm ci` and `npm run build` exited zero.
+
+No staging secrets were written, the names-only secret list remains empty, and the remote function list remains empty. The guarded deployment wrapper, bare deploy commands, browser smoke test, submission, webhook, SES, domain, data, push, and production operations were not run. The required classification `STAGING_BASELINE_DEPLOYED_DRAFT_V2_DISABLED` was therefore not reached.
