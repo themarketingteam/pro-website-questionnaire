@@ -17,6 +17,12 @@ The save states are distinct:
 
 All criteria marked release blocking in the traceability matrix must pass before global enablement. Security-boundary criteria permit zero known failures. Cross-client, cross-email, or cross-code exposure has zero tolerance. Production-enabled checks are continuation gates performed immediately after the separately authorized enablement step; failure changes the verdict to `FAILED` and invokes the kill switch or rollback. A deployment command returning success is deployment evidence only, never production certification.
 
+### Repository validation gate
+
+The repository-root `package.json` is the sole command authority. On the exact candidate commit, `npm run test:manifest`, `npm run test:ci`, and `npm run check` must each exit `0`. `npm run check` executes lint, typecheck, the normal CI suite, and the production build and reports every result. Missing tests cannot pass through `--passWithNoTests`.
+
+Normal release tests use `*.test.js`/`.test.jsx`. Temporary `*.baseline-characterization.test.js`/`.jsx` files reproduce known defects and are explicitly excluded from `test:ci`; a passing characterization is not evidence that the desired behavior works. Native-browser criteria remain `BLOCKED` until a separately reviewed Playwright harness exists under `tests/e2e/*.spec.js` and the required browser evidence passes.
+
 ## 1. Source and rollback
 
 Requirement IDs: `DR-SRC-001`, `DR-ROLLBACK-001`, `DR-MIG-REV-001`.
@@ -381,6 +387,6 @@ Certification cannot be evaluated because required evidence, access, environment
 
 Verdicts must name the commit, environment manifest, evidence-set version, blocker/failure IDs, signer, and UTC time. No alternative verdict such as partial pass, conditional approval, or presumed pass is permitted.
 
-## Documentation-only statement
+## Current certification state
 
-This document defines future acceptance evidence. It does not claim that any criterion is currently implemented, tested, or certified. Its creation changes no application behavior, test implementation, package script, schema, Base44 app or cloud resource, production data, SES configuration, email delivery, domain, or release flag.
+This document defines future acceptance evidence and does not certify the current revision. The root validation gate is installed, but the normal suite, lint, and typecheck retain known failures; required browser, staging, migration, security, and operational evidence is also incomplete. The current verdict therefore remains `BLOCKED`. The harness changes do not modify application behavior, schema, Base44 cloud resources, production data, SES configuration, email delivery, domains, or release flags.

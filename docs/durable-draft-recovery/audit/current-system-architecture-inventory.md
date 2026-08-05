@@ -53,11 +53,16 @@ This is a static inventory, not a runtime certification. No production records w
 | `build` | Production Vite build |
 | `lint`, `lint:fix` | ESLint check/fix |
 | `typecheck` | TypeScript check through `jsconfig.json` |
+| `test`, `test:watch`, `test:unit`, `test:ci` | Root-authoritative normal Vitest entry points |
+| `test:all`, `test:baseline-characterization` | Complete normal-plus-characterization evidence and opt-in defect characterization |
+| `test:submit-hardening`, `test:storage`, `test:runtime-config` | Focused validation groups |
+| `test:manifest` | Test naming, layout, config, and command-surface validation |
+| `check` | Aggregated lint, typecheck, normal CI test, and build gate |
 | `preview` | Vite preview server |
 | `workspace:check` | Read-only durable-draft workspace/branch validation |
 | `workspace:repair` | Workspace repair utility; not run for this audit |
 
-There is also `src/package.json` with a focused `test:submit-hardening` command. The root `package.json` has no `test` script, so repository tests are normally invoked directly with Vitest.
+The root `package.json` is the only package/command authority. The unreferenced `src/package.json` builder artifact was removed; Base44, Vite, the lockfile, local validation, and future CI all execute from the repository root.
 
 ### Base44 initialization and configuration
 

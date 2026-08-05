@@ -61,7 +61,7 @@ Only a separately authorized deployment prompt may then run:
 npm run deploy:base44:staging
 ```
 
-That wrapper re-verifies with `--required-environment=staging`, runs the focused guard suite, runs the production build, and only then reaches `npx base44 deploy -y`. A production environment declaration cannot pass through the staging-named wrapper.
+That wrapper re-verifies with `--required-environment=staging`, runs the focused guard suite, then runs the root `npm run check` gate (lint, typecheck, normal CI tests, and build). Only a completely green gate can reach `npx base44 deploy -y`. A production environment declaration cannot pass through the staging-named wrapper.
 
 ## Production configuration and workflow
 
@@ -83,7 +83,7 @@ Production requires:
 - the expected ID to differ from `BASE44_STAGING_APP_ID`;
 - `ALLOW_PRODUCTION_DEPLOY=true` exactly;
 - a clean `main` branch with `EXPECTED_GIT_BRANCH=main`; or a detached exact release tag explicitly declared as `EXPECTED_GIT_BRANCH=refs/tags/<approved-tag>` by a future immutable release workflow;
-- all target tests, normal tests, baseline characterizations, lint, typecheck, and build to pass before the deploy command is reachable.
+- all target tests plus the root lint, typecheck, normal CI test, and build gates to pass before the deploy command is reachable.
 
 Only an explicitly authorized production release may run:
 
@@ -92,6 +92,8 @@ npm run deploy:base44:production
 ```
 
 The production wrapper is intentionally additionally fail-closed while existing full-suite gates fail. No release procedure may bypass the target verifier or reorder the deployment command ahead of its gates.
+
+Baseline characterizations are deliberately not part of either deployment wrapper. They assert current defects and run separately through `npm run test:baseline-characterization`; their success cannot satisfy release acceptance.
 
 ## Safe output
 

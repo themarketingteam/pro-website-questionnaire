@@ -16,11 +16,15 @@ export default defineConfig({
     css: false,
     testTimeout: 20000,
     pool: 'forks',
+    include: [
+      'src/**/*.test.{js,jsx}',
+      'scripts/**/*.test.{js,jsx}'
+    ],
     // Temporary defect-characterization tests are opt-in through their own config.
     exclude: [
       ...configDefaults.exclude,
       '**/*.baseline-characterization.test.*',
-      '**/*.baseline-characterization.spec.*'
+      'tests/e2e/**'
     ]
   },
   resolve: {

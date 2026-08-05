@@ -15,7 +15,7 @@ This checklist is fail-closed. `READY` means current evidence exists; `NOT_READY
 | 2 | App ID is confirmed | `READY` | Staging SHA-256 fingerprint matches the registration and differs from production; full IDs remain outside Git. |
 | 3 | Branch is `feature/durable-draft-recovery` | `READY` | Both primary and staging checkouts are on the feature branch. |
 | 4 | Working tree is clean | `READY` | Clean at this audit's start; must be clean again at deployment time. |
-| 5 | Tests pass | `NOT_READY` | Target tests pass, but the normal suite retains known failures. No deployment exception is approved. |
+| 5 | Tests pass | `NOT_READY` | Root manifest validation passes and characterization evidence is green, but `npm run test:ci` exposes 5 failures across 338 normal tests. Lint/typecheck debt also keeps `npm run check` nonzero. No deployment exception is approved. |
 | 6 | Production build passes | `READY` | Current baseline build passes; re-run on the exact deployment revision. |
 | 7 | Staging environment variables are present | `NOT_READY` | Deployment examples exist, but staging has zero configured Base44 secrets and no approved ignored environment file is certified. |
 | 8 | External side effects are disabled or redirected | `NOT_READY` | Zapier is now server-policy controlled and defaults disabled, but OpenAI, analytics, Hotjar, Places, public assets, uploads, and parent callbacks still require staging controls/denylists. |
@@ -35,6 +35,12 @@ This checklist is fail-closed. `READY` means current evidence exists; `NOT_READY
 | 22 | Runtime markers are machine-verifiable | `READY` | One route-independent shell exposes safe `data-*` markers. Local staging and production previews produced the expected environment/build/disabled-feature values. |
 | 23 | Zapier external delivery is fail closed | `READY` | Shared backend policy requires exact environment/mode pairs, resolves destinations only from server variables, defaults staging to disabled, rejects missing redirect configuration, and exposes no URL/payload in responses or logs. |
 | 24 | Zapier caller outcomes are truthful | `READY` | Main submit, retry, repair, fallback-result plumbing, and admin/test callers distinguish delivered, redirected, suppressed, and failed outcomes. Suppression never sets `zapier_sent=true`; safe diagnostics use existing JSON fields without schema changes. |
+
+## Automated repository gate
+
+All validation runs from the repository root. `npm run test:manifest` enforces the normal, characterization, and future Playwright naming boundaries and currently reports 30 normal files, 5 characterization files, and 0 Playwright specs. `npm run check` is the staging and production wrapper gate: it executes lint, typecheck, `test:ci`, and build and reports all four outcomes. Characterization tests are run separately with `npm run test:baseline-characterization`; they preserve known-defect evidence and cannot certify a release.
+
+Current local evidence is 27/27 passing characterization tests and 333/338 passing normal tests. The normal failures cover Q24 validation status, recoverable local backup, geographic zero normalization, whitespace filtering, and repair warning shape. The absence of Playwright means native-browser acceptance evidence remains unavailable. These conditions keep deployment authorization denied.
 
 ## Environment-identification verification
 

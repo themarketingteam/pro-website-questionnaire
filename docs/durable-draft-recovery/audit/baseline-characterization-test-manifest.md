@@ -2,14 +2,14 @@
 
 Status: current-defect evidence captured on 2026-08-05 from `feature/durable-draft-recovery`.
 
-> **Temporary harness:** these tests intentionally assert the current draft-persistence behavior. Later implementation work must invert or replace the defect assertions with desired-behavior acceptance tests, then remove this opt-in harness. The normal test configuration explicitly excludes `*.baseline-characterization.test.*` and `*.baseline-characterization.spec.*`.
+> **Temporary harness:** these tests intentionally assert the current draft-persistence behavior. Later implementation work must invert or replace the defect assertions with desired-behavior acceptance tests, then remove this opt-in harness. The normal test configuration explicitly excludes `*.baseline-characterization.test.*`.
 
 ## Harness and isolation
 
 - Dedicated command: `npm run test:baseline-characterization`.
 - Dedicated config: `src/vitest.baseline-characterization.config.js`.
 - Naming/location: `src/test/baseline-characterization/**/*.baseline-characterization.test.{js,jsx}`.
-- Production isolation: the shared Base44 client is mocked; a baseline-only guard fails any test that attempts `fetch` or `XMLHttpRequest`; all fixtures use synthetic clients, sessions, records, domains, locations, and people.
+- Production isolation: the shared Base44 client is mocked; the shared setup fails any test that attempts unmocked `fetch` or `XMLHttpRequest`; all fixtures use synthetic clients, sessions, records, domains, locations, and people.
 - Prohibited side effects: no deployment, production entity access, real submission, email, upload, or PDF generation occurs.
 - Stable requirement mapping: the requested topic labels such as `DR-ISOLATION-*`, `DR-MUT-Q5-*`, `DR-RESET-*`, `DR-COND-*`, `DR-UISTATE-*`, and `DR-LIFECYCLE-*` are not IDs in the checked-in traceability matrix. The tests therefore use the closest applicable stable IDs that do exist: `DR-LOCAL-*`, `DR-MUT-001`, `DR-SAVE-001`, and `DR-OFFLINE-001`.
 
@@ -17,12 +17,12 @@ Status: current-defect evidence captured on 2026-08-05 from `feature/durable-dra
 
 - Runner: Vitest 1.6.1 with jsdom and `@vitejs/plugin-react`; normal config is `src/vitest.config.js`.
 - React tests: React Testing Library and `@testing-library/jest-dom`, initialized by `src/test/setupTests.js`.
-- Browser mocks: in-memory `localStorage`/`sessionStorage`, `matchMedia`, and a selector compatibility shim are centralized in `setupTests.js`; scenario-specific Google Places, storage-fault, and lifecycle mocks remain local to the baseline tests.
+- Browser mocks: in-memory `localStorage`/`sessionStorage`, `matchMedia`, and a selector compatibility shim are centralized in `setupTests.js`; reusable storage-fault helpers live in `src/test/utils/storage.js`, while scenario-specific Google Places and lifecycle mocks remain local.
 - Base44 mocks: `ProFormSubmission`, `ProFormDraft`, `ProFormDraftEvent`, `ProFormSubmissionIntake`, functions, uploads, and auth are centralized in `setupTests.js`.
 - Redux helper: `src/test/utils/renderWithStore.jsx`; the mutation suite also exercises the configured persistent singleton store.
 - Existing regressions: `src/test/proQuestionnaire.regression.test.jsx`, optional-child, textarea-validation, submission-resilience, recovery, PDF, payload, and helper suites remain unchanged.
-- Playwright: no Playwright configuration or browser-test script is present.
-- Package scripts: no pre-existing normal test script is defined. The existing normal suite is run directly with `npx vitest run --config src/vitest.config.js --reporter=dot --no-coverage`.
+- Playwright: `tests/e2e` is reserved for `*.spec.js`, but no Playwright dependency, configuration, or browser test exists.
+- Package scripts: the root package is authoritative. `npm test`/`npm run test:ci` run the normal suite, and `npm run test:manifest` enforces collection boundaries.
 - CI: no checked-in `.github` workflow is present, so no release workflow was changed to depend on these characterizations.
 
 ## Characterization cases
@@ -70,14 +70,14 @@ Every row below passed in the dedicated 27-test run. “Pass” means the curren
 - Command: `npm run test:baseline-characterization`.
 - Result: **5 files passed, 27 tests passed**.
 - Network guard: **0 fetch calls, 0 XMLHttpRequest opens** across all tests.
-- Global restoration: storage descriptors are restored by the storage-fault suite; React cleanup, timers, mocks, local/session storage, fetch stubs, and XHR spies are restored after each test.
+- Global restoration: React cleanup, fake timers, Base44 mock implementations, local/session storage, matchMedia, fetch stubs, and XHR spies are restored after each test.
 
 ## Required validation record
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| `npm ci` | Pass | 769 packages installed from the committed lockfile; npm reported the existing 29 dependency advisories. |
-| Normal Vitest suite | Expected baseline failure unchanged | 22/24 files and 195/198 tests passed. The same recorded failures remain: unresolved `proSubmissionRepairHelpers.js` import plus the Q24 status, failure-backup, and geographic zero-type assertions. No baseline-characterization file was collected. |
+| `npm ci` | Pass | 770 packages installed and 771 audited from the committed lockfile; npm reported the existing 29 dependency advisories. |
+| Normal Vitest suite | Expected baseline failure remains visible | 28/30 files and 333/338 tests passed. The invalid helper import is repaired, exposing two existing helper-contract mismatches in addition to Q24 status, failure-backup, and geographic zero-type failures. No characterization file was collected. |
 | Baseline characterization | Pass | 5/5 files and 27/27 tests passed after the clean install. |
 | `npm run lint` | Expected baseline failure unchanged | 54 findings: 34 errors and 20 warnings; none point to a new baseline harness file. |
 | `npm run typecheck` | Expected baseline failure unchanged | 264 TypeScript diagnostics, matching the recorded source baseline; none point to a new baseline harness file. |

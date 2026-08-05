@@ -1,115 +1,55 @@
-# Test Suite — Stability Verification Report
+# Test harness
 
-**Batch:** Regression Test Failure and Full-Suite Timeout Fix (Prompts 1–3)  
-**Date:** 2026-05-20  
-**Status:** Infrastructure verified ✅
+The repository-root `package.json` is the only package and command authority. Run every command from the repository root. `src/package.json` was removed because Base44, Vite, the lockfile, and local/CI validation all operate from the root.
 
----
+| Consumer | Authoritative package/command |
+| --- | --- |
+| Local development | Root `package.json`: `npm run dev`, `npm test`, and focused root scripts. |
+| Base44 build/development | `base44/config.jsonc` executes `npm install`, `npm run build`, and `npm run dev` from the project root. |
+| GitHub Actions/future CI | Root `npm run test:ci` and `npm run check`; no workflow is checked in yet. |
+| Codex validation prompts | Root scripts only, beginning with `npm run test:manifest`. |
+| Test documentation and deployment wrappers | The commands below; both deployment wrappers call the root `check` gate. |
 
-## Configuration Verification
+## Commands
 
-### package.json scripts ✅
-| Script | Command |
-|---|---|
-| `test:submit-hardening` | `vitest run --config src/vitest.config.js src/test/proResponseNormalizers.test.js src/test/submissionPayload.test.js src/lib/__tests__/submissionPayload.test.js src/test/proSubmissionResilience.test.js src/test/clarity.test.js --reporter=dot --no-coverage` |
-| `test:all` | `vitest run --config src/vitest.config.js --reporter=dot --no-coverage` |
+| Command | Purpose |
+| --- | --- |
+| `npm test` | Validate the manifest, then run the normal Vitest suite once. |
+| `npm run test:watch` | Validate the manifest, then run normal tests in watch mode. |
+| `npm run test:unit` | Root alias for the normal suite. |
+| `npm run test:all` | Run the normal suite and the opt-in characterization suite, reporting both results. |
+| `npm run test:submit-hardening` | Run the focused payload/submission hardening files. |
+| `npm run test:baseline-characterization` | Reproduce the temporary known-defect characterizations. This is evidence, not a release acceptance gate. |
+| `npm run test:storage` | Run shared storage-utility tests and storage characterization files. |
+| `npm run test:runtime-config` | Run frontend/backend environment, banner, and external-side-effect policy tests. |
+| `npm run test:ci` | Deterministic non-watch normal suite for automation. |
+| `npm run test:manifest` | Enforce package authority, script/config wiring, directory layout, and test naming. |
+| `npm run check` | Run lint, typecheck, `test:ci`, and build; all four execute even when an earlier gate fails. |
 
-### src/vitest.config.js ✅
-- React plugin: `@vitejs/plugin-react` ✅
-- `pool: 'forks'` ✅
-- `setupFiles: ['src/test/setupTests.js']` ✅
-- `environment: 'jsdom'` ✅
-- `testTimeout: 20000` ✅
-- `css: false` ✅
-- `globals: true` ✅
-- `restoreMocks: true` / `clearMocks: true` ✅
+No release-certifying command uses `--passWithNoTests`. The deployment wrappers invoke `npm run check`, so a missing suite or known failure remains fail-closed.
 
----
+## File conventions
 
-## setupTests.js Verification ✅
+- Normal Vitest unit/integration tests use `*.test.js` or `*.test.jsx` under `src/` or `scripts/`.
+- Temporary defect characterizations live under `src/test/baseline-characterization/` and use `*.baseline-characterization.test.js` or `.jsx`.
+- Future Playwright tests belong only under `tests/e2e/` and use `*.spec.js`.
+- Reusable synthetic data belongs in `src/test/fixtures/`; shared helpers belong in `src/test/utils/`; storage-harness tests belong in `src/test/storage/`.
+- Do not place `.spec` files outside `tests/e2e`, and do not place Vitest `.test` files in `tests/e2e`.
 
-Lifecycle order (no `act()` wrapper — removed to prevent hang):
-1. `cleanup()` — unmounts all React trees
-2. `vi.clearAllMocks()` — resets mock call counts and implementations
-3. `vi.runOnlyPendingTimers()` — drains any pending fake timers without advancing real time
-4. `vi.clearAllTimers()` — removes queued fake timers
-5. `vi.useRealTimers()` — restores real timer implementation
-6. `localStorage.clear()` — wipes local storage
-7. `sessionStorage.clear()` — wipes session storage
+`src/vitest.config.js` explicitly collects normal tests and excludes characterization and end-to-end files. `src/vitest.baseline-characterization.config.js` collects only the characterization naming pattern. No Playwright dependency or native browser suite exists yet.
 
-All wrapped in individual `try/catch` so one failure doesn't cascade.
+## Isolation contract
 
-### Base44 mock coverage ✅
-| Entity/Function | Mocked |
-|---|---|
-| `ProFormSubmission.create/update/filter/list` | ✅ |
-| `ProFormDraft.create/update/filter/list` | ✅ |
-| `ProFormDraftEvent.create/update/filter/list` | ✅ |
-| `ProFormSubmissionIntake.create/update/filter/list` | ✅ |
-| `functions.invoke('sendToZapier')` | ✅ |
-| `functions.invoke('submitProQuestionnaireFallback')` | ✅ |
-| `functions.invoke('retryProQuestionnaireIntakeSubmission')` | ✅ |
-| `functions.invoke('validateQuestionText')` | ✅ |
-| `integrations.Core.UploadFile` | ✅ |
-| `auth.me` | ✅ |
+`src/test/setupTests.js` installs fresh deterministic state for every test:
 
-**No real network calls will be made.** All Base44 SDK calls are mocked at module level via `vi.mock('@/api/base44Client', ...)`.
+- Base44 entities expose only methods used by current production source. Entity, function, upload, and auth mocks have their calls and implementations reset before each test.
+- Known function invocations receive safe synthetic defaults; an unknown function name throws instead of silently succeeding.
+- `localStorage`, `sessionStorage`, and `matchMedia` are restored to known implementations. Storage property/read/write/quota scenarios use `src/test/utils/storage.js`.
+- React trees are cleaned up. Fake timers are cleared only when a test enabled them; pending callbacks are never drained during teardown.
+- Unmocked `fetch` and `XMLHttpRequest.open` calls fail every normal and characterization test. Network-capable code must receive an explicit fake adapter.
 
----
+Fixtures and mock responses must use `.test` domains and synthetic identities. Never add production records, credentials, app IDs, webhook destinations, tokens, or real client data.
 
-## Test File Verification
+## Current baseline debt
 
-### proQuestionnaire.regression.test.jsx ✅
-- All `import` statements consolidated before `const setupUser`
-- `setupUser = () => userEvent.setup({ pointerEventsCheck: 0 })` — pointer-events check disabled
-- All `userEvent.setup()` replaced with `setupUser()`
-- `beforeAll` loads `base44` from mock via dynamic import
-- `beforeEach` resets mocks and sets up `ProFormDraft` responses
-- `afterEach` calls `vi.useRealTimers()` (pairs with `vi.useFakeTimers()` in fake-timer tests)
-- Uses `data-testid="question-wrapper-{id}"` — not brittle DOM traversal
-- 13 tests covering: render, rehydration, submit-time validation, radio completion, modal gating, local backup, Zapier resilience, draft dedup, autosave race condition, formatting helpers, payload normalization
-
-### proQuestionnaire.optionalChildren.test.jsx ✅
-- All `import` statements consolidated before `const setupUser`
-- `setupUser = () => userEvent.setup({ pointerEventsCheck: 0 })` — pointer-events check disabled
-- Uses `within(wrapper).findByPlaceholderText(...)` — stable scoped queries
-- Uses `data-testid="question-wrapper-{id}"` — stable test IDs
-- 3 tests covering: optional child empty state, type/clear oscillation, Q25/25.1 parent stability
-
----
-
-## Expected Run Results
-
-### `npm run build`
-**Expected:** ✅ Pass — no test infrastructure changes touch production code.
-
-### `npm run test:submit-hardening`
-**Expected:** ✅ Pass — pure unit/logic tests, no React rendering, no fake timers conflict.
-Files: `proResponseNormalizers`, `submissionPayload` (x2), `proSubmissionResilience`, `clarity`
-
-### `npx vitest run ... proQuestionnaire.optionalChildren ... proQuestionnaire.regression`
-**Expected:** ✅ Pass — pointer-events issue resolved; cleanup ordering prevents hang.
-
-### `npm run test:all`
-**Expected:** ✅ Pass or clear real failures only.
-No tests should hang. Any remaining failures are logic assertions, not infrastructure.
-
----
-
-## Known Structural Issues Resolved
-
-| Issue | Fix Applied |
-|---|---|
-| `userEvent` pointer-events CSS parser crash in jsdom | `pointerEventsCheck: 0` via `setupUser()` helper |
-| `afterEach` with `act()` wrapper causing hangs | Removed `act()` wrapper; `cleanup()` called synchronously first |
-| `import` statement interleaved with `const` declaration | All imports consolidated at top of file before any `const` |
-| Duplicate `setupUser` declarations from multi-prompt edits | Deduplicated — single declaration per file |
-
----
-
-## Constraints Honored
-- ✅ No tests skipped
-- ✅ No tests deleted
-- ✅ No production code modified
-- ✅ No questionnaire UI changes
-- ✅ No PDF behavior changes
+As of 2026-08-05, manifest validation reports 30 normal test files, 5 characterization files, and 0 Playwright specs. The characterization suite passes 27/27 tests. The normal suite intentionally remains release-blocking at 333/338 tests: three questionnaire regressions and two server-repair-helper contract mismatches are exposed. Lint and typecheck also retain separately recorded baseline debt. Do not skip, weaken, or convert these failures into expected passes; remediate the product/contract behavior in an authorized implementation batch.

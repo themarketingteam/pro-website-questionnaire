@@ -10,8 +10,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: [
-      path.resolve(root, 'test/setupTests.js'),
-      path.resolve(root, 'test/baseline-characterization/setupBaselineNetworkGuard.js')
+      path.resolve(root, 'test/setupTests.js')
     ],
     globals: true,
     restoreMocks: true,
@@ -20,8 +19,7 @@ export default defineConfig({
     testTimeout: 20000,
     pool: 'forks',
     include: [
-      'src/test/baseline-characterization/**/*.baseline-characterization.test.{js,jsx}',
-      'src/test/baseline-characterization/**/*.baseline-characterization.spec.{js,jsx}'
+      'src/test/baseline-characterization/**/*.baseline-characterization.test.{js,jsx}'
     ],
     exclude: [...configDefaults.exclude]
   },
