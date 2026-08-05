@@ -1,6 +1,7 @@
 # Base44 Staging App Registration
 
-- Status: **REGISTERED_EMPTY_AND_UNDEPLOYED**
+- Status: **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**
+- Creation state: **REGISTERED_EMPTY_AND_UNDEPLOYED**
 - Date created: 2026-08-05
 - Production app name: `Pro Website Questionnaire`
 - Staging app name: `Pro Website Questionnaire_staging`
@@ -48,6 +49,27 @@ The staging app is an empty cloud container linked only to the isolated local cl
 
 No deployment occurred. No production data, secret, connector, integration, or domain was copied or connected. The production Base44 app and production-linked checkout remain unchanged.
 
+## Staging-foundation controls
+
+- [Production-to-staging integration matrix](./production-to-staging-integration-matrix.md)
+- [Staging secret and environment-name inventory](./staging-secret-inventory.md)
+- [Staging deployment readiness checklist](./staging-deployment-readiness-checklist.md)
+- [Base44 deployment target guards](./base44-deployment-target-guards.md)
+
+Current readiness is **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**. The deployment guard exists, but staging side-effect isolation, synthetic fixtures, cleanup, banner, email redirect, production-destination denylists, feature flags, evidence packaging, and final dashboard checks remain incomplete.
+
+## Current read-only recheck
+
+On 2026-08-05, authenticated read-only checks reconfirmed:
+
+- the staging link fingerprint still matches this registration;
+- zero remote functions;
+- zero configured staging secrets;
+- the four known project entity schemas are unavailable, so their project record stores have not been deployed;
+- no staging execution path currently activates the production webhook or an email path.
+
+Current app name, custom-domain, connector-authorization, site/default-shell, and automation state require a fresh dashboard verification before deployment because no supported non-writing CLI state query was found for those surfaces. Creation-time evidence remains recorded above but is not treated as permanent proof.
+
 ## Next required step
 
-**Add deployment-target guards before any staging deployment.** The guards must fail closed on the wrong app identity/environment and must be reviewed before site code, entities, functions, agents, auth configuration, or connectors can be deployed to staging.
+**Implement and test the staging side-effect controls and resolve every `NOT_READY` or `MANUAL_VERIFICATION_REQUIRED` checklist item before any staging deployment.**
