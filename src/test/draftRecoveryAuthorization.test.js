@@ -42,7 +42,7 @@ const issueGrant = async (secret, overrides = {}) => {
 const loadAuthorizationHelpers = (path, configuredPassword) => {
   const source = readFileSync(resolve(process.cwd(), path), 'utf8');
   const start = source.indexOf("const DRAFT_RECOVERY_SECRET_NAME = 'DRAFT_RECOVERY_PASSWORD';");
-  const end = source.indexOf('// Deliver', start);
+  const end = source.indexOf('// --- End draft recovery authorization helpers ---', start);
   const helperSource = source.slice(start, end);
   const evaluate = new Function(
     'Deno',
@@ -87,8 +87,10 @@ describe.each(functionPaths)('%s public recovery authorization', (path) => {
     const anonymousBase44 = { auth: { me: async () => { throw new Error('Unauthorized'); } } };
 
     await expect(authorizeDraftRecoveryRequest(anonymousBase44, {})).resolves.toBe('');
+    const [payload, signature] = validToken.split('.');
+    const tamperedSignature = `${signature[0] === 'A' ? 'B' : 'A'}${signature.slice(1)}`;
     await expect(authorizeDraftRecoveryRequest(anonymousBase44, {
-      recoveryGrant: `${validToken.slice(0, -1)}x`,
+      recoveryGrant: `${payload}.${tamperedSignature}`,
     })).resolves.toBe('');
     await expect(authorizeDraftRecoveryRequest(anonymousBase44, {
       recoveryGrant: expiredToken,

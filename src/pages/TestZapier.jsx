@@ -97,12 +97,20 @@ export default function TestZapier() {
     setResponse(null);
 
     try {
-      console.log('📤 Sending test payload to Zapier...');
       const result = await base44.functions.invoke('sendToZapier', testPayload);
-      
-      console.log('✅ Response:', result.data);
-      setResponse(result.data);
-      toast.success('Successfully sent to Zapier!');
+      const data = result.data;
+      setResponse(data);
+      if (data?.success === false) {
+        toast.error(data?.message || 'Zapier delivery failed');
+      } else if (data?.suppressed) {
+        toast.info('External delivery was suppressed by environment policy.');
+      } else if (data?.redirected) {
+        toast.success('Test data was delivered to the staging destination.');
+      } else if (data?.delivered) {
+        toast.success('Data was delivered to the production destination.');
+      } else {
+        toast.info('No external delivery was reported.');
+      }
     } catch (error) {
       console.error('❌ Error:', error);
       setResponse({ error: error.message });

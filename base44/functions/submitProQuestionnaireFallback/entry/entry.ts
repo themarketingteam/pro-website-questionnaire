@@ -1,4 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
+import {
+  getExternalSideEffectPolicy,
+  stampSyntheticEnvironmentMetadata,
+} from '../../_shared/proExternalSideEffects/entry.ts';
 
 const truncate = (value, max = 500) => String(value ?? '').slice(0, max);
 const safeJsonStringify = (value) => {
@@ -29,7 +33,7 @@ const normalizePayload = (payload, questionnaireSessionId, primaryError) => {
   const metadata = typeof payload?.metadata === 'object' && payload.metadata ? payload.metadata : {};
   const userdata = typeof payload?.userdata === 'object' && payload.userdata ? payload.userdata : {};
 
-  return {
+  return stampSyntheticEnvironmentMetadata({
     ...payload,
     metadata: {
       ...metadata,
@@ -41,7 +45,7 @@ const normalizePayload = (payload, questionnaireSessionId, primaryError) => {
       questionnaire_session_id: questionnaireSessionId
     },
     userdata
-  };
+  });
 };
 
 const getIntakeBySession = async (base44, questionnaireSessionId) => {
@@ -102,10 +106,11 @@ const buildIntakePayload = ({
   notes: ''
 });
 
-Deno.serve(async (req) => {
+export default async function submitProQuestionnaireFallback(req) {
   try {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
+    const environmentDecision = getExternalSideEffectPolicy('zapier_submission');
     const transformedPayload = body?.transformedPayload;
     const rawResponses = body?.rawResponses || body?.responseSnapshot || null;
     const questionnaireSessionId = body?.questionnaireSessionId;
@@ -115,7 +120,13 @@ Deno.serve(async (req) => {
     const validationError = body?.validationError || null;
     const primaryError = body?.primaryError || validationError || transformError || null;
     const submitContext = body?.submitContext || {};
-    const diagnostics = body?.diagnostics || {};
+    const diagnostics = {
+      ...(body?.diagnostics && typeof body.diagnostics === 'object'
+        ? body.diagnostics
+        : {}),
+      environment: environmentDecision.environment,
+      external_side_effects_mode: environmentDecision.mode
+    };
 
     if (!questionnaireSessionId) {
       return Response.json({ success: false, received: false, usedFallback: true, error: { message: 'Missing questionnaire session', failureKind: 'validation', status: 400, code: 'MISSING_SESSION' } }, { status: 400 });
@@ -334,4 +345,4 @@ Deno.serve(async (req) => {
       }
     }, { status: 500 });
   }
-});
+}

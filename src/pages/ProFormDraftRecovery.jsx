@@ -147,11 +147,16 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
 
       const result = await base44.functions.invoke('retryProQuestionnaireIntakeSubmission', params);
       if (result.data?.success) {
-        toast.success(
-          result.data?.alreadySubmitted
+        if (result.data?.zapierSuppressed) {
+          toast.info('Submission saved; external delivery was suppressed by environment policy.');
+        } else if (result.data?.zapierRedirected) {
+          toast.success('Submission saved and delivered to the staging destination.');
+        } else {
+          toast.success(result.data?.alreadySubmitted
             ? `Already submitted — linked to ${result.data.linkedSubmissionId}`
             : `Submission succeeded for ${localDraft.business_name || localDraft.session_id}`
-        );
+          );
+        }
         onRetrySuccess?.();
       } else {
         const errMsg = result.data?.error?.message || result.data?.error || 'Unknown error';
@@ -186,7 +191,11 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
       });
       const data = result?.data;
       if (data?.success) {
-        if (data?.linkedSubmissionId) {
+        if (data?.zapierSuppressed) {
+          toast.info('Repair completed; external delivery was suppressed by environment policy.');
+        } else if (data?.zapierRedirected) {
+          toast.success('Repair completed and delivered to the staging destination.');
+        } else if (data?.linkedSubmissionId) {
           toast.success(`AI Repair + Retry succeeded — Submission: ${data.linkedSubmissionId}`);
         } else {
           toast.success(`${modeLabels[mode]} completed`);

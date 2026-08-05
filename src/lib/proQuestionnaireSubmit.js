@@ -164,14 +164,45 @@ export const sendZapierSafe = async (transformedPayload, options = {}) => {
       timeoutMs
     );
 
-    if (response?.data?.success === false) {
+    const data = response?.data || {};
+    if (data.success === false) {
       return {
         ok: false,
-        error: serializeSubmitError(response.data.error || new Error('Zapier function returned success:false'))
+        delivered: false,
+        redirected: false,
+        suppressed: false,
+        status: 'failed',
+        externalStatus: data.externalStatus ?? null,
+        environment: data.environment || 'unknown',
+        mode: data.mode || 'disabled',
+        destinationClass: data.destinationClass || 'none',
+        errorCode: data.errorCode || '',
+        error: serializeSubmitError(data.error || new Error(data.message || 'Zapier function returned success:false'))
       };
     }
 
-    return { ok: true };
+    const hasStructuredOutcome =
+      typeof data.delivered === 'boolean' ||
+      typeof data.redirected === 'boolean' ||
+      typeof data.suppressed === 'boolean';
+    const delivered = hasStructuredOutcome
+      ? data.delivered === true
+      : data.success === true;
+    const redirected = data.redirected === true;
+    const suppressed = data.suppressed === true;
+
+    return {
+      ok: true,
+      delivered,
+      redirected,
+      suppressed,
+      status: suppressed ? 'suppressed' : redirected ? 'redirected' : delivered ? 'delivered' : 'unknown',
+      externalStatus: data.externalStatus ?? null,
+      environment: data.environment || 'unknown',
+      mode: data.mode || 'disabled',
+      destinationClass: data.destinationClass || 'none',
+      errorCode: data.errorCode || ''
+    };
   } catch (error) {
     console.error(
       'Zapier webhook failed after successful database save:',
@@ -180,6 +211,15 @@ export const sendZapierSafe = async (transformedPayload, options = {}) => {
 
     return {
       ok: false,
+      delivered: false,
+      redirected: false,
+      suppressed: false,
+      status: 'failed',
+      externalStatus: null,
+      environment: 'unknown',
+      mode: 'disabled',
+      destinationClass: 'none',
+      errorCode: '',
       error: serializeSubmitError(error)
     };
   }
@@ -762,22 +802,65 @@ export const submitProQuestionnaire = async ({
     });
   }
 
+  let zapierDelivery = null;
   if (!receivedViaIntake && !resilientSubmitResult.zapierSent && transformedPayload) {
     // Keep the public page alive until the backend accepts or rejects delivery.
     // Fire-and-forget requests can be cancelled when the thank-you view replaces
     // the questionnaire immediately after submission on the published site.
-    const zapierResult = await sendZapierSafe(transformedPayload, { timeoutMs: 10000 });
-    if (!zapierResult.ok) {
+    zapierDelivery = await sendZapierSafe(transformedPayload, { timeoutMs: 10000 });
+    if (!zapierDelivery.ok) {
       await createDraftEventSafe({
         createDraftEvent,
         eventType: 'zapier_delivery_failed_after_submit',
         value: {
           status: 'zapier_failed',
           final_submission_id: savedSubmission?.id || '',
-          failureKind: zapierResult.error?.failureKind || 'unknown'
+          failureKind: zapierDelivery.error?.failureKind || 'unknown',
+          zapier_suppressed: false,
+          zapier_redirected: false,
+          zapier_status: zapierDelivery.externalStatus
+        }
+      });
+    } else if (zapierDelivery.suppressed) {
+      await createDraftEventSafe({
+        createDraftEvent,
+        eventType: 'zapier_delivery_suppressed_after_submit',
+        value: {
+          status: 'zapier_suppressed',
+          final_submission_id: savedSubmission?.id || '',
+          environment: zapierDelivery.environment,
+          zapier_suppressed: true,
+          zapier_redirected: false,
+          zapier_status: null
+        }
+      });
+    } else if (zapierDelivery.redirected) {
+      await createDraftEventSafe({
+        createDraftEvent,
+        eventType: 'zapier_delivery_redirected_after_submit',
+        value: {
+          status: 'zapier_redirected',
+          final_submission_id: savedSubmission?.id || '',
+          environment: zapierDelivery.environment,
+          zapier_suppressed: false,
+          zapier_redirected: true,
+          zapier_status: zapierDelivery.externalStatus
         }
       });
     }
+  } else if (resilientSubmitResult.zapierSent) {
+    zapierDelivery = {
+      ok: true,
+      delivered: true,
+      redirected: Boolean(resilientSubmitResult.zapierRedirected),
+      suppressed: false,
+      status: resilientSubmitResult.zapierRedirected ? 'redirected' : 'delivered',
+      externalStatus: resilientSubmitResult.zapierStatus ?? null,
+      environment: resilientSubmitResult.environment || 'unknown',
+      mode: resilientSubmitResult.externalSideEffectsMode || 'disabled',
+      destinationClass: resilientSubmitResult.destinationClass || 'none',
+      errorCode: ''
+    };
   }
 
   await recordSubmitStage('submit_success', {
@@ -789,6 +872,7 @@ export const submitProQuestionnaire = async ({
       savedSubmission,
       intakeId,
       receivedViaIntake,
+      zapierDelivery,
       responseSnapshot,
       transformedPayload
     });
@@ -798,6 +882,7 @@ export const submitProQuestionnaire = async ({
     savedSubmission,
     intakeId,
     receivedViaIntake,
+    zapierDelivery,
     responseSnapshot,
     transformedPayload
   };

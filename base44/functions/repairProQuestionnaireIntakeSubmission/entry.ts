@@ -1,44 +1,17 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import {
+  buildZapierPersistenceDiagnostics,
+  performZapierSubmission,
+  stampSyntheticEnvironmentMetadata,
+} from '../_shared/proExternalSideEffects/entry.ts';
 
-// ─── Inline helpers (no cross-file imports in Base44 Deno) ───────────────────
+// ─── Local repair helpers; external delivery policy is shared ────────────────
 
 const isPlainObject = (v) => {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
   const p = Object.getPrototypeOf(v);
   return p === Object.prototype || p === null;
 };
-
-const ZAPIER_WEBHOOK_FALLBACK_URL = 'https://hooks.zapier.com/hooks/catch/23529934/uas7p60/';
-
-const isValidZapierWebhookUrl = (value) => {
-  if (typeof value !== 'string' || !value.trim()) return false;
-
-  try {
-    const url = new URL(value.trim());
-    const normalizedUrl = `${url.origin}${url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`}`;
-    return normalizedUrl === ZAPIER_WEBHOOK_FALLBACK_URL &&
-      !url.username &&
-      !url.password &&
-      !url.search &&
-      !url.hash;
-  } catch {
-    return false;
-  }
-};
-
-const resolveZapierWebhookUrl = () => {
-  let configuredUrl = '';
-  try {
-    configuredUrl = Deno.env.get('ZAPIER_WEBHOOK_URL')?.trim() || '';
-  } catch {
-    configuredUrl = '';
-  }
-
-  if (!isValidZapierWebhookUrl(configuredUrl)) return ZAPIER_WEBHOOK_FALLBACK_URL;
-  return configuredUrl.endsWith('/') ? configuredUrl : `${configuredUrl}/`;
-};
-
-const ZAPIER_WEBHOOK_URL = resolveZapierWebhookUrl();
 
 const DRAFT_RECOVERY_SECRET_NAME = 'DRAFT_RECOVERY_PASSWORD';
 const DRAFT_RECOVERY_GRANT_SCOPE = 'draft-recovery';
@@ -110,25 +83,55 @@ const authorizeDraftRecoveryRequest = async (base44, body) => {
   return await verifyDraftRecoveryGrant(body?.recoveryGrant) ? 'recovery_grant' : '';
 };
 
-// Deliver repair-and-retry payloads to the required Zapier workflow. Delivery
-// failures are returned to the admin UI instead of being reported as success.
-const sendToZapierSafe = async (payload) => {
+// --- End draft recovery authorization helpers ---
+
+const sendToZapierSafe = async (payload) => performZapierSubmission(payload);
+
+const parseDiagnosticObject = (value) => {
+  if (!value) return {};
+  if (typeof value === 'object' && !Array.isArray(value)) return value;
+  if (typeof value !== 'string') return {};
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-    try {
-      const res = await fetch(ZAPIER_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: controller.signal
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const zapierResponseFields = (result) => ({
+  zapierSent: result.delivered === true,
+  zapierSuppressed: result.suppressed === true,
+  zapierRedirected: result.redirected === true,
+  zapierStatus: result.externalStatus,
+  environment: result.environment,
+  externalSideEffectsMode: result.mode,
+  destinationClass: result.destinationClass,
+  externalErrorCode: result.errorCode,
+  externalSideEffect: result
+});
+
+const persistZapierDiagnostics = async (base44, record, result) => {
+  const diagnostics = buildZapierPersistenceDiagnostics(result);
+  try {
+    if (record?.intakeId) {
+      await base44.asServiceRole.entities.ProFormSubmissionIntake.update(record.intakeId, {
+        zapier_sent: diagnostics.zapier_sent,
+        diagnostics_json: JSON.stringify({
+          ...parseDiagnosticObject(record.diagnosticsJson),
+          ...diagnostics
+        })
       });
-      return { ok: res.ok, status: res.status };
-    } finally {
-      clearTimeout(timeoutId);
+    } else if (record?.draftId) {
+      await base44.asServiceRole.entities.ProFormDraft.update(record.draftId, {
+        draft_metadata_json: JSON.stringify({
+          ...parseDiagnosticObject(record.diagnosticsJson),
+          ...diagnostics
+        })
+      });
     }
-  } catch (error) {
-    return { ok: false, error: error?.message || 'zapier_send_failed' };
+  } catch {
+    // Delivery outcome remains truthful even if diagnostic persistence fails.
   }
 };
 
@@ -645,6 +648,7 @@ Deno.serve(async (req) => {
         };
         rawPayloadRawString = rawPayloadRawString || (draft.metadata_json || '') + '\n' + (draft.userdata_json || '');
       }
+      rawPayload = stampSyntheticEnvironmentMetadata(rawPayload);
 
       const context = { businessName: draft.business_name, businessDomain: draft.domain };
       const repairResult = await runRepairPipeline({
@@ -657,6 +661,9 @@ Deno.serve(async (req) => {
         sessionId: draft.session_id,
         allowRetry: false
       });
+      if (repairResult.payload) {
+        repairResult.payload = stampSyntheticEnvironmentMetadata(repairResult.payload);
+      }
 
       const updateData = {
         ai_repair_status: repairResult.ok ? 'completed' : 'needs_human_review',
@@ -667,30 +674,27 @@ Deno.serve(async (req) => {
       };
       await base44.asServiceRole.entities.ProFormDraft.update(draft.id, updateData);
 
-      // For repair_and_retry, always fire the payload to Zapier — every button press.
-      // Zapier deduplicates on its end, so repeated sends are safe.
-      let zapierSent = false;
+      // The shared policy decides whether this is delivered, redirected, or
+      // truthfully suppressed. No destination comes from this request.
       let zapierResult = null;
       if (mode === 'repair_and_retry') {
-        const zapPayload = repairResult.payload || rawPayload;
-        if (zapPayload) {
-          zapierResult = await sendToZapierSafe(zapPayload);
-          zapierSent = zapierResult.ok;
-        }
+        const zapPayload = stampSyntheticEnvironmentMetadata(repairResult.payload || rawPayload);
+        zapierResult = await sendToZapierSafe(zapPayload);
+        await persistZapierDiagnostics(base44, {
+          draftId: draft.id,
+          diagnosticsJson: draft.draft_metadata_json
+        }, zapierResult);
       }
 
-      if (mode === 'repair_and_retry' && !zapierSent) {
-        const detail = zapierResult?.error || (zapierResult?.status ? `HTTP ${zapierResult.status}` : 'no submission payload was available');
+      if (mode === 'repair_and_retry' && !zapierResult?.success) {
         return Response.json({
           success: false,
           draftMode: true,
           submissionCreated: false,
           repairSource: repairResult.source,
           repairOk: repairResult.ok,
-          zapierSent: false,
-          zapierStatus: zapierResult?.status ?? null,
-          zapierEndpoint: ZAPIER_WEBHOOK_URL,
-          error: { message: `Zapier delivery failed: ${detail}` },
+          ...zapierResponseFields(zapierResult),
+          error: { message: zapierResult.message, code: zapierResult.errorCode },
           report: repairResult.report,
           hasRepairedPayload: Boolean(repairResult.payload),
           errors: repairResult.errors
@@ -703,8 +707,7 @@ Deno.serve(async (req) => {
         submissionCreated: false,
         repairSource: repairResult.source,
         repairOk: repairResult.ok,
-        zapierSent,
-        zapierEndpoint: mode === 'repair_and_retry' ? ZAPIER_WEBHOOK_URL : undefined,
+        ...(zapierResult ? zapierResponseFields(zapierResult) : { zapierSent: false }),
         report: repairResult.report,
         hasRepairedPayload: Boolean(repairResult.payload),
         errors: repairResult.errors
@@ -725,19 +728,22 @@ Deno.serve(async (req) => {
     // Guard: already submitted (linked_submission_id set)
     if (intake.linked_submission_id && !forceRetry) {
       const earlyParsed = safeJsonParse(intake.transformed_payload_json);
-      const earlyPayload = earlyParsed.ok && isPlainObject(earlyParsed.value) ? earlyParsed.value : null;
-      const zapierResult = earlyPayload ? await sendToZapierSafe(earlyPayload) : { ok: false, error: 'no submission payload was available' };
-      if (!zapierResult.ok) {
-        const detail = zapierResult.error || (zapierResult.status ? `HTTP ${zapierResult.status}` : 'unknown error');
+      const earlyPayload = stampSyntheticEnvironmentMetadata(
+        earlyParsed.ok && isPlainObject(earlyParsed.value) ? earlyParsed.value : null
+      );
+      const zapierResult = await sendToZapierSafe(earlyPayload);
+      await persistZapierDiagnostics(base44, {
+        intakeId: intake.id,
+        diagnosticsJson: intake.diagnostics_json
+      }, zapierResult);
+      if (!zapierResult.success) {
         return Response.json({
           success: false,
           alreadySubmitted: true,
           linkedSubmissionId: intake.linked_submission_id,
           intakeId: intake.id,
-          zapierSent: false,
-          zapierStatus: zapierResult.status ?? null,
-          zapierEndpoint: ZAPIER_WEBHOOK_URL,
-          error: { message: `Zapier delivery failed: ${detail}` }
+          ...zapierResponseFields(zapierResult),
+          error: { message: zapierResult.message, code: zapierResult.errorCode }
         });
       }
       return Response.json({
@@ -745,9 +751,7 @@ Deno.serve(async (req) => {
         alreadySubmitted: true,
         linkedSubmissionId: intake.linked_submission_id,
         intakeId: intake.id,
-        zapierSent: true,
-        zapierStatus: zapierResult.status,
-        zapierEndpoint: ZAPIER_WEBHOOK_URL
+        ...zapierResponseFields(zapierResult)
       });
     }
 
@@ -833,6 +837,7 @@ Deno.serve(async (req) => {
     if (intake.questionnaire_session_id && repairResult.payload?.metadata) {
       repairResult.payload.metadata.questionnaire_session_id = intake.questionnaire_session_id;
     }
+    repairResult.payload = stampSyntheticEnvironmentMetadata(repairResult.payload);
 
     // Check for existing submission by session ID (even if linked_submission_id not set)
     if (intake.questionnaire_session_id && !forceRetry) {
@@ -852,18 +857,19 @@ Deno.serve(async (req) => {
           ai_repair_retry_result_json: JSON.stringify({ linkedSubmissionId: existing.id, source: 'existing_found_by_session_id' })
         });
         const zapierResult = await sendToZapierSafe(repairResult.payload);
-        if (!zapierResult.ok) {
-          const detail = zapierResult.error || (zapierResult.status ? `HTTP ${zapierResult.status}` : 'unknown error');
+        await persistZapierDiagnostics(base44, {
+          intakeId: intake.id,
+          diagnosticsJson: intake.diagnostics_json
+        }, zapierResult);
+        if (!zapierResult.success) {
           return Response.json({
             success: false,
             alreadySubmitted: true,
             linkedSubmissionId: existing.id,
             intakeId: intake.id,
             mode: 'repair_and_retry',
-            zapierSent: false,
-            zapierStatus: zapierResult.status ?? null,
-            zapierEndpoint: ZAPIER_WEBHOOK_URL,
-            error: { message: `Zapier delivery failed: ${detail}` }
+            ...zapierResponseFields(zapierResult),
+            error: { message: zapierResult.message, code: zapierResult.errorCode }
           });
         }
         return Response.json({
@@ -872,9 +878,7 @@ Deno.serve(async (req) => {
           linkedSubmissionId: existing.id,
           intakeId: intake.id,
           mode: 'repair_and_retry',
-          zapierSent: true,
-          zapierStatus: zapierResult.status,
-          zapierEndpoint: ZAPIER_WEBHOOK_URL
+          ...zapierResponseFields(zapierResult)
         });
       }
     }
@@ -898,8 +902,11 @@ Deno.serve(async (req) => {
         retry_count: (Number(intake.retry_count) || 0) + 1
       });
       const zapierResult = await sendToZapierSafe(repairResult.payload);
-      if (!zapierResult.ok) {
-        const detail = zapierResult.error || (zapierResult.status ? `HTTP ${zapierResult.status}` : 'unknown error');
+      await persistZapierDiagnostics(base44, {
+        intakeId: intake.id,
+        diagnosticsJson: intake.diagnostics_json
+      }, zapierResult);
+      if (!zapierResult.success) {
         return Response.json({
           success: false,
           mode: 'repair_and_retry',
@@ -908,10 +915,8 @@ Deno.serve(async (req) => {
           repairSource: repairResult.source,
           report: repairResult.report,
           intakeId: intake.id,
-          zapierSent: false,
-          zapierStatus: zapierResult.status ?? null,
-          zapierEndpoint: ZAPIER_WEBHOOK_URL,
-          error: { message: `Submission was created, but Zapier delivery failed: ${detail}` }
+          ...zapierResponseFields(zapierResult),
+          error: { message: zapierResult.message, code: zapierResult.errorCode }
         });
       }
       await emitEvent(base44, intake.questionnaire_session_id, 'ai_repair_retry_succeeded', context);
@@ -922,9 +927,7 @@ Deno.serve(async (req) => {
         repairSource: repairResult.source,
         report: repairResult.report,
         intakeId: intake.id,
-        zapierSent: true,
-        zapierStatus: zapierResult.status,
-        zapierEndpoint: ZAPIER_WEBHOOK_URL
+        ...zapierResponseFields(zapierResult)
       });
     } catch (createErr) {
       const errObj = { message: createErr?.message || 'create_failed', status: createErr?.status || null };

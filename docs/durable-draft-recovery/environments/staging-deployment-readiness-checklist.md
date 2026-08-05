@@ -18,14 +18,14 @@ This checklist is fail-closed. `READY` means current evidence exists; `NOT_READY
 | 5 | Tests pass | `NOT_READY` | Target tests pass, but the normal suite retains known failures. No deployment exception is approved. |
 | 6 | Production build passes | `READY` | Current baseline build passes; re-run on the exact deployment revision. |
 | 7 | Staging environment variables are present | `NOT_READY` | Deployment examples exist, but staging has zero configured Base44 secrets and no approved ignored environment file is certified. |
-| 8 | External side effects are disabled or redirected | `NOT_READY` | Zapier fallback, OpenAI, analytics, Hotjar, Places, public assets, uploads, and parent callbacks require staging controls/denylists. |
+| 8 | External side effects are disabled or redirected | `NOT_READY` | Zapier is now server-policy controlled and defaults disabled, but OpenAI, analytics, Hotjar, Places, public assets, uploads, and parent callbacks still require staging controls/denylists. |
 | 9 | Staging email redirect is tested | `NOT_READY` | No email implementation or `STAGING_EMAIL_REDIRECT_TO` exists. Missing redirect must suppress sending; `[STAGING]` prefix and destination rewrite tests are absent. |
 | 10 | No production data exists | `READY` | Current privileged read-only checks report all four known project entity schemas unavailable in staging; creation-time dashboard evidence reported no data tables. Recheck after any resource deployment. |
 | 11 | No production domain is attached | `MANUAL_VERIFICATION_REQUIRED` | Creation-time dashboard evidence showed only the generated free Base44 URL. No documented CLI state command exists; capture a fresh Domains screenshot/report before deployment. |
 | 12 | Synthetic fixtures are ready | `NOT_READY` | Fixtures must be irreversibly synthetic/de-identified and include `test_run_id` plus `environment=staging`. |
 | 13 | Cleanup procedure is ready | `NOT_READY` | Implement dry-run/select/delete/report behavior scoped by staging app ID, environment marker, and test-run ID; test that production IDs cannot be selected. |
 | 14 | Visible staging banner is implemented | `READY` | The application shell renders the exact persistent warning only when environment is `staging` and the banner flag is exactly `true`. Focused tests and local previews cover questionnaire, thank-you, and admin routes. |
-| 15 | Production IDs are denylisted | `NOT_READY` | Deployment target IDs are cross-checked, but webhook, analytics, Maps, asset, storage, email, migration, and cleanup production identifiers are not comprehensively denylisted. |
+| 15 | Production IDs are denylisted | `NOT_READY` | Deployment targets are cross-checked and staging Zapier selection cannot fall back to production, but analytics, Maps, asset, storage, email, migration, and cleanup production identifiers are not comprehensively denylisted. |
 | 16 | Feature flags are environment-isolated and fail closed | `READY` | Central frontend/backend runtime modules require recognized environments and exact lowercase controls. V2/recovery defaults remain off, client/server authorization is independent, and kill switches override ordinary enable flags. |
 | 17 | Rollback/delete-staging procedure is documented and rehearsed | `NOT_READY` | Draft procedure appears below; owner approval and a non-destructive rehearsal/evidence record are still required. |
 | 18 | `npx base44 whoami` succeeds | `READY` | Authenticated check succeeded before this prompt's read-only CLI operations. |
@@ -33,6 +33,8 @@ This checklist is fail-closed. `READY` means current evidence exists; `NOT_READY
 | 20 | Deployment has an evidence directory/report | `NOT_READY` | Define an immutable evidence path containing revision, guard output, tests/build, side-effect proofs, dashboard checks, approver, timestamps, rollback reference, and post-deploy smoke results. |
 | 21 | Safe build metadata is present | `READY` | Frozen metadata exposes only environment, sanitized SHA/time, and safe feature booleans. Missing SHA/time becomes `unknown`; no app ID, URL, token, email, or recovery code is included. |
 | 22 | Runtime markers are machine-verifiable | `READY` | One route-independent shell exposes safe `data-*` markers. Local staging and production previews produced the expected environment/build/disabled-feature values. |
+| 23 | Zapier external delivery is fail closed | `READY` | Shared backend policy requires exact environment/mode pairs, resolves destinations only from server variables, defaults staging to disabled, rejects missing redirect configuration, and exposes no URL/payload in responses or logs. |
+| 24 | Zapier caller outcomes are truthful | `READY` | Main submit, retry, repair, fallback-result plumbing, and admin/test callers distinguish delivered, redirected, suppressed, and failed outcomes. Suppression never sets `zapier_sent=true`; safe diagnostics use existing JSON fields without schema changes. |
 
 ## Environment-identification verification
 
@@ -48,6 +50,20 @@ The following local verification is implementation evidence only. It does not au
 | Production runtime markers | `PASS` | Environment reported `production`; V2, public email recovery, OTP, and magic link reported `false`; kill switch reported `true`. |
 | Production bundle warning text | `PASS` | The staging warning string exists in bundled code because the component is compiled, but rendered-DOM verification proves it is absent under production configuration. |
 | Compiled secret scan | `PASS` | No AWS/recovery secret names with values, token fixture values, or real Zapier/Slack webhook URL matched the production output scan. |
+
+## External-side-effect isolation verification
+
+The following is local implementation evidence only. Every network-capable test injects a fake adapter; no real webhook is configured or contacted.
+
+| Verification | Result | Evidence |
+| --- | --- | --- |
+| Shared policy and function/caller suite | `PASS` | `src/test/proExternalSideEffects.test.js` covers production/staging routing, disabled/unknown/test zero-fetch behavior, missing destinations, request override rejection, HTTPS, timeout, non-2xx, safe output/logs, diagnostics, caller compatibility, and entrypoint divergence. |
+| Staging default | `PASS` | `PRO_DRAFT_EXTERNAL_SIDE_EFFECTS_MODE=disabled` returns `success=true`, `suppressed=true`, `delivered=false`, and performs zero fetch calls without requiring a staging URL. |
+| Staging redirect fail-closed | `PASS` | `staging_redirect` without `STAGING_ZAPIER_WEBHOOK_URL` fails with no fetch and never selects `PRO_ZAPIER_WEBHOOK_URL`. |
+| Production activation boundary | `PASS` | Production delivery requires both `PRO_DRAFT_ENVIRONMENT=production` and `PRO_DRAFT_EXTERNAL_SIDE_EFFECTS_MODE=production`; tests use an invalid-domain URL and injected fetch only. |
+| Hardcoded destination removal | `PASS` | Repository scan finds no production Zapier host/path or credential-bearing fallback in committed source. Only server variable names remain. |
+| Public/log secrecy | `PASS` | Function result contains the ten approved safe fields; URL and external body are omitted; logs contain request ID, environment, mode, payload byte size, safe submission ID, and external status only. |
+| SES/email | `NOT_IMPLEMENTED` | No email delivery was added or tested in this prompt. Email remains disabled. |
 
 Native Vite `VITE_*` replacement supplies build SHA/time once per build. `vite.config.js` remains unchanged, preserving the Base44 plugin and `BASE44_LEGACY_SDK_IMPORTS` behavior without exposing `process.env` through `define`.
 
@@ -66,7 +82,7 @@ Native Vite `VITE_*` replacement supplies build SHA/time once per build. `vite.c
 | Site deployment/default shell | `MANUAL_VERIFICATION_REQUIRED` | No site deploy was run in this batch. Dashboard must distinguish an empty Base44-provided shell from a user-deployed site. |
 | Authorized connectors | `MANUAL_VERIFICATION_REQUIRED` | Creation-time connector pull/dashboard evidence reported zero. No supported non-writing current-authorization CLI command is documented; recheck `My integrations` without initiating OAuth. |
 | Scheduled automations | `MANUAL_VERIFICATION_REQUIRED` | No repository schedule/cron resource exists. Confirm the staging dashboard has no automation before deployment. |
-| Production webhook active in staging | `PASS` | Zero remote functions and zero secrets mean no staging execution path currently calls Zapier. Deploying the current source would be unsafe because it contains a production-bound fallback. |
+| Production webhook active in staging | `PASS` | Zero remote functions and zero secrets mean no current staging execution path calls Zapier. Current source also contains no hardcoded fallback and would suppress Zapier while mode remains `disabled`; this does not resolve other deployment blockers. |
 | Production email path active in staging | `PASS` | No remote functions/secrets and no active email caller/SES implementation were found. |
 
 ## Staging email gate

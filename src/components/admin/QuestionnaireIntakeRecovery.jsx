@@ -319,7 +319,13 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
       });
       const data = response?.data;
       if (data?.success) {
-        toast.success(data?.alreadySubmitted ? 'Already linked to a submission' : 'Submission retry completed');
+        if (data?.zapierSuppressed) {
+          toast.info('Submission saved; external delivery was suppressed by environment policy.');
+        } else if (data?.zapierRedirected) {
+          toast.success('Submission saved and delivered to the staging destination.');
+        } else {
+          toast.success(data?.alreadySubmitted ? 'Already linked to a submission' : 'Submission retry completed');
+        }
       } else {
         toast.error(data?.error?.message || 'Retry failed');
       }
@@ -347,7 +353,11 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
       });
       const data = response?.data;
       if (data?.success) {
-        if (data?.linkedSubmissionId) {
+        if (data?.zapierSuppressed) {
+          toast.info('Repair completed; external delivery was suppressed by environment policy.');
+        } else if (data?.zapierRedirected) {
+          toast.success('Repair completed and delivered to the staging destination.');
+        } else if (data?.linkedSubmissionId) {
           toast.success(`AI Repair + Retry succeeded — Submission: ${data.linkedSubmissionId}`);
         } else {
           toast.success(`${modeLabels[mode]} completed`);

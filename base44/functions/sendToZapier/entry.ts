@@ -1,107 +1,181 @@
-const ZAPIER_WEBHOOK_FALLBACK_URL = 'https://hooks.zapier.com/hooks/catch/23529934/uas7p60/';
+import {
+  MAX_EXTERNAL_PAYLOAD_BYTES,
+  buildFailedSideEffectResult,
+  buildSafeSideEffectLogContext,
+  getExternalSideEffectPolicy,
+  performZapierSubmission,
+  type ExternalSideEffectPolicyOptions,
+} from '../_shared/proExternalSideEffects/entry.ts';
 
-const isValidZapierWebhookUrl = (value) => {
-  if (typeof value !== 'string' || !value.trim()) return false;
-
-  try {
-    const url = new URL(value.trim());
-    const normalizedUrl = `${url.origin}${url.pathname.endsWith('/') ? url.pathname : `${url.pathname}/`}`;
-    return normalizedUrl === ZAPIER_WEBHOOK_FALLBACK_URL &&
-      !url.username &&
-      !url.password &&
-      !url.search &&
-      !url.hash;
-  } catch {
-    return false;
-  }
-};
-
-const resolveZapierWebhookUrl = () => {
-  let configuredUrl = '';
-  try {
-    configuredUrl = Deno.env.get('ZAPIER_WEBHOOK_URL')?.trim() || '';
-  } catch {
-    configuredUrl = '';
-  }
-
-  if (!isValidZapierWebhookUrl(configuredUrl)) return ZAPIER_WEBHOOK_FALLBACK_URL;
-  return configuredUrl.endsWith('/') ? configuredUrl : `${configuredUrl}/`;
-};
-
-const ZAPIER_WEBHOOK_URL = resolveZapierWebhookUrl();
-
-Deno.serve(async (req) => {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  };
-
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-
-  try {
-    const payload = await req.json();
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-    let zapierResponse;
-    try {
-      zapierResponse = await fetch(ZAPIER_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: controller.signal,
-      });
-    } catch (error) {
-      if (error?.name === 'AbortError') {
-        console.error('Zapier delivery timed out', { zapierEndpoint: ZAPIER_WEBHOOK_URL });
-        return Response.json({
-          success: false,
-          error: 'Zapier webhook timed out',
-          zapierEndpoint: ZAPIER_WEBHOOK_URL,
-        }, { status: 504, headers: corsHeaders });
-      }
-      throw error;
-    } finally {
-      clearTimeout(timeoutId);
-    }
-
-    const responseText = await zapierResponse.text();
-    if (!zapierResponse.ok) {
-      console.error('Zapier delivery rejected', {
-        zapierEndpoint: ZAPIER_WEBHOOK_URL,
-        zapierStatus: zapierResponse.status,
-      });
-      return Response.json({
-        success: false,
-        error: 'Zapier webhook failed',
-        zapierStatus: zapierResponse.status,
-        zapierBody: responseText,
-        zapierEndpoint: ZAPIER_WEBHOOK_URL,
-      }, { status: 502, headers: corsHeaders });
-    }
-
-    console.info('Zapier delivery accepted', {
-      zapierEndpoint: ZAPIER_WEBHOOK_URL,
-      zapierStatus: zapierResponse.status,
-    });
-    return Response.json({
-      success: true,
-      message: 'Data sent to Zapier successfully',
-      zapierResponse: responseText,
-      zapierEndpoint: ZAPIER_WEBHOOK_URL,
-    }, { headers: corsHeaders });
-  } catch (error) {
-    console.error('Zapier delivery failed', {
-      zapierEndpoint: ZAPIER_WEBHOOK_URL,
-      error: error?.message || 'Zapier webhook request failed',
-    });
-    return Response.json({
-      success: false,
-      error: error?.message || 'Zapier webhook request failed',
-      zapierEndpoint: ZAPIER_WEBHOOK_URL,
-    }, { status: 500, headers: corsHeaders });
-  }
+const CORS_HEADERS = Object.freeze({
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Request-Id',
 });
+
+type HandlerDependencies = ExternalSideEffectPolicyOptions &
+  Readonly<{
+    fetchImpl?: typeof fetch;
+    logger?: Pick<Console, 'info' | 'error'>;
+  }>;
+
+function responseStatusForResult(result: {
+  success: boolean;
+  errorCode: string;
+}): number {
+  if (result.success) return 200;
+  if (result.errorCode === 'EXTERNAL_TIMEOUT') return 504;
+  if (result.errorCode === 'EXTERNAL_HTTP_REJECTED') return 502;
+  if (result.errorCode === 'PAYLOAD_TOO_LARGE') return 413;
+  if (result.errorCode.startsWith('PAYLOAD_')) return 400;
+  return 503;
+}
+
+function safeRequestId(req: Request): string {
+  const provided = req.headers.get('x-request-id') || '';
+  if (provided) return provided;
+  try {
+    return crypto.randomUUID();
+  } catch {
+    return '';
+  }
+}
+
+function safeSubmissionIdentifier(payload: Record<string, unknown>): unknown {
+  const metadata =
+    payload.metadata &&
+    typeof payload.metadata === 'object' &&
+    !Array.isArray(payload.metadata)
+      ? (payload.metadata as Record<string, unknown>)
+      : {};
+  return (
+    metadata.questionnaire_session_id ||
+    metadata.submission_id ||
+    payload.submission_id ||
+    ''
+  );
+}
+
+export function createSendToZapierHandler(
+  dependencies: HandlerDependencies = {},
+): (req: Request) => Promise<Response> {
+  const policyOptions: ExternalSideEffectPolicyOptions = {
+    envSource: dependencies.envSource,
+    runtimeConfig: dependencies.runtimeConfig,
+    allowHttpForTests: dependencies.allowHttpForTests,
+  };
+  const logger = dependencies.logger ?? console;
+
+  return async (req: Request): Promise<Response> => {
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+
+    const decision = getExternalSideEffectPolicy(
+      'zapier_submission',
+      policyOptions,
+    );
+    const validationFailure = (errorCode: string, message: string, status: number) =>
+      Response.json(
+        buildFailedSideEffectResult(decision, errorCode, message),
+        { status, headers: CORS_HEADERS },
+      );
+
+    if (req.method !== 'POST') {
+      return validationFailure(
+        'METHOD_NOT_ALLOWED',
+        'Only POST requests are supported.',
+        405,
+      );
+    }
+
+    const contentType = (req.headers.get('content-type') || '')
+      .split(';')[0]
+      .trim()
+      .toLowerCase();
+    if (contentType !== 'application/json') {
+      return validationFailure(
+        'CONTENT_TYPE_UNSUPPORTED',
+        'Content-Type must be application/json.',
+        415,
+      );
+    }
+
+    const declaredLength = Number(req.headers.get('content-length'));
+    if (
+      Number.isFinite(declaredLength) &&
+      declaredLength > MAX_EXTERNAL_PAYLOAD_BYTES
+    ) {
+      return validationFailure(
+        'PAYLOAD_TOO_LARGE',
+        'Request body exceeds the server-side size limit.',
+        413,
+      );
+    }
+
+    let requestText = '';
+    try {
+      requestText = await req.text();
+    } catch {
+      return validationFailure(
+        'PAYLOAD_READ_FAILED',
+        'Request body could not be read.',
+        400,
+      );
+    }
+
+    const payloadByteSize = new TextEncoder().encode(requestText).byteLength;
+    if (payloadByteSize > MAX_EXTERNAL_PAYLOAD_BYTES) {
+      return validationFailure(
+        'PAYLOAD_TOO_LARGE',
+        'Request body exceeds the server-side size limit.',
+        413,
+      );
+    }
+
+    let payload: unknown;
+    try {
+      payload = JSON.parse(requestText);
+    } catch {
+      return validationFailure(
+        'PAYLOAD_INVALID_JSON',
+        'Request body must contain valid JSON.',
+        400,
+      );
+    }
+
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return validationFailure(
+        'PAYLOAD_INVALID',
+        'Request body must contain a JSON object.',
+        400,
+      );
+    }
+
+    const result = await performZapierSubmission(payload, {
+      ...policyOptions,
+      fetchImpl: dependencies.fetchImpl,
+    });
+    const logContext = buildSafeSideEffectLogContext(decision, {
+      requestId: safeRequestId(req),
+      payloadByteSize,
+      submissionIdentifier: safeSubmissionIdentifier(
+        payload as Record<string, unknown>,
+      ),
+      externalStatus: result.externalStatus,
+    });
+
+    if (result.success) {
+      logger.info('Zapier side-effect result', logContext);
+    } else {
+      logger.error('Zapier side-effect result', logContext);
+    }
+
+    return Response.json(result, {
+      status: responseStatusForResult(result),
+      headers: CORS_HEADERS,
+    });
+  };
+}
+
+export default createSendToZapierHandler();

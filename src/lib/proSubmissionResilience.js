@@ -369,6 +369,22 @@ export const buildSubmitDiagnostics = ({
   timestamp: new Date().toISOString()
 });
 
+const getZapierOutcomeFields = (data) => ({
+  zapierSent: Boolean(data?.zapierSent || data?.delivered),
+  zapierSuppressed: Boolean(data?.zapierSuppressed || data?.suppressed),
+  zapierRedirected: Boolean(data?.zapierRedirected || data?.redirected),
+  zapierStatus: data?.zapierStatus ?? data?.externalStatus ?? null,
+  environment: data?.environment || 'unknown',
+  externalSideEffectsMode: data?.externalSideEffectsMode || data?.mode || 'disabled',
+  destinationClass: data?.destinationClass || 'none'
+});
+
+const getSubmissionOutcomeDefaults = () => ({
+  intakeId: '',
+  receivedViaIntake: false,
+  ...getZapierOutcomeFields(null)
+});
+
 export const createProFormSubmissionWithFallback = async (payload, options = {}) => {
   const {
     responseSnapshot,
@@ -392,6 +408,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
     if (!transformFailed && !validationFailed) {
       const error = serializeSubmitError(new Error('Invalid submission payload'));
       return {
+        ...getSubmissionOutcomeDefaults(),
         ok: false,
         submission: null,
         error,
@@ -425,6 +442,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
       const data = response?.data;
       if (data?.success && data?.received && data?.submissionCreated === false && data?.intakeId) {
         return {
+          ...getSubmissionOutcomeDefaults(),
           ok: true,
           submission: null,
           intakeId: data.intakeId,
@@ -434,11 +452,12 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
           usedFallback: true,
           failureKind: null,
           primaryError: transformError || validationError,
-          zapierSent: Boolean(data?.zapierSent)
+          ...getZapierOutcomeFields(data)
         };
       }
       if (data?.success && data?.submission) {
         return {
+          ...getSubmissionOutcomeDefaults(),
           ok: true,
           submission: data.submission,
           error: null,
@@ -446,12 +465,13 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
           usedFallback: true,
           failureKind: null,
           primaryError: transformError || validationError,
-          zapierSent: Boolean(data?.zapierSent)
+          ...getZapierOutcomeFields(data)
         };
       }
 
       const fallbackError = serializeSubmitError(data?.error || new Error('Fallback submission failed'));
       return {
+        ...getSubmissionOutcomeDefaults(),
         ok: false,
         submission: null,
         error: fallbackError,
@@ -463,6 +483,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
     } catch (error) {
       const fallbackError = serializeSubmitError(error);
       return {
+        ...getSubmissionOutcomeDefaults(),
         ok: false,
         submission: null,
         error: fallbackError,
@@ -480,7 +501,10 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
   });
 
   if (primaryResult.ok) {
-    return primaryResult;
+    return {
+      ...getSubmissionOutcomeDefaults(),
+      ...primaryResult
+    };
   }
 
   if (typeof onPrimaryFailure === 'function') {
@@ -515,6 +539,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
 
     if (data?.success && data?.received && data?.submissionCreated === false && data?.intakeId) {
       const result = {
+        ...getSubmissionOutcomeDefaults(),
         ok: true,
         submission: null,
         intakeId: data.intakeId,
@@ -524,7 +549,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
         usedFallback: true,
         failureKind: null,
         primaryError: primaryResult.error,
-        zapierSent: Boolean(data?.zapierSent)
+        ...getZapierOutcomeFields(data)
       };
 
       if (typeof onFallbackSuccess === 'function') {
@@ -536,6 +561,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
 
     if (data?.success && data?.submission) {
       const result = {
+        ...getSubmissionOutcomeDefaults(),
         ok: true,
         submission: data.submission,
         error: null,
@@ -543,7 +569,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
         usedFallback: true,
         failureKind: null,
         primaryError: primaryResult.error,
-        zapierSent: Boolean(data?.zapierSent)
+        ...getZapierOutcomeFields(data)
       };
 
       if (typeof onFallbackSuccess === 'function') {
@@ -555,6 +581,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
 
     const fallbackError = serializeSubmitError(data?.error || new Error('Fallback submission failed'));
     const failedResult = {
+      ...getSubmissionOutcomeDefaults(),
       ok: false,
       submission: null,
       error: fallbackError,
@@ -572,6 +599,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
   } catch (error) {
     const fallbackError = serializeSubmitError(error);
     const failedResult = {
+      ...getSubmissionOutcomeDefaults(),
       ok: false,
       submission: null,
       error: fallbackError,

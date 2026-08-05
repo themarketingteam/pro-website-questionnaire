@@ -1,6 +1,6 @@
 # Production-to-Staging Integration Matrix
 
-- Status: **INVENTORIED_NOT_SAFE_TO_ENABLE**
+- Status: **ZAPIER_ISOLATED_OTHER_SURFACES_NOT_SAFE_TO_ENABLE**
 - Inventory date: 2026-08-05
 - Count: **22 integration and side-effect surfaces**
 - Scope: repository source, Base44 resources, configuration, existing durable-draft documentation, and names-only/read-only Base44 checks
@@ -11,7 +11,7 @@ This inventory records names and destination types only. It intentionally omits 
 
 The audit searched environment-variable access, HTTP destinations, Base44 SDK calls, functions, agents, connectors, entity writes, OpenAI, AWS/SES, Zapier/webhooks, PDF generation, uploads/storage, CAPTCHA, analytics, error reporting, collaboration/CRM/database services, S3/CloudFront, callbacks, recovery authorization, scheduled work, email recipients, and repair/retry paths.
 
-The names-only production secret check returned four names: `DRAFT_RECOVERY_PASSWORD`, `ZAPIER_WEBHOOK_URL`, `VITE_GOOGLE_PLACES_API_KEY`, and `OPENAI_KEY`. The read-only production function list returned seven functions. No secret value was requested or displayed.
+The names-only production secret check returned four names: `DRAFT_RECOVERY_PASSWORD`, the legacy Zapier destination name, `VITE_GOOGLE_PLACES_API_KEY`, and `OPENAI_KEY`. The read-only production function list returned seven top-level functions and no nested `/entry` function names. The isolated staging app returned zero remote functions. No secret value was requested or displayed, and no cloud configuration was changed.
 
 ## Inventory: source, destination, and data
 
@@ -21,9 +21,9 @@ The names-only production secret check returned four names: `DRAFT_RECOVERY_PASS
 | `INT-002` | Base44 draft-event stream | `src/pages/ProQuestionnaire.jsx`; `src/lib/proQuestionnaireSubmit.js`; `ProFormDraftEvent` | App-scoped Base44 runtime | Production Base44 entity | Session/business context, event type, question ID/type, and serialized changed values or submit-stage metadata |
 | `INT-003` | Questionnaire final-submission endpoint | `src/lib/proSubmissionResilience.js`; `src/lib/proQuestionnaireSubmit.js`; `ProFormSubmission` | App-scoped Base44 runtime | Production Base44 entity | Complete transformed questionnaire metadata and user data, including business/client context and uploaded-file URLs |
 | `INT-004` | Intake fallback endpoint | `submitProQuestionnaireFallback`; `ProFormSubmissionIntake` | App-scoped Base44 runtime | Production Base44 function and intake/submission entities | Raw and transformed questionnaire payloads, client identifiers, diagnostics, primary/fallback errors, and final linkage |
-| `INT-005` | Zapier submission delivery | `sendToZapier`; `retryProQuestionnaireIntakeSubmission`; `repairProQuestionnaireIntakeSubmission`; `src/lib/proQuestionnaireSubmit.js` | `ZAPIER_WEBHOOK_URL`; source also contains a credential-bearing fallback destination whose value is intentionally omitted | Production Zapier catch-hook/workflow; downstream destination is not described in this repository | Complete final questionnaire payload and related business/client data |
-| `INT-006` | Submission retry | `retryProQuestionnaireIntakeSubmission`; recovery UIs | `DRAFT_RECOVERY_PASSWORD`, `ZAPIER_WEBHOOK_URL` | Production Base44 entities plus Zapier | Existing draft/intake/final payload, retry state, linked IDs, and webhook body |
-| `INT-007` | AI repair and repair-and-retry | `repairProQuestionnaireIntakeSubmission`; `pro_submission_repair_agent` | `DRAFT_RECOVERY_PASSWORD`, `ZAPIER_WEBHOOK_URL`; Base44 app-scoped agent authorization | Production Base44 agent/entities and, in retry mode, Zapier | Raw payload, errors, repair prompt/report, repaired payload, entity updates, and webhook body |
+| `INT-005` | Zapier submission delivery | `sendToZapier`; `retryProQuestionnaireIntakeSubmission`; `repairProQuestionnaireIntakeSubmission`; `src/lib/proQuestionnaireSubmit.js`; shared side-effect policy | `PRO_DRAFT_ENVIRONMENT`, `PRO_DRAFT_EXTERNAL_SIDE_EFFECTS_MODE`, `PRO_ZAPIER_WEBHOOK_URL`, `STAGING_ZAPIER_WEBHOOK_URL`, `PRO_ZAPIER_TIMEOUT_MS` | Server-selected production Zapier workflow or separately configured staging redirect; no destination remains hardcoded | Complete final questionnaire payload and related business/client data |
+| `INT-006` | Submission retry | `retryProQuestionnaireIntakeSubmission`; recovery UIs | `DRAFT_RECOVERY_PASSWORD` plus the five side-effect variables in `INT-005` | Environment-scoped Base44 entities plus policy-selected Zapier destination | Existing draft/intake/final payload, retry state, linked IDs, safe delivery diagnostics, and webhook body when allowed |
+| `INT-007` | AI repair and repair-and-retry | `repairProQuestionnaireIntakeSubmission`; `pro_submission_repair_agent`; shared side-effect policy | `DRAFT_RECOVERY_PASSWORD`; Base44 app-scoped agent authorization; the five side-effect variables in `INT-005` | Base44 agent/entities and, only when policy allows, the environment-scoped Zapier destination | Raw payload, errors, repair prompt/report, repaired payload, entity updates, safe delivery diagnostics, and webhook body when allowed |
 | `INT-008` | Draft recovery password/grant | `verifyDraftRecoveryAccess`; retry/repair authorization helpers; admin recovery UIs | `DRAFT_RECOVERY_PASSWORD`; future `PRO_FORM_ADMIN_GRANT_SECRET` | Production Base44 function and persistent browser grant | Submitted password, signed authorization grant, scope/version/expiry metadata; no questionnaire payload is required for verification |
 | `INT-009` | OpenAI answer validation | `validateQuestionText`; `src/components/pro-form/useTextValidation.jsx`; `src/pages/ProQuestionnaire.jsx` | `OPENAI_KEY` | OpenAI chat-completions API | Questionnaire answer text and question context; free text can contain client PII |
 | `INT-010` | OpenAI assistant content generation | `generateAIContentOpenAI`; dormant `AIContentModal` path | `OPENAI_KEY`; assistant identifier is source-configured and intentionally omitted | OpenAI Assistants API | Instruction, question context, draft content, business name, and form context |
@@ -40,6 +40,35 @@ The names-only production secret check returned four names: `DRAFT_RECOVERY_PASS
 | `INT-021` | Parent-window callbacks | `src/lib/NavigationTracker.jsx`; `src/main.jsx`; `src/lib/VisualEditAgent.jsx` | None | Embedding parent window via `postMessage` with wildcard target origin | Current URL and builder/visual-edit messages; the URL can contain client or authorization parameters |
 | `INT-022` | Console/runtime logging and error reporting | Frontend components/libs and Base44 functions | No Sentry or other error-reporting secret found; future `ERROR_REPORTING_ENVIRONMENT` | Browser console and Base44 function logs | Errors, statuses, business names in one AI path, and currently some endpoint metadata; payload/PII exposure depends on error content |
 
+## Operation classification
+
+`Safe staging` means safe only under the named control; it is not deployment authorization.
+
+| ID | Operation class | Production-only side effect | Safe staging side effect | Requires later staging replacement/control |
+| --- | --- | --- | --- | --- |
+| `INT-001` | Reversible/irreversible Base44 record writes | Current app-scoped writes are production-bound | Separate staging app, synthetic records only | Yes: RLS, cleanup, namespace, retention |
+| `INT-002` | Irreversible append/write | Current app-scoped event stream | Separate staging app with synthetic/redacted events | Yes |
+| `INT-003` | Irreversible final-record write | Current app-scoped final submission | Separate staging app, synthetic records only | Yes |
+| `INT-004` | Irreversible function/entity write | Current production fallback target; function absent remotely | Separate staging app after deployment certification | Yes |
+| `INT-005` | Irreversible external automation | Only `production` + `production` mode | `disabled`, or approved `staging_redirect` sink | Staging sink/downstream inventory only; policy code is implemented |
+| `INT-006` | Irreversible entity writes plus external automation | Production entities/destination | Synthetic staging entities plus disabled/approved redirect | Yes: entity/grant/cleanup controls |
+| `INT-007` | Irreversible entity/agent writes and optional external automation | Production agent/entities/destination | Disabled Zapier; later separate staging agent and redirect | Yes |
+| `INT-008` | Reversible privileged grant issuance | Production recovery secret/grants | Separate staging secret and bounded test grants | Yes |
+| `INT-009` | Read-only external inference with irreversible disclosure/cost | Production OpenAI project/key | Mock or separate staging project with synthetic text | Yes |
+| `INT-010` | External inference/conversation writes with irreversible disclosure/cost | Production OpenAI assistant | Disabled/mock or separate staging assistant | Yes |
+| `INT-011` | External conversation write | Production Base44 agent/app | Separate staging agent/app or mock | Yes |
+| `INT-012` | Reversible external file write with durable URL | Production app storage | Isolated staging storage/mock, synthetic files | Yes |
+| `INT-013` | Local reversible browser file creation | No server delivery exists | Synthetic local download | No external replacement unless server delivery is introduced |
+| `INT-014` | Future irreversible email send | No active path | Disabled only | Yes before implementation; no SES work in this prompt |
+| `INT-015` | Dormant potentially irreversible integrations | No active caller | Disabled/no call | Yes if activated |
+| `INT-016` | Irreversible telemetry disclosure | Production Clarity property | Disabled or separate staging property | Yes |
+| `INT-017` | Irreversible telemetry/session disclosure | Production Hotjar property | Disabled or separate staging property | Yes |
+| `INT-018` | Irreversible operational log write | Production app logs | Staging app with safe structured events | Yes: schema/redaction/retention |
+| `INT-019` | Read-only external lookup with irreversible disclosure/cost | Production Places key/project | Mock or separate restricted staging key | Yes |
+| `INT-020` | Read-only public asset request | Production/public third-party hosts | Approved/self-hosted/mock assets | Yes for production-bound hosts |
+| `INT-021` | Irreversible cross-origin disclosure | Current wildcard parent callback | Disabled/mock or fixed trusted staging origin | Yes |
+| `INT-022` | Irreversible log/error disclosure | Current browser/function logs | Safe structured staging logs | Yes: remaining unstructured paths |
+
 ## Inventory: staging control and release gate
 
 | ID | Client PII included | Irreversible side effect | Required staging behavior | Required test | Release-blocking configuration |
@@ -48,9 +77,9 @@ The names-only production secret check returned four names: `DRAFT_RECOVERY_PASS
 | `INT-002` | Yes; serialized answer values may be complete | Yes: appends records | Separate staging resource with redacted/synthetic values | Event payload/PII tests plus cleanup verification | Event retention/redaction and staging cleanup are not ready |
 | `INT-003` | Yes | Yes: creates final record | Separate staging resource; synthetic data only | Final-create idempotency, environment marker, production-ID denylist, and no-green-migration tests | Staging schema/RLS/cleanup and synthetic fixtures are not ready |
 | `INT-004` | Yes | Yes: creates/updates intake and may create final record | Separate staging resource, initially disabled except controlled synthetic tests | Failure-injection, intake dedupe, environment marker, and cleanup tests | Function is not deployed; schema/RLS/abuse controls are not ready |
-| `INT-005` | Yes | Yes: triggers external automation | **Disabled**, then redirected only to a separately owned staging webhook or mocked sink | Network denylist proves production host/path cannot be called; missing staging URL fails closed; synthetic contract test | Committed fallback destination must be removed/disabled; staging URL and downstream inventory do not exist |
-| `INT-006` | Yes | Yes: record creation/status changes and webhook delivery | Disabled until isolated entities, grant controls, and mocked/staging webhook are ready | Authorization, idempotency, bounded retry, synthetic-only, and no-production-webhook tests | Password/grant, staging webhook, data cleanup, and production-ID denylist are not ready |
-| `INT-007` | Yes | Yes: record mutation, AI disclosure, optional submission/webhook | Disabled; later use separate staging agent and mocked/staging webhook with synthetic data | Repair decision, prompt redaction, authorization, no-production-webhook, and duplicate tests | Staging agent/function/secrets are absent; source fallback webhook remains unsafe |
+| `INT-005` | Yes | Yes: triggers external automation | **Disabled** by default; redirect only to a separately owned staging webhook or injected fake sink | Policy suite proves disabled/unknown/test make zero fetch calls, staging never selects production, missing redirect fails closed, and public output/logs omit URLs/payload | Policy/code tests pass and hardcoded URL is removed; real staging URL/downstream inventory remain absent, so redirect remains off |
+| `INT-006` | Yes | Yes: record creation/status changes and webhook delivery | External delivery disabled until isolated entities/grants are ready; approved redirect later | Authorization, idempotency, bounded retry, synthetic environment marker, truthful suppression/redirect diagnostics, and no-production-webhook tests | Password/grant, staging data cleanup, and production-ID denylist are not ready |
+| `INT-007` | Yes | Yes: record mutation, AI disclosure, optional submission/webhook | Zapier disabled; later use separate staging agent and approved redirect with synthetic data | Repair decision, prompt redaction, authorization, suppression/redirect diagnostics, no-production-webhook, and duplicate tests | Staging agent/function/secrets are absent; AI isolation remains unimplemented |
 | `INT-008` | No direct client PII; grants are sensitive | Yes: grants privileged recovery access | Separate staging password/grant secret; no production copy | Missing secret fails closed; wrong-environment/rotation/revocation/rate-limit tests | No staging secret, rate limits, lockouts, or admin-grant redesign exists |
 | `INT-009` | Possibly, through free text | Yes: external API disclosure/cost | Mocked by default or separate staging key/project with synthetic text | Missing key fails closed; no production key; prompt-redaction and deterministic mock tests | Staging AI key/mode, budget, retention review, and egress control are absent |
 | `INT-010` | Yes | Yes: external API disclosure/cost | Disabled or mocked; later separate staging key and assistant | No production key/assistant, synthetic context, and disabled-by-default tests | Hardcoded assistant selection and no staging mode block enablement |
@@ -79,7 +108,7 @@ The names-only production secret check returned four names: `DRAFT_RECOVERY_PASS
 | Base44 connector configuration | No local `base44/connectors` configuration exists; agents declare empty connector config arrays. | Current staging authorization requires dashboard re-verification; never initiate OAuth in this batch. |
 | Scheduled automation | No cron, schedule resource, or local job runner found. An entity description mentions a possible future `scheduled_job` source only. | Dashboard/manual automation review remains required before deployment. |
 | Production email recipient | No active email caller or hardcoded recipient found. | Future staging mail must use the redirect policy below; do not infer a production recipient. |
-| Webhook signing secret | No separate webhook signature secret or verification found. The Zapier URL itself is credential-bearing. | Reserve a signing-secret name only if the future staging endpoint supports verification; never log the URL. |
+| Webhook signing secret | No separate webhook signature secret or verification found. Destination URLs are credential-bearing server configuration and no longer appear in source/public results/logs. | Reserve a signing-secret name only if the future staging endpoint supports verification; never log either destination. |
 | Dedicated external error reporter | No Sentry or comparable client found. | Keep `ERROR_REPORTING_ENVIRONMENT` reserved and require a separate staging project before adding one. |
 
 ## Staging email policy
@@ -105,6 +134,6 @@ The names-only production secret check returned four names: `DRAFT_RECOVERY_PASS
 
 ## Current verdict
 
-The isolated app is not deployable yet. `INT-005`, `INT-009`, `INT-010`, `INT-016`, `INT-017`, `INT-019`, `INT-020`, and `INT-021` contain hardcoded or production-bound configuration that must be disabled, separated, or deny-listed before the staging site/functions can be deployed.
+The isolated app is not deployable yet. `INT-005` is now fail-closed in source and safe only while mode remains `disabled`; staging redirect still lacks an approved sink and downstream inventory. `INT-009`, `INT-010`, `INT-016`, `INT-017`, `INT-019`, `INT-020`, and `INT-021` remain production-bound or insufficiently isolated and must be disabled, separated, or deny-listed before staging deployment.
 
-No deployment, webhook call, email send, connector authorization, secret creation, data copy, domain operation, or production-side mutation occurred during this inventory.
+No deployment, real webhook call, email send, connector authorization, secret creation, data copy, domain operation, or production-side mutation occurred. All delivery tests used injected fake adapters and reserved invalid/local test URLs.
