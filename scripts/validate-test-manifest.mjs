@@ -52,6 +52,9 @@ const requiredFoundationFiles = [
   '.node-version',
   'scripts/build-ci-summary.mjs',
   'scripts/scan-ci-source-safety.mjs',
+  'src/lib/resilientStorage.js',
+  'src/test/storage/resilientStorage.test.js',
+  'docs/durable-draft-recovery/architecture/browser-storage-resilience.md',
 ];
 
 for (const file of requiredFoundationFiles) {
@@ -238,6 +241,14 @@ requireCondition(
 requireCondition(
   typeof packageJson.devDependencies?.['@playwright/test'] === 'string',
   '@playwright/test must be a root development dependency',
+);
+requireCondition(
+  typeof packageJson.devDependencies?.['fake-indexeddb'] === 'string',
+  'fake-indexeddb must be a root development dependency for storage tests',
+);
+requireCondition(
+  scripts['test:storage']?.includes('src/test/storage'),
+  'test:storage must execute the resilient storage test directory',
 );
 requireCondition(
   !existsSync(path.join(repositoryRoot, 'src/package.json')),

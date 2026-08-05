@@ -1,3 +1,8 @@
+import {
+  tryGetLocalStorage,
+  tryGetSessionStorage,
+} from '@/lib/resilientStorage';
+
 const createCircularReplacer = () => {
   const seen = new WeakSet();
   return (_key, value) => {
@@ -36,11 +41,14 @@ export const safeGetUserAgent = () => {
   }
 };
 
+// Deprecated for authoritative draft state, but retained for compatibility callers.
+// New draft persistence should use resilientStorage for fallback diagnostics.
 export const safeLocalStorageSet = (key, value) => {
+  const storage = tryGetLocalStorage();
+  if (!storage || !key) return false;
   try {
-    if (typeof localStorage === 'undefined' || !key) return false;
     const normalizedValue = typeof value === 'string' ? value : safeJsonStringify(value, '');
-    localStorage.setItem(key, normalizedValue);
+    storage.setItem(key, normalizedValue);
     return true;
   } catch {
     return false;
@@ -48,19 +56,32 @@ export const safeLocalStorageSet = (key, value) => {
 };
 
 export const safeLocalStorageGet = (key) => {
+  const storage = tryGetLocalStorage();
+  if (!storage || !key) return null;
   try {
-    if (typeof localStorage === 'undefined' || !key) return null;
-    return localStorage.getItem(key);
+    return storage.getItem(key);
   } catch {
     return null;
   }
 };
 
-export const safeSessionStorageSet = (key, value) => {
+export const safeLocalStorageRemove = (key) => {
+  const storage = tryGetLocalStorage();
+  if (!storage || !key) return false;
   try {
-    if (typeof sessionStorage === 'undefined' || !key) return false;
+    storage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+export const safeSessionStorageSet = (key, value) => {
+  const storage = tryGetSessionStorage();
+  if (!storage || !key) return false;
+  try {
     const normalizedValue = typeof value === 'string' ? value : safeJsonStringify(value, '');
-    sessionStorage.setItem(key, normalizedValue);
+    storage.setItem(key, normalizedValue);
     return true;
   } catch {
     return false;
@@ -68,11 +89,23 @@ export const safeSessionStorageSet = (key, value) => {
 };
 
 export const safeSessionStorageGet = (key) => {
+  const storage = tryGetSessionStorage();
+  if (!storage || !key) return null;
   try {
-    if (typeof sessionStorage === 'undefined' || !key) return null;
-    return sessionStorage.getItem(key);
+    return storage.getItem(key);
   } catch {
     return null;
+  }
+};
+
+export const safeSessionStorageRemove = (key) => {
+  const storage = tryGetSessionStorage();
+  if (!storage || !key) return false;
+  try {
+    storage.removeItem(key);
+    return true;
+  } catch {
+    return false;
   }
 };
 
