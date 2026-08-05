@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "test:baseline-characterization": "vitest run --config src/vitest.baseline-characterization.config.js --reporter=verbose --no-coverage",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
     "workspace:check": "node scripts/ensure-durable-draft-workspace.mjs --mode check --branch feature/durable-draft-recovery",
