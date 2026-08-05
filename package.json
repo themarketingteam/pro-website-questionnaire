@@ -8,11 +8,15 @@
     "build": "vite build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "test:base44-target": "vitest run --config scripts/vitest.deployment-target.config.js --reporter=verbose --no-coverage",
     "test:baseline-characterization": "vitest run --config src/vitest.baseline-characterization.config.js --reporter=verbose --no-coverage",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
     "workspace:check": "node scripts/ensure-durable-draft-workspace.mjs --mode check --branch feature/durable-draft-recovery",
-    "workspace:repair": "node scripts/ensure-durable-draft-workspace.mjs --mode repair --branch feature/durable-draft-recovery"
+    "workspace:repair": "node scripts/ensure-durable-draft-workspace.mjs --mode repair --branch feature/durable-draft-recovery",
+    "verify:base44-target": "node scripts/verify-base44-deployment-target.mjs",
+    "deploy:base44:staging": "node scripts/verify-base44-deployment-target.mjs --required-environment=staging && npm run test:base44-target && npm run build && npx base44 deploy -y",
+    "deploy:base44:production": "node scripts/verify-base44-deployment-target.mjs --required-environment=production && npm run test:base44-target && npx vitest run --config src/vitest.config.js --reporter=dot --no-coverage && npm run test:baseline-characterization && npm run lint && npm run typecheck && npm run build && npx base44 deploy -y"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.39",
@@ -101,6 +105,7 @@
     "eslint-plugin-react-refresh": "^0.4.18",
     "eslint-plugin-unused-imports": "^4.3.0",
     "globals": "^15.14.0",
+    "jsonc-parser": "^3.3.1",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.2",

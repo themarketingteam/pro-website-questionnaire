@@ -1,6 +1,8 @@
 #env
 .env
 .env.*
+!.env.staging.example
+!.env.production.example
 
 # Logs
 logs
@@ -27,5 +29,4 @@ dist-ssr
 *.sln
 *.sw?
 
-.env
 base44/.app.jsonc
