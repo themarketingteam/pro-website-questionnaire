@@ -17,6 +17,8 @@ const ignoredDirectories = new Set([
   'coverage',
   'dist',
   'node_modules',
+  'playwright-report',
+  'test-results',
 ]);
 
 const walk = (directory) => {
@@ -55,6 +57,13 @@ const requiredScripts = [
   'test:runtime-config',
   'test:ci',
   'test:manifest',
+  'test:e2e',
+  'test:e2e:smoke',
+  'test:e2e:staging',
+  'test:e2e:headed',
+  'test:e2e:debug',
+  'test:e2e:install',
+  'test:e2e:edge',
   'check',
 ];
 
@@ -99,6 +108,22 @@ requireCondition(
   'check must use the complete validation sequence',
 );
 requireCondition(
+  scripts['test:e2e'] === 'playwright test',
+  'test:e2e must use the fail-closed Playwright config',
+);
+requireCondition(
+  scripts['test:e2e:staging'] === 'node scripts/run-e2e.mjs staging',
+  'test:e2e:staging must use the staging preflight runner',
+);
+requireCondition(
+  scripts['test:e2e:install'] === 'playwright install',
+  'test:e2e:install must install browsers only when explicitly invoked',
+);
+requireCondition(
+  typeof packageJson.devDependencies?.['@playwright/test'] === 'string',
+  '@playwright/test must be a root development dependency',
+);
+requireCondition(
   !existsSync(path.join(repositoryRoot, 'src/package.json')),
   'src/package.json competes with the authoritative root package.json',
 );
@@ -110,6 +135,9 @@ const requiredDirectories = [
   'src/test/storage',
   'src/test/utils',
   'tests/e2e',
+  'tests/e2e/fixtures',
+  'tests/e2e/helpers',
+  'tests/e2e/smoke',
 ];
 
 for (const directory of requiredDirectories) {
@@ -125,11 +153,13 @@ const characterizationConfigPath = path.join(
   repositoryRoot,
   'src/vitest.baseline-characterization.config.js',
 );
+const playwrightConfigPath = path.join(repositoryRoot, 'playwright.config.js');
 requireCondition(existsSync(normalConfigPath), 'src/vitest.config.js is missing');
 requireCondition(
   existsSync(characterizationConfigPath),
   'src/vitest.baseline-characterization.config.js is missing',
 );
+requireCondition(existsSync(playwrightConfigPath), 'playwright.config.js is missing');
 
 if (existsSync(normalConfigPath)) {
   const normalConfig = readFileSync(normalConfigPath, 'utf8');
@@ -148,6 +178,22 @@ if (existsSync(normalConfigPath)) {
   requireCondition(
     normalConfig.includes("'tests/e2e/**'"),
     'normal Vitest config must exclude Playwright tests',
+  );
+}
+
+if (existsSync(playwrightConfigPath)) {
+  const playwrightConfig = readFileSync(playwrightConfigPath, 'utf8');
+  requireCondition(
+    playwrightConfig.includes("testDir: './tests/e2e'"),
+    'Playwright must collect only tests/e2e',
+  );
+  requireCondition(
+    playwrightConfig.includes('resolveE2ETarget(process.env)'),
+    'Playwright config must validate target safety before launch',
+  );
+  requireCondition(
+    playwrightConfig.includes("video: 'retain-on-failure'"),
+    'Playwright config must retain failure video',
   );
 }
 
@@ -199,6 +245,7 @@ requireCondition(
   characterizationFiles.length > 0,
   'no baseline characterization test files found',
 );
+requireCondition(playwrightFiles.length > 0, 'no Playwright smoke specs found');
 
 if (failures.length > 0) {
   for (const failure of failures) console.error(`FAIL ${failure}`);

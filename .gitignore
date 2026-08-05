@@ -31,3 +31,13 @@ dist-ssr
 *.sw?
 
 base44/.app.jsonc
+
+# Playwright outputs and generated E2E runtime evidence
+playwright-report/
+test-results/
+tests/e2e/artifacts/
+tests/e2e/evidence/
+tests/e2e/.auth/
+tests/e2e/**/*.webm
+tests/e2e/**/*.trace.zip
+tests/e2e/**/*.storage-state.json

@@ -21,7 +21,7 @@ Status: current-defect evidence captured on 2026-08-05 from `feature/durable-dra
 - Base44 mocks: `ProFormSubmission`, `ProFormDraft`, `ProFormDraftEvent`, `ProFormSubmissionIntake`, functions, uploads, and auth are centralized in `setupTests.js`.
 - Redux helper: `src/test/utils/renderWithStore.jsx`; the mutation suite also exercises the configured persistent singleton store.
 - Existing regressions: `src/test/proQuestionnaire.regression.test.jsx`, optional-child, textarea-validation, submission-resilience, recovery, PDF, payload, and helper suites remain unchanged.
-- Playwright: `tests/e2e` is reserved for `*.spec.js`, but no Playwright dependency, configuration, or browser test exists.
+- Playwright: the later-added harness now owns `tests/e2e/**/*.spec.js`; it is isolated from this historical Vitest characterization suite and does not turn known-defect observations into acceptance evidence.
 - Package scripts: the root package is authoritative. `npm test`/`npm run test:ci` run the normal suite, and `npm run test:manifest` enforces collection boundaries.
 - CI: no checked-in `.github` workflow is present, so no release workflow was changed to depend on these characterizations.
 
@@ -61,7 +61,7 @@ Every row below passed in the dedicated 27-test run. “Pass” means the curren
 
 ## Reproduction limits
 
-- No Playwright/browser harness exists, so a native browser process and actual `window.location.reload()` were not exercised. Component remount plus the real Redux/persistence boundary is the deterministic jsdom proxy for full reload; later browser acceptance tests must replace these cases.
+- These characterization cases still do not launch a native browser or exercise an actual `window.location.reload()`. The Playwright foundation added later currently covers only a read-only application-shell smoke; component remount plus the real Redux/persistence boundary remains the deterministic jsdom proxy for these cases until dedicated browser acceptance coverage replaces it.
 - Unavailable `sessionStorage` and IndexedDB currently succeed because the imported bootstrap path does not access them. This records absence of use, not complete browser resilience.
 - The conditional case records that no server snapshot survives the re-render; therefore there is no queued payload to inspect. The stale-server reload risk follows from the unchanged prior server record and is directly complemented by `BC-CLEAR-002`’s old-draft lookup characterization.
 
@@ -76,8 +76,8 @@ Every row below passed in the dedicated 27-test run. “Pass” means the curren
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| `npm ci` | Pass | 770 packages installed and 771 audited from the committed lockfile; npm reported the existing 29 dependency advisories. |
-| Normal Vitest suite | Expected baseline failure remains visible | 28/30 files and 333/338 tests passed. The invalid helper import is repaired, exposing two existing helper-contract mismatches in addition to Q24 status, failure-backup, and geographic zero-type failures. No characterization file was collected. |
+| `npm ci` | Pass | 774 packages installed and 775 audited from the committed lockfile; npm reported the existing 29 dependency advisories. |
+| Normal Vitest suite | Expected baseline failure remains visible | 29/31 files and 351/356 tests passed. The five known failures remain two existing helper-contract mismatches plus Q24 status, failure-backup, and geographic zero-type failures. The 18 target-safety tests pass and no characterization file was collected. |
 | Baseline characterization | Pass | 5/5 files and 27/27 tests passed after the clean install. |
 | `npm run lint` | Expected baseline failure unchanged | 54 findings: 34 errors and 20 warnings; none point to a new baseline harness file. |
 | `npm run typecheck` | Expected baseline failure unchanged | 264 TypeScript diagnostics, matching the recorded source baseline; none point to a new baseline harness file. |
