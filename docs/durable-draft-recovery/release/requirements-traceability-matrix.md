@@ -502,3 +502,16 @@ No admin-recovery requirement advances to staging acceptance. Password/grant
 persistence, revocation, live backend-only networking, security events, RLS,
 retry/repair, and cleanup remain uncertified. No staging or production resource
 was mutated, and no branch was pushed.
+
+## 2026-08-06 restrictive draft RLS staging attempt
+
+The [staging RLS report](../security/staging-draft-rls-certification.md) is
+**DRAFT_RLS_BLOCKED**. `npm ci` succeeded, but `npm run precheck:rls` failed on
+the three missing staging certifications and the production-linked primary
+checkout. The mandatory hard stop occurred before every staging target,
+schema, attack, backend, browser, regression, record, cleanup, and Git-push
+operation.
+
+No requirement advances to staging certification. `DR-RLS-001`, public/admin
+recovery, lifecycle, browser, submission/PDF, email, and release-readiness
+requirements remain blocked. Production and `main` were untouched.

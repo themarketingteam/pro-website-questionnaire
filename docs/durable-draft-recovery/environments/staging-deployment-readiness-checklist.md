@@ -424,3 +424,14 @@ cleanup were not entered.
 
 No checklist item is promoted. The decision remains
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
+
+## 2026-08-06 restrictive draft RLS certification attempt
+
+The [staging RLS report](../security/staging-draft-rls-certification.md) is
+**DRAFT_RLS_BLOCKED**. The primary `precheck:rls` failed before the staging
+checkout because authoritative API, password-only admin, and full lifecycle
+certifications are not passing and the primary checkout is production-linked.
+
+No readiness item is promoted. No counts, entity push, denial attack, backend
+flow, browser matrix, regression, or cleanup query ran. The decision remains
+**STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.

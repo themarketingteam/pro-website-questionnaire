@@ -168,3 +168,10 @@ the complete ordered source gate from a clean candidate. Only a fully passing
 gate may proceed to a freshly guarded staging deployment and live
 certification. Until then, the classification remains
 **PUBLIC_RECOVERY_SERVICES_BLOCKED**.
+
+## Restrictive RLS follow-up
+
+The later [restrictive draft RLS attempt](staging-draft-rls-certification.md)
+was **DRAFT_RLS_BLOCKED** at the deployment precheck. No public recovery flow,
+direct-access denial, recovery email, or cleanup operation was rerun or
+promoted by that attempt.

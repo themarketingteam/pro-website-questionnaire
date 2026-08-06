@@ -122,3 +122,14 @@ Production builds now end with `test:sensitive-built-bundle`; the same scanner
 can run source-only or built-only. CI source safety runs both the frontend
 direct-access validator and backend service-role validator. The deployment
 precheck also requires a clean result from both layers.
+
+## Prompt 4 live-boundary attempt
+
+The [staging RLS certification attempt](staging-draft-rls-certification.md) is
+**DRAFT_RLS_BLOCKED**. The primary precheck stopped before schema push, so no
+live direct denial or backend service-role success is claimed. The browser
+network matrix and non-admin matrix remain mandatory evidence gaps; the local
+no-fallback policy remains unchanged.
+
+No direct fallback or exemption was added, no RLS was weakened, and no cloud
+resource or Git remote was changed.

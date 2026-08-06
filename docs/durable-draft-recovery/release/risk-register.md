@@ -548,3 +548,16 @@ live-evidence gaps.
 
 No staging secret, function, site, record, integration, domain, production
 resource, or remote Git branch was changed.
+
+## 2026-08-06 restrictive draft RLS staging hard stop
+
+The [staging RLS attempt](../security/staging-draft-rls-certification.md) is
+**DRAFT_RLS_BLOCKED**. The deployment precheck rejected three missing staging
+certifications and the production-linked primary checkout before any app-
+scoped operation. Direct anonymous/non-admin denial, authorized service-role
+success, network isolation, cleanup, and production-comparison evidence remain
+absent.
+
+No RLS or direct-access risk is closed or lowered. No schema, entity, record,
+secret, function, site, email, integration, domain, production resource, or
+remote Git branch changed.

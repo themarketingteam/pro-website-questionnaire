@@ -107,3 +107,11 @@ push, `exec`, or all-resource deployment command ran. Production records,
 secrets, functions, site, integrations, domain, and external destinations were
 not operated on. `main` was neither checked out nor pushed. The feature branch
 was not pushed because certification failed.
+
+## Restrictive RLS follow-up
+
+The later [restrictive draft RLS attempt](../security/staging-draft-rls-certification.md)
+was **DRAFT_RLS_BLOCKED** because this admin report, the authoritative API
+report, and the lifecycle report do not provide passing certification evidence
+and the primary checkout was production-linked. No admin workflow was retested
+or promoted by that attempt.

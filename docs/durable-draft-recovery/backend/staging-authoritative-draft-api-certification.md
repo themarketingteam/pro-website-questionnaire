@@ -109,3 +109,11 @@ Production was untouched: no production app, data, secret, function, schema,
 domain, connector, email, webhook, or branch operation occurred. `main` was not
 pushed. The feature branch was not pushed because the required successful
 certification condition was not met.
+
+## Restrictive RLS follow-up
+
+The later [restrictive draft RLS attempt](../security/staging-draft-rls-certification.md)
+was **DRAFT_RLS_BLOCKED** because this API report, the admin report, and the
+full lifecycle report do not provide passing certification evidence and the
+primary checkout was production-linked. No API workflow was retested or
+promoted by that attempt.

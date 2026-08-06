@@ -91,3 +91,11 @@ verification of all four batch commits is consequently pending.
 5. Complete final capacity and security certification.
 6. Perform the separately authorized production-disabled deployment.
 7. Perform domain cutover only under a later explicit cutover prompt.
+
+## Restrictive RLS follow-up
+
+The later [restrictive draft RLS attempt](../security/staging-draft-rls-certification.md)
+was **DRAFT_RLS_BLOCKED** because this lifecycle report, the authoritative API
+report, and the admin report do not provide passing certification evidence and
+the primary checkout was production-linked. No lifecycle workflow was retested
+or promoted by that attempt.

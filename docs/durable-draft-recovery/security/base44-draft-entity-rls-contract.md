@@ -189,3 +189,15 @@ Prompt 3 validation produced the following local evidence:
 
 No schema was pushed, no function or site was deployed, no Base44 record or
 secret was changed, and neither the feature branch nor `main` was pushed.
+
+## Prompt 4 staging certification attempt
+
+The [staging restrictive RLS report](staging-draft-rls-certification.md) is
+**DRAFT_RLS_BLOCKED**. The primary deployment precheck failed on three missing
+staging certifications and the production-linked primary checkout. In
+accordance with the hard stop, restrictive schemas were not pushed and no live
+anonymous, non-admin, service-role, public/admin, browser, regression, or
+cleanup evidence was gathered.
+
+This preserves the local contract without claiming live enforcement. No RLS
+was weakened, production was untouched, and no branch was pushed.
