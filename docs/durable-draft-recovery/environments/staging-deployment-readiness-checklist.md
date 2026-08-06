@@ -1,5 +1,23 @@
 # Staging Deployment Readiness Checklist
 
+## 2026-08-06 load/capacity harness checkpoint
+
+- [x] Add staging/production target rejection and explicit soak/full confirmations.
+- [x] Define 5-client smoke through 250-session/1,000-draft full-capacity profiles.
+- [x] Add bounded workers, graceful shutdown, deterministic seed/checkpoint, safe reports, and mandatory cleanup orchestration.
+- [x] Add latency, integrity, cross-client, submitted-lock, event-amplification, and threshold evaluation.
+- [x] Add 15 controlled client/interception chaos profiles with in-memory SES failure only.
+- [x] Pass 29/29 harness/chaos tests and local mock smoke with zero unresolved records.
+- [ ] Deploy and verify `cleanupDurableDraftTestData` on the approved staging app under separate authorization.
+- [ ] Confirm staging app ID/URL, admin grant, side-effect suppression, and cleanup preview immediately before load.
+- [ ] Run save-burst, typing, recovery, conflict, and submission-lock staging profiles.
+- [ ] Run the two-hour soak and 250-session/1,000-draft final capacity gate in the next authorized prompt.
+
+Full capacity and soak were explicitly prohibited here and were not run. No
+deployment occurred. Overall status remains
+**STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**; see the
+[load/capacity contract](../testing/load-capacity-and-chaos-test-contract.md).
+
 ## Prompt 3 final local RLS gate (2026-08-06)
 
 - [x] Normalize browser authorization/RLS/feature/network/conflict/lock failures without raw SDK detail.

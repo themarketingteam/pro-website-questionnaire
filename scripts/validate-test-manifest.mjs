@@ -87,12 +87,16 @@ const requiredFoundationFiles = [
   'scripts/validate-release-test-coverage.mjs',
   'scripts/lib/normalize-test-results.mjs',
   'scripts/lib/security-output-safety.mjs',
+  'scripts/lib/pro-draft-load-harness.mjs',
+  'scripts/lib/pro-draft-load-metrics.mjs',
+  'scripts/lib/pro-draft-load-staging-adapter.mjs',
   'scripts/run-durable-draft-release-tests.mjs',
   'scripts/build-durable-draft-evidence-bundle.mjs',
   'scripts/cleanup-durable-draft-test-data.mjs',
   'scripts/scan-durable-draft-test-artifacts.mjs',
   'scripts/audit-durable-draft-dependencies.mjs',
   'scripts/run-durable-draft-security-tests.mjs',
+  'scripts/run-pro-draft-load-test.mjs',
   'tests/security/vitest.config.js',
   'tests/security/vitest.staging.config.js',
   'tests/security/helpers/propertyTest.js',
@@ -103,8 +107,13 @@ const requiredFoundationFiles = [
   'tests/security/unit/security-tools.test.js',
   'tests/security/integration/state-rls-email-and-migration.test.js',
   'tests/security/staging/staging-safety-contract.test.js',
+  'tests/load/vitest.config.js',
+  'tests/load/proDraftLoadHarness.test.js',
+  'tests/chaos/proDraftChaosFixtures.js',
+  'tests/chaos/proDraftChaosFixtures.test.js',
   'tests/e2e/security/draft-credential-leakage.spec.js',
   'docs/durable-draft-recovery/testing/security-and-adversarial-test-contract.md',
+  'docs/durable-draft-recovery/testing/load-capacity-and-chaos-test-contract.md',
 ];
 
 for (const file of requiredFoundationFiles) {
@@ -242,6 +251,16 @@ const requiredScripts = [
   'security:test',
   'security:test:browser',
   'security:test:staging',
+  'load:test:smoke',
+  'load:test:save-burst',
+  'load:test:typing',
+  'load:test:recovery',
+  'load:test:conflict',
+  'load:test:submission',
+  'load:test:soak',
+  'load:test:full',
+  'chaos:test',
+  'load:test:cleanup',
   'check',
 ];
 
@@ -351,6 +370,8 @@ const requiredDirectories = [
   'tests/security/staging',
   'tests/security/fixtures',
   'tests/security/helpers',
+  'tests/load',
+  'tests/chaos',
 ];
 
 for (const directory of requiredDirectories) {
@@ -437,10 +458,14 @@ const playwrightFiles = testLikeFiles.filter((file) =>
 const securityFiles = testLikeFiles.filter((file) =>
   file.startsWith('tests/security/') && /\.test\.js$/.test(file),
 );
+const loadAndChaosFiles = testLikeFiles.filter((file) =>
+  /^(?:tests\/load|tests\/chaos)\//u.test(file) && /\.test\.js$/u.test(file),
+);
 const normalTestFiles = testLikeFiles.filter((file) =>
   !characterizationFiles.includes(file)
   && !playwrightFiles.includes(file)
   && !securityFiles.includes(file)
+  && !loadAndChaosFiles.includes(file)
   && /\.test\.(?:js|jsx)$/.test(file),
 );
 
@@ -449,11 +474,12 @@ for (const file of testLikeFiles) {
     && file.startsWith('src/test/baseline-characterization/');
   const isPlaywright = playwrightFiles.includes(file);
   const isSecurity = securityFiles.includes(file);
+  const isLoadOrChaos = loadAndChaosFiles.includes(file);
   const isNormal = normalTestFiles.includes(file)
     && (file.startsWith('src/') || file.startsWith('scripts/'));
 
   requireCondition(
-    isCharacterization || isPlaywright || isSecurity || isNormal,
+    isCharacterization || isPlaywright || isSecurity || isLoadOrChaos || isNormal,
     `test file violates repository naming/location conventions: ${file}`,
   );
 }
@@ -465,6 +491,7 @@ requireCondition(
 );
 requireCondition(playwrightFiles.length > 0, 'no Playwright smoke specs found');
 requireCondition(securityFiles.length > 0, 'no adversarial security tests found');
+requireCondition(loadAndChaosFiles.length > 0, 'no load or chaos harness tests found');
 
 if (failures.length > 0) {
   for (const failure of failures) console.error(`FAIL ${failure}`);
@@ -475,4 +502,5 @@ console.log(`normal_test_files=${normalTestFiles.length}`);
 console.log(`characterization_test_files=${characterizationFiles.length}`);
 console.log(`playwright_spec_files=${playwrightFiles.length}`);
 console.log(`security_test_files=${securityFiles.length}`);
+console.log(`load_and_chaos_test_files=${loadAndChaosFiles.length}`);
 console.log('status=PASS');

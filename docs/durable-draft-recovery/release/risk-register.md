@@ -1,5 +1,20 @@
 # Durable Draft Recovery Risk Register
 
+## 2026-08-06 load, capacity, and controlled-failure controls
+
+| Risk | Control added | Residual / release gate |
+|---|---|---|
+| Keystroke request storm or event amplification | Debounced logical batches, request/event ratios, fixed amplification threshold | Final sustained staging evidence pending |
+| Lost acknowledged state or revision regression | Post-load hash, compatibility, monotonic revision, idempotent bootstrap, and submitted-lock probes | Exact staging candidate must pass with zero mismatches |
+| Cross-client disclosure under concurrency | Wrong-client credential probe and exact test-run markers | Live staging authorization/RLS result pending |
+| Hidden transient/backend failures | No implicit runner retry; 4xx/5xx/timeout counters and controlled interception fixtures | Staging service behavior/latency pending |
+| Load-test data remains after interruption | Safe checkpoint, `finally` cleanup, exact run-ID delete, zero-record verification, manual cleanup command | Cleanup backend function and admin staging grant must be deployed/verified before live load |
+| Capacity run triggers external side effects | Adapter allowlist excludes SES, Zapier, PDF, migration, and deployment functions | Reconfirm staging side-effect flags immediately before final run |
+
+The local 5-client/10-draft smoke and 29-case harness/chaos suite are mechanics
+evidence only. Full capacity and soak were deliberately not executed. No risk
+rating is lowered until remote staging thresholds and cleanup pass.
+
 ## 2026-08-06 comprehensive adversarial security controls
 
 | Risk | Control added | Residual / release gate |

@@ -1,5 +1,18 @@
 # Durable Draft Recovery Production Acceptance Criteria
 
+## Load, capacity, and controlled-failure acceptance
+
+Requirement `DR-PERF-LOAD-001` must pass against the exact staging release
+candidate before production enablement. The final gate requires 250
+simultaneous sessions, 1,000 drafts, at least 30 sustained minutes, the fixed
+latency/integrity/security/event-amplification thresholds, and zero unresolved
+test records. A cleanup failure, cross-client result, lost acknowledged state,
+submitted regression, or threshold failure blocks release.
+
+Local mock smoke/chaos evidence validates harness mechanics only. It does not
+certify Base44 staging capacity. Thresholds cannot be loosened without an ADR
+and risk update. See the [load/capacity contract](../testing/load-capacity-and-chaos-test-contract.md).
+
 ## Adversarial security acceptance
 
 Production enablement additionally requires `DR-SEC-ADV-001` evidence from the

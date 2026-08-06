@@ -1,5 +1,11 @@
 # Durable Draft Recovery Requirements Traceability Matrix
 
+## 2026-08-06 load/capacity/chaos gate
+
+| Requirement | Source controls | Automated evidence | Release status |
+|---|---|---|---|
+| `DR-PERF-LOAD-001` Staging load, capacity, integrity, soak, and controlled failure | Staging/production target guard; bounded workers; fixed profiles/thresholds; safe checkpoints/reports; integrity probes; mandatory cleanup; interception-only chaos fixtures | `npm run chaos:test`; `npm run load:test:smoke`; [load/capacity contract](../testing/load-capacity-and-chaos-test-contract.md) | Harness source/local adapter implemented. Full staging capacity and soak explicitly not run; staging cleanup function/deployment evidence pending. |
+
 ## 2026-08-06 adversarial security gate
 
 | Requirement | Source controls | Automated evidence | Release status |
