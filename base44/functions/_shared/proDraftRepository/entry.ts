@@ -55,12 +55,30 @@ export interface ConditionalDraftUpdateInput {
   readonly changes: Readonly<Record<string, unknown>>;
 }
 
+export interface ConditionalDraftDeliveryMetadataUpdateInput {
+  readonly draftId: string;
+  readonly expectedUpdatedDate: string;
+  readonly expectedStatus: string;
+  readonly expectedServerRevision: number;
+  readonly changes: Readonly<Record<string, unknown>>;
+}
+
 const ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/u;
 const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const STATUS_PATTERN = /^[a-z][a-z0-9_]{0,63}$/u;
 const ENTITY_METHODS = Object.freeze([
   'filter', 'get', 'create', 'update', 'updateMany', 'bulkCreate',
 ] as const);
+const DELIVERY_METADATA_FIELDS = new Set([
+  'recovery_email_delivery_status',
+  'last_recovery_email_sent_at',
+  'recovery_email_delivery_error_code',
+  'recovery_email_delivery_attempt_count',
+  'recovery_email_delivery_idempotency_hash',
+  'recovery_email_delivery_purpose',
+  'recovery_email_provider_message_id',
+  'recovery_email_last_request_id',
+]);
 
 export class ProDraftRepositoryError extends Error {
   readonly code: DraftRepositoryErrorCode;
@@ -351,6 +369,67 @@ export async function conditionalUpdateDraftRecord(
   return accepted;
 }
 
+/**
+ * Claims or finalizes delivery metadata without changing canonical draft state,
+ * lifecycle status, or server revision. The built-in updated timestamp is the
+ * compare-and-set token, so concurrent delivery attempts cannot both win.
+ */
+export async function conditionalUpdateDraftDeliveryMetadata(
+  repository: DraftRepository,
+  input: ConditionalDraftDeliveryMetadataUpdateInput,
+): Promise<DraftRecord> {
+  const repo = requireRepository(repository);
+  if (!isPlainObject(input)
+    || typeof input.expectedUpdatedDate !== 'string'
+    || Number.isNaN(Date.parse(input.expectedUpdatedDate))
+    || !STATUS_PATTERN.test(input.expectedStatus)
+    || !Number.isSafeInteger(input.expectedServerRevision)
+    || input.expectedServerRevision < 0
+    || !isPlainObject(input.changes)
+    || Object.keys(input.changes).length < 1
+    || Object.keys(input.changes).some((field) => !DELIVERY_METADATA_FIELDS.has(field))
+    || Object.values(input.changes).some((value) => (
+      typeof value !== 'string'
+      && !(typeof value === 'number' && Number.isSafeInteger(value) && value >= 0)
+    ))) {
+    return repositoryError(PRO_DRAFT_REPOSITORY_ERROR_CODES.INPUT_INVALID);
+  }
+  const draftId = requireId(input.draftId);
+  let result: unknown;
+  try {
+    result = await repo.drafts.updateMany({
+      id: draftId,
+      updated_date: input.expectedUpdatedDate,
+      status: input.expectedStatus,
+      server_revision: input.expectedServerRevision,
+    }, { $set: { ...input.changes } });
+  } catch {
+    return repositoryError(PRO_DRAFT_REPOSITORY_ERROR_CODES.WRITE_FAILED, true);
+  }
+  if (!isPlainObject(result) || !Number.isSafeInteger(result.updated)) {
+    return repositoryError(
+      PRO_DRAFT_REPOSITORY_ERROR_CODES.CONDITIONAL_UPDATE_UNSUPPORTED,
+    );
+  }
+  if (result.updated === 0) {
+    return repositoryError(PRO_DRAFT_REPOSITORY_ERROR_CODES.CONDITIONAL_CONFLICT);
+  }
+  if (result.updated !== 1) {
+    return repositoryError(
+      PRO_DRAFT_REPOSITORY_ERROR_CODES.CONDITIONAL_UPDATE_UNSUPPORTED,
+    );
+  }
+  const accepted = await getDraftById(repo, draftId);
+  if (accepted.status !== input.expectedStatus
+    || accepted.server_revision !== input.expectedServerRevision
+    || Object.entries(input.changes).some(([field, value]) => accepted[field] !== value)) {
+    return repositoryError(
+      PRO_DRAFT_REPOSITORY_ERROR_CODES.CONDITIONAL_POST_READ_MISMATCH,
+    );
+  }
+  return accepted;
+}
+
 export async function listDraftEventsByDraftId(
   repository: DraftRepository,
   draftId: unknown,
@@ -453,5 +532,6 @@ export function getSafeRepositoryDiagnostics(): Readonly<Record<string, unknown>
     maxEventQueryLimit: MAX_EVENT_QUERY_LIMIT,
     methods: ENTITY_METHODS,
     conditionalUpdate: 'updateMany_then_verified_get',
+    conditionalDeliveryMetadataUpdate: 'updated_date_compare_and_set',
   });
 }

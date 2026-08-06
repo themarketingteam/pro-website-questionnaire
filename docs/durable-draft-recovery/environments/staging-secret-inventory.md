@@ -2,7 +2,7 @@
 
 - Status: **STAGING_CRYPTOGRAPHIC_SECRETS_CONFIGURED**
 - Inventory date: 2026-08-05
-- Inventory rows: **77 names**
+- Inventory rows: **79 names**
 - Current production Base44 secret names observed: **4**
 - Current staging Base44 secret names observed: **8** (six cryptographic secrets and two ordinary staging controls)
 
@@ -32,6 +32,8 @@ The four production names observed through the names-only Base44 secret command 
 | 8h | `PRO_DRAFT_SES_TIMEOUT_MS` | Bounded SES timeout; default 10000, clamped 2000–30000 | Optional | Optional | No | Yes; non-secret bounded configuration only |
 | 8i | `PRO_DRAFT_RECOVERY_BASE_URL` | HTTPS recovery-site base URL with no code/query/fragment | Later | Later | Yes | Only separately reviewed noncredential URL |
 | 8j | `AWS_SESSION_TOKEN` | Standard AWS compatibility alias for a temporary session token | Optional compatibility only | Optional compatibility only | Yes | No |
+| 8k | `PRO_DRAFT_RECOVERY_EMAIL_MAX_ATTEMPTS` | Draft-wide authorized recovery-email attempt cap; default 3, bounded 1–10 | Optional | Optional | No | Yes; reviewed integer only |
+| 8l | `PRO_DRAFT_RECOVERY_EMAIL_RETRY_SECONDS` | Same-key failed-delivery backoff; default 30, bounded 1–3600 seconds | Optional | Optional | No | Yes; reviewed integer only |
 | 9 | `AWS_REGION` | Future SES region | Later | Later | Prefer Yes | Prefer No |
 | 10 | `AWS_ACCESS_KEY_ID` | Future least-privilege SES access-key identifier | Later | Later | Yes | No |
 | 11 | `AWS_SECRET_ACCESS_KEY` | Future least-privilege SES secret | Later | Later | Yes | No |

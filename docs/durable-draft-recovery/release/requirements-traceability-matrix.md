@@ -244,9 +244,24 @@ no answers/tracking/images, safe diagnostics, and frontend credential
 separation. The four added optional `ProFormDraft` fields support hashed
 idempotency and allowlisted backend diagnostics only.
 
-This is source evidence, not environment evidence. The source has no caller,
-function, schema push, credentials, or live send. Sender/domain verification,
-region, SES account status, IAM, quotas, bounce/complaint routing, live staging
-redirection, persistence orchestration, retry behavior, and monitoring remain
-pending. `DR-EMAIL-001`, `DR-EMAIL-002`, `DR-CLEAR-002`, `DR-OBS-001`, and
+This is source evidence, not environment evidence. At that checkpoint the
+source had no caller/function, schema push, credentials, or live send. The next
+source increment below adds the authorized coordinator but not environment
+evidence. `DR-EMAIL-001`, `DR-EMAIL-002`, `DR-CLEAR-002`, `DR-OBS-001`, and
 `DR-REL-001` do not advance to staging certification.
+
+### 2026-08-06 authorized recovery-code email delivery source
+
+The [delivery flow](../email/recovery-code-email-delivery-flow.md), function,
+repository compare-and-set, client helper, and focused tests add local evidence
+for the orchestration portions of `DR-EMAIL-002`, `DR-CLEAR-002`, and
+`DR-OBS-001`: exact authorization, recovery-code HMAC match, purpose/lifecycle
+binding, stored recipient only, purpose-keyed replay suppression, bounded
+failure retry, draft-wide attempt cap, metadata/event allowlists, uncertain-
+delivery response, no canonical revision change, strict public projection, and
+no general send control or browser persistence.
+
+This remains source-only. Entity fields are not pushed, the function is not
+deployed, Clear All/Start New controllers are not connected, SES is not
+configured/called, and live CAS/FLS/routing evidence is absent. No requirement
+advances to staging certification.

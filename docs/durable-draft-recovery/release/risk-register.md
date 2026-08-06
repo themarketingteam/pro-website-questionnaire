@@ -245,3 +245,20 @@ are unknown. Email-only recovery remains unverified; future OTP/magic-link
 templates do not mitigate `RISK-001` and are not enabled. No AWS/Base44 secret,
 schema push, function deployment, email, record, production operation, or Git
 remote changed.
+
+## 2026-08-06 authorized recovery-email delivery source
+
+The [delivery flow](../email/recovery-code-email-delivery-flow.md) adds local
+evidence for exact-draft write authorization, code-HMAC verification, strict
+purpose and replacement/submission relationships, stored-recipient use,
+purpose-keyed idempotency, compare-and-set attempt claims, bounded retry,
+maximum attempts, safe delivery metadata/events, and ambiguous-send denial of
+blind retry. The client helper has no storage, Redux, automatic retry, or
+general-send UI surface.
+
+No risk rating changes. This reduces source-design uncertainty for `RISK-008`
+and duplicate-send behavior, but live Base44 conditional-update semantics,
+entity FLS, SES redirection, 100-message routing, sender/IAM/account readiness,
+bounce/complaint handling, and controller integration remain unproved.
+`RISK-009` remains blocking. No function/schema was deployed, no secret or
+record changed, no email/SES call occurred, and no Git remote changed.

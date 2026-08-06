@@ -184,7 +184,12 @@ These optional admin/backend diagnostics contain no recipient, message body,
 raw code, provider token, credential, or response body. The idempotency value
 is a purpose-keyed hash; purpose/error/request values are bounded safe codes or
 opaque IDs; provider message ID is backend/admin-only. The source transport has
-no schema writer and this schema remains unpushed.
+no schema writer. The source-only authorized delivery coordinator now updates
+only these fields through an `updated_date`/status/server-revision compare-and-
+set, leaving canonical state and `server_revision` unchanged. Same-key `sent`
+requests are replay-safe; failed delivery uses bounded backoff/attempts; an SES
+success followed by metadata failure is treated as uncertain and not blindly
+retried. This schema remains unpushed.
 
 ### Retention (4)
 
@@ -288,6 +293,11 @@ Prompts 2 and 3 edit only the four local entity schemas and their validation/pla
 The 2026-08-06 SES source prompt adds four optional delivery fields and updates
 the manifest/hash/tests locally. It does not push this schema, write any field,
 configure AWS, deploy a function, or send email.
+
+The 2026-08-06 authorized-delivery source prompt adds a function that will use
+the existing eight fields and event schema after a separately authorized
+deployment. Local injected tests write only synthetic in-memory records. No
+entity schema, cloud record, or canonical revision changed in this prompt.
 
 ## Staging certification attempt
 

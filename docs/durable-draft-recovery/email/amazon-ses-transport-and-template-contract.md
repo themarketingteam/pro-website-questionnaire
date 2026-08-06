@@ -11,10 +11,11 @@
 ## Scope and safety boundary
 
 This source-only foundation provides an injectable backend transport and safe
-templates. It does not add a public or scheduled function, connect a caller,
-configure a Base44 secret, create AWS credentials, inspect an AWS account, or
-send an email. OTP and magic-link templates are reserved for later authorized
-verification workflows and do not enable either feature.
+templates. The later source-only `sendProFormDraftRecoveryCodeEmail` function
+is now their sole authorized caller, but it is not deployed and no Clear All or
+Start New UI/controller invokes it. This work does not configure a Base44
+secret, create AWS credentials, inspect an AWS account, or send an email. OTP
+and magic-link templates remain reserved and are not enabled.
 
 The transport is backend-only. No frontend module imports it, and no `VITE_*`
 name may contain or expose AWS credentials. Public APIs must map the internal
@@ -28,7 +29,7 @@ provider status, credential/configuration errors, or raw SES exceptions.
 | Existing SES SDK package/import | No SES v1/v2 SDK or `SendEmailCommand` existed before this change | Known absent before implementation |
 | Existing package usage | `package.json` has no AWS SDK dependency; the backend module uses the Base44/Deno `npm:@aws-sdk/client-sesv2` runtime import | Known |
 | Existing Base44 email capability | `src/api/integrations.js` exports Base44 Core `SendEmail`, but tracked production questionnaire source has no caller | Known dormant |
-| Existing email functions | No mail-sending backend function exists; `recoverProFormDraftByEmail` recovers by email input but does not send email | Known absent |
+| Existing email functions | Source now includes the undeployed authorized recovery-code delivery function; `recoverProFormDraftByEmail` still performs lookup only and sends nothing | Known source-only |
 | Existing connectors | No local `base44/connectors` directory/configuration exists | Known absent locally |
 | Existing variable names | Documentation reserved `STAGING_EMAIL_REDIRECT_TO`, standard AWS names, `SES_FROM_ADDRESS`, and `SES_CONFIGURATION_SET`; no source reader existed | Known names only |
 | Staging side-effect mode | Repository evidence records `PRO_DRAFT_EXTERNAL_SIDE_EFFECTS_MODE=disabled`; this prompt did not refresh cloud configuration | Known from prior sanitized evidence; not freshly verified |
@@ -46,12 +47,15 @@ filename-safe scanning.
 
 - Transport: `base44/functions/_shared/proDraftEmailTransport/entry.ts`
 - Templates: `base44/functions/_shared/proDraftEmailTemplates/entry.ts`
+- Authorized delivery: `base44/functions/sendProFormDraftRecoveryCodeEmail/entry.ts`
+- Delivery flow: `docs/durable-draft-recovery/email/recovery-code-email-delivery-flow.md`
 
 The transport exports its version, modes, safe error codes, configuration
 reader, SES client adapter, destination resolver, transactional send operation,
 safe diagnostics, and related types. The module has no logger or persistence
-dependency. The caller—not the transport—owns durable idempotency and status
-updates using the optional admin-only entity fields.
+dependency. The authorized delivery coordinator owns durable idempotency,
+bounded retry, status updates, and safe event recording using the optional
+admin-only entity fields without changing canonical revision.
 
 The template module exports recovery, future OTP, and future magic-link
 renderers plus HTML escaping, validation, limits, and safe diagnostics. It
@@ -178,6 +182,12 @@ recovery text/HTML, staging prefix, code/link separation, HTML escaping,
 business-name bounds, answer omission, tracking/image denial, and future
 templates. No test can reach an AWS account.
 
+The authorized delivery function adds focused source coverage for exact-draft
+authorization, HMAC code matching, purpose/lifecycle linkage, stored-recipient
+selection, compare-and-set attempt claims, replay suppression, retry/backoff,
+maximum attempts, metadata success/failure, uncertain delivery, safe events,
+strict responses, and the no-storage/no-Redux client helper.
+
 Required later environment evidence includes verified identity/domain, region,
 sandbox exit, quotas, IAM policy simulation/review, bounce/complaint routing,
 configuration-set/event ownership, 100-message staging redirect proof, provider
@@ -217,9 +227,9 @@ synthetic clients.
    certified without exposing it in evidence.
 5. Bounce, complaint, suppression, retry, idempotency, monitoring, retention,
    and incident ownership must be operational.
-6. A backend delivery coordinator must authorize recipient/purpose, render the
-   template, persist only allowlisted diagnostics, and never roll back a newly
-   created draft when mail fails.
+6. The source delivery coordinator must be deployed and live-certified for
+   exact authorization, entity FLS, atomic attempt claims, and ambiguous-send
+   handling before any controller invokes it.
 7. Schema push, function deployment, staging delivery, and production
    enablement each require a separate explicit prompt and guarded target.
 
