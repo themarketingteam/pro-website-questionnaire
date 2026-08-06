@@ -561,3 +561,17 @@ absent.
 No RLS or direct-access risk is closed or lowered. No schema, entity, record,
 secret, function, site, email, integration, domain, production resource, or
 remote Git branch changed.
+
+## 2026-08-06 legacy migration analysis risk evidence
+
+The offline version 1 analyzer reduces source-design uncertainty for legacy
+JSON corruption, response preservation, duplicate sessions, submitted/active
+partitioning, recovery-association provenance, event linkage, and report data
+leakage. Critical corruption, future versions, ambiguous hashes, unmapped
+payload answers, and invalid existing recovery associations fail closed to
+manual review.
+
+No migration or retention risk is closed or lowered without real-data dry-run,
+execution idempotency, checkpoint, secret-backed email hashing, staging
+rehearsal, cleanup, and reverse-migration proof. No Base44 or Git remote
+operation occurred.

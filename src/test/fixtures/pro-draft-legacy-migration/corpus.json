@@ -1,0 +1,193 @@
+{
+  "batchId": "synthetic-legacy-fixture-v1",
+  "environment": "fixture",
+  "analyzedAt": "2026-08-06T12:00:00.000Z",
+  "drafts": [
+    {
+      "id": "legacy-complete-active",
+      "session_id": "session-complete",
+      "status": "draft",
+      "responses_json": "{\"q_complete\":\"SYNTHETIC_COMPLETE_RESPONSE\"}",
+      "validation_status_json": "{\"q_complete\":\"complete\"}",
+      "touched_questions_json": "{\"q_complete\":true}",
+      "expanded_questions_json": "{}",
+      "metadata_json": "{\"source\":\"synthetic\"}",
+      "userdata_json": "{}",
+      "mapped_payload_json": "{}",
+      "draft_metadata_json": "{}",
+      "last_saved_at": "2025-07-01T10:00:00.000Z",
+      "created_date": "2025-06-01T10:00:00.000Z"
+    },
+    {
+      "id": "legacy-partial-active",
+      "session_id": "session-partial",
+      "responses_json": "{}",
+      "metadata_json": "{}",
+      "created_date": "2025-06-02T10:00:00.000Z"
+    },
+    {
+      "id": "legacy-submitted",
+      "session_id": "session-submitted",
+      "status": "submitted",
+      "responses_json": "{\"q_submitted\":\"SYNTHETIC_SUBMITTED_RESPONSE\"}",
+      "submitted_at": "2025-07-02T10:00:00.000Z",
+      "final_submission_id": "submission-synthetic-1",
+      "created_date": "2025-06-03T10:00:00.000Z"
+    },
+    {
+      "id": "legacy-submit-failed",
+      "session_id": "session-submit-failed",
+      "status": "submit_failed",
+      "responses_json": "{\"q_failed\":\"SYNTHETIC_FAILED_RESPONSE\"}",
+      "submit_error": "synthetic-provider-error-not-for-report",
+      "created_date": "2025-06-04T10:00:00.000Z"
+    },
+    {
+      "id": "legacy-malformed-metadata",
+      "session_id": "session-malformed-metadata",
+      "status": "active",
+      "responses_json": "{\"q_preserved\":\"SYNTHETIC_PRESERVED_RESPONSE\"}",
+      "metadata_json": "{not-json",
+      "created_date": "2025-06-05T10:00:00.000Z"
+    },
+    {
+      "id": "legacy-malformed-responses",
+      "session_id": "session-malformed-responses",
+      "status": "active",
+      "responses_json": "{not-json",
+      "metadata_json": "{\"safe\":true}",
+      "created_date": "2025-06-06T10:00:00.000Z"
+    },
+    {
+      "id": "legacy-missing-status",
+      "session_id": "session-missing-status",
+      "responses_json": "{\"q_missing_status\":\"SYNTHETIC_MISSING_STATUS_RESPONSE\"}",
+      "created_date": "2025-06-07T10:00:00.000Z"
+    },
+    {
+      "id": "legacy-invalid-email",
+      "session_id": "session-invalid-email",
+      "status": "active",
+      "responses_json": "{}",
+      "user_email": "invalid-synthetic-email",
+      "created_date": "2025-06-08T10:00:00.000Z"
+    },
+    {
+      "id": "legacy-valid-email",
+      "session_id": "session-valid-email",
+      "status": "active",
+      "responses_json": "{}",
+      "user_email": "synthetic.legacy@example.invalid",
+      "created_date": "2025-06-09T10:00:00.000Z"
+    },
+    {
+      "id": "already-current",
+      "session_id": "session-current",
+      "status": "active",
+      "form_type": "pro-questionnaire",
+      "draft_schema_version": 4,
+      "draft_state_json": "{\"schemaVersion\":4,\"responses\":{}}",
+      "text_validation_meta_json": "{}",
+      "ui_draft_state_json": "{}",
+      "field_change_metadata_json": "{}",
+      "credentials_json": "{}",
+      "client_revision": 1,
+      "server_revision": 1,
+      "state_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "created_date": "2025-06-10T10:00:00.000Z"
+    },
+    {
+      "id": "unsupported-future",
+      "session_id": "session-future",
+      "status": "active",
+      "draft_schema_version": 99,
+      "draft_state_json": "{\"schemaVersion\":99,\"responses\":{}}",
+      "responses_json": "{}",
+      "created_date": "2025-06-11T10:00:00.000Z"
+    },
+    {
+      "id": "duplicate-active-low",
+      "session_id": "session-duplicate-active",
+      "status": "active",
+      "responses_json": "{\"q_duplicate\":\"SYNTHETIC_DUPLICATE_LOW\"}",
+      "server_revision": 1,
+      "client_revision": 2,
+      "state_hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "last_saved_at": "2025-07-01T10:00:00.000Z",
+      "created_date": "2025-06-12T10:00:00.000Z"
+    },
+    {
+      "id": "duplicate-active-high",
+      "session_id": "session-duplicate-active",
+      "status": "active",
+      "responses_json": "{\"q_duplicate\":\"SYNTHETIC_DUPLICATE_HIGH\"}",
+      "server_revision": 3,
+      "client_revision": 3,
+      "state_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "last_saved_at": "2025-07-03T10:00:00.000Z",
+      "created_date": "2025-06-13T10:00:00.000Z"
+    },
+    {
+      "id": "same-session-active",
+      "session_id": "session-partition-conflict",
+      "status": "active",
+      "responses_json": "{\"q_partition\":\"SYNTHETIC_ACTIVE_PARTITION\"}",
+      "created_date": "2025-06-14T10:00:00.000Z"
+    },
+    {
+      "id": "same-session-submitted",
+      "session_id": "session-partition-conflict",
+      "status": "submitted",
+      "responses_json": "{\"q_partition\":\"SYNTHETIC_SUBMITTED_PARTITION\"}",
+      "final_submission_id": "submission-synthetic-partition",
+      "submitted_at": "2025-07-04T10:00:00.000Z",
+      "created_date": "2025-06-15T10:00:00.000Z"
+    },
+    {
+      "id": "ambiguous-a",
+      "session_id": "session-ambiguous-a",
+      "status": "active",
+      "responses_json": "{\"q_ambiguous\":\"SYNTHETIC_AMBIGUOUS_A\"}",
+      "bootstrap_idempotency_key_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "server_revision": 2,
+      "client_revision": 2,
+      "state_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "created_date": "2025-06-16T10:00:00.000Z"
+    },
+    {
+      "id": "ambiguous-b",
+      "session_id": "session-ambiguous-b",
+      "status": "active",
+      "responses_json": "{\"q_ambiguous\":\"SYNTHETIC_AMBIGUOUS_B\"}",
+      "bootstrap_idempotency_key_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "server_revision": 2,
+      "client_revision": 2,
+      "state_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "created_date": "2025-06-16T10:00:00.000Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "legacy-event-linked",
+      "draft_id": "legacy-complete-active",
+      "session_id": "session-complete",
+      "event_type": "answer_change",
+      "value_json": "{\"value\":\"SYNTHETIC_EVENT_VALUE\"}",
+      "created_date": "2025-07-01T10:01:00.000Z"
+    },
+    {
+      "id": "legacy-event-unlinked-unique",
+      "session_id": "session-valid-email",
+      "event_type": "answer_change",
+      "value_json": "{\"value\":\"SYNTHETIC_UNLINKED_EVENT\"}",
+      "created_date": "2025-07-01T10:02:00.000Z"
+    },
+    {
+      "id": "legacy-event-unlinked-ambiguous",
+      "session_id": "session-duplicate-active",
+      "event_type": "answer_change",
+      "value_json": "{not-json",
+      "created_date": "2025-07-01T10:03:00.000Z"
+    }
+  ]
+}

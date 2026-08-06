@@ -515,3 +515,16 @@ operation.
 No requirement advances to staging certification. `DR-RLS-001`, public/admin
 recovery, lifecycle, browser, submission/PDF, email, and release-readiness
 requirements remain blocked. Production and `main` were untouched.
+
+## 2026-08-06 legacy migration analysis source evidence
+
+The [version 1 analysis contract](../migration/legacy-draft-analysis-and-upgrade-contract.md),
+pure shared module, fixture corpus, and offline CLI add local evidence for
+`DR-MIG-001`, `DR-ID-001`, and `DR-OBS-001`: independent JSON parsing,
+canonical reconstruction, unverified approved email association, no-code
+handling, before/after fingerprints, deterministic duplicate/event planning,
+safe diagnostics, and strict manual-review gates.
+
+This is dry-run source evidence only. No exported real dataset, Base44 record,
+lookup secret, execution function, checkpoint, retention policy, staging run,
+or production migration exists. No requirement advances to staging acceptance.

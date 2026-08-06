@@ -340,3 +340,16 @@ entity schema, cloud record, or canonical revision changed in this prompt.
 The 2026-08-05 Prompt 4 attempt is classified **ENTITY_EXTENSIONS_BLOCKED**. On candidate `9ca8e6478facd6d5cfa1e2f51986ba12fc1a26d1`, dependency installation passed and the schema validator/focused suite passed 18/18, but the full normal suite failed 5 of 780 tests. The required hard stop fired before staging checkout update, authentication in that checkout, target guard, record inventory, entity push, type generation, CRUD, field-level-security testing, browser compatibility smoke, or cleanup.
 
 The four extended schemas therefore remain local-only. No staging or production entity was read or mutated, no deleted-entity count was observed, and no generated type or deployed compatibility claim is available. See the [blocked staging entity schema certification](staging-entity-schema-certification.md).
+
+## Legacy migration analysis version 1
+
+The [legacy analysis contract](../migration/legacy-draft-analysis-and-upgrade-contract.md)
+implements offline reconstruction and patch planning against the existing
+optional canonical, identity, event, environment, and migration fields. It
+does not add or push a schema. Retention metadata remains deferred to the later
+policy increment.
+
+The engine never overwrites nonempty current fields, created dates, submitted
+locks, final submission IDs, or raw event values. It proposes no patch when
+answer mapping, future version, recovery association, or duplicate evidence is
+ambiguous. No Base44 record was read or changed.
