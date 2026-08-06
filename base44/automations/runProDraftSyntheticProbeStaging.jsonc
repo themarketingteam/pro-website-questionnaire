@@ -1,0 +1,12 @@
+{
+  // Disabled-first staging schedule. Deployment and enablement require a later explicit prompt.
+  "name": "runProDraftSyntheticProbeStaging",
+  "function": "runProDraftSyntheticProbe",
+  "schedule": "*/15 * * * *",
+  "timezone": "UTC",
+  "enabled": false,
+  "environment": "staging",
+  "authorizationMode": "scheduled_secret",
+  "externalSideEffects": "disabled",
+  "description": "Synthetic durable-draft health probe every 15 minutes in staging; initially disabled and never emails clients or invokes Zapier."
+}

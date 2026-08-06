@@ -462,3 +462,12 @@ storage state. Deployment success alone never satisfies this requirement.
 ## Operational observability acceptance gate
 
 Production promotion additionally requires: the operational entity and both functions deployed first to staging; the fingerprint secret independently configured in staging and production; zero PII/answer/credential findings in logs and telemetry evidence; verified admin-only RLS and denial of direct client access; verified event allowlists and privilege separation; save/recovery/SES/submission/conflict/RLS/migration/synthetic summary signals; approved ordinary and security-boundary retention windows; alert routing and incident ownership; test-run cleanup; latency/error thresholds; and rollback evidence. Local implementation or successful deployment alone is not certification.
+
+Health/alert acceptance also requires the fixed public projection to pass a
+response/log leak scan; admin health and the operations dashboard to reject
+missing, expired, wrong-device, and revoked grants; synthetic probes to prove
+exact-state recovery and exact-run cleanup without SES, Zapier, or intake side
+effects; two consecutive probe failures and every critical invariant to alert;
+staging delivery to reach only the approved internal redirect; cooldown to be
+durable across instances; alert-transport failure to be independently visible;
+and production scheduling to remain disabled until the authorized cutover.

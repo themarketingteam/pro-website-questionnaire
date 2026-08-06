@@ -519,6 +519,20 @@ No checklist item is promoted. The decision remains
 No readiness item is promoted by source tooling alone. The decision remains
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
 
+## Health, probe, and alerting readiness
+
+- [x] Local public/admin health contracts and fixed safe projections exist.
+- [x] Local synthetic probe sequence has failure and cleanup tests.
+- [x] Staging automation source is disabled at a 15-minute cadence.
+- [x] Alert policy, delivery abstraction, and password-gated dashboard exist locally.
+- [ ] Health functions and dashboard have not been deployed to staging.
+- [ ] Probe/alert secrets and approved internal redirect are not configured.
+- [ ] Live RLS, cleanup, response/log leak, cooldown, and delivery-failure evidence is absent.
+- [ ] No staging probe has run and no production schedule exists.
+
+These local controls do not promote readiness. The decision remains
+**STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
+
 ## 2026-08-06 bidirectional migration utility certification attempt
 
 The [migration utility report](../migration/staging-migration-utility-certification.md)

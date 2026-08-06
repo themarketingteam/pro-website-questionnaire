@@ -747,3 +747,9 @@ No risk is closed or lowered. The final gate found 96 RC-precheck failures, 82 s
 | Telemetry failure impacts saving | Best-effort writes and queue restoration are isolated from draft state | Failure-injection tests must pass |
 | Cross-environment/test contamination | Server-derived environment and exact `test_run_id` filtering; production test IDs rejected | Staging cleanup evidence required |
 | Excessive or unrestricted query | Password-issued device-bound admin grant, bounded projection and aggregate-only response | Capacity and access tests required before deployment |
+| Public health leaks configuration or topology | Fixed six-field projection, no entity reads/writes, no-store response | Staging response/log scan required before exposure |
+| Synthetic probe affects clients or submissions | Exact synthetic identity, external-effects-disabled gate, no SES/Zapier/intake calls, exact-run cleanup | Staging RLS and cleanup evidence required before scheduling |
+| Probe cleanup fails | `finally` cleanup, escalated safe error, operational event | Alert routing and operator runbook must be verified |
+| Alert storm or duplicate delivery | Fingerprint cooldown abstraction and bounded safe messages | Durable shared cooldown store required for scaled production |
+| Alert transport silently fails | Delivery failure records a separate operational event | Independent monitoring path and staging failure injection required |
+| Operations dashboard exposes sensitive records | Function-only aggregate client, password-issued grant, bounded safe projections | Browser/security review and staging authorization evidence required |

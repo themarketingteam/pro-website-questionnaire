@@ -703,3 +703,7 @@ The [final gate summary](./staging-release-candidate-summary.md) is **NOT ISSUED
 | Non-authoritative browser telemetry | `proDraftOperationalTelemetry.js` | queue, bounds, failure, exclusion tests | Local implemented |
 | Authorized ingest and aggregate-only query | `recordProDraftOperationalEvents`, `getProDraftOperationalSummary` | authorization-order, allowlist, isolation, aggregate tests | Local implemented |
 | PII/credential-safe logs | client/server `safeLogger` | recursive redaction tests | Local implemented |
+| Public and admin health | `getProDraftPublicHealth`, `getProDraftAdminHealth`, `proDraftHealth` | `proDraftHealth.test.js` | Local implemented; not deployed |
+| Synthetic health probe and cleanup | `runProDraftSyntheticProbe`, `proDraftSyntheticProbe` | `proDraftSyntheticProbe.test.js` | Local implemented; disabled/not scheduled |
+| Alert policy and safe delivery | `proDraftAlertPolicy`, `proDraftAlertDelivery` | `proDraftAlerting.test.js` | Local implemented; destinations unconfigured |
+| Password-gated operations dashboard | `/admin/draft-operations`, `proDraftHealthClient` | dashboard/client/admin authorization tests | Local implemented; not deployed |

@@ -318,3 +318,17 @@ staging and production names-only inventories were not refreshed or changed.
 | `PRO_FORM_OPERATIONAL_FINGERPRINT_SECRET` | Unique secret, minimum 32 bytes | Independently generated unique secret, minimum 32 bytes | Purpose-separated HMAC for short operational draft/session/tab/admin-grant correlation fingerprints | Not configured by this change |
 
 This secret must not be reused for email lookup, recovery codes, abuse controls, signed invitations, recovery sessions, admin grants, retention, idempotency, or migration. Its value must never appear in source, logs, telemetry, tests, screenshots, or evidence bundles.
+
+## Health probes and alert delivery
+
+| Variable | Purpose | Status |
+|---|---|---|
+| `PRO_FORM_SYNTHETIC_PROBE_SECRET` | Separate authorization for scheduled synthetic probes | Reserved; not configured |
+| `PRO_DRAFT_ALERT_MODE` | Select disabled, staging redirect, or production internal email | Reserved; not configured; defaults disabled |
+| `PRO_DRAFT_ALERT_EMAIL_TO` | Internal production operations recipient | Reserved; not configured |
+| `STAGING_ALERT_EMAIL_REDIRECT_TO` | Mandatory non-client staging redirect recipient | Reserved; not configured |
+| `PRO_DRAFT_ALERT_COOLDOWN_SECONDS` | Duplicate-alert suppression interval | Reserved; not configured |
+
+No value was generated, queried, printed, copied, or stored by the local health
+and alerting implementation. Activation requires a separately authorized
+environment-configuration and deployment procedure.

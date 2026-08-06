@@ -13,6 +13,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AdminSubmitIntake from './pages/AdminSubmitIntake';
 import ProFormDraftRecovery from './pages/ProFormDraftRecovery';
 import ProDraftRecovery from './pages/ProDraftRecovery';
+import ProDraftOperations from './pages/ProDraftOperations';
 import QuestionnaireIntakeRecoveryPage from './pages/QuestionnaireIntakeRecovery';
 import DraftRecoveryPasswordGate from '@/components/admin/DraftRecoveryPasswordGate';
 import ProDraftAdminRecoveryShell from '@/components/admin/ProDraftAdminRecoveryShell';
@@ -76,7 +77,8 @@ export const AuthenticatedApp = () => {
   const location = useLocation();
   const bypassesBase44UserLogin = location.pathname === '/recover-draft'
     || location.pathname === '/admin/draft-recovery'
-    || location.pathname === '/admin/questionnaire-intake-recovery';
+    || location.pathname === '/admin/questionnaire-intake-recovery'
+    || location.pathname === '/admin/draft-operations';
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -142,6 +144,11 @@ export const AuthenticatedApp = () => {
       <Route path="/admin/questionnaire-intake-recovery" element={
         <ProDraftAdminAuthorizationProvider><DraftRecoveryPasswordGate><ProDraftAdminRecoveryShell>
           <LayoutWrapper currentPageName={"admin/questionnaire-intake-recovery"}><QuestionnaireIntakeRecoveryPage /></LayoutWrapper>
+        </ProDraftAdminRecoveryShell></DraftRecoveryPasswordGate></ProDraftAdminAuthorizationProvider>
+      } />
+      <Route path="/admin/draft-operations" element={
+        <ProDraftAdminAuthorizationProvider><DraftRecoveryPasswordGate><ProDraftAdminRecoveryShell>
+          <LayoutWrapper currentPageName={"admin/draft-operations"}><ProDraftOperations /></LayoutWrapper>
         </ProDraftAdminRecoveryShell></DraftRecoveryPasswordGate></ProDraftAdminAuthorizationProvider>
       } />
       <Route path="*" element={<PageNotFound />} />
