@@ -1,0 +1,113 @@
+name: Durable Draft Staging Release Candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Exact feature-branch commit to certify
+        required: true
+        type: string
+      test_run_id:
+        description: Unique safe staging certification run ID
+        required: true
+        type: string
+      resume_nonsecurity:
+        description: Resume passed nonsecurity groups; security groups always rerun
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: durable-draft-staging-release-candidate
+  cancel-in-progress: false
+
+jobs:
+  staging-release-candidate:
+    name: Strict staging RC gate
+    if: github.event_name == 'workflow_dispatch' && github.event.repository.fork == false
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v7
+        with:
+          ref: feature/durable-draft-recovery
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up approved Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Validate candidate and staging target without printing the URL
+        env:
+          EXPECTED_COMMIT: ${{ inputs.commit_sha }}
+          PRO_DRAFT_STAGING_URL: ${{ secrets.PRO_DRAFT_STAGING_URL }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { createHash } from 'node:crypto';
+          import { appendFileSync } from 'node:fs';
+          import { execFileSync } from 'node:child_process';
+          import { resolveE2ETarget } from './tests/e2e/helpers/targetSafety.js';
+          const actual = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (actual !== process.env.EXPECTED_COMMIT) throw new Error('RC_WORKFLOW_COMMIT_MISMATCH');
+          const target = resolveE2ETarget({
+            E2E_ALLOW_PRODUCTION: 'false',
+            E2E_ALLOW_WRITES: 'true',
+            E2E_BASE_URL: process.env.PRO_DRAFT_STAGING_URL,
+            E2E_TARGET_ENVIRONMENT: 'staging',
+          });
+          const fingerprint = createHash('sha256').update(target.origin).digest('hex');
+          appendFileSync(process.env.GITHUB_ENV, `STAGING_URL_FINGERPRINT=${fingerprint}\n`);
+          NODE
+
+      - name: Build production bundle for source and secret checks
+        env:
+          VITE_APP_BUILD_SHA: ${{ inputs.commit_sha }}
+          VITE_APP_BUILD_TIME: '2000-01-01T00:00:00Z'
+          VITE_APP_ENVIRONMENT: staging
+          VITE_PRO_DRAFT_DIAGNOSTICS_ENABLED: 'false'
+          VITE_PRO_DRAFT_EMAIL_OTP_ENABLED: 'false'
+          VITE_PRO_DRAFT_MAGIC_LINK_ENABLED: 'false'
+          VITE_PRO_DRAFT_PUBLIC_EMAIL_RECOVERY_ENABLED: 'true'
+          VITE_PRO_DRAFT_V2_ENABLED: 'true'
+          VITE_PRO_DRAFT_V2_KILL_SWITCH: 'false'
+          VITE_STAGING_BANNER_ENABLED: 'true'
+        run: npm run build
+
+      - name: Run strict release-candidate certification
+        env:
+          PRO_DRAFT_STAGING_URL: ${{ secrets.PRO_DRAFT_STAGING_URL }}
+          VITE_PRO_DRAFT_DIAGNOSTICS_ENABLED: 'false'
+          VITE_PRO_DRAFT_EMAIL_OTP_ENABLED: 'false'
+          VITE_PRO_DRAFT_MAGIC_LINK_ENABLED: 'false'
+          VITE_PRO_DRAFT_PUBLIC_EMAIL_RECOVERY_ENABLED: 'true'
+          VITE_PRO_DRAFT_V2_ENABLED: 'true'
+          VITE_PRO_DRAFT_V2_KILL_SWITCH: 'false'
+          VITE_STAGING_BANNER_ENABLED: 'true'
+        shell: bash
+        run: |
+          args=(--environment staging --test-run-id '${{ inputs.test_run_id }}')
+          if [[ '${{ inputs.resume_nonsecurity }}' == 'true' ]]; then args+=(--resume); fi
+          node scripts/run-staging-release-candidate-certification.mjs "${args[@]}"
+
+      - name: Scan sanitized RC evidence
+        if: always()
+        run: npm run security:scan-artifacts -- --path .durable-draft-artifacts/staging-rc
+
+      - name: Upload sanitized evidence only
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: durable-draft-staging-rc-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .durable-draft-artifacts/staging-rc/
+          if-no-files-found: error
+          retention-days: 30

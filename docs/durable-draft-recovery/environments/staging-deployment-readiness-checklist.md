@@ -1,5 +1,20 @@
 # Staging Deployment Readiness Checklist
 
+## 2026-08-06 staging release-candidate gate
+
+- [x] Add versioned staging RC configuration and accepted pending families.
+- [x] Add fail-closed report/classification/commit/checksum precheck.
+- [x] Add checksummed, fingerprint-only immutable RC manifest.
+- [x] Add change classification with feature-freeze enforcement deferred to Prompt 4.
+- [x] Add strict no-deploy/no-tag orchestrator and manual-only GitHub workflow.
+- [ ] Replace blocked/failed staging certification reports with current checksummed certified evidence.
+- [ ] Pass all required browser, security, capacity, cleanup, defect, and risk gates.
+- [ ] Complete real-device, mail-app, and rollback-drill evidence in later prompts.
+- [ ] Create the freeze ref and release-candidate tag only in Prompt 4.
+
+No deployment, tag, `_next` creation, feature push, `main` push, or production
+operation is part of this increment.
+
 ## 2026-08-06 comprehensive automated certification attempt
 
 - [x] Confirm clean feature branch and authenticated Base44 CLI.

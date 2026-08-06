@@ -1,5 +1,18 @@
 # Durable Draft Recovery Production Acceptance Criteria
 
+## Staging release-candidate acceptance gate
+
+Production acceptance requires a `READY_FOR_FINAL_STAGING_MANUAL_CERTIFICATION`
+manifest tied to one exact feature commit, verified report/evidence checksums,
+all required staging browser/security/capacity/cleanup evidence, no forbidden
+pending staging requirements, and later completion of the manual/rollback
+placeholders. Manually editing a report status cannot satisfy this gate.
+
+Any runtime fix after the future freeze invalidates prior RC evidence. Test
+changes require affected-suite reruns; schema/function changes require staging
+redeployment and full recertification. Freeze/tag creation remains deferred to
+Prompt 4 and this source increment authorizes no production action.
+
 ## Comprehensive staging gate status — 2026-08-06
 
 Candidate `023ed7c9feb3e7b8baf8da09aedd785406ca59cb` did not enter live staging

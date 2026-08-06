@@ -1,0 +1,128 @@
+{
+  "releaseCandidateVersion": 1,
+  "requiredPhase": "staging_release_candidate",
+  "requiredCertificationReports": [
+    {
+      "id": "browser-storage",
+      "path": "docs/durable-draft-recovery/testing/staging-browser-storage-certification.md",
+      "acceptedClassifications": ["STORAGE_FOUNDATION_CERTIFIED_IN_STAGING"]
+    },
+    {
+      "id": "canonical-state-redux",
+      "path": "docs/durable-draft-recovery/testing/staging-canonical-state-redux-certification.md",
+      "acceptedClassifications": ["CANONICAL_STATE_FOUNDATION_CERTIFIED_IN_STAGING"]
+    },
+    {
+      "id": "authoritative-draft-apis",
+      "path": "docs/durable-draft-recovery/backend/staging-authoritative-draft-api-certification.md",
+      "acceptedClassifications": ["AUTHORITATIVE_DRAFT_APIS_CERTIFIED_IN_STAGING"]
+    },
+    {
+      "id": "public-recovery",
+      "path": "docs/durable-draft-recovery/security/staging-public-recovery-services-certification.md",
+      "acceptedClassifications": ["PUBLIC_RECOVERY_SERVICES_CERTIFIED_IN_STAGING"]
+    },
+    {
+      "id": "ses-recovery",
+      "path": "docs/durable-draft-recovery/email/staging-ses-recovery-email-certification.md",
+      "acceptedClassifications": ["SES_RECOVERY_EMAIL_CERTIFIED_IN_STAGING"]
+    },
+    {
+      "id": "client-recovery-entry",
+      "path": "docs/durable-draft-recovery/frontend/staging-recovery-entry-certification.md",
+      "acceptedClassifications": ["CLIENT_RECOVERY_ENTRY_CERTIFIED_IN_STAGING"]
+    },
+    {
+      "id": "admin-recovery",
+      "path": "docs/durable-draft-recovery/admin/staging-password-only-admin-recovery-certification.md",
+      "acceptedClassifications": ["PASSWORD_ONLY_ADMIN_RECOVERY_CERTIFIED_IN_STAGING"]
+    },
+    {
+      "id": "draft-rls",
+      "path": "docs/durable-draft-recovery/security/staging-draft-rls-certification.md",
+      "acceptedClassifications": ["DRAFT_RLS_CERTIFIED_IN_STAGING"]
+    },
+    {
+      "id": "security-primitives",
+      "path": "docs/durable-draft-recovery/security/staging-security-primitives-certification.md",
+      "acceptedClassifications": ["SECURITY_PRIMITIVES_CERTIFIED_IN_STAGING"]
+    },
+    {
+      "id": "full-lifecycle",
+      "path": "docs/durable-draft-recovery/testing/staging-full-draft-lifecycle-certification.md",
+      "acceptedClassifications": ["FULL_DRAFT_LIFECYCLE_CERTIFIED_IN_STAGING"]
+    },
+    {
+      "id": "comprehensive-automation",
+      "path": "docs/durable-draft-recovery/testing/staging-comprehensive-automated-certification.md",
+      "acceptedClassifications": ["COMPREHENSIVE_AUTOMATED_STAGING_CERTIFIED"]
+    },
+    {
+      "id": "migration-utility",
+      "path": "docs/durable-draft-recovery/migration/staging-migration-utility-certification.md",
+      "acceptedClassifications": ["MIGRATION_UTILITY_CERTIFIED_LIVE_GREEN_PENDING"]
+    }
+  ],
+  "requiredBrowserProjects": [
+    "chromium-desktop",
+    "firefox-desktop",
+    "webkit-desktop",
+    "mobile-chromium",
+    "mobile-webkit"
+  ],
+  "requiredManualEvidence": [
+    {
+      "id": "real-device-browser",
+      "status": "PENDING_FINAL_STAGING_MANUAL_CERTIFICATION"
+    },
+    {
+      "id": "mail-app-link",
+      "status": "PENDING_FINAL_STAGING_MANUAL_CERTIFICATION"
+    },
+    {
+      "id": "rollback-drill",
+      "status": "PENDING_PROMPT_3"
+    }
+  ],
+  "requiredSecurityVerdicts": [
+    "SECURITY_CERTIFIED_IN_STAGING",
+    "RLS_CERTIFIED_IN_STAGING",
+    "ADMIN_RECOVERY_CERTIFIED_IN_STAGING",
+    "PUBLIC_RECOVERY_CERTIFIED_IN_STAGING"
+  ],
+  "requiredPerformanceThresholds": {
+    "successfulPathErrorRateExclusiveMaximum": 0.001,
+    "lostAcknowledgedStateMaximum": 0,
+    "crossClientLeakageMaximum": 0,
+    "submittedRegressionMaximum": 0,
+    "rlsBypassMaximum": 0,
+    "serverSaveP95MillisecondsMaximum": 2500,
+    "serverSaveP99MillisecondsMaximum": 5000,
+    "draftLoadP95MillisecondsMaximum": 3000,
+    "bootstrapP95MillisecondsMaximum": 4000,
+    "cleanupUnresolvedRecordsMaximum": 0
+  },
+  "allowedPendingRequirementPrefixes": [
+    "DR-MIG-GREEN-",
+    "DR-PROD-DISABLED-",
+    "DR-CUTOVER-",
+    "DR-POST-CUTOVER-",
+    "DR-ROLLBACK-MIG-"
+  ],
+  "forbiddenFeatureFlags": {
+    "VITE_PRO_DRAFT_DIAGNOSTICS_ENABLED": true,
+    "VITE_PRO_DRAFT_EMAIL_OTP_ENABLED": true,
+    "VITE_PRO_DRAFT_MAGIC_LINK_ENABLED": true,
+    "VITE_PRO_DRAFT_V2_KILL_SWITCH": true
+  },
+  "requiredFeatureFlags": {
+    "VITE_PRO_DRAFT_PUBLIC_EMAIL_RECOVERY_ENABLED": true,
+    "VITE_PRO_DRAFT_V2_ENABLED": true,
+    "VITE_STAGING_BANNER_ENABLED": true
+  },
+  "requiredEnvironment": "staging",
+  "requiredMigrationStatus": "MIGRATION_UTILITY_CERTIFIED_LIVE_GREEN_PENDING",
+  "requiredCleanupStatus": "CLEANUP_VERIFIED_ZERO",
+  "featureFreezeEnforced": false,
+  "featureFreezeRef": null
+}

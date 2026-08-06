@@ -49,6 +49,7 @@ const scripts = packageJson.scripts || {};
 const requiredFoundationFiles = [
   '.github/workflows/durable-draft-quality.yml',
   '.github/workflows/durable-draft-staging-e2e.yml',
+  '.github/workflows/durable-draft-staging-release-candidate.yml',
   '.node-version',
   'scripts/build-ci-summary.mjs',
   'scripts/scan-ci-source-safety.mjs',
@@ -83,6 +84,7 @@ const requiredFoundationFiles = [
   'tests/e2e/draft-v2/client-isolation.spec.js',
   'tests/e2e/draft-v2/identity-boundary.spec.js',
   'config/durable-draft-release-phases.json',
+  'config/durable-draft-staging-release-candidate.json',
   'tests/factories/proDraftSyntheticDataFactory.js',
   'scripts/validate-release-test-coverage.mjs',
   'scripts/lib/normalize-test-results.mjs',
@@ -91,6 +93,11 @@ const requiredFoundationFiles = [
   'scripts/lib/pro-draft-load-metrics.mjs',
   'scripts/lib/pro-draft-load-staging-adapter.mjs',
   'scripts/run-durable-draft-release-tests.mjs',
+  'scripts/precheck-staging-release-candidate.mjs',
+  'scripts/build-staging-release-candidate-manifest.mjs',
+  'scripts/validate-release-candidate-feature-freeze.mjs',
+  'scripts/run-staging-release-candidate-certification.mjs',
+  'scripts/staging-release-candidate.test.js',
   'scripts/build-durable-draft-evidence-bundle.mjs',
   'scripts/cleanup-durable-draft-test-data.mjs',
   'scripts/scan-durable-draft-test-artifacts.mjs',
@@ -114,6 +121,7 @@ const requiredFoundationFiles = [
   'tests/e2e/security/draft-credential-leakage.spec.js',
   'docs/durable-draft-recovery/testing/security-and-adversarial-test-contract.md',
   'docs/durable-draft-recovery/testing/load-capacity-and-chaos-test-contract.md',
+  'docs/durable-draft-recovery/release/staging-release-candidate-contract.md',
 ];
 
 for (const file of requiredFoundationFiles) {
@@ -216,6 +224,39 @@ if (existsSync(stagingWorkflowPath)) {
     'staging E2E workflow must never deploy Base44',
   );
 }
+
+const stagingRcWorkflowPath = path.join(
+  repositoryRoot,
+  '.github/workflows/durable-draft-staging-release-candidate.yml',
+);
+if (existsSync(stagingRcWorkflowPath)) {
+  const workflow = readFileSync(stagingRcWorkflowPath, 'utf8');
+  const triggerSection = workflow.split('\npermissions:')[0];
+  requireCondition(
+    triggerSection.includes('  workflow_dispatch:'),
+    'staging RC workflow must support manual dispatch',
+  );
+  requireCondition(
+    !/\n  (?:pull_request|push|schedule):/u.test(triggerSection),
+    'staging RC workflow must remain manual-only',
+  );
+  requireCondition(
+    workflow.includes('secrets.PRO_DRAFT_STAGING_URL'),
+    'staging RC workflow must use the approved staging URL secret',
+  );
+  requireCondition(
+    workflow.includes("github.event.repository.fork == false"),
+    'staging RC workflow must deny fork execution with secrets',
+  );
+  requireCondition(
+    workflow.includes('scripts/run-staging-release-candidate-certification.mjs'),
+    'staging RC workflow must run the authoritative orchestrator',
+  );
+  requireCondition(
+    !/\b(?:npx base44 deploy|npm run deploy:base44|git tag|git push)\b/u.test(workflow),
+    'staging RC workflow must never deploy, tag, or push',
+  );
+}
 const requiredScripts = [
   'test',
   'test:watch',
@@ -246,6 +287,11 @@ const requiredScripts = [
   'release:validate-coverage',
   'release:build-evidence',
   'release:cleanup-test-data',
+  'release:precheck-staging-rc',
+  'release:build-staging-rc-manifest',
+  'release:validate-feature-freeze',
+  'release:certify-staging-rc',
+  'test:staging-rc',
   'security:audit-dependencies',
   'security:scan-artifacts',
   'security:test',

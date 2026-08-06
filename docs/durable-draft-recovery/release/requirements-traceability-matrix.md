@@ -1,5 +1,16 @@
 # Durable Draft Recovery Requirements Traceability Matrix
 
+## 2026-08-06 staging release-candidate gate source
+
+The [staging RC contract](./staging-release-candidate-contract.md), versioned
+configuration, precheck, checksummed manifest builder, dormant feature-freeze
+validator, no-deploy orchestrator, and manual-only workflow now provide the
+source gate for `staging_release_candidate`. No requirement is advanced to
+certified: current staging reports remain subject to exact classification,
+commit, checksum, browser, security, capacity, cleanup, defect, and risk checks.
+Only green/production/cutover/post-cutover/rollback-migration families can be
+pending at an eventual RC verdict.
+
 ## 2026-08-06 comprehensive staging certification attempt
 
 Candidate `023ed7c9feb3e7b8baf8da09aedd785406ca59cb` is
