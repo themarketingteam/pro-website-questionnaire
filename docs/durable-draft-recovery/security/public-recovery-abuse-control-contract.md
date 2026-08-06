@@ -35,6 +35,12 @@ and migration metadata. They never contain raw email, normalized email, network
 address, random device ID, recovery code, CAPTCHA token, request body, answer
 content, recovery-session material, or provider response body.
 
+The same entity contract now also allowlists admin password authentication, grant validation/revocation, and future scoped admin draft/event/retry/repair operations. Admin outcomes distinguish authorization, invalid password/grant, version/device/environment mismatch, rate limit, lockout, revocation, and internal failure. Admin authorization uses its own `PRO_FORM_ADMIN_GRANT_SECRET` HMAC domains for IP/device correlation; it does not reuse the public-recovery abuse secret or store raw inputs. The entity remains admin/backend only, and this source batch did not push its enum extension.
+
+## Password-only admin controls
+
+The admin endpoint applies independent IP and random-device attempt buckets with defaults of 10 per 15 minutes, locks after 10 failures for 1,800 seconds, and targets at least 400 ms plus up to 200 ms jitter. Grant validation and forget-device audit use four-times thresholds so normal persistent-grant checks are less aggressively limited while still bounded. Public recovery CAPTCHA/global/subject policies do not authorize or substitute for admin controls. Full details are in the [password-only admin recovery authorization contract](../admin/password-only-admin-recovery-authorization-contract.md).
+
 ## Rate-limit keys and secret separation
 
 `PRO_FORM_ABUSE_HASH_SECRET` is reserved exclusively for abuse-correlation

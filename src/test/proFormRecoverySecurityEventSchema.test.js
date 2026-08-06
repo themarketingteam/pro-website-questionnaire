@@ -38,10 +38,17 @@ describe('ProFormRecoverySecurityEvent schema', () => {
     expect(schema.properties.attempt_type.enum).toEqual([
       'email_recovery', 'code_recovery', 'list_choices',
       'select_choice', 'captcha', 'admin_review',
+      'admin_password_authentication', 'admin_grant_validation',
+      'admin_grant_revocation', 'admin_draft_list', 'admin_draft_detail',
+      'admin_draft_update', 'admin_event_list', 'admin_retry_submission',
+      'admin_repair_submission',
     ]);
     expect(schema.properties.outcome.enum).toEqual([
       'success', 'not_found', 'invalid_input', 'rate_limited',
       'captcha_required', 'captcha_failed', 'locked', 'superseded', 'internal_error',
+      'authorized', 'invalid_password', 'invalid_grant', 'grant_version_mismatch',
+      'password_version_mismatch', 'device_mismatch', 'environment_mismatch',
+      'revoked',
     ]);
     expect(schema.properties.captcha_required.default).toBe(false);
     expect(schema.properties.captcha_verified.default).toBe(false);

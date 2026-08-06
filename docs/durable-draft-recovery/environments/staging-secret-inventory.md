@@ -2,7 +2,7 @@
 
 - Status: **STAGING_CRYPTOGRAPHIC_SECRETS_CONFIGURED**
 - Inventory date: 2026-08-05
-- Inventory rows: **81 names**
+- Inventory rows: **90 names**
 - Current production Base44 secret names observed: **4**
 - Current staging Base44 secret names observed: **8** (six cryptographic secrets and two ordinary staging controls)
 
@@ -39,12 +39,12 @@ The four production names observed through the names-only Base44 secret command 
 | 11 | `AWS_SECRET_ACCESS_KEY` | Future least-privilege SES secret | Later | Later | Yes | No |
 | 12 | `SES_FROM_ADDRESS` | Future verified environment-specific sender | Later | Later | Prefer Yes | No |
 | 13 | `SES_CONFIGURATION_SET` | Future environment-specific SES event routing | Later | Later | Yes | No |
-| 14 | `DRAFT_RECOVERY_PASSWORD` | Current support/admin recovery password and grant signing input | Later | Yes currently; redesign planned | Yes | No |
+| 14 | `DRAFT_RECOVERY_PASSWORD` | Exact backend-only support/admin recovery password; never a signing key | Later; not configured by this source batch | Yes currently | Yes | No |
 | 15 | `PRO_FORM_DRAFT_TOKEN_SECRET` | Draft resume-token storage/lookup | Yes; configured independently 2026-08-05 | Later | Yes | No |
 | 16 | `PRO_FORM_DRAFT_LINK_SECRET` | Signed draft-link integrity | Yes; configured independently 2026-08-05 | Later | Yes | No |
 | 17 | `PRO_FORM_RECOVERY_CODE_SECRET` | Recovery-code lookup hashing | Yes; configured independently 2026-08-05 | Later | Yes | No |
 | 18 | `PRO_FORM_EMAIL_LOOKUP_SECRET` | Normalized-email lookup hashing | Yes; configured independently 2026-08-05 | Later | Yes | No |
-| 19 | `PRO_FORM_ADMIN_GRANT_SECRET` | Independently rotatable admin-grant signing | Yes; configured independently 2026-08-05 | Later | Yes | No |
+| 19 | `PRO_FORM_ADMIN_GRANT_SECRET` | Independently rotatable admin-grant signing, device/IP HMAC, and purpose-separated password comparison | Yes; configured independently 2026-08-05 | Later | Yes | No |
 | 19a | `PRO_FORM_RECOVERY_SESSION_SECRET` | Recovery-session signing | Yes; configured independently 2026-08-05 | Later | Yes | No |
 | 19b | `PRO_FORM_ABUSE_HASH_SECRET` | Purpose-separated IP/device/email/code abuse-limit HMAC | Later; reserved, not configured | Later | Yes | No |
 | 19c | `PRO_FORM_RECOVERY_SESSION_TTL_SECONDS` | Positive recovery-session TTL; default 43200, maximum 604800 | Optional | Optional | No | Yes; non-secret bounded configuration only |
@@ -95,6 +95,15 @@ The four production names observed through the names-only Base44 secret command 
 | 50f | `PRO_DRAFT_RECOVERY_GLOBAL_ATTEMPTS_PER_MIN` | Positive bounded environment circuit breaker; default 300 | Optional | Optional | Prefer Yes for load profile | Yes; non-secret policy only |
 | 50g | `PRO_DRAFT_RECOVERY_MIN_RESPONSE_MS` | Positive bounded generic-response floor; default 400 | Optional | Optional | No | Yes; non-secret policy only |
 | 50h | `PRO_DRAFT_RECOVERY_MAX_JITTER_MS` | Positive bounded Web Crypto jitter; default 200 | Optional | Optional | No | Yes; non-secret policy only |
+| 50i | `PRO_FORM_ADMIN_GRANT_VERSION` | Exact persistent admin-grant fleet version; default 1 | Optional source default; explicitly review before staging use | Optional | Prefer Yes during revocation tests | Yes; reviewed integer only |
+| 50j | `PRO_FORM_ADMIN_PASSWORD_VERSION` | Exact admin-password revocation version; default 1 | Optional source default; explicitly review before staging use | Optional | Prefer Yes during password rotation | Yes; reviewed integer only |
+| 50k | `PRO_FORM_ADMIN_RECOVERY_POLICY_VERSION` | Exact admin recovery policy revocation version; default 1 | Optional source default; explicitly review before staging use | Optional | Prefer Yes during policy migration | Yes; reviewed integer only |
+| 50l | `PRO_FORM_ADMIN_RECOVERY_IP_ATTEMPTS_PER_15_MIN` | Positive bounded admin password IP threshold; default 10 | Optional | Optional | No | Yes; reviewed integer only |
+| 50m | `PRO_FORM_ADMIN_RECOVERY_DEVICE_ATTEMPTS_PER_15_MIN` | Positive bounded admin password device threshold; default 10 | Optional | Optional | No | Yes; reviewed integer only |
+| 50n | `PRO_FORM_ADMIN_RECOVERY_FAILURES_BEFORE_LOCKOUT` | Positive bounded admin failure threshold; default 10 | Optional | Optional | Prefer Yes for testing | Yes; reviewed integer only |
+| 50o | `PRO_FORM_ADMIN_RECOVERY_LOCKOUT_SECONDS` | Positive bounded admin lockout; default 1800 seconds | Optional | Optional | Prefer Yes for testing | Yes; reviewed integer only |
+| 50p | `PRO_FORM_ADMIN_RECOVERY_MIN_RESPONSE_MS` | Bounded admin response floor; default 400 ms | Optional | Optional | No | Yes; reviewed integer only |
+| 50q | `PRO_FORM_ADMIN_RECOVERY_MAX_JITTER_MS` | Bounded admin response jitter; default 200 ms | Optional | Optional | No | Yes; reviewed integer only |
 
 `ALLOW_PRODUCTION_DEPLOY=false` is a non-sensitive safe default, not authorization. All app IDs remain outside Git even though identifiers are not access credentials.
 
@@ -152,6 +161,11 @@ Both destination values must use HTTPS outside an explicitly injected local test
 - A missing redirect, webhook, AI, CAPTCHA, or environment declaration must suppress the related side effect; it must not select production.
 - Backend runtime names 42-50 require reviewed staging values before any later deployment, except optional bounded timeout configuration. The staging redirect URL remains absent and unnecessary while mode is `disabled`. This inventory does not set any value.
 - The abuse secret, CAPTCHA variables, public site key, and recovery-policy variables added in rows 19b, 20a-20f, and 50a-50h are reserved only. Row 19c is optional, bounded, non-secret source configuration with a 12-hour default. This prompt configured none of them.
+- Admin authorization variables in rows 14, 19, and 50i-50q are now consumed by the source contract. This prompt configured, queried, printed, or changed none of their values. The existing staging grant secret evidence predates this source change and does not certify the new endpoint.
+
+## 2026-08-06 password-only admin authorization source inventory
+
+The eleven exact admin authorization names are reserved by the backend contract. The nine version/rate/lockout/timing names added in rows 50i-50q are ordinary bounded configuration, not secrets. `DRAFT_RECOVERY_PASSWORD` and `PRO_FORM_ADMIN_GRANT_SECRET` remain private and environment-specific. No Base44 secret/configuration operation, schema push, function deployment, or production change occurred. Before staging use, operators must configure the password independently, retain or deliberately rotate the already independent grant secret, explicitly review all three version values, and validate only presence/version behavior without printing values.
 
 ## 2026-08-05 staging cryptographic configuration evidence
 

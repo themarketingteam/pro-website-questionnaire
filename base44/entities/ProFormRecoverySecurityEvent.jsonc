@@ -12,12 +12,12 @@
     },
     "attempt_type": {
       "type": "string",
-      "enum": ["email_recovery", "code_recovery", "list_choices", "select_choice", "captcha", "admin_review"],
+      "enum": ["email_recovery", "code_recovery", "list_choices", "select_choice", "captcha", "admin_review", "admin_password_authentication", "admin_grant_validation", "admin_grant_revocation", "admin_draft_list", "admin_draft_detail", "admin_draft_update", "admin_event_list", "admin_retry_submission", "admin_repair_submission"],
       "description": "Allowlisted recovery operation that produced this security event."
     },
     "outcome": {
       "type": "string",
-      "enum": ["success", "not_found", "invalid_input", "rate_limited", "captcha_required", "captcha_failed", "locked", "superseded", "internal_error"],
+      "enum": ["success", "not_found", "invalid_input", "rate_limited", "captcha_required", "captcha_failed", "locked", "superseded", "internal_error", "authorized", "invalid_password", "invalid_grant", "grant_version_mismatch", "password_version_mismatch", "device_mismatch", "environment_mismatch", "revoked"],
       "description": "Internal allowlisted outcome; public responses use a generic recovery-not-completed envelope."
     },
     "subject_hash": {
