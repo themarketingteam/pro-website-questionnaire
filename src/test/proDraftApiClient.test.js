@@ -205,6 +205,47 @@ describe('frontend authoritative draft API client contract', () => {
     expect(JSON.stringify(normalized)).not.toMatch(/provider|RRRR|answer|canonical/u);
   });
 
+  it('keeps only bounded conflict metadata and omits the remote canonical payload', () => {
+    const normalized = normalizeDraftApiError({
+      response: {
+        status: 409,
+        data: {
+          errorCode: 'REVISION_CONFLICT',
+          mergeRequired: true,
+          conflict: {
+            draftId: 'draft-synthetic-1',
+            clientRevision: 3,
+            serverRevision: 8,
+            status: 'active',
+            stateHash: 'a'.repeat(64),
+            canonicalState: { responses: { '1': 'must remain private' } },
+          },
+        },
+      },
+    });
+    expect(normalized).toMatchObject({
+      mergeRequired: true,
+      conflict: {
+        draftId: 'draft-synthetic-1',
+        clientRevision: 3,
+        serverRevision: 8,
+        status: 'active',
+        stateHash: 'a'.repeat(64),
+      },
+    });
+    expect(JSON.stringify(normalized)).not.toMatch(/canonicalState|must remain private/u);
+  });
+
+  it('normalizes a bounded retry-after value from response metadata', () => {
+    expect(normalizeDraftApiError({
+      response: {
+        status: 503,
+        headers: { 'retry-after': '17' },
+        data: { errorCode: 'DRAFT_SAVE_FAILED', retryable: true },
+      },
+    })).toMatchObject({ retryAfterSeconds: 17, retryable: true });
+  });
+
   it('exposes only safe diagnostics without tokens or client internals', () => {
     const { client } = createHarness(disabledStagingConfig);
     const diagnostics = getSafeDraftApiClientDiagnostics(client);

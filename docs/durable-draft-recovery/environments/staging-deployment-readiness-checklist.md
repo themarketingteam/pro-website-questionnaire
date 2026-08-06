@@ -8,6 +8,24 @@
 
 This checklist is fail-closed. `READY` means current evidence exists; `NOT_READY` blocks deployment. `MANUAL_VERIFICATION_REQUIRED` also blocks deployment until dated evidence is captured immediately before the authorized deployment.
 
+## 2026-08-06 client sync-manager local evidence
+
+The V2 authoritative client sync manager and bootstrap-gated React ownership
+are implemented locally. A focused 128-test gate passes across synchronization,
+context/hook, API client, canonical cache, local persistence, Redux, status UI,
+save/event integration, and feature-mode exclusivity. The legacy
+characterization gate passes 27/27 and `npm run build` succeeds. No staging or
+production Base44 resource was changed.
+
+This is source evidence only. It does not promote checklist item 5 because the
+full normal suite is 1,519/1,524 with the same five established questionnaire
+and submission-repair failures, and it does not promote
+items 6, 20, 26, or 27 because no authorized staging build/deploy, live browser
+matrix, cloud target proof, or evidence-package update occurred. Repository
+lint and typecheck retain their documented baseline debt. Overall status stays
+**STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT** and deployment authorization stays
+**DENIED**.
+
 ## Gate checklist
 
 | # | Required gate | Status | Current evidence / remaining work |

@@ -25,6 +25,7 @@ export const PRO_DRAFT_API_CLIENT_ERROR_CODES = Object.freeze({
 const SAFE_ERROR_CODE = /^[A-Z][A-Z0-9_]{0,95}$/u;
 const SAFE_REQUEST_ID = /^pdrq_[A-Za-z0-9_-]{20,123}$/u;
 const SAFE_TEST_RUN_ID = /^[A-Za-z0-9._:-]{1,128}$/u;
+const SAFE_CONFLICT_ID = /^[A-Za-z0-9._:-]{1,256}$/u;
 const BASE64URL_ALPHABET =
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
 
@@ -36,6 +37,9 @@ class ProDraftApiClientError extends Error {
     this.status = details.status;
     this.retryable = details.retryable;
     this.requestId = details.requestId;
+    this.retryAfterSeconds = details.retryAfterSeconds;
+    this.mergeRequired = details.mergeRequired;
+    this.conflict = details.conflict;
   }
 }
 
@@ -59,10 +63,44 @@ function publicMessage(status) {
   return 'The draft request could not be completed.';
 }
 
+function safeConflictMetadata(value) {
+  if (!isPlainObject(value)) return null;
+  const output = {};
+  if (typeof value.draftId === 'string' && SAFE_CONFLICT_ID.test(value.draftId)) {
+    output.draftId = value.draftId;
+  }
+  if (Number.isSafeInteger(value.clientRevision) && value.clientRevision >= 0) {
+    output.clientRevision = value.clientRevision;
+  }
+  if (Number.isSafeInteger(value.serverRevision) && value.serverRevision >= 0) {
+    output.serverRevision = value.serverRevision;
+  }
+  if (typeof value.status === 'string' && /^[a-z_]{1,64}$/u.test(value.status)) {
+    output.status = value.status;
+  }
+  if (typeof value.stateHash === 'string' && /^[a-f0-9]{64}$/u.test(value.stateHash)) {
+    output.stateHash = value.stateHash;
+  }
+  return Object.keys(output).length > 0 ? Object.freeze(output) : null;
+}
+
+function safeRetryAfterSeconds(response, body) {
+  const bodyValue = body.retryAfterSeconds;
+  if (Number.isSafeInteger(bodyValue) && bodyValue >= 0 && bodyValue <= 86_400) {
+    return bodyValue;
+  }
+  const headerValue = response?.headers?.['retry-after']
+    ?? response?.headers?.get?.('retry-after');
+  const parsed = Number.parseInt(String(headerValue ?? ''), 10);
+  return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= 86_400 ? parsed : 0;
+}
+
 export function normalizeDraftApiError(error) {
   const response = isPlainObject(error?.response) ? error.response : {};
   const body = isPlainObject(response.data) ? response.data : {};
   const status = safeStatus(response.status ?? error?.status);
+  const retryAfterSeconds = safeRetryAfterSeconds(response, body);
+  const conflict = body.mergeRequired === true ? safeConflictMetadata(body.conflict) : null;
   return Object.freeze({
     code: typeof body.errorCode === 'string' && SAFE_ERROR_CODE.test(body.errorCode)
       ? body.errorCode
@@ -73,6 +111,9 @@ export function normalizeDraftApiError(error) {
       ? body.requestId
       : null,
     message: publicMessage(status),
+    ...(retryAfterSeconds > 0 ? { retryAfterSeconds } : {}),
+    ...(body.mergeRequired === true ? { mergeRequired: true } : {}),
+    ...(conflict ? { conflict } : {}),
   });
 }
 

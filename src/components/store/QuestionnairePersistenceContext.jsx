@@ -19,6 +19,8 @@ export const useQuestionnairePersistence = () => {
         storageMode: 'unknown',
         lastErrorCode: 'LOCAL_CANONICAL_PERSISTENCE_UNAVAILABLE',
       }),
+      localPersistence: null,
+      canonicalCacheAdapter: null,
     };
   }
   return context;

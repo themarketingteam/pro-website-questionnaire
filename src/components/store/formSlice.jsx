@@ -1379,7 +1379,13 @@ const formSlice = createSlice(/** @type {any} */ ({
           errorCode: null,
           retryCount: 0,
         });
-        state.draftContext.clientRevision = action.payload.confirmedClientRevision;
+        // A save can finish after newer local mutations. The acknowledgement
+        // confirms the sent revision but must never roll Redux back over a
+        // newer pending client revision.
+        state.draftContext.clientRevision = Math.max(
+          state.draftContext.clientRevision,
+          action.payload.confirmedClientRevision,
+        );
         state.draftContext.serverRevision = action.payload.confirmedServerRevision;
       },
     },

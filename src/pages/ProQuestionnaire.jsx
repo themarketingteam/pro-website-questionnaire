@@ -68,6 +68,7 @@ import {
   frontendRuntimeConfig,
   isDurableDraftClientEnabled,
 } from '@/lib/proDraftRuntimeConfig';
+import { useProDraftSync } from '@/hooks/useProDraftSync';
 
 const DeferredSectionLoader = () => (
   <div className="flex items-center justify-center py-6">
@@ -81,6 +82,7 @@ const selectQuestionnaireForm = (state) => state?.form || EMPTY_OBJECT;
 
 function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
   const dispatch = useDispatch();
+  const draftSync = useProDraftSync();
   const questionnairePersistence = useQuestionnairePersistence();
   const browserNamespace = questionnairePersistence.namespace
     || deriveQuestionnaireBrowserNamespace();
@@ -122,7 +124,7 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
 
   useEffect(() => {
     if (!legacyPersistenceEnabled) {
-      setQuestionnaireSessionId(formState.sessionId || '');
+      setQuestionnaireSessionId(formState.draftContext?.sessionId || '');
       return undefined;
     }
     let active = true;
@@ -136,7 +138,7 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
   }, [
     browserNamespace,
     browserStorage,
-    formState.sessionId,
+    formState.draftContext?.sessionId,
     legacyPersistenceEnabled,
   ]);
 
@@ -372,7 +374,14 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     touchedQuestionsSnapshot = touchedQuestions,
     expandedQuestionsSnapshot = expandedQuestions
   } = {}) => {
-    if (!legacyPersistenceEnabled) return null;
+    if (!legacyPersistenceEnabled) {
+      if (status === 'submit_attempted') return draftSync.markSubmitAttempted();
+      if (status === 'submit_failed') {
+        return draftSync.markSubmitFailed('SUBMISSION_FAILED');
+      }
+      if (status === 'submitted') return draftSync.markSubmitted(finalSubmissionId);
+      return draftSync.flush({ reason: 'manual_save' });
+    }
     if (!questionnaireSessionId) return null;
     return saveDraftSnapshot({
       sessionId: questionnaireSessionId,
@@ -400,6 +409,7 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     credentials,
     businessNameParam,
     domainParam,
+    draftSync,
     legacyPersistenceEnabled,
   ]);
 
@@ -467,7 +477,15 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     questionId,
     value
   }) => {
-    if (!legacyPersistenceEnabled) return;
+    if (!legacyPersistenceEnabled) {
+      const question = questionId ? getQuestionById(QUESTIONS, questionId) : null;
+      return draftSync.queueEvent({
+        eventType,
+        questionId,
+        questionType: question?.type || 'unknown',
+        value,
+      });
+    }
     if (!questionnaireSessionId) return;
     try {
       const question = questionId ? getQuestionById(QUESTIONS, questionId) : null;
@@ -496,6 +514,7 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     credentials.domain,
     credentials.userId,
     domainParam,
+    draftSync,
     legacyPersistenceEnabled,
   ]);
 
@@ -504,6 +523,9 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     questionId,
     value
   }) => {
+    if (!legacyPersistenceEnabled) {
+      return createDraftEvent({ eventType, questionId, value });
+    }
     const question = getQuestionById(QUESTIONS, questionId);
 
     const shouldDebounce =
@@ -531,7 +553,7 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
       questionId,
       value
     });
-  }, [createDraftEvent, draftTextEventDelayMs]);
+  }, [createDraftEvent, draftTextEventDelayMs, legacyPersistenceEnabled]);
 
   // Helper: dispatch only when status meaningfully changes
   const setValidationStatusIfChanged = (qid, next, snapshot) => {
@@ -1455,6 +1477,7 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
         browserStorage,
         saveDraftNow,
         createDraftEvent,
+        legacyDraftPersistenceEnabled: legacyPersistenceEnabled,
         serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
         onFinalSubmitSuccess: ({ responseSnapshot }) => {
           hasFinalSubmittedRef.current = true;
@@ -1469,7 +1492,7 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
           setSubmittedFormData(submittedResponseSnapshot);
           setShowConfirmModal(false);
           setShowThankYouModal(true);
-          dispatch(resetForm());
+          if (legacyPersistenceEnabled) dispatch(resetForm());
           toast.success('Questionnaire submitted successfully!');
         },
         onFinalSubmitFailure: () => {}
@@ -1969,10 +1992,13 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
               </main>
 
       <AutoSaveIndicator
-        show={legacyPersistenceEnabled ? showAutoSave : false}
+        show={legacyPersistenceEnabled ? showAutoSave : Boolean(draftSync.syncStatus?.state)}
         storageMode={questionnairePersistence.storageMode}
         getStorageDiagnostics={questionnairePersistence.getStorageDiagnostics}
         getLocalPersistenceStatus={questionnairePersistence.getLocalPersistenceStatus}
+        syncState={legacyPersistenceEnabled ? null : draftSync.syncStatus?.state}
+        confirmedServerRevision={draftSync.syncStatus?.confirmedServerRevision}
+        lastServerSavedAt={draftSync.lastServerSavedAt}
       />
       <Suspense fallback={null}>
         <ReduxDataValidator />

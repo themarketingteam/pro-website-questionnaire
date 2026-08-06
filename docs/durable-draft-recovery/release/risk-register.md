@@ -11,6 +11,25 @@ Likelihood is `Low`, `Medium`, or `High` before planned controls. Severity is `M
 
 Any detection meeting a rollback trigger is an operational trigger, not permission to wait for a percentage threshold when client data, authorization, or integrity is at risk. Review dates are next required reviews and must also be repeated before certification and after a material incident or design change.
 
+## 2026-08-06 client synchronization control update
+
+The [authoritative client sync manager](../frontend/draft-sync-manager-contract.md)
+adds local source controls for `RISK-004`, `RISK-005`, `RISK-006`, `RISK-007`,
+and `RISK-029`: immediate canonical-cache coordination, one-in-flight
+serialization, newest-state coalescing, hash-bound idempotency, backend-only
+server revision acceptance, bounded transient retry, offline recovery,
+conflict pause, and submitted/superseded timer locks. Safe provider ownership
+also prevents Strict Mode from constructing concurrent V2 managers, while an
+explicit feature branch preserves the legacy writer only when V2 is disabled.
+
+These controls reduce source-level implementation uncertainty but do not lower
+any likelihood or severity. Multi-tab merge belongs to the next conflict
+batch; every component has not yet migrated to the canonical mutation factory;
+and staging concurrency, lifecycle, browser-close, authorization, and deployed
+log evidence is absent. The full normal test, lint, and typecheck gates are not
+green, so all mapped risks remain **Mitigated (pending proof)** and deployment
+authorization remains denied.
+
 ## Register
 
 | Risk ID | Description | Cause | Impact | Likelihood | Severity | Accepted or mitigated | Mitigation | Detection | Rollback trigger | Owner | Review date |

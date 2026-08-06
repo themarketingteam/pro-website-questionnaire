@@ -580,6 +580,8 @@ export default function ReduxProvider({
     getLocalPersistenceStatus: () => getLocalCanonicalPersistenceStatus(
       runtime.localPersistence,
     ),
+    localPersistence: runtime.localPersistence,
+    canonicalCacheAdapter: runtime.canonicalCacheAdapter,
   };
 
   return (

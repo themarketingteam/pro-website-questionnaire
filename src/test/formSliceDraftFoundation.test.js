@@ -292,6 +292,23 @@ describe('canonical Redux draft foundation', () => {
     })).toThrowError(DraftStateValidationError);
   });
 
+  it('does not regress a newer local client revision when an older in-flight save is accepted', () => {
+    let state = reducer(undefined, setDraftContext({
+      clientRevision: 7,
+      serverRevision: 2,
+    }));
+    state = reducer(state, setDraftServerSaved({
+      confirmedClientRevision: 5,
+      confirmedServerRevision: 3,
+      lastServerSavedAt: '2026-08-06T10:00:01.000Z',
+    }));
+    expect(state.draftContext).toMatchObject({
+      clientRevision: 7,
+      serverRevision: 3,
+    });
+    expect(state.draftSyncStatus.confirmedClientRevision).toBe(5);
+  });
+
   it('labels memory-only storage as offline local-only', () => {
     const state = reducer(undefined, setDraftLocalSaved({
       storageMode: 'memory_only',

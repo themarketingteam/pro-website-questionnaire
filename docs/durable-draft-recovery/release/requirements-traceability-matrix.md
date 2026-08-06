@@ -11,6 +11,28 @@ Each row is a stable requirement. Evidence IDs name artifacts that later impleme
 
 All rows in this initial matrix are release blocking. Production-enabled evidence marked as a continuation check is collected immediately after the separate authorized enablement step; failure invokes the documented kill switch/rollback. No row may be removed or changed to non-blocking without a versioned architecture and risk review.
 
+### 2026-08-06 authoritative client sync-manager source evidence
+
+The [client synchronization contract](../frontend/draft-sync-manager-contract.md),
+React-independent manager, bootstrap-gated provider/hook, truthful save-state UI,
+and explicit V2/legacy branch add local implementation and test evidence for
+`DR-LOCAL-001`, `DR-SAVE-001`, `DR-REV-001`, `DR-OFFLINE-001`,
+`DR-LIFE-001`, and `DR-MUT-001`. The manager owns debounced and maximum-wait
+server saves, one-in-flight coalescing, hash-bound idempotency, backend-only
+server revision acceptance, offline recovery, bounded retry, lifecycle
+fallback, terminal locks, and an independent event queue. The existing local
+canonical persistence controller remains the sole browser-cache writer.
+
+Focused source validation passes 128/128 tests and the five-suite legacy
+characterization gate passes 27/27. The production build passes. The full
+normal suite passes 1,519/1,524 but retains five established questionnaire and
+submission-repair failures; repository lint/typecheck also retain their
+established project-wide debt. These remain release-blocking, so no
+requirement is promoted to staging-certified or production-ready. Interactive
+conflict merge and migration of every component mutation to the canonical
+mutation factory remain later-batch work. No Base44 deploy, schema push,
+feature-branch push, production operation, or `main` change occurred.
+
 ## Planned implementation batches
 
 | Batch | Scope |

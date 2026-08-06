@@ -13,6 +13,7 @@ import {
 } from '@/lib/proDraftRuntimeConfig';
 import { useQuestionnairePersistence } from '@/components/store/QuestionnairePersistenceContext';
 import ProDraftEntryModal from './ProDraftEntryModal';
+import { ProDraftSyncProvider } from '@/contexts/ProDraftSyncContext';
 
 const PREPARING_PHASES = new Set([
   'idle',
@@ -86,54 +87,60 @@ const EnabledProDraftBootstrapGate = ({
 
   return (
     <ProDraftCredentialProvider coordinator={bootstrap.coordinator}>
-      <section
-        aria-busy={!interactiveReady}
-        data-testid="pro-draft-bootstrap-gate"
-        data-bootstrap-phase={bootstrap.phase}
+      <ProDraftSyncProvider
+        enabled={interactiveReady}
+        runtimeConfig={runtimeConfig}
+        pendingServerSync={bootstrap.pendingServerSync}
       >
-        {preparing && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="flex min-h-[18rem] items-center justify-center bg-white px-4 text-center"
-          >
-            <div className="space-y-3">
-              <span
-                className="mx-auto block h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#1E6BA8]"
-                aria-hidden="true"
-              />
-              <p className="font-medium text-slate-800">Preparing draft recovery options…</p>
+        <section
+          aria-busy={!interactiveReady}
+          data-testid="pro-draft-bootstrap-gate"
+          data-bootstrap-phase={bootstrap.phase}
+        >
+          {preparing && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="flex min-h-[18rem] items-center justify-center bg-white px-4 text-center"
+            >
+              <div className="space-y-3">
+                <span
+                  className="mx-auto block h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#1E6BA8]"
+                  aria-hidden="true"
+                />
+                <p className="font-medium text-slate-800">Preparing draft recovery options…</p>
+              </div>
             </div>
-          </div>
-        )}
-        {modalReady && !entryAcknowledged && (
-          <ProDraftEntryModal
-            bootstrap={bootstrap}
-            initialEmail={params.signedInvitationEmail || params.recoveryEmail}
-            signedInvitationEmail={params.signedInvitationEmail}
-            environment={runtimeConfig.environment}
-            createIdentityForEmail={createIdentityForEmail}
-            createAnonymousIdentity={createAnonymousIdentity}
-            captchaProvider={captchaProvider}
-            captchaSiteKey={captchaSiteKey}
-            onComplete={completeEntry}
-          />
-        )}
-        <p className="sr-only" role="status" aria-live="polite">
-          {interactiveReady
-            ? (bootstrap.readOnly
-              ? 'Submitted questionnaire ready in read-only mode.'
-              : 'Questionnaire ready.')
-            : 'Questionnaire interaction is unavailable until draft recovery is complete.'}
-        </p>
-        {interactiveReady && bootstrap.readOnly && (
-          <fieldset disabled aria-disabled="true" className="min-w-0 border-0 p-0">
-            <legend className="sr-only">Submitted questionnaire read-only content</legend>
-            {submittedContent}
-          </fieldset>
-        )}
-        {interactiveReady && !bootstrap.readOnly && content}
-      </section>
+          )}
+          {modalReady && !entryAcknowledged && (
+            <ProDraftEntryModal
+              bootstrap={bootstrap}
+              initialEmail={params.signedInvitationEmail || params.recoveryEmail}
+              signedInvitationEmail={params.signedInvitationEmail}
+              environment={runtimeConfig.environment}
+              createIdentityForEmail={createIdentityForEmail}
+              createAnonymousIdentity={createAnonymousIdentity}
+              captchaProvider={captchaProvider}
+              captchaSiteKey={captchaSiteKey}
+              onComplete={completeEntry}
+            />
+          )}
+          <p className="sr-only" role="status" aria-live="polite">
+            {interactiveReady
+              ? (bootstrap.readOnly
+                ? 'Submitted questionnaire ready in read-only mode.'
+                : 'Questionnaire ready.')
+              : 'Questionnaire interaction is unavailable until draft recovery is complete.'}
+          </p>
+          {interactiveReady && bootstrap.readOnly && (
+            <fieldset disabled aria-disabled="true" className="min-w-0 border-0 p-0">
+              <legend className="sr-only">Submitted questionnaire read-only content</legend>
+              {submittedContent}
+            </fieldset>
+          )}
+          {interactiveReady && !bootstrap.readOnly && content}
+        </section>
+      </ProDraftSyncProvider>
     </ProDraftCredentialProvider>
   );
 };

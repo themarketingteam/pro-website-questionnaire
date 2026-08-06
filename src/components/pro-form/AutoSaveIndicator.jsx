@@ -9,6 +9,8 @@ export const AUTO_SAVE_STATUS_WORDING = Object.freeze({
   offline_local_only: 'Offline — saved in this browser and will sync when reconnected',
   retrying: 'We could not sync yet — retrying',
   error: 'We could not save securely yet',
+  conflict: 'This draft changed elsewhere — review before continuing',
+  superseded: 'This draft was replaced and is now read-only',
   restored: 'Your previous draft was restored',
   submitted: 'Submitted — read-only',
 });

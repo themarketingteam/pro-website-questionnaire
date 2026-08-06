@@ -73,7 +73,8 @@ export const safeDraftSave = async ({
   touchedQuestionsSnapshot,
   expandedQuestionsSnapshot,
   textValidationMetaSnapshot,
-  options = {}
+  options = {},
+  legacyDraftFailureBackupEnabled = true,
 }) => {
   if (typeof saveDraftNow !== 'function') {
     return null;
@@ -92,16 +93,18 @@ export const safeDraftSave = async ({
 
     console.error('Non-fatal draft save failed:', serialized);
 
-    await writeDraftFailureBackup({
-      namespace,
-      storage,
-      questionnaireSessionId,
-      responses: responsesSnapshot,
-      validationStatus: validationStatusSnapshot,
-      touchedQuestions: touchedQuestionsSnapshot,
-      expandedQuestions: expandedQuestionsSnapshot,
-      textValidationMeta: textValidationMetaSnapshot
-    });
+    if (legacyDraftFailureBackupEnabled) {
+      await writeDraftFailureBackup({
+        namespace,
+        storage,
+        questionnaireSessionId,
+        responses: responsesSnapshot,
+        validationStatus: validationStatusSnapshot,
+        touchedQuestions: touchedQuestionsSnapshot,
+        expandedQuestions: expandedQuestionsSnapshot,
+        textValidationMeta: textValidationMetaSnapshot
+      });
+    }
 
     return null;
   }
@@ -300,6 +303,7 @@ export const submitProQuestionnaire = async ({
   browserStorage = defaultResilientStorage,
   saveDraftNow,
   createDraftEvent,
+  legacyDraftPersistenceEnabled = true,
   onFinalSubmitSuccess,
   onFinalSubmitFailure,
   serviceOptionsGrouped = {}
@@ -321,10 +325,11 @@ export const submitProQuestionnaire = async ({
     namespace: browserNamespace,
     storage: browserStorage,
     textValidationMetaSnapshot: textValidationMeta,
+    legacyDraftFailureBackupEnabled: legacyDraftPersistenceEnabled,
     ...options,
   });
   const writeFailedSubmissionBackupForSubmission = (options) => (
-    writeFailedSubmissionBackup({
+    legacyDraftPersistenceEnabled ? writeFailedSubmissionBackup({
       namespace: browserNamespace,
       storage: browserStorage,
       validationStatus,
@@ -332,36 +337,38 @@ export const submitProQuestionnaire = async ({
       expandedQuestions,
       textValidationMeta,
       ...options,
-    })
+    }) : Promise.resolve(null)
   );
 
   const recordSubmitStage = async (stage, details = {}) => {
     const safeDetails = sanitizeStageDetails(details);
 
-    try {
-      const eventRecord = buildDraftEventRecord({
-        sessionId: questionnaireSessionId,
-        eventType: 'submit_stage',
-        questionId: stage,
-        questionType: 'submit_stage',
-        value: {
-          stage,
-          timestamp: safeNowIso(),
-          questionnaireSessionId,
-          businessName: businessName || '',
+    if (legacyDraftPersistenceEnabled) {
+      try {
+        const eventRecord = buildDraftEventRecord({
+          sessionId: questionnaireSessionId,
+          eventType: 'submit_stage',
+          questionId: stage,
+          questionType: 'submit_stage',
+          value: {
+            stage,
+            timestamp: safeNowIso(),
+            questionnaireSessionId,
+            businessName: businessName || '',
+            domain: resolvedDomain,
+            failureKind: safeDetails.failureKind || '',
+            usedFallback: Boolean(safeDetails.usedFallback),
+            ...safeDetails
+          },
+          businessName,
           domain: resolvedDomain,
-          failureKind: safeDetails.failureKind || '',
-          usedFallback: Boolean(safeDetails.usedFallback),
-          ...safeDetails
-        },
-        businessName,
-        domain: resolvedDomain,
-        userId: credentials?.userId || credentials?.id || ''
-      });
+          userId: credentials?.userId || credentials?.id || ''
+        });
 
-      await base44.entities.ProFormDraftEvent.create(eventRecord);
-    } catch {
-      // no-op
+        await base44.entities.ProFormDraftEvent.create(eventRecord);
+      } catch {
+        // no-op
+      }
     }
 
     try {
