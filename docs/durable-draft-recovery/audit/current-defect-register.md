@@ -7,6 +7,8 @@
 
 This register distinguishes observed current behavior from future acceptance requirements. A mapped requirement remains `Planned` until its implementation and acceptance evidence pass. “Release blocking” applies to the durable draft recovery release, not to the historical baseline tag.
 
+Feature-branch remediation notes preserve the audited production-baseline finding while recording later source changes. They do not certify staging or production and do not change the historical severity counts above.
+
 ## Severity summary
 
 | Severity | Count | Meaning in this audit |
@@ -22,13 +24,16 @@ This register distinguishes observed current behavior from future acceptance req
 - **Confidence:** Confirmed
 - **Affected browsers:** Any browser/webview where the `localStorage` getter, read, or write throws; privacy and quota modes are representative triggers.
 - **Trigger:** Import the app-parameter/Base44 bootstrap path when storage access is restricted or throws.
-- **Current behavior:** Module import rejects before React or the questionnaire error boundary mounts.
+- **Audited production-baseline behavior:** Module import rejects before React or the questionnaire error boundary mounts.
 - **Required future behavior:** Guard all storage acquisition and operations; render within the accepted startup bound using an explicit degraded-persistence state.
 - **User/business impact:** A client can be unable to open the questionnaire at all.
 - **Files/functions:** `src/lib/app-params.js` module initialization; Base44 client bootstrap.
 - **Reproduction/evidence:** `BC-BOOT-002` through `BC-BOOT-004`; [architecture inventory, browser persistence](./current-system-architecture-inventory.md#browser-persistence-inventory).
 - **Current workaround:** Use a browser context that permits local storage; this is not a product-grade guarantee.
 - **Permanent implementation batch:** B01 — safe boot and client-scoped browser namespace.
+- **Feature-branch remediation (2026-08-05):** `app-params.js` now guards window/location, URL parsing, storage acquisition/read/write, document access, and URL replacement. Base44 client creation returns value-free diagnostics on failure; authentication bootstrap is bounded to four seconds; non-destructive initialization/render error UI is present. Unit tests and the active seven-mode/five-project Playwright boot matrix provide source/local evidence.
+- **Remediation evidence:** `src/test/appParamsSafety.test.js`; `src/test/base44ClientInitialization.test.js`; `src/test/authContextSafety.test.jsx`; `src/test/appInitializationError.test.jsx`; `src/test/errorBoundarySafety.test.jsx`; `tests/e2e/draft-v2/storage-recovery.spec.js`.
+- **Remediation status:** Implemented on `feature/durable-draft-recovery`; staging, production-disabled, and production-enabled certification remain pending. Draft-store integration and durable server recovery are outside this remediation.
 - **Release blocking:** Yes
 
 ## DRAFT-002 — One global Redux persistence key

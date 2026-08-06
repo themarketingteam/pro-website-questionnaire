@@ -15,6 +15,8 @@ import ProFormDraftRecovery from './pages/ProFormDraftRecovery';
 import QuestionnaireIntakeRecoveryPage from './pages/QuestionnaireIntakeRecovery';
 import DraftRecoveryPasswordGate from '@/components/admin/DraftRecoveryPasswordGate';
 import AppRuntimeShell from '@/components/common/AppRuntimeShell';
+import AppInitializationError from '@/components/common/AppInitializationError';
+import { base44ClientInitialization } from '@/api/base44Client';
 
 const ADMIN_EMAILS = ['benjamin.hines8@gmail.com'];
 
@@ -141,6 +143,10 @@ const AuthenticatedApp = () => {
 
 
 function App() {
+
+  if (!base44ClientInitialization.success) {
+    return <AppInitializationError />;
+  }
 
   return (
     <AuthProvider>

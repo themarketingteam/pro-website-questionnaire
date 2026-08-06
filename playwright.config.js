@@ -93,6 +93,10 @@ export default defineConfig({
         VITE_APP_ENVIRONMENT: 'local',
         VITE_APP_BUILD_SHA: 'e2e-local',
         VITE_APP_BUILD_TIME: '2000-01-01T00:00:00Z',
+        // Local preview has no Base44 URL bootstrap parameters. This synthetic
+        // app ID permits client construction while the read-only fixture blocks
+        // every cross-origin request and all writes.
+        VITE_BASE44_APP_ID: 'e2e-local-synthetic-app',
         VITE_PRO_DRAFT_V2_ENABLED: 'false',
         VITE_PRO_DRAFT_V2_KILL_SWITCH: 'true',
         VITE_PRO_DRAFT_PUBLIC_EMAIL_RECOVERY_ENABLED: 'false',

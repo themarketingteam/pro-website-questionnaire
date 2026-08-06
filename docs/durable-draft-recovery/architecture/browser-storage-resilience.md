@@ -1,9 +1,9 @@
 # Browser storage resilience
 
-- Status: foundational adapter implemented; questionnaire-store integration is deferred
+- Status: foundational adapter and storage-safe application boot implemented; questionnaire-store integration is deferred
 - Date: 2026-08-05
-- Source: `src/lib/resilientStorage.js`
-- Tests: `src/test/storage/resilientStorage.test.js`
+- Sources: `src/lib/resilientStorage.js`; `src/lib/app-params.js`; `src/api/base44Client.js`; `src/lib/AuthContext.jsx`
+- Tests: `src/test/storage/resilientStorage.test.js`; `src/test/appParamsSafety.test.js`; `src/test/base44ClientInitialization.test.js`; `src/test/authContextSafety.test.jsx`; `tests/e2e/draft-v2/storage-recovery.spec.js`
 
 ## Purpose and boundary
 
@@ -12,6 +12,18 @@ The resilient-storage adapter gives browser code a non-crashing asynchronous sto
 This foundation does not change the current questionnaire store, create a server draft, add a recovery code, modify a Base44 entity, or authorize a user. A later integration prompt must deliberately replace the current Redux Persist storage binding after its boot and migration behavior is approved.
 
 Browser storage is never an authorization boundary. Values in IndexedDB, localStorage, sessionStorage, or memory are client-controlled and must not prove identity, draft ownership, recovery permission, or administrative access. Future server-authority integration must authenticate and authorize every remote operation independently.
+
+## Application boot integration
+
+`app-params.js` now protects window/location acquisition, URL parsing, the localStorage property getter, reads, writes, document access, and history replacement. It retains the Base44 parameter set (`app_id`, `server_url`, `access_token`, `from_url`, and `functions_version`) and resolves non-empty values in this order: query parameter, Vite environment default, then stored value. Empty query/default values do not overwrite a last known stored value. No browser object is captured at module scope.
+
+An `access_token` query value is captured synchronously and its removal is attempted without blocking initialization. Successful removal retains the path, unrelated query parameters, and fragment. If parsing or `replaceState` fails, initialization continues and diagnostics report only boolean capability/outcome fields; they never include parameter values or exception messages.
+
+`base44Client.js` initializes exactly one real SDK client with `appId`, `serverUrl`, `token`, `functionsVersion`, and `requiresAuth: false`. A missing app ID or thrown/empty SDK result yields a null client plus a stable value-free error code. `App.jsx` renders `AppInitializationError` only for that real client-initialization failure; it does not fabricate an app ID or a production client.
+
+`AuthContext.jsx` bounds both the public-settings request and authenticated-user lookup to 4,000 ms. Every rejection and timeout exits both startup loading flags. Only allowlisted error types and fixed messages reach React state; raw backend messages, response bodies, tokens, and error objects are not logged. A public-settings/auth availability error remains non-blocking for the public questionnaire, while explicit 401/403 authentication requirements preserve the existing login behavior.
+
+The initialization and render error screens state that saved information was not intentionally deleted. Reload/retry is non-destructive. The render boundary retains a separate delete-and-reload action, but labels it as permanently clearing browser-saved questionnaire state and never runs it automatically.
 
 ## Public API
 
@@ -107,8 +119,12 @@ The storage suite uses development-only `fake-indexeddb` plus controlled Web Sto
 - protected session helpers and the existing browser-safety compatibility API;
 - Redux Persist Promise signatures, invalid caller inputs, diagnostics modes, test reset, and absence of storage logging.
 
+Boot-specific unit coverage adds window/document absence, malformed URL parsing, throwing storage getter/read/write/quota operations, throwing history replacement, parameter precedence, token URL cleanup, value-free client diagnostics, request rejection, and never-settling request timeouts. The activated `DR-BOOT-001`/`DR-BOOT-002` Playwright matrix covers normal storage, four localStorage failure modes, unavailable IndexedDB, and all persistent storage unavailable. It runs in the five configured Chromium, Firefox, WebKit, mobile Chrome, and mobile Safari projects with writes and cross-origin requests denied.
+
+These source and local-browser tests are implementation evidence, not staging or production certification. The release still requires the named staging, production-disabled, and post-enable evidence in the traceability matrix.
+
 Timeout tests wait beyond settlement and assert that no unhandled rejection is emitted. Full application, characterization, Playwright fixture, lint, type-check, and build results remain part of the prompt validation record rather than being treated as durability guarantees.
 
 ## Future integration
 
-The later application-boot integration must inject `defaultResilientStorage` into Redux Persist, preserve versioned state normalization/migration, expose a non-sensitive storage warning when mode is `memory_only`, and keep the questionnaire usable while rehydration completes or persistence is denied. Server synchronization must treat local state as an untrusted replica and resolve authority through authenticated server records; it must not infer authorization from any browser-stored identifier or token.
+The later questionnaire-store integration must inject `defaultResilientStorage` into Redux Persist, preserve versioned state normalization/migration, expose a non-sensitive storage warning when mode is `memory_only`, and keep the questionnaire usable while rehydration completes or persistence is denied. Server synchronization must treat local state as an untrusted replica and resolve authority through authenticated server records; it must not infer authorization from any browser-stored identifier or token.

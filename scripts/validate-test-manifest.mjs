@@ -55,6 +55,13 @@ const requiredFoundationFiles = [
   'src/lib/resilientStorage.js',
   'src/test/storage/resilientStorage.test.js',
   'docs/durable-draft-recovery/architecture/browser-storage-resilience.md',
+  'src/components/common/AppInitializationError.jsx',
+  'src/test/appParamsSafety.test.js',
+  'src/test/base44ClientInitialization.test.js',
+  'src/test/authContextSafety.test.jsx',
+  'src/test/appInitializationError.test.jsx',
+  'src/test/errorBoundarySafety.test.jsx',
+  'tests/e2e/draft-v2/storage-recovery.spec.js',
 ];
 
 for (const file of requiredFoundationFiles) {

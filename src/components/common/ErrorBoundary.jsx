@@ -6,10 +6,10 @@ import { resetForm } from '@/components/store/formSlice';
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null, errorInfo: null };
+    this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError(error) {
+  static getDerivedStateFromError() {
     return { hasError: true };
   }
 
@@ -17,7 +17,7 @@ class ErrorBoundary extends React.Component {
     try {
       await persistor.purge();
       store.dispatch(resetForm());
-    } catch (e) {
+    } catch {
       // no-op; we still try reloading
     } finally {
       // remove any reset flag from URL and hard reload
@@ -26,23 +26,20 @@ class ErrorBoundary extends React.Component {
         url.searchParams.delete('resetFormState');
         window.history.replaceState({}, '', url.toString());
       } catch {}
-      window.location.reload();
+      try {
+        window.location.reload();
+      } catch {
+        // The bounded error state remains visible if reload is unavailable.
+      }
     }
   }
 
-  componentDidCatch(error, errorInfo) {
-    // You can log to an error reporting service here
-    // Save details for dev display
-    this.setState({ error, errorInfo });
-    console.error('[ErrorBoundary] Caught render error:', error, errorInfo);
+  componentDidCatch() {
+    console.error('[ErrorBoundary] A render error was caught.');
   }
 
   render() {
     if (this.state.hasError) {
-      const isDev = (() => {
-        try { return import.meta && import.meta.env && import.meta.env.DEV; } catch { return false; }
-      })();
-
       return (
         <div className="min-h-screen flex items-center justify-center p-6 bg-red-50">
           <div className="w-full max-w-xl bg-white border border-red-200 rounded-xl shadow p-6">
@@ -51,24 +48,15 @@ class ErrorBoundary extends React.Component {
               <div className="flex-1">
                 <h2 className="text-lg font-semibold text-red-700">We hit a problem loading the form</h2>
                 <p className="mt-1 text-sm text-slate-700">
-                  Your saved questionnaire data may be corrupted. You can reset it and reload to continue.
+                  We hit a problem loading this questionnaire. Your previously saved information
+                  has not been intentionally deleted.
+                </p>
+                <p className="mt-2 text-sm text-slate-700">
+                  Reload first. The delete option below permanently clears browser-saved
+                  questionnaire state and should only be used if you choose to start over.
                 </p>
               </div>
             </div>
-
-            {isDev && (
-              <div className="mt-4 p-3 rounded bg-slate-900 text-slate-100 text-xs overflow-auto max-h-60">
-                <div className="font-semibold mb-1">Dev details:</div>
-                {this.state.error && (
-                  <pre className="whitespace-pre-wrap">
-                    {String(this.state.error.stack || this.state.error.toString())}
-                  </pre>
-                )}
-                {this.state.errorInfo?.componentStack && (
-                  <pre className="whitespace-pre-wrap opacity-80 mt-2">{this.state.errorInfo.componentStack}</pre>
-                )}
-              </div>
-            )}
 
             <div className="mt-6 flex flex-col sm:flex-row gap-3">
               <button
@@ -76,11 +64,13 @@ class ErrorBoundary extends React.Component {
                 onClick={() => this.handleResetAndReload()}
                 className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium"
               >
-                Reset saved questionnaire state & Reload
+                Delete browser-saved questionnaire state & Reload
               </button>
               <button
                 type="button"
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  try { window.location.reload(); } catch {}
+                }}
                 className="flex-1 px-4 py-3 bg-slate-600 hover:bg-slate-700 text-white rounded-lg font-medium"
               >
                 Reload without clearing

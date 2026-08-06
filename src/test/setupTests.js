@@ -26,6 +26,14 @@ vi.mock('@/api/base44Client', () => {
   });
 
   return {
+    base44ClientInitialization: Object.freeze({
+      success: true,
+      hasAppId: true,
+      hasServerUrl: true,
+      hasToken: false,
+      hasFunctionsVersion: false,
+      errorCode: null,
+    }),
     base44: {
       entities: {
         ProFormSubmission: createMockEntity(),
