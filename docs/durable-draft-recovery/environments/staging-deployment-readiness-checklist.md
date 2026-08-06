@@ -1,5 +1,24 @@
 # Staging Deployment Readiness Checklist
 
+## Local draft entity RLS boundary (2026-08-06)
+
+- [x] Verify Base44 RLS operations, equality-only `user_condition`, and service-role admin semantics from bundled documentation.
+- [x] Add local admin-only create/read/update/delete RLS to Draft and Event without changing fields or required arrays.
+- [x] Confirm recovery security-event and email-verification attempt entities were already admin-only.
+- [x] Preserve and byte-freeze `ProFormSubmission` and `ProFormSubmissionIntake`.
+- [x] Add service-role/request-client/authorization-order validation and frontend prohibition.
+- [x] Define a synthetic-only Prompt 4 anonymous/non-admin/backend-success attack matrix.
+- [ ] Push/deploy backend functions to a verified staging target (not authorized here).
+- [ ] Certify every authorized backend path before pushing restrictive RLS.
+- [ ] Push entity schemas only under separate explicit authorization.
+- [ ] Execute live denial/success attack tests and clean synthetic records in Prompt 4.
+- [ ] Keep production/blue, domains, and `main` unchanged.
+
+Overall status remains **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT** and entity
+push/deployment authorization remains **DENIED**. The mandatory ordering and
+rollback warning are in the
+[RLS contract](../security/base44-draft-entity-rls-contract.md).
+
 ## Backend-only sensitive entity boundary (2026-08-06)
 
 - [x] Remove production frontend direct access to all five sensitive entities.

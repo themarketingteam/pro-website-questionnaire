@@ -13,6 +13,12 @@ const ADMIN_BACKEND_ONLY_RLS = {
   read: { user_condition: { role: 'admin' } },
   write: { user_condition: { role: 'admin' } },
 };
+const ADMIN_ENTITY_RLS = {
+  create: { user_condition: { role: 'admin' } },
+  read: { user_condition: { role: 'admin' } },
+  update: { user_condition: { role: 'admin' } },
+  delete: { user_condition: { role: 'admin' } },
+};
 
 const FIELD_CATEGORIES = {
   canonicalState: [
@@ -197,7 +203,7 @@ describe('ProFormDraft entity schema extension', () => {
     expect(schema.name).toBe('ProFormDraft');
     expect(schema.type).toBe('object');
     expect(schema.required).toEqual(['session_id']);
-    expect(schema.rls).toBeUndefined();
+    expect(schema.rls).toEqual(ADMIN_ENTITY_RLS);
     expect(schema.properties.status).toMatchObject({ type: 'string' });
     expect(schema.properties.status.enum).toBeUndefined();
   });

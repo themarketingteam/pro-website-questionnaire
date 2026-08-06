@@ -68,6 +68,17 @@ const REQUIRED_GROUP_POLICY_FIELDS = Object.freeze([
 const IMPLEMENTATION_STATUSES = new Set([
   'planned',
   'local_schema_implemented_not_pushed',
+  'local_schema_and_admin_rls_implemented_not_pushed',
+]);
+
+const IMPLEMENTED_STATUSES = new Set([
+  'local_schema_implemented_not_pushed',
+  'local_schema_and_admin_rls_implemented_not_pushed',
+]);
+
+const MANIFEST_STATUSES = new Set([
+  'local_schema_extensions_implemented_not_pushed',
+  'local_schema_extensions_and_draft_rls_implemented_not_pushed',
 ]);
 
 const SUPPORTED_TYPES = new Set([
@@ -273,7 +284,7 @@ const validateManifestDefinition = (fieldName, definition, manifest) => {
 const validateManifest = (manifest) => {
   if (!isRecord(manifest)) return;
   if (manifest.manifestVersion !== 1) addViolation('MANIFEST_VERSION_INVALID', MANIFEST_RELATIVE_PATH);
-  if (manifest.status !== 'local_schema_extensions_implemented_not_pushed') {
+  if (!MANIFEST_STATUSES.has(manifest.status)) {
     addViolation('MANIFEST_STATUS_INVALID', MANIFEST_RELATIVE_PATH);
   }
   if (manifest.nonDeployable !== true) addViolation('MANIFEST_MUST_BE_NON_DEPLOYABLE', MANIFEST_RELATIVE_PATH);
@@ -340,7 +351,7 @@ const validateManifest = (manifest) => {
       addViolation('IMPLEMENTATION_STATUS_INVALID', `${entityName}.${implementationStatus}`);
     }
     if (
-      implementationStatus === 'local_schema_implemented_not_pushed'
+      IMPLEMENTED_STATUSES.has(implementationStatus)
       && !/^[a-f0-9]{64}$/u.test(entity.implementedSchemaSha256 || '')
     ) {
       addViolation('IMPLEMENTED_SCHEMA_HASH_MISSING', entityName);
@@ -467,7 +478,7 @@ const validateSchema = (entityName, entityPlan, manifest) => {
     }
   }
   const implementationStatus = entityPlan.implementationStatus || 'planned';
-  if (implementationStatus === 'local_schema_implemented_not_pushed') {
+  if (IMPLEMENTED_STATUSES.has(implementationStatus)) {
     const missingImplementedFields = (entityPlan.proposedFields || []).filter((fieldName) => (
       !implementedFields.includes(fieldName)
     ));

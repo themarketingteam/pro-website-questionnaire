@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "status": "local_schema_extensions_implemented_not_pushed",
+  "status": "local_schema_extensions_and_draft_rls_implemented_not_pushed",
   "manifestPath": "docs/durable-draft-recovery/data/pro-form-field-manifest.json",
   "entityDirectory": "base44/entities",
   "nonDeployable": true,
@@ -29,6 +29,14 @@
           "role": "admin"
         }
       }
+    }
+  },
+  "entityLevelRlsPolicies": {
+    "admin_backend_only": {
+      "create": {"user_condition": {"role": "admin"}},
+      "read": {"user_condition": {"role": "admin"}},
+      "update": {"user_condition": {"role": "admin"}},
+      "delete": {"user_condition": {"role": "admin"}}
     }
   },
   "groupPolicies": {
@@ -1640,10 +1648,15 @@
       "schemaFile": "base44/entities/ProFormDraft.jsonc",
       "baselineSha256": "134d638d3fd42f429022b694b1dc1ba8393341b8b133ff6eda22a3d12f06d1f6",
       "baselineExistingPropertiesSha256": "6b8993602c502ef8fdd119ed95ab10c4ddaafd7d16e531980888bad214873c5e",
-      "implementedSchemaSha256": "5980ab79760180f4f8ab71defdec11581a43b4c30f587bdd82af8f91bbe17ce8",
-      "implementationStatus": "local_schema_implemented_not_pushed",
+      "implementedSchemaSha256": "8b99d4ea51baa890ecc62616bd2bec731118f2f7aa4df1f42db29cd88a156f08",
+      "implementationStatus": "local_schema_and_admin_rls_implemented_not_pushed",
       "existingRequired": ["session_id"],
-      "expectedRls": null,
+      "expectedRls": {
+        "create": {"user_condition": {"role": "admin"}},
+        "read": {"user_condition": {"role": "admin"}},
+        "update": {"user_condition": {"role": "admin"}},
+        "delete": {"user_condition": {"role": "admin"}}
+      },
       "legacyDescriptionExceptions": [],
       "existingFields": {
         "session_id": {"type": "string", "required": true},
@@ -1694,10 +1707,15 @@
       "schemaFile": "base44/entities/ProFormDraftEvent.jsonc",
       "baselineSha256": "4828654d5a77525438daf4c61855542a1302a51b3860a0a671425edc3085f5ae",
       "baselineExistingPropertiesSha256": "0aed9cd3b0e1317f38d05331f1513fd511b9362b33364706570099a36b43bc37",
-      "implementedSchemaSha256": "e948797ed128f5f1242b18fd8eda6635b92c13385a76bd805df66eeeae2a28ca",
-      "implementationStatus": "local_schema_implemented_not_pushed",
+      "implementedSchemaSha256": "e90ef810850895b22510432674cb7fc70f64285f6573944a9d139a826d71a220",
+      "implementationStatus": "local_schema_and_admin_rls_implemented_not_pushed",
       "existingRequired": ["session_id"],
-      "expectedRls": null,
+      "expectedRls": {
+        "create": {"user_condition": {"role": "admin"}},
+        "read": {"user_condition": {"role": "admin"}},
+        "update": {"user_condition": {"role": "admin"}},
+        "delete": {"user_condition": {"role": "admin"}}
+      },
       "legacyDescriptionExceptions": [],
       "existingFields": {
         "session_id": {"type": "string", "required": true},

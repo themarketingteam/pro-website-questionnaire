@@ -1,5 +1,20 @@
 # Durable Draft Recovery Requirements Traceability Matrix
 
+## 2026-08-06 local draft entity RLS evidence
+
+| Requirement | Source evidence | Test evidence | Status |
+|---|---|---|---|
+| Draft/Event direct CRUD denied unless role is admin | Draft and Event entity schemas | RLS schema contract tests | Locally tested; not pushed |
+| Support entities remain admin-only | Security-event and verification-attempt schemas | Existing plus consolidated RLS tests | Locally tested; unchanged |
+| Backend functions use service role after authorization | Service-role validator and shared request/repository boundaries | Validator positive/negative tests | Locally tested; staging pending |
+| Frontend cannot use service role | Service-role validator plus direct-access policy | Frontend prohibition tests | Locally tested |
+| Submission/Intake compatibility retained | Unchanged schemas and SHA-256 freeze | Byte-for-byte exclusion test | Satisfied locally |
+| Anonymous/non-admin live denial and authorized backend success | Synthetic Prompt 4 attack contract | Contract completeness only | Pending authorized staging |
+
+`DR-RLS-001` advances from planned to **implemented and locally tested, not
+pushed or live-certified**. See the
+[RLS contract](../security/base44-draft-entity-rls-contract.md).
+
 ## 2026-08-06 backend-only sensitive entity access evidence
 
 | Requirement | Source evidence | Test evidence | Status |

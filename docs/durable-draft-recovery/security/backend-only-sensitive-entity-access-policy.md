@@ -1,6 +1,6 @@
 # Backend-only sensitive entity access policy
 
-Status: **IMPLEMENTED_LOCALLY; RLS_AND_STAGING_CERTIFICATION_PENDING**
+Status: **BACKEND BOUNDARY AND LOCAL RLS IMPLEMENTED; STAGING CERTIFICATION PENDING**
 
 Branch: `feature/durable-draft-recovery`
 
@@ -11,6 +11,16 @@ Audit date: 2026-08-06
 Sensitive entities are `ProFormDraft`, `ProFormDraftEvent`,
 `ProFormRecoverySecurityEvent`, `ProFormEmailVerificationAttempt`, and the
 already-migrated admin intake entity `ProFormSubmissionIntake`.
+
+## 2026-08-06 local RLS hardening addendum
+
+`ProFormDraft` and `ProFormDraftEvent` now have local entity-level
+create/read/update/delete rules requiring `role=admin`. The recovery security
+event and future email-verification attempt entities were already admin-only.
+The [Base44 draft entity RLS contract](./base44-draft-entity-rls-contract.md)
+defines the verified syntax, service-role authorization order, submission
+exclusions, and Prompt 4 live attack matrix. No schema was pushed and no live
+denial is claimed.
 
 ## Pre-edit direct-access remediation table
 
@@ -25,7 +35,7 @@ frontend code from backend service-role code and synthetic test fixtures.
 | Admin recovery pages/components | No direct sensitive entity access found; all operations use `proDraftAdminApiClient`. | Backend-only in current source. | Keep under the new whole-frontend validator. |
 | `src/api/entities.js` | Exposes only the unrelated `Query` entity. | Production frontend, but not a sensitive entity in this policy. | No change. |
 | `src/lib/proSubmissionResilience.js` and `src/pages/AdminSubmitIntake.jsx` | Direct `ProFormSubmission` create only. | Outside this prompt's sensitive draft-recovery entity set. | No change in this prompt. |
-| `base44/functions/**` | Service-role draft, event, security-event, and verification-attempt operations. | Backend only. | Allow through policy; restrictive entity RLS is a later prompt. |
+| `base44/functions/**` | Service-role draft, event, security-event, and verification-attempt operations. | Backend only. | Allow only through the audited request-client, authorization, and service-role boundary; local restrictive RLS is now present. |
 | `src/test/**` | Backend harnesses, schema fixtures, and legacy direct-transport characterization mocks. | Test only. | Allow approved backend mocks; remove obsolete frontend direct-transport fixtures and test only the retired export boundary. |
 | `tests/e2e/**` | One synthetic direct-entity URL exists in fixture-policy tests; admin specs inspect requests. | Synthetic attack/guard evidence only. | Restrict exceptions to explicitly named attack tests and install a redacting request guard in the shared V2 fixture. |
 
@@ -92,7 +102,9 @@ served the new disabled/unavailable state to scenarios expecting an enabled
 V2 test target. No reliable aggregate exit code was captured for that
 terminated run and no direct sensitive-entity request violation was observed.
 
-Entity-level RLS is intentionally unchanged here. No Base44 deploy, production
-operation, feature-branch push, domain change, or `main` change occurred. The
-next RLS prompt can restrict entities after this backend-only transport
-boundary and an authorized staging target are verified.
+The original backend-boundary increment intentionally left entity RLS
+unchanged. This follow-up adds local admin-only entity RLS for
+`ProFormDraft` and `ProFormDraftEvent` and preserves the pre-existing
+admin-only support-entity rules. No Base44 deploy, entity push, production
+operation, feature-branch push, domain change, or `main` change occurred.
+Staging must still certify authorized backend paths before any RLS push.

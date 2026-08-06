@@ -1,5 +1,21 @@
 # Durable Draft Recovery Risk Register
 
+## 2026-08-06 local draft entity RLS hardening
+
+| Risk | Control added | Residual / release gate |
+|---|---|---|
+| Anonymous or ordinary user calls Draft/Event entities directly | All four entity operations require `role=admin` locally | Schema remains unpushed; live denial pending Prompt 4 |
+| Service role fails after RLS because admin is not included | Explicit admin condition on every operation; SDK contract and validator tests | Must certify deployed staging functions before RLS push |
+| Backend elevates before validating/authorizing a request | Static service-role/request-client/authorization validator | Live abuse and denial auditing pending |
+| Compatibility break reaches final submission/intake | Both excluded schemas are byte-frozen | Separate submission hardening remains future work |
+| RLS is pushed before backend readiness | Deployment-order warning and staging checklist hard stop | Human/CI deployment sequencing remains required |
+
+This reduces local source/schema uncertainty only. A premature RLS push could
+deny legitimate questionnaire operations, so `DR-RLS-001` and the associated
+availability risk remain release-blocking until deployed backend success and
+direct-denial tests pass in a verified staging target. Blue production remains
+unchanged.
+
 ## 2026-08-06 direct sensitive entity access hardening
 
 | Risk | Control added | Residual / release gate |

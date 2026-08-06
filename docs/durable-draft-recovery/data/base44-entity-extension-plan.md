@@ -1,6 +1,6 @@
 # Base44 Pro Form entity extension and compatibility plan
 
-- Status: four Pro Form extensions plus recovery security-event schema implemented locally; no entity schema pushed
+- Status: four Pro Form extensions plus draft-recovery admin-only RLS implemented locally; no entity schema pushed
 - Date: 2026-08-05
 - Planning baseline: `50c7379c1cfc30e2d242e917b0abe951e3f75584`
 - Prompt 2 implementation baseline: `8b5aac603bb9c568b7bdc726423852c4e146582a`
@@ -60,10 +60,22 @@ RLS/FLS and atomic one-time-consumption certification.
 
 ## Current compatibility baseline
 
+### 2026-08-06 draft-recovery RLS hardening addendum
+
+`ProFormDraft` and `ProFormDraftEvent` now declare local entity-level
+create/read/update/delete rules requiring `role=admin`. The existing field
+extensions and FLS are unchanged. Public and password-grant flows use scoped
+backend functions with `asServiceRole` only after their request-specific
+validation/authorization boundary. `ProFormRecoverySecurityEvent` and
+`ProFormEmailVerificationAttempt` were already admin-only and remain unchanged.
+`ProFormSubmission` and `ProFormSubmissionIntake` are explicitly excluded and
+byte-frozen by tests. See the
+[RLS contract](../security/base44-draft-entity-rls-contract.md).
+
 | Entity | Existing top-level fields | Existing required array | Repository RLS/FLS | Current compatibility callers |
 | --- | ---: | --- | --- | --- |
-| `ProFormDraft` | 30 original + 71 local optional extensions | `session_id` | No entity RLS; all 71 new fields use admin read/write FLS | Public browser filter/create/update remains compatible; later backend service-role functions own new fields |
-| `ProFormDraftEvent` | 12 original + 25 local optional extensions | `session_id` | No entity RLS; all new fields use admin read/write FLS | Public browser create remains compatible; later backend event append owns new fields |
+| `ProFormDraft` | 30 original + 71 local optional extensions | `session_id` | Local admin-only entity RLS; all 71 new fields use admin read/write FLS | Scoped backend functions use service role after authorization; no browser entity CRUD |
+| `ProFormDraftEvent` | 12 original + 25 local optional extensions | `session_id` | Local admin-only entity RLS; all new fields use admin read/write FLS | Backend event append uses service role after exact-draft authorization; no browser entity create |
 | `ProFormSubmission` | 2 original large objects + 16 local optional extensions | `metadata`, `userdata` | Existing creator/admin entity RLS unchanged; all new fields use admin read/write FLS | Existing submission payload remains compatible; trusted backend/migration owns linkage fields |
 | `ProFormSubmissionIntake` | 33 original + 18 local optional extensions | `questionnaire_session_id` | Existing admin-only entity RLS unchanged; all new fields use admin read/write FLS | Existing fallback/retry/repair behavior remains compatible |
 
@@ -73,7 +85,7 @@ Compatibility findings:
 - `ProFormSubmissionIntake.status` retains exactly `submitted`, `received_intake`, `retry_pending`, `retry_success`, `retry_failed`, and `abandoned`, with default `received_intake`.
 - `ProFormSubmission.metadata` and `userdata` are preserved without restructuring.
 - Runtime backend code already writes/searches `metadata.questionnaire_session_id`. The new optional top-level value is migration/backend linkage only: trusted writers set both to the same normalized value when both are present, readers fall back to the legacy metadata value, and mismatches are quarantined rather than silently repaired.
-- Existing direct browser operations remain compatibility-only. Future authorization must move to scoped backend functions before draft/event entity RLS is tightened.
+- Direct browser draft/event operations have been retired. Restrictive local RLS is not deployable until scoped backend paths are staging-certified in the later authorized prompt.
 - The schemas contain 27 pre-existing missing-description paths outside Draft: 5 in `ProFormSubmission` and 22 in `ProFormSubmissionIntake`. The validator freezes those exact exceptions, requires descriptions on every new/future field, and rejects any new missing description.
 
 ## Field classification system
@@ -305,7 +317,14 @@ No schema push is authorized by this plan. Before a later staging-only entity pu
 
 ## Local implementation action statement
 
-Prompts 2 and 3 edit only the four local entity schemas and their validation/planning artifacts. They add field-level admin restrictions without altering entity-level RLS. They do not create or read a record, generate types, push entities, deploy code, send email, run cleanup, invoke recovery, change a domain, or enable a feature.
+The earlier entity-extension Prompts 2 and 3 edited only the four local entity
+schemas and their validation/planning artifacts. They added field-level admin
+restrictions without altering entity-level RLS. The later RLS-hardening
+increment adds local admin-only entity rules to `ProFormDraft` and
+`ProFormDraftEvent`; it leaves both submission schemas byte-for-byte unchanged.
+None of these local increments creates or reads a record, generates types,
+pushes entities, deploys code, sends email, runs cleanup, invokes recovery,
+changes a domain, or enables a feature.
 
 The 2026-08-06 SES source prompt adds four optional delivery fields and updates
 the manifest/hash/tests locally. It does not push this schema, write any field,

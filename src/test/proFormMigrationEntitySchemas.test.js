@@ -13,6 +13,12 @@ const ADMIN_BACKEND_ONLY_RLS = {
   read: { user_condition: { role: 'admin' } },
   write: { user_condition: { role: 'admin' } },
 };
+const ADMIN_ENTITY_RLS = {
+  create: { user_condition: { role: 'admin' } },
+  read: { user_condition: { role: 'admin' } },
+  update: { user_condition: { role: 'admin' } },
+  delete: { user_condition: { role: 'admin' } },
+};
 const COMMON_MIGRATION_FIELDS = MANIFEST.commonMigrationFields;
 const TARGETS = [
   'ProFormDraftEvent',
@@ -136,7 +142,8 @@ describe('Pro Form migration entity schema extensions', () => {
     const plan = MANIFEST.entities.ProFormDraftEvent;
     expect(schema.name).toBe('ProFormDraftEvent');
     expect(schema.required).toEqual(['session_id']);
-    expect(schema.rls).toBeUndefined();
+    expect(schema.rls).toEqual(ADMIN_ENTITY_RLS);
+    expect(schema.rls).toEqual(plan.expectedRls);
     expect(sha256Stable(Object.fromEntries(Object.keys(plan.existingFields).map((field) => [
       field,
       schema.properties[field],
