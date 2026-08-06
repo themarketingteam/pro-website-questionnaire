@@ -15,6 +15,10 @@ These are four separate operations:
 
 Source rollback alone does not restore or reconcile database records written after a future cutover. It also does not deploy the source or move a domain.
 
+## RLS-compatible staging rollback rule
+
+An RLS-hardened staging app may roll back only to a commit independently certified with `DRAFT_RLS_CERTIFIED_IN_STAGING`. The pre-durable baseline is a blue-production fallback reference, not a deployable predecessor for the hardened staging schema. Before any staging source rollback, run `npm run release:precheck-staging-rollback`, preserve a backup/checkpoint, activate the bounded kill switch, prove no migration lease or replacement is active, and follow the [staging drill plan](./staging-application-rollback-drill-plan.md). The 2026-08-06 attempt is blocked because no certified compatible predecessor or complete staging target evidence exists.
+
 ## Approved baseline references
 
 - Repository: `https://github.com/themarketingteam/pro-website-questionnaire.git`

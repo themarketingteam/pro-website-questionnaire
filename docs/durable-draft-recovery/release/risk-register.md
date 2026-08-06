@@ -727,3 +727,9 @@ adapter scale, live signatures/pagination, RLS, replay, cleanup, file
 references, reverse synchronization, and late writes were not exercised. The
 hard stop prevented all staging and production mutation, so no risk is lowered
 or closed.
+
+## 2026-08-06 staging application rollback drill evidence
+
+The fail-closed precheck now rejects an absent or uncertified predecessor, the pre-durable baseline, ambiguous staging identity, missing deployment/backup/secret-set evidence, production inputs, dirty source, build gaps, and missing authorization. The local synthetic drill exercises nine entity classes, a green update and green-native record, submitted preservation, reverse interruption/resume, duplicate/hash checks, browser-state models, and exact cleanup.
+
+`RISK-010`, `RISK-011`, `RISK-016`, `RISK-019`, and `RISK-025` remain open at their prior ratings. No live RLS-compatible predecessor exists in the evidence, so no Base44 kill switch, deployment, adapter, record, browser, lease, cleanup, domain, or production behavior was exercised. Synthetic evidence lowers no release risk classification.

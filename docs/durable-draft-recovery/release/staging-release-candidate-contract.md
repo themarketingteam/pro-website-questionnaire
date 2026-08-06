@@ -99,3 +99,5 @@ device or assistive-technology rows. No staging URL, approved test mailbox, or
 device-cloud credential was available, and the synthetic PDF exposed a
 nonstandard single tall-page pagination defect. The RC therefore remains
 blocked and no manual status is advanced.
+
+Prompt 3 adds the fail-closed staging rollback precheck, local nine-entity reverse-migration interruption/resume drill, application rollback plan, and domain-transfer rehearsal checklist. The live classification is **STAGING_APPLICATION_ROLLBACK_DRILL_BLOCKED** because no prior RLS-certified compatible commit or complete staging target/backup/secret-set evidence exists. The current RC was not deployed, rolled back, or rolled forward; no staging or production resource changed.

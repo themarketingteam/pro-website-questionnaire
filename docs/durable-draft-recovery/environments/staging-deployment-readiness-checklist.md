@@ -382,6 +382,16 @@ This does not promote a readiness item: live Base44 optimistic-concurrency and
 deployed-browser certification are still missing. The decision remains
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
 
+## 2026-08-06 staging rollback drill gate
+
+- [x] Added a fail-closed rollback precheck and nine-entity synthetic interruption/resume drill.
+- [x] Documented kill-switch, RLS-compatible source, reverse migration, roll-forward, cleanup, and domain-rehearsal ordering.
+- [ ] Identify a prior `DRAFT_RLS_CERTIFIED_IN_STAGING` commit.
+- [ ] Supply approved staging target/deployment, backup, and secret-set fingerprints.
+- [ ] Complete live kill-switch, source rollback, Chromium/WebKit, reverse migration, roll-forward, and cleanup evidence.
+
+Current classification: **STAGING_APPLICATION_ROLLBACK_DRILL_BLOCKED**. No live mutation was authorized or performed.
+
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**
 
 ### 2026-08-06 full lifecycle certification attempt

@@ -93,7 +93,7 @@
     },
     {
       "id": "rollback-drill",
-      "status": "PENDING_PROMPT_3"
+      "status": "STAGING_APPLICATION_ROLLBACK_DRILL_BLOCKED"
     }
   ],
   "requiredSecurityVerdicts": [

@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "environment": "staging",
+  "requiredBranch": "feature/durable-draft-recovery",
+  "baselineCommit": "27ddc347d55db00796a0e3e19ac343245519b01e",
+  "currentReleaseCandidateCommit": "e22ceaa0b0fb64f11c661de74657a7f32f4da46f",
+  "priorRlsCompatibleCommit": null,
+  "priorCertificationClassification": null,
+  "requiredPriorClassification": "DRAFT_RLS_CERTIFIED_IN_STAGING",
+  "requiredEnvironmentVariables": [
+    "PRO_DRAFT_STAGING_URL",
+    "PRO_DRAFT_STAGING_APP_ID",
+    "PRO_DRAFT_STAGING_CURRENT_DEPLOYMENT_SHA",
+    "PRO_DRAFT_STAGING_PRIOR_BUILD_SHA",
+    "PRO_DRAFT_STAGING_APP_FINGERPRINT",
+    "PRO_DRAFT_STAGING_BACKUP_FINGERPRINT",
+    "PRO_DRAFT_STAGING_SECRET_SET_VERSION",
+    "PRO_DRAFT_STAGING_RLS_FINGERPRINT",
+    "PRO_DRAFT_STAGING_RLS_STATUS",
+    "PRO_DRAFT_STAGING_MIGRATION_LEASE_STATUS",
+    "PRO_DRAFT_STAGING_REPLACEMENT_STATUS",
+    "PRO_DRAFT_STAGING_CLEANUP_PLAN_HASH"
+  ],
+  "productionForbiddenEnvironmentVariables": [
+    "PRO_DRAFT_PRODUCTION_URL",
+    "PRO_DRAFT_PRODUCTION_APP_ID"
+  ],
+  "killSwitchFlags": {
+    "client": "VITE_PRO_DRAFT_V2_KILL_SWITCH",
+    "server": "PRO_DRAFT_V2_KILL_SWITCH"
+  },
+  "minimumSyntheticEntityClasses": 9,
+  "liveMutationsAuthorized": false
+}
