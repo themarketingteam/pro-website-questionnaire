@@ -1,0 +1,15 @@
+{
+  "fixture": "active-load",
+  "syntheticOnly": true,
+  "requestShape": {
+    "requestedDraftId": "draft-synthetic-active",
+    "includeCanonicalState": true,
+    "upgradeLegacyOnLoad": false
+  },
+  "responseShape": {
+    "success": true,
+    "readOnly": false,
+    "canWrite": true,
+    "draft": { "status": "active" }
+  }
+}

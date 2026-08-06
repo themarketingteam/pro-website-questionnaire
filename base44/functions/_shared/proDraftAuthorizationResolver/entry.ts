@@ -106,6 +106,26 @@ function denied(code: string, status: 401 | 403 = 401): never {
   throw new ProDraftAuthorizationResolverError(code, status);
 }
 
+function validatedAuthorization(value: unknown): DraftAuthorizationInput {
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)
+    && 'method' in value) {
+    const candidate = value as Record<string, unknown>;
+    const tokenOnly = candidate.method === PRO_DRAFT_AUTHORIZATION_METHODS.RESUME_TOKEN
+      ? { resumeToken: candidate.resumeToken }
+      : candidate.method === PRO_DRAFT_AUTHORIZATION_METHODS.SIGNED_INVITATION
+        ? { signedDraftAccessToken: candidate.signedDraftAccessToken }
+        : candidate.method === PRO_DRAFT_AUTHORIZATION_METHODS.RECOVERY_SESSION
+          ? { recoverySessionToken: candidate.recoverySessionToken }
+          : {};
+    const validated = validateDraftAuthorizationInput(tokenOnly);
+    if (validated.method !== candidate.method) {
+      return denied(PRO_DRAFT_RESOLVER_ERROR_CODES.AUTHORIZATION_DENIED);
+    }
+    return validated;
+  }
+  return validateDraftAuthorizationInput(value);
+}
+
 function validateOptions(options: ResolveDraftAuthorizationOptions): void {
   if (!options
     || !ID_PATTERN.test(options.formType)
@@ -370,7 +390,7 @@ export async function resolveDraftAuthorization(
     return denied(PRO_DRAFT_RESOLVER_ERROR_CODES.DRAFT_BINDING_INVALID);
   }
   try {
-    const authorization = validateDraftAuthorizationInput(input.authorization);
+    const authorization = validatedAuthorization(input.authorization);
     if (input.associationIntent === 'changed_signed_email'
       && authorization.method
         !== PRO_DRAFT_AUTHORIZATION_METHODS.SIGNED_INVITATION) {

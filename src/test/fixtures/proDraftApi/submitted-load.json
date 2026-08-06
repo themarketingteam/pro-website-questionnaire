@@ -1,0 +1,15 @@
+{
+  "fixture": "submitted-load",
+  "syntheticOnly": true,
+  "requestShape": {
+    "requestedDraftId": "draft-synthetic-submitted",
+    "includeCanonicalState": true,
+    "upgradeLegacyOnLoad": false
+  },
+  "responseShape": {
+    "success": true,
+    "readOnly": true,
+    "canWrite": false,
+    "draft": { "status": "submitted" }
+  }
+}

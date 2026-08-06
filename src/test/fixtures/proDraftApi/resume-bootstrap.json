@@ -1,0 +1,16 @@
+{
+  "fixture": "resume-bootstrap",
+  "syntheticOnly": true,
+  "requestShape": {
+    "authorization": {
+      "resumeToken": "SYNTHETIC_RESUME_TOKEN_PLACEHOLDER_NOT_VALID_000000"
+    }
+  },
+  "responseShape": {
+    "success": true,
+    "created": false,
+    "resumed": true,
+    "recoveryCodeIssued": false,
+    "resumeTokenIssued": false
+  }
+}

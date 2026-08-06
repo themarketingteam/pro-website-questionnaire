@@ -1,8 +1,8 @@
 # Authoritative draft API contract
 
 - Contract version: 1
-- Implementation state: shared local foundation only
-- Public functions: not created
+- Implementation state: local bootstrap/load functions implemented and tested; deployment pending
+- Public functions: source present, not deployed
 - Deployment/entity push: not performed
 - Current frontend persistence: unchanged
 
@@ -52,7 +52,7 @@ authorization object is accepted only as a new-draft bootstrap method.
 ```text
 {
   apiVersion, idempotencyKey, authorization, clientContext,
-  localStateSummary?, testRunId?
+  localStateSummary?, clientBootstrapToken?, testRunId?
 }
 ```
 
@@ -69,12 +69,22 @@ Bootstrap never searches by unsigned email. If a signed-invitation email is
 changed, its context must use `changed_signed_email` and `unverified`, producing
 a new association instead of inheriting signed verification.
 
+`clientBootstrapToken` is an unpadded Base64URL value representing at least 256
+bits of client-generated entropy. Its purpose-bound hash becomes the initial
+resume verifier. Production bootstrap requires this value. A lost first
+response can therefore be retried or resumed without creating a second draft,
+although the server-generated recovery code cannot be reconstructed. On an
+idempotent replay, raw credentials are omitted and
+`recoveryCodeReissueRequired` is true. In staging/test/local, omission remains
+supported for compatibility: the server generates a resume token and returns
+it only on the successful create response.
+
 ### Load
 
 ```text
 {
   apiVersion, authorization, requestedDraftId,
-  includeCanonicalState?, clientContext, testRunId?
+  includeCanonicalState?, upgradeLegacyOnLoad?, clientContext, testRunId?
 }
 ```
 
@@ -83,6 +93,12 @@ verified authorization binding. A resume token matches only its stored verifier
 record. A recovery session is exact-draft and scope bound. A signed invitation
 queries only the derived verified identity-key hash. Submitted data requires
 `draft:submitted-read` and is projected read-only.
+
+`upgradeLegacyOnLoad` defaults to false. The current function rejects true:
+legacy compatibility columns are reconstructed independently into a normalized
+canonical response, malformed metadata does not discard valid responses, and
+the read updates only `last_restored_at`. Durable record upgrades remain the
+responsibility of later migration tooling.
 
 ### Save
 
@@ -138,7 +154,7 @@ a separate idempotent step.
 `testRunId` is accepted only when the trusted runtime environment is `test` or
 `staging`. It is rejected in production.
 
-Every future endpoint response must contain a safe server-generated request ID.
+Every bootstrap/load response contains a safe server-generated request ID.
 Success and error builders emit JSON with `Cache-Control: no-store, max-age=0`
 and `Pragma: no-cache`. Authorization failures use a generic public message and
 never echo authorization values or internal exception details.
@@ -166,6 +182,30 @@ hashes. Public failure is always `Authorization could not be verified.`
 Public email recovery and recovery-code recovery are future integrations. Those
 flows must authenticate their proof separately and issue a scoped recovery
 session; they must not add email/code verification to this resolver.
+
+## Implemented bootstrap/load boundary
+
+`bootstrapProFormDraft` and `loadProFormDraft` use the Base44 zero-config
+`Deno.serve` convention and `createClientFromRequest`. Both are guarded by the
+strict backend environment, V2 server flag, and kill switch before a client is
+created. They accept POST JSON only, enforce the shared one-MiB request limit,
+never log the request body, and return no-store responses.
+
+Bootstrap resume-token lookup uses only `resume_token_hash` and applies the
+canonical duplicate selector. Signed invitations verify temporal,
+environment, form, and visible identity bindings before querying only
+`identity_key_hash`; changed signed email never queries the replacement email
+and is stored as a new unverified association without an identity key.
+Recovery sessions remain exact-draft and scope bound. Unsigned email is never
+an authorization or lookup input.
+
+New records receive a secure session ID, one-time recovery code and hint,
+purpose-bound recovery/resume/idempotency hashes, empty canonical state plus
+compatibility columns, zero revisions, active status, generation one,
+environment/test isolation metadata, recovery-session/status/retention
+versions, and a one-year server-time retention expiry. Raw code/token material
+is never written to any entity field. See
+[bootstrap and load flow](bootstrap-and-load-flow.md).
 
 ## Repository contract
 

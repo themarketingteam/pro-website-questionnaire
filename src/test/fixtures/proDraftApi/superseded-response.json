@@ -1,0 +1,10 @@
+{
+  "fixture": "superseded-response",
+  "syntheticOnly": true,
+  "response": {
+    "success": false,
+    "errorCode": "DRAFT_SUPERSEDED",
+    "message": "Draft access or request validation failed.",
+    "retryable": false
+  }
+}

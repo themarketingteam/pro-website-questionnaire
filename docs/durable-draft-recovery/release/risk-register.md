@@ -50,6 +50,22 @@ Any detection meeting a rollback trigger is an operational trigger, not permissi
 
 ## Current audit evidence overlay
 
+### 2026-08-05 local bootstrap/load control update
+
+The local functions now mitigate source-level portions of `RISK-001`,
+`RISK-004`, `RISK-005`, `RISK-006`, `RISK-020`, `RISK-021`, `RISK-026`,
+`RISK-027`, `RISK-028`, and `RISK-029`: bootstrap never searches unsigned
+email; codes/tokens are hashed and returned once; replay is keyed-idempotent;
+load is exact-token/draft/scope bound; changed signed email is isolated;
+submitted and terminal statuses fail closed; and legacy reads do not overwrite
+records. The V2 flag and kill switch remain fail closed.
+
+Risk ratings are not lowered. The functions were not deployed, Base44
+service-role/FLS behavior and create concurrency are not live-certified, the
+normal suite retains its pre-existing failures, and public email/code recovery,
+abuse controls, save/submit endpoints, migration, and frontend cutover remain
+outside this prompt.
+
 The register's likelihood/severity columns describe the risk before planned controls. The overlay below records the **current** evidence assessment as of 2026-08-06. “Path absent” means a planned feature risk is not currently active; its accepted/mitigated treatment above remains unchanged for the future release. The identity contract is now integrated through canonical state, Redux, browser namespace/cache, and bootstrap, while the recovery-code/selection contract remains a pure contract. Public recovery, backend authorization, secure generation, keyed lookup hashing, schemas, UI, and deployment remain absent.
 
 | Risk ID | Current likelihood | Current severity | Current audit evidence/classification |

@@ -1,0 +1,15 @@
+{
+  "fixture": "invalid-authorization",
+  "syntheticOnly": true,
+  "requestShape": {
+    "authorization": {
+      "resumeToken": "SYNTHETIC_INVALID_AUTHORIZATION_PLACEHOLDER_000000"
+    }
+  },
+  "response": {
+    "success": false,
+    "errorCode": "INVALID_AUTHORIZATION",
+    "message": "Draft access or request validation failed.",
+    "retryable": false
+  }
+}

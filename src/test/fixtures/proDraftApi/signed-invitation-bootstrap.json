@@ -1,0 +1,14 @@
+{
+  "fixture": "signed-invitation-bootstrap",
+  "syntheticOnly": true,
+  "requestShape": {
+    "authorization": {
+      "signedDraftAccessToken": "SYNTHETIC_SIGNED_INVITATION_TOKEN_PLACEHOLDER_NOT_VALID"
+    },
+    "associationIntent": "new_invitation"
+  },
+  "responseShape": {
+    "success": true,
+    "authorizationMethod": "signed_invitation"
+  }
+}

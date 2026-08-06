@@ -1,0 +1,21 @@
+{
+  "fixture": "new-email-bootstrap",
+  "syntheticOnly": true,
+  "request": {
+    "apiVersion": 1,
+    "idempotencyKey": "fixture.email.bootstrap.0001",
+    "authorization": {},
+    "clientBootstrapToken": "EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE",
+    "clientContext": {
+      "formType": "pro-questionnaire",
+      "identityContextVersion": 1,
+      "associationIntent": "anonymous_start",
+      "recoveryEmail": "synthetic.user@example.invalid",
+      "recoveryEmailSource": "client_entered",
+      "recoveryEmailVerificationStatus": "unverified",
+      "anonymousRecoveryAcknowledged": false,
+      "environment": "staging"
+    }
+  },
+  "responseShape": { "success": true, "created": true }
+}

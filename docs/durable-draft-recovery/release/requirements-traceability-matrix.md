@@ -26,6 +26,22 @@ All rows in this initial matrix are release blocking. Production-enabled evidenc
 
 ## Requirement matrix
 
+### 2026-08-05 bootstrap/load implementation evidence
+
+| Requirement | Local implementation evidence | Test evidence | Remaining release gate |
+| --- | --- | --- | --- |
+| Authorized bootstrap and idempotent create | `bootstrapProFormDraft`; keyed idempotency; one-time credentials; client bootstrap token | `bootstrapProFormDraft.test.js` | Deploy-disabled staging certification and concurrent live retry proof |
+| Exact authorized load | `loadProFormDraft`; resume/invitation/recovery-session exact binding; `canWrite` | `loadProFormDraft.test.js`; resolver suite | Live service-role/FLS and denial matrix |
+| Signed-email isolation | Visible claim validation; replacement email is unverified, unqueried, and has no inherited identity key | Changed/unchanged invitation bootstrap tests | Staging invitation issuer interoperability |
+| Submitted and terminal lifecycle | Submitted scope/read-only projection; superseded/expired/deleted controlled errors | Load lifecycle tests | Staging entity records and immutable submitted snapshot proof |
+| Legacy read compatibility | Independent reconstruction; metadata failure does not discard responses; no read upgrade | Legacy reconstruction tests | Migration utility and production-data rehearsal |
+| Response confidentiality | Allowlisted projection, no-store, safe codes/request IDs, raw values only on create | Response/hash/raw-storage assertions | Deployed network/log scan |
+
+These rows move the source/test portions of `DR-SAVE-001`, `DR-SAVE-002`,
+`DR-ID-002`, `DR-ID-003`, `DR-ID-004`, `DR-LIFE-001`, and `DR-SEC-001` to
+implemented locally. Environment evidence remains pending; no row is certified
+for release by this source-only change.
+
 | Requirement ID | Requirement description | ADR source | Planned implementation batch | Planned source files/modules | Unit test ID | Integration test ID | Browser test ID | Staging evidence | Production-disabled evidence | Production-enabled evidence | Release blocking | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `DR-SRC-001` | Verify immutable remote baseline/backup refs and three fresh-clone baseline builds. | [ADR-001 §M](../architecture/ADR-001-approved-product-and-security-decisions.md) | `B07` | `scripts/ensure-durable-draft-workspace.mjs`; baseline manifests/runbooks | `UT-SRC-001` | `IT-SRC-001` | `BT-SRC-001` | `EV-STG-SRC-001` fresh-clone/build manifest | `EV-PD-SRC-001` remote-ref proof | Not applicable—source gate precedes enablement | Yes | Planned |

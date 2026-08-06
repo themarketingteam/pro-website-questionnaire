@@ -100,6 +100,7 @@ export interface BootstrapDraftRequest {
   readonly authorization: DraftAuthorizationInput;
   readonly clientContext: DraftClientContext;
   readonly localStateSummary?: Readonly<Record<string, unknown>>;
+  readonly clientBootstrapToken?: string;
   readonly testRunId?: string;
 }
 
@@ -108,6 +109,7 @@ export interface LoadDraftRequest {
   readonly authorization: DraftAuthorizationInput;
   readonly requestedDraftId: string;
   readonly includeCanonicalState: boolean;
+  readonly upgradeLegacyOnLoad: boolean;
   readonly clientContext: DraftClientContext;
   readonly testRunId?: string;
 }
@@ -150,6 +152,7 @@ const SAFE_TEXT_PATTERN = /^[A-Za-z0-9 ._:/@+-]{1,256}$/u;
 const REQUEST_ID_PATTERN = /^pdrq_[A-Za-z0-9_-]{20,123}$/u;
 const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/u;
+const BOOTSTRAP_TOKEN_PATTERN = /^[A-Za-z0-9_-]{43,128}$/u;
 const ENVIRONMENTS = new Set(['local', 'test', 'staging', 'production']);
 const ASSOCIATION_INTENTS = new Set([
   'new_invitation',
@@ -196,11 +199,11 @@ const FORBIDDEN_AUTHORIZATION_FIELD = /(?:recovery.?code|resume.?token|recovery.
 
 const BOOTSTRAP_KEYS = new Set([
   'apiVersion', 'idempotencyKey', 'authorization', 'clientContext',
-  'localStateSummary', 'testRunId',
+  'localStateSummary', 'clientBootstrapToken', 'testRunId',
 ]);
 const LOAD_KEYS = new Set([
   'apiVersion', 'authorization', 'requestedDraftId',
-  'includeCanonicalState', 'clientContext', 'testRunId',
+  'includeCanonicalState', 'upgradeLegacyOnLoad', 'clientContext', 'testRunId',
 ]);
 const SAVE_KEYS = new Set([
   'apiVersion', 'authorization', 'draftId', 'expectedServerRevision',
@@ -469,12 +472,18 @@ export function validateBootstrapDraftRequest(
   if (environment !== clientContext.environment) {
     return apiError(PRO_DRAFT_API_ERROR_CODES.INVALID_REQUEST);
   }
+  if (input.clientBootstrapToken !== undefined
+    && (typeof input.clientBootstrapToken !== 'string'
+      || !BOOTSTRAP_TOKEN_PATTERN.test(input.clientBootstrapToken))) {
+    return apiError(PRO_DRAFT_API_ERROR_CODES.AUTHORIZATION_INVALID, 401);
+  }
   return Object.freeze({
     apiVersion: PRO_DRAFT_API_VERSION,
     idempotencyKey: validateIdempotencyKey(input.idempotencyKey),
     authorization,
     clientContext,
     localStateSummary: validateLocalStateSummary(input.localStateSummary),
+    clientBootstrapToken: input.clientBootstrapToken as string | undefined,
     testRunId: validateTestRunId(input.testRunId, environment),
   });
 }
@@ -499,11 +508,16 @@ export function validateLoadDraftRequest(
     && typeof input.includeCanonicalState !== 'boolean') {
     return apiError(PRO_DRAFT_API_ERROR_CODES.INVALID_REQUEST);
   }
+  if (input.upgradeLegacyOnLoad !== undefined
+    && typeof input.upgradeLegacyOnLoad !== 'boolean') {
+    return apiError(PRO_DRAFT_API_ERROR_CODES.INVALID_REQUEST);
+  }
   return Object.freeze({
     apiVersion: PRO_DRAFT_API_VERSION,
     authorization,
     requestedDraftId: requireId(input.requestedDraftId),
     includeCanonicalState: input.includeCanonicalState !== false,
+    upgradeLegacyOnLoad: input.upgradeLegacyOnLoad === true,
     clientContext,
     testRunId: validateTestRunId(input.testRunId, environment),
   });

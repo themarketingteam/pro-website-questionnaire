@@ -1,0 +1,23 @@
+{
+  "fixture": "new-anonymous-bootstrap",
+  "syntheticOnly": true,
+  "request": {
+    "apiVersion": 1,
+    "idempotencyKey": "fixture.anonymous.bootstrap.0001",
+    "authorization": {},
+    "clientBootstrapToken": "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+    "clientContext": {
+      "formType": "pro-questionnaire",
+      "identityContextVersion": 1,
+      "associationIntent": "anonymous_start",
+      "anonymousRecoveryAcknowledged": true,
+      "environment": "staging"
+    }
+  },
+  "responseShape": {
+    "success": true,
+    "created": true,
+    "recoveryCodeIssued": true,
+    "resumeTokenIssued": false
+  }
+}
