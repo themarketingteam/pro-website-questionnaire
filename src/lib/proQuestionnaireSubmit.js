@@ -14,71 +14,65 @@ import { getSubmitDebugFailureMode, shouldSimulateSubmitFailure } from '@/lib/su
 import {
   getSafeSubmitContext,
   safeJsonStringify,
-  safeLocalStorageSet,
   safeNowIso
 } from '@/lib/browserSafety';
+import { defaultResilientStorage } from '@/lib/resilientStorage';
+import { deriveQuestionnaireBrowserNamespace } from '@/lib/questionnaireBrowserNamespace';
+import { writeDraftFailureBackup as writeScopedDraftFailureBackup } from '@/lib/draftPersistence';
 
 export { serializeSubmitError } from '@/lib/proSubmissionResilience';
 
 
-export const writeFailedSubmissionBackup = ({
+export const writeFailedSubmissionBackup = async ({
+  namespace = deriveQuestionnaireBrowserNamespace(),
+  storage = defaultResilientStorage,
   questionnaireSessionId,
   responseSnapshot,
-  transformedPayload,
-  error
-}) => {
-  try {
-    safeLocalStorageSet(
-      `failed_pro_submission_${Date.now()}`,
-      {
-        session_id: questionnaireSessionId,
-        responses: responseSnapshot,
-        transformedPayload,
-        error,
-        createdAt: safeNowIso()
-      }
-    );
-  } catch (storageError) {
-    console.error(
-      'Could not write failed submission backup:',
-      serializeSubmitError(storageError)
-    );
-  }
-};
+  validationStatus = {},
+  touchedQuestions = {},
+  expandedQuestions = {},
+  textValidationMeta = {},
+}) => writeScopedDraftFailureBackup({
+  namespace,
+  storage,
+  questionnaireSessionId,
+  responses: responseSnapshot,
+  validationStatus,
+  touchedQuestions,
+  expandedQuestions,
+  textValidationMeta,
+});
 
-export const writeDraftFailureBackup = ({
+export const writeDraftFailureBackup = async ({
+  namespace = deriveQuestionnaireBrowserNamespace(),
+  storage = defaultResilientStorage,
   questionnaireSessionId,
   responses,
   validationStatus,
   touchedQuestions,
   expandedQuestions,
-  error
-}) => {
-  try {
-    safeLocalStorageSet(
-      `pro_questionnaire_local_backup_${questionnaireSessionId}`,
-      {
-        session_id: questionnaireSessionId,
-        responses,
-        validationStatus,
-        touchedQuestions,
-        expandedQuestions,
-        error,
-        savedAt: safeNowIso()
-      }
-    );
-  } catch {
-    // no-op
-  }
-};
+  textValidationMeta,
+}) => writeScopedDraftFailureBackup({
+  namespace,
+  storage,
+  questionnaireSessionId,
+  responses,
+  validationStatus,
+  touchedQuestions,
+  expandedQuestions,
+  textValidationMeta,
+});
 
 export const safeDraftSave = async ({
   saveDraftNow,
+  namespace,
+  storage,
   questionnaireSessionId,
   responsesSnapshot,
   validationStatusSnapshot,
   touchedQuestionsSnapshot,
   expandedQuestionsSnapshot,
+  textValidationMetaSnapshot,
   options = {}
 }) => {
   if (typeof saveDraftNow !== 'function') {
@@ -98,13 +92,15 @@ export const safeDraftSave = async ({
 
     console.error('Non-fatal draft save failed:', serialized);
 
-    writeDraftFailureBackup({
+    await writeDraftFailureBackup({
+      namespace,
+      storage,
       questionnaireSessionId,
       responses: responsesSnapshot,
       validationStatus: validationStatusSnapshot,
       touchedQuestions: touchedQuestionsSnapshot,
       expandedQuestions: expandedQuestionsSnapshot,
-      error: serialized
+      textValidationMeta: textValidationMetaSnapshot
     });
 
     return null;
@@ -296,9 +292,12 @@ export const submitProQuestionnaire = async ({
   validationStatus,
   touchedQuestions,
   expandedQuestions,
+  textValidationMeta,
   credentials,
   domainParam,
   questionnaireSessionId,
+  browserNamespace = deriveQuestionnaireBrowserNamespace(),
+  browserStorage = defaultResilientStorage,
   saveDraftNow,
   createDraftEvent,
   onFinalSubmitSuccess,
@@ -318,6 +317,23 @@ export const submitProQuestionnaire = async ({
   });
   const responseSnapshotMetadata = buildResponseSnapshotMetadata(responseSnapshot, validationStatus);
   const submitDebugMode = getSubmitDebugFailureMode();
+  const safeDraftSaveForSubmission = (options) => safeDraftSave({
+    namespace: browserNamespace,
+    storage: browserStorage,
+    textValidationMetaSnapshot: textValidationMeta,
+    ...options,
+  });
+  const writeFailedSubmissionBackupForSubmission = (options) => (
+    writeFailedSubmissionBackup({
+      namespace: browserNamespace,
+      storage: browserStorage,
+      validationStatus,
+      touchedQuestions,
+      expandedQuestions,
+      textValidationMeta,
+      ...options,
+    })
+  );
 
   const recordSubmitStage = async (stage, details = {}) => {
     const safeDetails = sanitizeStageDetails(details);
@@ -373,7 +389,7 @@ export const submitProQuestionnaire = async ({
     }
   });
 
-  await safeDraftSave({
+  await safeDraftSaveForSubmission({
     saveDraftNow,
     questionnaireSessionId,
     responsesSnapshot: responseSnapshot,
@@ -425,7 +441,7 @@ export const submitProQuestionnaire = async ({
       }
     });
 
-    await safeDraftSave({
+    await safeDraftSaveForSubmission({
       saveDraftNow,
       questionnaireSessionId,
       responsesSnapshot: responseSnapshot,
@@ -442,7 +458,7 @@ export const submitProQuestionnaire = async ({
       }
     });
 
-    writeFailedSubmissionBackup({
+    await writeFailedSubmissionBackupForSubmission({
       questionnaireSessionId,
       responseSnapshot,
       transformedPayload: null,
@@ -572,7 +588,7 @@ export const submitProQuestionnaire = async ({
       }
     });
 
-    await safeDraftSave({
+    await safeDraftSaveForSubmission({
       saveDraftNow,
       questionnaireSessionId,
       responsesSnapshot: responseSnapshot,
@@ -589,7 +605,7 @@ export const submitProQuestionnaire = async ({
       }
     });
 
-    writeFailedSubmissionBackup({
+    await writeFailedSubmissionBackupForSubmission({
       questionnaireSessionId,
       responseSnapshot,
       transformedPayload,
@@ -703,7 +719,7 @@ export const submitProQuestionnaire = async ({
       }
     });
 
-    await safeDraftSave({
+    await safeDraftSaveForSubmission({
       saveDraftNow,
       questionnaireSessionId,
       responsesSnapshot: responseSnapshot,
@@ -716,7 +732,7 @@ export const submitProQuestionnaire = async ({
       }
     });
 
-    writeFailedSubmissionBackup({
+    await writeFailedSubmissionBackupForSubmission({
       questionnaireSessionId,
       responseSnapshot,
       transformedPayload,
@@ -763,7 +779,7 @@ export const submitProQuestionnaire = async ({
     });
   }
 
-  await safeDraftSave({
+  await safeDraftSaveForSubmission({
     saveDraftNow,
     questionnaireSessionId,
     responsesSnapshot: responseSnapshot,

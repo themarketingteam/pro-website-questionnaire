@@ -5,15 +5,23 @@ function uniqArray(arr) {
   return Array.from(new Set(arr || []));
 }
 
+export const createEmptyPersistedQuestionnaireState = () => ({
+  responses: {},
+  validationStatus: {},
+  touchedQuestions: {},
+  expandedQuestions: {},
+  textValidationMeta: {},
+});
+
+const isPlainRecord = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
+
 export function normalizePersistedState(state) {
   if (!state || typeof state !== 'object') {
-    return {
-      responses: {},
-      validationStatus: {},
-      touchedQuestions: {},
-      expandedQuestions: {},
-      textValidationMeta: {}
-    };
+    return createEmptyPersistedQuestionnaireState();
   }
 
   const knownIds = new Set(getAllQuestionIds(QUESTIONS));
@@ -245,13 +253,7 @@ export function normalizePersistedStateV3(state) {
   // Guard: if state is completely missing or malformed, return a safe empty baseline
   // so that transformResponsesToPayload never receives undefined/null responses
   if (!state || typeof state !== 'object') {
-    return {
-      responses: {},
-      validationStatus: {},
-      touchedQuestions: {},
-      expandedQuestions: {},
-      textValidationMeta: {}
-    };
+    return createEmptyPersistedQuestionnaireState();
   }
 
   const base = normalizePersistedState(state);
@@ -263,6 +265,17 @@ export function normalizePersistedStateV3(state) {
     validationStatus: { ...(base.validationStatus || {}) },
     touchedQuestions: { ...(base.touchedQuestions || {}) },
     expandedQuestions: { ...(base.expandedQuestions || {}) },
+    textValidationMeta: { ...(base.textValidationMeta || {}) },
+  };
+
+  const clearHiddenChild = (childId) => {
+    delete next.responses[childId];
+    delete next.responses[`${childId}_other`];
+    delete next.responses[`${childId}_primary`];
+    delete next.validationStatus[childId];
+    delete next.touchedQuestions[childId];
+    delete next.expandedQuestions[childId];
+    delete next.textValidationMeta[childId];
   };
 
   // Generic rule set
@@ -273,11 +286,7 @@ export function normalizePersistedStateV3(state) {
       const isRequired = !!child.requiredIfParentYes;
       const childVal = next.responses[child.id];
       if (parentVal !== 'yes') {
-        // Parent not active: fully clear child state across slices
-        delete next.responses[child.id];
-        if (child.id in next.validationStatus) next.validationStatus[child.id] = '';
-        if (child.id in next.touchedQuestions) delete next.touchedQuestions[child.id];
-        next.expandedQuestions[child.id] = false;
+        clearHiddenChild(child.id);
       } else {
         // Parent is yes
         const childType = getQuestionById(QUESTIONS, child.id)?.type;
@@ -299,10 +308,7 @@ export function normalizePersistedStateV3(state) {
     const parentVal = next.responses[parentId];
     const val = next.responses[childId];
     if (parentVal !== 'yes') {
-      delete next.responses[childId];
-      if (childId in next.validationStatus) next.validationStatus[childId] = '';
-      if (childId in next.touchedQuestions) delete next.touchedQuestions[childId];
-      next.expandedQuestions[childId] = false;
+      clearHiddenChild(childId);
     } else {
       const empty = !val || (typeof val === 'string' && val.trim().length === 0);
       if (empty) {
@@ -316,4 +322,55 @@ export function normalizePersistedStateV3(state) {
   fixOptional('25', '25.1');
 
   return next;
+}
+
+// Redux Persist passes its complete persisted form payload to this boundary.
+// Only the approved browser fields are admitted; credentials and unknown keys
+// are intentionally excluded. Any malformed slice or normalization failure
+// returns an empty, usable form state without logging answer data.
+export function normalizePersistedQuestionnaireState(state) {
+  if (!isPlainRecord(state)) return createEmptyPersistedQuestionnaireState();
+
+  const approvedFields = [
+    'responses',
+    'validationStatus',
+    'touchedQuestions',
+    'expandedQuestions',
+    'textValidationMeta',
+  ];
+  if (approvedFields.some((field) => (
+    state[field] !== undefined && !isPlainRecord(state[field])
+  ))) {
+    return createEmptyPersistedQuestionnaireState();
+  }
+
+  const approvedState = {
+    responses: isPlainRecord(state.responses) ? state.responses : {},
+    validationStatus: isPlainRecord(state.validationStatus) ? state.validationStatus : {},
+    touchedQuestions: isPlainRecord(state.touchedQuestions) ? state.touchedQuestions : {},
+    expandedQuestions: isPlainRecord(state.expandedQuestions) ? state.expandedQuestions : {},
+    textValidationMeta: isPlainRecord(state.textValidationMeta) ? state.textValidationMeta : {},
+  };
+
+  try {
+    const normalized = normalizePersistedStateV3(approvedState);
+    if (!isPlainRecord(normalized)) return createEmptyPersistedQuestionnaireState();
+    return {
+      responses: isPlainRecord(normalized.responses) ? normalized.responses : {},
+      validationStatus: isPlainRecord(normalized.validationStatus)
+        ? normalized.validationStatus
+        : {},
+      touchedQuestions: isPlainRecord(normalized.touchedQuestions)
+        ? normalized.touchedQuestions
+        : {},
+      expandedQuestions: isPlainRecord(normalized.expandedQuestions)
+        ? normalized.expandedQuestions
+        : {},
+      textValidationMeta: isPlainRecord(normalized.textValidationMeta)
+        ? normalized.textValidationMeta
+        : {},
+    };
+  } catch {
+    return createEmptyPersistedQuestionnaireState();
+  }
 }

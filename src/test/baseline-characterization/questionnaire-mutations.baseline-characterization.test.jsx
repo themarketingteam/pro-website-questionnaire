@@ -1,14 +1,26 @@
 import React from 'react';
 import { Provider } from 'react-redux';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
-import { store, persistor } from '@/components/store/store';
+import { createQuestionnaireStore } from '@/components/store/store';
 import { loadInitialState } from '@/components/store/formSlice';
 import { createFindExistingDraftBySessionId } from '@/lib/draftPersistence';
+import { createResilientStorage } from '@/lib/resilientStorage';
+import {
+  buildQuestionnaireStorageKey,
+  deriveQuestionnaireBrowserNamespace,
+} from '@/lib/questionnaireBrowserNamespace';
 
-const REDUX_STORAGE_KEY = 'persist:pro-questionnaire-root';
-const SESSION_STORAGE_KEY = 'pro_questionnaire_session_id';
+const namespace = deriveQuestionnaireBrowserNamespace({ userId: 'synthetic-mutation-client' });
+const SESSION_STORAGE_KEY = buildQuestionnaireStorageKey({
+  namespace,
+  purpose: 'legacy-session',
+});
+let REDUX_STORAGE_KEY;
+let store;
+let persistor;
+let storage;
 
 const completeFormState = (overrides = {}) => ({
   responses: {},
@@ -50,7 +62,8 @@ const renderQuestionnaire = async () => {
 };
 
 const readPersistedResponses = () => {
-  const root = JSON.parse(localStorage.getItem(REDUX_STORAGE_KEY));
+  const localRecord = JSON.parse(localStorage.getItem(REDUX_STORAGE_KEY));
+  const root = JSON.parse(localRecord.value);
   return JSON.parse(root.responses);
 };
 
@@ -72,8 +85,15 @@ let base44;
 describe('baseline characterization: questionnaire mutation bypasses', () => {
   beforeAll(async () => {
     ({ base44 } = await import('@/api/base44Client'));
+    storage = createResilientStorage({ indexedDB: null, localStorage });
+    const runtime = createQuestionnaireStore({ namespace, storage });
+    store = runtime.store;
+    persistor = runtime.persistor;
+    REDUX_STORAGE_KEY = runtime.persistenceKey;
     await waitForBootstrap();
   });
+
+  afterAll(() => persistor.pause());
 
   beforeEach(async () => {
     localStorage.clear();
@@ -83,7 +103,7 @@ describe('baseline characterization: questionnaire mutation bypasses', () => {
       '',
       '/?businessName=Synthetic%20Mutation%20Client&domainName=mutation.invalid'
     );
-    localStorage.setItem(SESSION_STORAGE_KEY, 'synthetic-stable-session');
+    await storage.setItem(SESSION_STORAGE_KEY, 'synthetic-stable-session');
 
     window.google = {
       maps: {
@@ -240,7 +260,7 @@ describe('baseline characterization: questionnaire mutation bypasses', () => {
 
     expect(store.getState().form.responses).toEqual({});
     expect(readPersistedResponses()['6']).toBe('Synthetic answer to clear');
-    expect(localStorage.getItem(SESSION_STORAGE_KEY)).toBe('synthetic-stable-session');
+    expect(await storage.getItem(SESSION_STORAGE_KEY)).toBe('synthetic-stable-session');
     expect(base44.entities.ProFormDraft.create).not.toHaveBeenCalled();
     expect(base44.entities.ProFormDraft.update).not.toHaveBeenCalled();
     expect(base44.entities.ProFormDraftEvent.create).not.toHaveBeenCalled();
@@ -260,7 +280,7 @@ describe('baseline characterization: questionnaire mutation bypasses', () => {
     const findExistingDraft = createFindExistingDraftBySessionId({ draftRecordIdRef });
 
     const found = await findExistingDraft({
-      sessionId: localStorage.getItem(SESSION_STORAGE_KEY),
+      sessionId: await storage.getItem(SESSION_STORAGE_KEY),
       entities: { ProFormDraft: { filter } },
     });
 

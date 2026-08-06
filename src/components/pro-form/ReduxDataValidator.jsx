@@ -3,9 +3,14 @@ import { useSelector } from 'react-redux';
 import { CheckCircle2, AlertCircle, Database } from 'lucide-react';
 import { QUESTIONS } from '@/components/pro-form/questionData';
 import { getAllQuestionIds, getQuestionById } from '@/components/pro-form/questionUtils';
+import { useQuestionnairePersistence } from '@/components/store/QuestionnairePersistenceContext';
+
+/** @param {any} state */
+const selectValidatorForm = (state) => state?.form || {};
 
 export default function ReduxDataValidator() {
   const isDev = import.meta.env.DEV;
+  const questionnairePersistence = useQuestionnairePersistence();
 
   // Check if redux-data=true is in URL
   const urlParams = new URLSearchParams(window.location.search);
@@ -14,11 +19,12 @@ export default function ReduxDataValidator() {
   const [isVisible, setIsVisible] = useState(false);
   const [validationResults, setValidationResults] = useState(null);
   
-  const responses = useSelector((state) => state.form.responses);
-  const validationStatus = useSelector((state) => state.form.validationStatus);
-  const touchedQuestions = useSelector((state) => state.form.touchedQuestions);
-  const expandedQuestions = useSelector((state) => state.form.expandedQuestions);
-  const credentials = useSelector((state) => state.form.credentials);
+  const formState = useSelector(selectValidatorForm);
+  const responses = formState.responses;
+  const validationStatus = formState.validationStatus;
+  const touchedQuestions = formState.touchedQuestions;
+  const expandedQuestions = formState.expandedQuestions;
+  const credentials = formState.credentials;
   
   // Global hotkey — stable listener; actual validation runs in the reactive effect below
   useEffect(() => {
@@ -93,20 +99,25 @@ export default function ReduxDataValidator() {
       details: hasCredentials ? `${Object.keys(credentials).length} credential fields stored` : 'No credentials stored (optional)'
     });
 
-    // Check 7: LocalStorage persistence
-    let persistData = null;
+    // Check 7: scoped adapter durability. Do not inspect persisted answer bytes.
     try {
-      persistData = localStorage.getItem('persist:pro-questionnaire-root');
+      const diagnostics = questionnairePersistence.getStorageDiagnostics?.();
+      const storageMode = diagnostics?.storageMode
+        || questionnairePersistence.storageMode
+        || 'unknown';
+      const durable = Boolean(diagnostics?.durable ?? questionnairePersistence.durable);
       results.checks.push({
-        name: 'LocalStorage Persistence',
-        passed: !!persistData,
-        details: persistData ? `Data persisted (${(persistData.length / 1024).toFixed(2)} KB)` : 'No persisted data found'
+        name: 'Scoped Browser Persistence',
+        passed: durable,
+        details: durable
+          ? `Scoped adapter mode: ${storageMode}`
+          : `Page-only or unavailable adapter mode: ${storageMode}`
       });
-    } catch (e) {
+    } catch {
       results.checks.push({
-        name: 'LocalStorage Persistence',
+        name: 'Scoped Browser Persistence',
         passed: false,
-        details: `Error accessing localStorage: ${e.message}`
+        details: 'Safe persistence diagnostics unavailable'
       });
     }
 
@@ -257,11 +268,6 @@ export default function ReduxDataValidator() {
         hasUserId: Boolean(credentials?.userId),
         hasUserEmail: Boolean(credentials?.userEmail)
       });
-
-      if (persistData) {
-        console.log('');
-        console.log('💾 PERSISTED DATA IN LOCALSTORAGE: present');
-      }
 
       console.log('========================================');
     }

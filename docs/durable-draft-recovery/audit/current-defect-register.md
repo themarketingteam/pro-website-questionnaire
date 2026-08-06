@@ -50,6 +50,9 @@ Feature-branch remediation notes preserve the audited production-baseline findin
 - **Reproduction/evidence:** `BC-LOCAL-001`, `BC-LOCAL-003`, `BC-LOCAL-004`.
 - **Current workaround:** Clear site storage or use a fresh browser profile between clients; this is operationally fragile.
 - **Permanent implementation batch:** B01 — safe boot and client-scoped browser namespace.
+- **Feature-branch remediation (2026-08-05):** `createQuestionnaireStore` now persists approved form fields under `pro-questionnaire:v4:ns_<hash>:redux-state`. `ReduxProvider` derives identity first, caches one runtime per namespace, and resets only the active namespace. Version 3 rehydration normalizes the complete form and discards malformed or hidden-child data safely.
+- **Remediation evidence:** `src/test/questionnaireStore.test.jsx`; `src/test/questionnaireBrowserNamespace.test.js`; `tests/e2e/draft-v2/client-isolation.spec.js`; `BC-LOCAL-001`, `BC-LOCAL-003`, and `BC-LOCAL-004` now assert the remediated contract.
+- **Remediation status:** Local browser isolation is implemented on `feature/durable-draft-recovery`; staging, production-disabled, and production-enabled certification remain pending. No server hydration or authorization is implied.
 - **Release blocking:** Yes
 
 ## DRAFT-003 — One global questionnaire session key
@@ -66,6 +69,9 @@ Feature-branch remediation notes preserve the audited production-baseline findin
 - **Reproduction/evidence:** `BC-LOCAL-002`, `BC-CLEAR-001`, `BC-CLEAR-002`.
 - **Current workaround:** Manually clear site storage before changing clients; no application workflow enforces this.
 - **Permanent implementation batch:** B01 — safe boot and client-scoped browser namespace.
+- **Feature-branch remediation (2026-08-05):** Session creation, read, and clear now require the derived namespace and use the version 4 `legacy-session` purpose. Persistent denial retains one namespace-specific in-memory session for the current page. The global key is available only through an explicit authorized legacy helper and is never automatically migrated or deleted.
+- **Remediation evidence:** `src/test/questionnaireSessionId.test.js`; `src/test/legacyQuestionnaireStorage.test.js`; `BC-LOCAL-002`.
+- **Remediation status:** Local session scoping is implemented on `feature/durable-draft-recovery`; authorized server identity/recovery and environment certification remain pending.
 - **Release blocking:** Yes
 
 ## DRAFT-004 — Server drafts are never restored into the public form
@@ -98,6 +104,9 @@ Feature-branch remediation notes preserve the audited production-baseline findin
 - **Reproduction/evidence:** `BC-LOCAL-005`, `BC-REC-003`, `BC-LIFE-001`.
 - **Current workaround:** Extract storage manually during support intervention; not suitable for clients or production scale.
 - **Permanent implementation batch:** B01/B03 — local journal plus authorized reconciliation.
+- **Feature-branch remediation (2026-08-05):** Failure backups now use the exact version 4 client namespace and resilient storage, contain only approved serializable form state plus safe metadata, and have an exact-namespace safe reader. The reader is a foundation API only: page bootstrap does not automatically hydrate a backup or server draft.
+- **Remediation evidence:** `src/test/draftFailureBackup.test.js`; `BC-LOCAL-005`; `BC-LIFE-001`.
+- **Remediation status:** Scoped write/read foundation is implemented on `feature/durable-draft-recovery`; deterministic reconciliation, expiry, automatic authorized restore, and environment certification remain pending.
 - **Release blocking:** Yes
 
 ## DRAFT-006 — Lifecycle persistence relies only on beforeunload
@@ -226,6 +235,9 @@ Feature-branch remediation notes preserve the audited production-baseline findin
 - **Reproduction/evidence:** Source text plus storage/entity flow in the architecture inventory.
 - **Current workaround:** Support documentation can explain the limitation, but the product message remains misleading.
 - **Permanent implementation batch:** B01/B02/B03 — truthful state model and recovery UI.
+- **Feature-branch remediation (2026-08-05):** The indicator now reports browser-save progress, durable browser state, or page-only memory state and exposes an `aria-live` status. Server-confirmed wording is allowed only from an explicit server-confirmation input.
+- **Remediation evidence:** `src/test/autoSaveIndicatorSafety.test.jsx`; source search finds no secure-cookie claim in production code.
+- **Remediation status:** Local wording is implemented on `feature/durable-draft-recovery`; canonical server acknowledgement and recovery-panel UX remain pending.
 - **Release blocking:** Yes
 
 ## DRAFT-014 — Draft data crosses a direct browser entity boundary
@@ -290,6 +302,9 @@ Feature-branch remediation notes preserve the audited production-baseline findin
 - **Reproduction/evidence:** `BC-LOCAL-001` through `BC-LOCAL-004`.
 - **Current workaround:** Fresh browser profile/site-data purge for every client; not acceptable at scale.
 - **Permanent implementation batch:** B01/B03/B05/B06 — identity namespace, server authorization, security certification.
+- **Feature-branch remediation (2026-08-05):** Redux state, session IDs, and failure backups are partitioned by a deterministic version 4 namespace whose keys contain no raw identity components. The active normal/IndexedDB-unavailable browser scenarios prove Client A → Client B → Client A isolation; memory-only mode makes no reload-survival claim.
+- **Remediation evidence:** `src/test/questionnaireBrowserNamespace.test.js`; `src/test/questionnaireStore.test.jsx`; `src/test/questionnaireSessionId.test.js`; required Chromium, Firefox, and WebKit desktop client-isolation matrix passes 9/9 executions.
+- **Remediation status:** The confirmed local shared-browser leak is remediated on `feature/durable-draft-recovery`. Server-side authorization, cross-device recovery, `DR-SEC-001`, and all environment certification remain pending; the namespace hash is not an authorization boundary.
 - **Release blocking:** Yes
 
 ## DRAFT-018 — Raw/in-flight file selection cannot be restored

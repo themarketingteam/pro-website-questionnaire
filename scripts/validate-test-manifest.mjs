@@ -53,8 +53,20 @@ const requiredFoundationFiles = [
   'scripts/build-ci-summary.mjs',
   'scripts/scan-ci-source-safety.mjs',
   'src/lib/resilientStorage.js',
+  'src/lib/questionnaireBrowserNamespace.js',
+  'src/lib/legacyQuestionnaireStorage.js',
+  'src/lib/sessionId.js',
+  'src/components/store/QuestionnairePersistenceContext.jsx',
+  'src/components/store/store.jsx',
   'src/test/storage/resilientStorage.test.js',
+  'src/test/questionnaireStore.test.jsx',
+  'src/test/questionnaireBrowserNamespace.test.js',
+  'src/test/questionnaireSessionId.test.js',
+  'src/test/legacyQuestionnaireStorage.test.js',
+  'src/test/draftFailureBackup.test.js',
+  'src/test/autoSaveIndicatorSafety.test.jsx',
   'docs/durable-draft-recovery/architecture/browser-storage-resilience.md',
+  'docs/durable-draft-recovery/architecture/browser-namespace-and-legacy-key-policy.md',
   'src/components/common/AppInitializationError.jsx',
   'src/test/appParamsSafety.test.js',
   'src/test/base44ClientInitialization.test.js',
@@ -62,6 +74,7 @@ const requiredFoundationFiles = [
   'src/test/appInitializationError.test.jsx',
   'src/test/errorBoundarySafety.test.jsx',
   'tests/e2e/draft-v2/storage-recovery.spec.js',
+  'tests/e2e/draft-v2/client-isolation.spec.js',
 ];
 
 for (const file of requiredFoundationFiles) {

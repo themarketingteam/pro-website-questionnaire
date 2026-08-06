@@ -5,6 +5,9 @@ import userEvent from '@testing-library/user-event';
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
 import ConfirmModal from '@/components/pro-form/ConfirmModal';
 import { renderWithStore } from '@/test/utils/renderWithStore';
+import { readDraftFailureBackup } from '@/lib/draftPersistence';
+import { defaultResilientStorage } from '@/lib/resilientStorage';
+import { deriveQuestionnaireBrowserNamespace } from '@/lib/questionnaireBrowserNamespace';
 
 const formState = (overrides = {}) => ({
   form: {
@@ -227,13 +230,13 @@ describe('baseline characterization: lifecycle registration and save paths', () 
 
     window.dispatchEvent(new Event('beforeunload'));
 
-    await waitFor(() => {
-      const backupKey = Object.keys(localStorage).find((key) =>
-        key.startsWith('pro_questionnaire_local_backup_')
-      );
-      expect(backupKey).toBeTruthy();
-      const backup = JSON.parse(localStorage.getItem(backupKey));
-      expect(backup.responses['6']).toBe('Synthetic lifecycle answer');
+    await waitFor(async () => {
+      const backup = await readDraftFailureBackup({
+        namespace: deriveQuestionnaireBrowserNamespace(),
+        storage: defaultResilientStorage,
+      });
+      expect(backup?.form?.responses?.['6']).toBe('Synthetic lifecycle answer');
+      expect(backup?.storageMode).toBe('localstorage');
     });
 
     expect(base44.entities.ProFormDraft.create).not.toHaveBeenCalled();

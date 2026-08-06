@@ -47,6 +47,7 @@ const formSlice = createSlice({
       state.validationStatus = initialState.validationStatus;
       state.touchedQuestions = {};
       state.expandedQuestions = {};
+      state.textValidationMeta = {};
     },
     deleteResponse: (state, action) => {
       const questionId = action.payload;

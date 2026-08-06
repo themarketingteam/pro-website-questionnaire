@@ -59,7 +59,9 @@ import {
   createSaveDraftSnapshot,
   writeDraftFailureBackup
 } from '@/lib/draftPersistence';
-import { safeLocalStorageSet, safeNowIso } from '@/lib/browserSafety';
+import { defaultResilientStorage } from '@/lib/resilientStorage';
+import { deriveQuestionnaireBrowserNamespace } from '@/lib/questionnaireBrowserNamespace';
+import { useQuestionnairePersistence } from '@/components/store/QuestionnairePersistenceContext';
 
 const DeferredSectionLoader = () => (
   <div className="flex items-center justify-center py-6">
@@ -68,17 +70,24 @@ const DeferredSectionLoader = () => (
 );
 
 const EMPTY_OBJECT = Object.freeze({});
+/** @param {any} state */
+const selectQuestionnaireForm = (state) => state?.form || EMPTY_OBJECT;
 
 export default function ProQuestionnaire() {
   const dispatch = useDispatch();
+  const questionnairePersistence = useQuestionnairePersistence();
+  const browserNamespace = questionnairePersistence.namespace
+    || deriveQuestionnaireBrowserNamespace();
+  const browserStorage = questionnairePersistence.storage || defaultResilientStorage;
   const standardContentClass = 'w-full max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto';
   const wideContentClass = 'w-full max-w-4xl lg:max-w-6xl xl:max-w-7xl 2xl:max-w-[1440px] mx-auto';
-  const responses = useSelector((state) => state.form.responses || EMPTY_OBJECT);
-  const validationStatus = useSelector((state) => state.form.validationStatus || EMPTY_OBJECT);
-  const textValidationMeta = useSelector((state) => state.form.textValidationMeta || EMPTY_OBJECT);
-  const touchedQuestions = useSelector((state) => state.form.touchedQuestions || EMPTY_OBJECT);
-  const expandedQuestions = useSelector((state) => state.form.expandedQuestions || EMPTY_OBJECT);
-  const credentials = useSelector((state) => state.form.credentials || EMPTY_OBJECT);
+  const formState = useSelector(selectQuestionnaireForm);
+  const responses = formState.responses || EMPTY_OBJECT;
+  const validationStatus = formState.validationStatus || EMPTY_OBJECT;
+  const textValidationMeta = formState.textValidationMeta || EMPTY_OBJECT;
+  const touchedQuestions = formState.touchedQuestions || EMPTY_OBJECT;
+  const expandedQuestions = formState.expandedQuestions || EMPTY_OBJECT;
+  const credentials = formState.credentials || EMPTY_OBJECT;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const finalSubmitInFlightRef = useRef(false);
   const [showAutoSave, setShowAutoSave] = useState(0);
@@ -103,7 +112,18 @@ export default function ProQuestionnaire() {
   const clearAllReloadDelayMs = isTestMode ? 0 : 100;
   const hasFinalSubmittedRef = useRef(false);
   const lastChangedQuestionIdRef = useRef('');
-  const [questionnaireSessionId] = useState(() => getOrCreateQuestionnaireSessionId());
+  const [questionnaireSessionId, setQuestionnaireSessionId] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    getOrCreateQuestionnaireSessionId({
+      namespace: browserNamespace,
+      storage: browserStorage,
+    }).then((sessionId) => {
+      if (active) setQuestionnaireSessionId(sessionId);
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [browserNamespace, browserStorage]);
 
   // Extract URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -195,23 +215,16 @@ export default function ProQuestionnaire() {
 
   useEffect(() => {
     const handleBeforeUnload = () => {
-      try {
-        const backup = {
-          session_id: questionnaireSessionId,
-          responses,
-          validationStatus,
-          touchedQuestions,
-          expandedQuestions,
-          savedAt: safeNowIso()
-        };
-
-        safeLocalStorageSet(
-          `pro_questionnaire_local_backup_${questionnaireSessionId}`,
-          backup
-        );
-      } catch {
-        // no-op
-      }
+      void writeDraftFailureBackup({
+        namespace: browserNamespace,
+        storage: browserStorage,
+        questionnaireSessionId,
+        responses,
+        validationStatus,
+        touchedQuestions,
+        expandedQuestions,
+        textValidationMeta,
+      });
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -231,10 +244,13 @@ export default function ProQuestionnaire() {
     };
   }, [
     questionnaireSessionId,
+    browserNamespace,
+    browserStorage,
     responses,
     validationStatus,
     touchedQuestions,
-    expandedQuestions
+    expandedQuestions,
+    textValidationMeta
   ]);
 
   // Initialize expanded questions on mount
@@ -339,6 +355,7 @@ export default function ProQuestionnaire() {
     touchedQuestionsSnapshot = touchedQuestions,
     expandedQuestionsSnapshot = expandedQuestions
   } = {}) => {
+    if (!questionnaireSessionId) return null;
     return saveDraftSnapshot({
       sessionId: questionnaireSessionId,
       responses: responsesSnapshot,
@@ -368,7 +385,7 @@ export default function ProQuestionnaire() {
   ]);
 
   const queueDraftSave = useCallback((changedQuestionId, nextResponses = responses) => {
-    if (hasFinalSubmittedRef.current) return;
+    if (hasFinalSubmittedRef.current || !questionnaireSessionId) return;
 
     lastChangedQuestionIdRef.current = changedQuestionId;
 
@@ -396,22 +413,27 @@ export default function ProQuestionnaire() {
         });
       } catch (error) {
         console.error('Draft autosave failed:', serializeError(error));
-        writeDraftFailureBackup({
+        void writeDraftFailureBackup({
+          namespace: browserNamespace,
+          storage: browserStorage,
           questionnaireSessionId,
           responses: nextResponses,
           validationStatus,
           touchedQuestions,
           expandedQuestions,
-          error: serializeError(error)
+          textValidationMeta,
         });
       }
     }, draftSaveDelayMs);
   }, [
     questionnaireSessionId,
+    browserNamespace,
+    browserStorage,
     responses,
     validationStatus,
     touchedQuestions,
     expandedQuestions,
+    textValidationMeta,
     credentials,
     businessNameParam,
     domainParam,
@@ -424,6 +446,7 @@ export default function ProQuestionnaire() {
     questionId,
     value
   }) => {
+    if (!questionnaireSessionId) return;
     try {
       const question = questionId ? getQuestionById(QUESTIONS, questionId) : null;
 
@@ -1401,9 +1424,12 @@ export default function ProQuestionnaire() {
         validationStatus,
         touchedQuestions,
         expandedQuestions,
+        textValidationMeta,
         credentials,
         domainParam,
         questionnaireSessionId,
+        browserNamespace,
+        browserStorage,
         saveDraftNow,
         createDraftEvent,
         serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
@@ -1910,7 +1936,11 @@ export default function ProQuestionnaire() {
               </div>
               </main>
 
-      <AutoSaveIndicator show={showAutoSave} />
+      <AutoSaveIndicator
+        show={showAutoSave}
+        storageMode={questionnairePersistence.storageMode}
+        getStorageDiagnostics={questionnairePersistence.getStorageDiagnostics}
+      />
       <Suspense fallback={null}>
         <ReduxDataValidator />
       </Suspense>

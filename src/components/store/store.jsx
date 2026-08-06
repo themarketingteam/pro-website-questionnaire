@@ -1,57 +1,168 @@
 import { configureStore } from '@reduxjs/toolkit';
-import { persistStore, persistReducer, createMigrate, createTransform, FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER } from 'redux-persist';
-import storage from 'redux-persist/lib/storage'; // defaults to localStorage
+import {
+  FLUSH,
+  PAUSE,
+  PERSIST,
+  PURGE,
+  REGISTER,
+  REHYDRATE,
+  persistReducer,
+  persistStore,
+} from 'redux-persist';
 import formReducer from './formSlice';
+import { normalizePersistedQuestionnaireState } from './normalization';
+import {
+  createResilientStorage,
+  defaultResilientStorage,
+} from '@/lib/resilientStorage';
+import {
+  buildQuestionnaireStorageKey,
+  deriveQuestionnaireBrowserNamespace,
+} from '@/lib/questionnaireBrowserNamespace';
 
-import { normalizePersistedState, normalizePersistedStateV3 } from './normalization';
+export const QUESTIONNAIRE_PERSIST_VERSION = 3;
+export const DEFAULT_REHYDRATION_TIMEOUT_MS = 2_000;
+export const PERSISTED_FORM_FIELDS = Object.freeze([
+  'responses',
+  'validationStatus',
+  'touchedQuestions',
+  'expandedQuestions',
+  'textValidationMeta',
+]);
 
-const migrations = {
-  2: (state) => normalizePersistedState(state),
-  3: (state) => normalizePersistedStateV3(state),
-};
-
-// This transform runs on EVERY rehydrate (not just migrations), ensuring
-// corrupted or stale v3 states are always sanitized before entering Redux.
-const normalizationTransform = createTransform(
-  // outbound (before persist) — no-op
-  (inboundState) => inboundState,
-  // inbound (after rehydrate from storage) — always normalize
-  (outboundState, key) => {
-    if (key === 'form') {
-      try {
-        return normalizePersistedStateV3(outboundState);
-      } catch (e) {
-        console.error('[store] normalizationTransform failed, using raw state:', e);
-        return outboundState;
-      }
-    }
-    return outboundState;
-  }
+const normalizeTimeout = (value) => (
+  Number.isFinite(value) && value >= 0
+    ? Math.trunc(value)
+    : DEFAULT_REHYDRATION_TIMEOUT_MS
 );
 
-const persistConfig = {
-  key: 'pro-questionnaire-root',
-  version: 3,
-  storage,
-  whitelist: ['responses', 'validationStatus', 'touchedQuestions', 'expandedQuestions', 'textValidationMeta'],
-  migrate: createMigrate(migrations, { debug: false }),
-  transforms: [normalizationTransform],
-  serialize: true,
-  debug: false
-};
-
-const persistedReducer = persistReducer(persistConfig, formReducer);
-
-export const store = configureStore({
-  reducer: {
-    form: persistedReducer
+const createBoundedRehydrationStorage = ({ storage, timeoutMs, state }) => ({
+  async getItem(key) {
+    let timeoutId;
+    try {
+      const result = await Promise.race([
+        Promise.resolve().then(() => storage.getItem(key)),
+        new Promise((resolve) => {
+          timeoutId = setTimeout(() => {
+            state.status = 'timed_out';
+            state.timedOut = true;
+            resolve(null);
+          }, timeoutMs);
+        }),
+      ]);
+      if (!state.timedOut) state.status = 'storage_settled';
+      return result;
+    } catch {
+      state.status = 'storage_failed';
+      return null;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   },
-  middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware({
-      serializableCheck: {
-        ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER]
-      }
-    })
+  async setItem(key, value) {
+    try { return await storage.setItem(key, value); } catch { return undefined; }
+  },
+  async removeItem(key) {
+    try { return await storage.removeItem(key); } catch { return undefined; }
+  },
 });
 
-export const persistor = persistStore(store);
+/** @param {{ namespace?: string, storage?: any, rehydrationTimeoutMs?: number }} [options] */
+export const createQuestionnaireStore = ({
+  namespace,
+  storage = defaultResilientStorage,
+  rehydrationTimeoutMs = DEFAULT_REHYDRATION_TIMEOUT_MS,
+} = {}) => {
+  const persistenceKey = buildQuestionnaireStorageKey({
+    namespace,
+    purpose: 'redux-state',
+  });
+  const rehydration = {
+    status: 'pending',
+    timedOut: false,
+  };
+  const boundedStorage = createBoundedRehydrationStorage({
+    storage,
+    timeoutMs: normalizeTimeout(rehydrationTimeoutMs),
+    state: rehydration,
+  });
+  const persistConfig = {
+    key: persistenceKey,
+    keyPrefix: '',
+    version: QUESTIONNAIRE_PERSIST_VERSION,
+    storage: boundedStorage,
+    whitelist: [...PERSISTED_FORM_FIELDS],
+    migrate: async (persistedState) => ({
+      ...normalizePersistedQuestionnaireState(persistedState),
+      _persist: persistedState?._persist || {
+        version: QUESTIONNAIRE_PERSIST_VERSION,
+        rehydrated: false,
+      },
+    }),
+    debug: false,
+  };
+  const persistedFormReducer = persistReducer(persistConfig, formReducer);
+  const questionnaireStore = configureStore({
+    reducer: { form: persistedFormReducer },
+    middleware: (getDefaultMiddleware) => getDefaultMiddleware({
+      serializableCheck: {
+        ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
+      },
+    }),
+  });
+
+  let resolveReady;
+  const ready = new Promise((resolve) => { resolveReady = resolve; });
+  const questionnairePersistor = persistStore(questionnaireStore, null, () => {
+    if (!rehydration.timedOut && rehydration.status !== 'storage_failed') {
+      rehydration.status = 'rehydrated';
+    }
+    resolveReady();
+  });
+
+  return Object.freeze({
+    namespace,
+    persistenceKey,
+    store: questionnaireStore,
+    persistor: questionnairePersistor,
+    storage,
+    ready,
+    getDiagnostics: () => Object.freeze({
+      namespace,
+      rehydrationStatus: rehydration.status,
+      rehydrationTimedOut: rehydration.timedOut,
+      storageMode: storage.getMode?.() || 'unknown',
+      durable: Boolean(storage.getDiagnostics?.().durable),
+    }),
+  });
+};
+
+/** @param {{ namespace?: string, storage?: any }} [options] */
+export const clearQuestionnairePersistedState = async ({
+  namespace,
+  storage = defaultResilientStorage,
+} = {}) => {
+  const persistenceKey = buildQuestionnaireStorageKey({
+    namespace,
+    purpose: 'redux-state',
+  });
+  try {
+    await storage.removeItem(persistenceKey);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Compatibility-only exports for legacy imports and non-questionnaire tools.
+// They are isolated in page-lifetime memory and are never used by ReduxProvider.
+const compatibilityNamespace = deriveQuestionnaireBrowserNamespace({
+  userId: 'compatibility-non-questionnaire-route',
+});
+const compatibilityRuntime = createQuestionnaireStore({
+  namespace: compatibilityNamespace,
+  storage: createResilientStorage({ indexedDB: null, localStorage: null, sessionStorage: null }),
+});
+
+export const store = compatibilityRuntime.store;
+export const persistor = compatibilityRuntime.persistor;

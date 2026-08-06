@@ -1,7 +1,10 @@
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
-import { store, persistor } from '@/components/store/store';
-import { resetForm } from '@/components/store/formSlice';
+import { clearQuestionnairePersistedState } from '@/components/store/store';
+import {
+  deriveQuestionnaireBrowserNamespace,
+  readQuestionnaireIdentityFromUrl,
+} from '@/lib/questionnaireBrowserNamespace';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -15,8 +18,10 @@ class ErrorBoundary extends React.Component {
 
   async handleResetAndReload() {
     try {
-      await persistor.purge();
-      store.dispatch(resetForm());
+      const namespace = deriveQuestionnaireBrowserNamespace(
+        readQuestionnaireIdentityFromUrl(),
+      );
+      await clearQuestionnairePersistedState({ namespace });
     } catch {
       // no-op; we still try reloading
     } finally {

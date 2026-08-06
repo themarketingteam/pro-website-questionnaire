@@ -1,15 +1,15 @@
 # Browser storage resilience
 
-- Status: foundational adapter and storage-safe application boot implemented; questionnaire-store integration is deferred
+- Status: resilient adapter, storage-safe application boot, and scoped questionnaire-store integration implemented; environment certification is pending
 - Date: 2026-08-05
-- Sources: `src/lib/resilientStorage.js`; `src/lib/app-params.js`; `src/api/base44Client.js`; `src/lib/AuthContext.jsx`
-- Tests: `src/test/storage/resilientStorage.test.js`; `src/test/appParamsSafety.test.js`; `src/test/base44ClientInitialization.test.js`; `src/test/authContextSafety.test.jsx`; `tests/e2e/draft-v2/storage-recovery.spec.js`
+- Sources: `src/lib/resilientStorage.js`; `src/lib/questionnaireBrowserNamespace.js`; `src/components/store/store.jsx`; `src/components/ReduxProvider.jsx`; `src/lib/sessionId.js`; `src/lib/draftPersistence.js`
+- Tests: `src/test/storage/resilientStorage.test.js`; `src/test/questionnaireStore.test.jsx`; `src/test/questionnaireBrowserNamespace.test.js`; `src/test/questionnaireSessionId.test.js`; `src/test/draftFailureBackup.test.js`; `tests/e2e/draft-v2/storage-recovery.spec.js`; `tests/e2e/draft-v2/client-isolation.spec.js`
 
 ## Purpose and boundary
 
-The resilient-storage adapter gives browser code a non-crashing asynchronous storage contract when browser persistence is available, partially restricted, or completely unavailable. It is suitable for a future Redux Persist integration and for direct string or JSON access.
+The resilient-storage adapter gives browser code a non-crashing asynchronous storage contract when browser persistence is available, partially restricted, or completely unavailable. Redux Persist, questionnaire session IDs, and failure backups now use that contract through a versioned, identity-scoped browser namespace.
 
-This foundation does not change the current questionnaire store, create a server draft, add a recovery code, modify a Base44 entity, or authorize a user. A later integration prompt must deliberately replace the current Redux Persist storage binding after its boot and migration behavior is approved.
+This foundation does not load a server draft, add a recovery code, modify a Base44 entity, or authorize a user. Browser state remains an untrusted local replica; automatic server hydration and reconciliation remain deferred.
 
 Browser storage is never an authorization boundary. Values in IndexedDB, localStorage, sessionStorage, or memory are client-controlled and must not prove identity, draft ownership, recovery permission, or administrative access. Future server-authority integration must authenticate and authorize every remote operation independently.
 
@@ -24,6 +24,26 @@ An `access_token` query value is captured synchronously and its removal is attem
 `AuthContext.jsx` bounds both the public-settings request and authenticated-user lookup to 4,000 ms. Every rejection and timeout exits both startup loading flags. Only allowlisted error types and fixed messages reach React state; raw backend messages, response bodies, tokens, and error objects are not logged. A public-settings/auth availability error remains non-blocking for the public questionnaire, while explicit 401/403 authentication requirements preserve the existing login behavior.
 
 The initialization and render error screens state that saved information was not intentionally deleted. Reload/retry is non-destructive. The render boundary retains a separate delete-and-reload action, but labels it as permanently clearing browser-saved questionnaire state and never runs it automatically.
+
+## Scoped questionnaire-store integration
+
+`ReduxProvider` derives the questionnaire namespace before creating the store. `createQuestionnaireStore({ namespace, storage })` builds one store and persistor for that identity and persists only `responses`, `validationStatus`, `touchedQuestions`, `expandedQuestions`, and `textValidationMeta`. Credentials and unknown fields are not persisted.
+
+The exact Redux key is `pro-questionnaire:v4:ns_<128-bit-hex>:redux-state`; Redux Persist receives an empty key prefix so it does not add a global `persist:` prefix. Runtime instances are cached by namespace so ordinary route rerenders do not create competing stores. An identity change selects a different runtime and cannot carry the previous namespace's state with it.
+
+Rehydration is bounded to 2,000 ms by default. A missing, denied, malformed, or timed-out read settles to a usable empty store and records only safe status codes. The accessible bootstrap status remains visible only while the runtime is being created and the bounded rehydration is pending. The current page remains usable with adapter-instance memory if IndexedDB and localStorage are both unavailable; that mode is explicitly non-durable.
+
+Persisted version 3 state is normalized as a complete form object during migration. Only approved fields survive. Malformed state becomes a safe empty form, and answers for conditional children whose parent is not `yes` are removed together with related validation, touched, expanded, and text-validation metadata. No answer values or parse exceptions are logged.
+
+`resetFormState=1` remains as a compatibility path. It purges and resets only the currently derived namespace, tolerates removal failure, removes only that query parameter when possible, and does not reload or clear unrelated browser records.
+
+## Session and failure-backup integration
+
+Questionnaire session IDs use the same namespace with purpose `legacy-session`. Creation prefers `crypto.randomUUID`, falls back to `crypto.getRandomValues`, and retains an in-memory value when persistent writes are denied. Clearing a session removes only that namespace.
+
+Failure backups use purpose `failure-backup` and include the namespace version, opaque session ID, saved timestamp, observed storage mode, and approved serializable form slices. A safe exact-namespace reader exists for a later bootstrap/reconciliation batch, but no backup or server draft is automatically hydrated in this implementation.
+
+The save indicator distinguishes `Progress saved in this browser.` from `Progress is available for this page only.` Explicit server-confirmed wording requires an explicit `serverConfirmed` input; a Redux update alone never implies server acknowledgement.
 
 ## Public API
 
@@ -121,10 +141,12 @@ The storage suite uses development-only `fake-indexeddb` plus controlled Web Sto
 
 Boot-specific unit coverage adds window/document absence, malformed URL parsing, throwing storage getter/read/write/quota operations, throwing history replacement, parameter precedence, token URL cleanup, value-free client diagnostics, request rejection, and never-settling request timeouts. The activated `DR-BOOT-001`/`DR-BOOT-002` Playwright matrix covers normal storage, four localStorage failure modes, unavailable IndexedDB, and all persistent storage unavailable. It runs in the five configured Chromium, Firefox, WebKit, mobile Chrome, and mobile Safari projects with writes and cross-origin requests denied.
 
+Scoped-persistence tests cover IndexedDB, localStorage fallback, memory-only fallback, bounded rehydration, complete-form normalization, hidden-child removal, two-client separation, reset isolation, deterministic non-PII namespaces, session separation, legacy detection without migration, failure-backup scoping, truthful save wording, and provider rendering when storage is denied. The active client-isolation Playwright scenarios verify Client A → Client B → Client A behavior for normal and IndexedDB-unavailable modes, plus truthful page-only behavior after reload in memory-only mode. The required Chromium, Firefox, and WebKit desktop matrix passes 9/9 active executions; the deliberately deferred server-authorization scenario remains skipped.
+
 These source and local-browser tests are implementation evidence, not staging or production certification. The release still requires the named staging, production-disabled, and post-enable evidence in the traceability matrix.
 
 Timeout tests wait beyond settlement and assert that no unhandled rejection is emitted. Full application, characterization, Playwright fixture, lint, type-check, and build results remain part of the prompt validation record rather than being treated as durability guarantees.
 
 ## Future integration
 
-The later questionnaire-store integration must inject `defaultResilientStorage` into Redux Persist, preserve versioned state normalization/migration, expose a non-sensitive storage warning when mode is `memory_only`, and keep the questionnaire usable while rehydration completes or persistence is denied. Server synchronization must treat local state as an untrusted replica and resolve authority through authenticated server records; it must not infer authorization from any browser-stored identifier or token.
+Server synchronization must treat local state as an untrusted replica and resolve authority through authenticated server records; it must not infer authorization from any browser-stored identifier or token. A later approved batch must define canonical draft hydration, authorized legacy migration, reconciliation, expiry, server acknowledgement, and recovery behavior before any local backup is treated as recoverable authority.
