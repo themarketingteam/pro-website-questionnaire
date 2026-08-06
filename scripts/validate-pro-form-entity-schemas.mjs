@@ -65,6 +65,11 @@ const REQUIRED_GROUP_POLICY_FIELDS = Object.freeze([
   'testRequirement',
 ]);
 
+const IMPLEMENTATION_STATUSES = new Set([
+  'planned',
+  'local_schema_implemented_not_pushed',
+]);
+
 const SUPPORTED_TYPES = new Set([
   'string',
   'number',
@@ -268,7 +273,9 @@ const validateManifestDefinition = (fieldName, definition, manifest) => {
 const validateManifest = (manifest) => {
   if (!isRecord(manifest)) return;
   if (manifest.manifestVersion !== 1) addViolation('MANIFEST_VERSION_INVALID', MANIFEST_RELATIVE_PATH);
-  if (manifest.status !== 'plan_only') addViolation('MANIFEST_STATUS_INVALID', MANIFEST_RELATIVE_PATH);
+  if (manifest.status !== 'mixed_local_implementation_not_pushed') {
+    addViolation('MANIFEST_STATUS_INVALID', MANIFEST_RELATIVE_PATH);
+  }
   if (manifest.nonDeployable !== true) addViolation('MANIFEST_MUST_BE_NON_DEPLOYABLE', MANIFEST_RELATIVE_PATH);
   if (manifest.manifestPath !== MANIFEST_RELATIVE_PATH) {
     addViolation('MANIFEST_PATH_MISMATCH', MANIFEST_RELATIVE_PATH);
@@ -328,6 +335,16 @@ const validateManifest = (manifest) => {
   for (const entityName of EXPECTED_ENTITIES) {
     const entity = manifest.entities?.[entityName];
     if (!isRecord(entity)) continue;
+    const implementationStatus = entity.implementationStatus || 'planned';
+    if (!IMPLEMENTATION_STATUSES.has(implementationStatus)) {
+      addViolation('IMPLEMENTATION_STATUS_INVALID', `${entityName}.${implementationStatus}`);
+    }
+    if (
+      implementationStatus === 'local_schema_implemented_not_pushed'
+      && !/^[a-f0-9]{64}$/u.test(entity.implementedSchemaSha256 || '')
+    ) {
+      addViolation('IMPLEMENTED_SCHEMA_HASH_MISSING', entityName);
+    }
     const proposedFields = entity.proposedFields || [];
     if (!Array.isArray(proposedFields) || !unique(proposedFields)) {
       addViolation('PROPOSED_FIELD_LIST_INVALID', `${entityName}.proposedFields`);
@@ -401,14 +418,26 @@ const validateSchema = (entityName, entityPlan, manifest) => {
       addViolation('EXISTING_DEFAULT_CHANGED', `${entityName}.${fieldName}`);
     }
   }
+  if (entityPlan.baselineExistingPropertiesSha256) {
+    const existingProperties = Object.fromEntries(existingFieldNames.map((fieldName) => [
+      fieldName,
+      properties[fieldName],
+    ]));
+    const existingPropertiesHash = sha256(JSON.stringify(stableValue(existingProperties)));
+    if (existingPropertiesHash !== entityPlan.baselineExistingPropertiesSha256) {
+      addViolation('EXISTING_PROPERTY_SCHEMA_CHANGED', entityName);
+    }
+  }
   const required = Array.isArray(schema.required) ? schema.required : [];
   if (!unique(required)) addViolation('DUPLICATE_REQUIRED_FIELD', entityName);
   if (!valuesEqual([...required].sort(), [...entityPlan.existingRequired].sort())) {
     addViolation('REQUIRED_FIELD_SET_CHANGED', entityName);
   }
   const requiredSet = new Set(required);
+  const implementedFields = [];
   for (const fieldName of entityPlan.proposedFields || []) {
     if (isRecord(properties[fieldName])) {
+      implementedFields.push(fieldName);
       validateImplementedField(
         entityName,
         fieldName,
@@ -421,6 +450,12 @@ const validateSchema = (entityName, entityPlan, manifest) => {
   }
   const actualRls = schema.rls ?? null;
   if (!valuesEqual(actualRls, entityPlan.expectedRls)) addViolation('ENTITY_RLS_CHANGED', entityName);
+  if (
+    entityName === 'ProFormDraft'
+    && (properties.status?.type !== 'string' || Object.hasOwn(properties.status || {}, 'enum'))
+  ) {
+    addViolation('DRAFT_STATUS_COMPATIBILITY_CHANGED', `${entityName}.status`);
+  }
   const missingDescriptions = collectMissingDescriptions(schema);
   const exceptions = entityPlan.legacyDescriptionExceptions || [];
   for (const pointer of missingDescriptions) {
@@ -431,12 +466,24 @@ const validateSchema = (entityName, entityPlan, manifest) => {
       addViolation('STALE_DESCRIPTION_EXCEPTION', `${entityName}${pointer}`);
     }
   }
-  if (planOnly) {
-    if (sha256(text) !== entityPlan.baselineSha256) addViolation('PLAN_BASELINE_SCHEMA_CHANGED', entityName);
-    const implemented = (entityPlan.proposedFields || []).filter((fieldName) => (
-      Object.hasOwn(properties, fieldName)
+  const implementationStatus = entityPlan.implementationStatus || 'planned';
+  if (implementationStatus === 'local_schema_implemented_not_pushed') {
+    const missingImplementedFields = (entityPlan.proposedFields || []).filter((fieldName) => (
+      !implementedFields.includes(fieldName)
     ));
-    if (implemented.length > 0) addViolation('PLAN_ONLY_SCHEMA_EXTENSION_DETECTED', entityName);
+    for (const fieldName of missingImplementedFields) {
+      addViolation('IMPLEMENTED_FIELD_MISSING', `${entityName}.${fieldName}`);
+    }
+    const expectedFieldNames = [...existingFieldNames, ...(entityPlan.proposedFields || [])];
+    if (!valuesEqual([...actualFieldNames].sort(), [...expectedFieldNames].sort())) {
+      addViolation('IMPLEMENTED_FIELD_SET_MISMATCH', entityName);
+    }
+    if (sha256(text) !== entityPlan.implementedSchemaSha256) {
+      addViolation('IMPLEMENTED_SCHEMA_HASH_CHANGED', entityName);
+    }
+  } else if (planOnly) {
+    if (sha256(text) !== entityPlan.baselineSha256) addViolation('PLAN_BASELINE_SCHEMA_CHANGED', entityName);
+    if (implementedFields.length > 0) addViolation('PLAN_ONLY_SCHEMA_EXTENSION_DETECTED', entityName);
     if (!valuesEqual([...actualFieldNames].sort(), [...existingFieldNames].sort())) {
       addViolation('PLAN_ONLY_EXISTING_FIELD_SET_CHANGED', entityName);
     }

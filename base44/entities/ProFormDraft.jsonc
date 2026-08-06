@@ -122,6 +122,457 @@
       "type": "boolean",
       "default": false,
       "description": "True if the AI-repaired payload was accepted and used in a submission attempt for this draft"
+    },
+    "form_type": {
+      "type": "string",
+      "description": "Canonical questionnaire form type, normally pro-questionnaire",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "draft_schema_version": {
+      "type": "number",
+      "description": "Canonical draft-state schema version for the serialized draft envelope",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "draft_state_json": {
+      "type": "string",
+      "description": "Complete serialized canonical draft-state envelope that becomes the authoritative full snapshot after backend migration",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "text_validation_meta_json": {
+      "type": "string",
+      "description": "Serialized text and textarea validation metadata retained as a compatibility column",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "ui_draft_state_json": {
+      "type": "string",
+      "description": "Serialized incomplete answer-bearing component editor state retained for canonical restoration",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "field_change_metadata_json": {
+      "type": "string",
+      "description": "Serialized per-field mutation metadata used for conflict analysis",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "credentials_json": {
+      "type": "string",
+      "description": "Serialized allowlisted questionnaire credential and identity metadata for compatibility and migration; excludes raw codes, tokens, grants, and provider secrets",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "client_revision": {
+      "type": "number",
+      "description": "Client-monotonic revision assigned by the coordinated questionnaire client",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "server_revision": {
+      "type": "number",
+      "description": "Server-authoritative monotonic revision assigned after an accepted draft mutation",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "state_hash": {
+      "type": "string",
+      "description": "SHA-256 hash over the canonical draft-state hash projection",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "source_tab_id": {
+      "type": "string",
+      "description": "Opaque source browser-tab identifier containing no PII",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "last_sync_reason": {
+      "type": "string",
+      "description": "Safe diagnostic reason for the latest coordinated draft synchronization",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "last_restored_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Server-recorded timestamp of the latest successful draft restoration, populated by later backend logic",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "recovery_email": {
+      "type": "string",
+      "format": "email",
+      "description": "Sensitive validated recovery email retained for authorized recovery delivery and never inferred automatically from user_email",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "recovery_email_lookup_hash": {
+      "type": "string",
+      "description": "Version-controlled keyed hash used by backend recovery-email lookup without a public normalized-email field",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "recovery_email_source": {
+      "type": "string",
+      "description": "Controlled provenance of the recovery-email association without implying verification",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "recovery_email_verification_status": {
+      "type": "string",
+      "description": "Explicit backend-managed verification status for the recovery-email association",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "recovery_email_verified_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Server timestamp when the recovery-email association was explicitly verified",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "recovery_code_hash": {
+      "type": "string",
+      "description": "Secure versioned verifier hash for a recovery code; the raw recovery code is never stored",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "recovery_code_version": {
+      "type": "number",
+      "description": "Monotonic version used to rotate or revoke the current recovery-code verifier",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "recovery_code_hint": {
+      "type": "string",
+      "description": "Non-authorizing safe last-four display fragment for support; never sufficient to recover a draft",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "resume_token_hash": {
+      "type": "string",
+      "description": "Secure hash of an authorized resume token; the raw resume token is never stored",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "identity_key_hash": {
+      "type": "string",
+      "description": "Secure hash representing a verified signed identity without storing raw signed identity material",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "recovery_session_version": {
+      "type": "number",
+      "description": "Backend-managed version that revokes prior recovery-session grants without storing a recovery-session token",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "draft_generation": {
+      "type": "number",
+      "description": "Sequence number for drafts within one recovery-email association when Clear All or Start New creates a new record",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "previous_draft_id": {
+      "type": "string",
+      "description": "Link to the retained prior draft when Clear All or Start New creates this replacement record",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "replacement_draft_id": {
+      "type": "string",
+      "description": "Link from a retained cleared_superseded record to the new draft created by Clear All or Start New",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "superseded_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Server timestamp when the old retained record was marked cleared_superseded after Clear All or Start New",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "superseded_reason": {
+      "type": "string",
+      "description": "Controlled Clear All or Start New reason for retaining and superseding the old draft record",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "status_version": {
+      "type": "number",
+      "description": "Version of the lifecycle transition metadata; supplements rather than replaces the existing unconstrained status field",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "submitted_state_hash": {
+      "type": "string",
+      "description": "Integrity hash of the immutable submitted canonical state supplementing submitted_at and final_submission_id",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "pdf_source_state_hash": {
+      "type": "string",
+      "description": "Integrity hash binding PDF generation to the exact submitted canonical state",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "submitted_lock_version": {
+      "type": "number",
+      "description": "Version of the terminal submission-lock contract supplementing existing submission fields",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "status_locked_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Server timestamp when the submitted lifecycle status became terminal and immutable",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "last_submission_error_code": {
+      "type": "string",
+      "description": "Safe bounded submission failure code without exception stacks, external response bodies, or secrets",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "recovery_email_delivery_status": {
+      "type": "string",
+      "description": "Safe backend-managed lifecycle status for recovery-email delivery",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "last_recovery_email_sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Server timestamp of the latest provider-accepted recovery-email delivery",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "recovery_email_delivery_error_code": {
+      "type": "string",
+      "description": "Safe bounded recovery-email delivery failure code without recipient, response body, or provider secret",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "recovery_email_delivery_attempt_count": {
+      "type": "number",
+      "description": "Backend-maintained count of recovery-email delivery attempts",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "retention_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Server-assigned retention expiration timestamp for new records; absence keeps legacy records valid",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "retention_hold": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether authorized retention cleanup must preserve this draft; false is the safe default for newly created records",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "retention_hold_reason": {
+      "type": "string",
+      "description": "Sensitive controlled reason for an authorized retention hold",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "retention_policy_version": {
+      "type": "number",
+      "description": "Version of the retention policy used when backend logic assigns retention metadata",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "environment": {
+      "type": "string",
+      "description": "Environment classification assigned by trusted backend or migration code",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "test_run_id": {
+      "type": "string",
+      "description": "Opaque synthetic test-run identifier; absent for ordinary production records",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "source_app_id": {
+      "type": "string",
+      "description": "Internal Base44 application identifier of the source record",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "source_entity": {
+      "type": "string",
+      "description": "Source entity name used by the migration identity and integrity report",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "source_record_id": {
+      "type": "string",
+      "description": "Immutable Base44 identifier of the source record",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "source_created_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Authoritative source platform creation timestamp",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "source_updated_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Authoritative source platform update timestamp",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "migration_batch_id": {
+      "type": "string",
+      "description": "Opaque identifier of the migration or reconciliation batch",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "migration_direction": {
+      "type": "string",
+      "description": "Controlled migration direction recorded by the migration runner",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "migrated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Server timestamp when the destination record was last reconciled",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "source_content_hash": {
+      "type": "string",
+      "description": "Deterministic hash of normalized source content excluding migration bookkeeping",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "migration_version": {
+      "type": "number",
+      "description": "Positive migration contract version used for this record",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
     }
   },
   "required": [

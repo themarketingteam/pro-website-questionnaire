@@ -1,12 +1,14 @@
 # Base44 Pro Form entity extension and compatibility plan
 
-- Status: plan only; no entity schema has been edited or pushed
+- Status: `ProFormDraft` extension implemented locally; no entity schema pushed
 - Date: 2026-08-05
-- Git baseline: `50c7379c1cfc30e2d242e917b0abe951e3f75584`
+- Planning baseline: `50c7379c1cfc30e2d242e917b0abe951e3f75584`
+- Prompt 2 implementation baseline: `8b5aac603bb9c568b7bdc726423852c4e146582a`
 - Branch: `feature/durable-draft-recovery`
 - Base44 CLI inspected locally: `0.1.8`
 - Machine-readable contract: [pro-form-field-manifest.json](./pro-form-field-manifest.json)
 - Validator: `scripts/validate-pro-form-entity-schemas.mjs`
+- Focused test runner: `scripts/run-pro-form-entity-schema-tests.mjs`
 - Architecture authority: [ADR-002](../architecture/ADR-002-blue-green-base44-cutover-and-data-continuity.md), [ADR-003](../architecture/ADR-003-draft-identity-recovery-and-lifecycle-contract.md), [canonical draft state](../architecture/canonical-draft-state-contract.md), [identity contract](../architecture/draft-identity-and-email-normalization-contract.md), and [recovery-code contract](../architecture/recovery-code-and-draft-selection-contract.md)
 
 ## Decision and boundary
@@ -18,15 +20,15 @@ The four existing uppercase schema files remain the authoritative repository con
 3. `base44/entities/ProFormSubmission.jsonc`
 4. `base44/entities/ProFormSubmissionIntake.jsonc`
 
-They are not renamed. No proposed field is required. Existing fields, required arrays, status behavior, metadata/userdata shape, and row-level policies remain unchanged until a separately reviewed staging schema prompt. The current public questionnaire may continue its compatibility draft/event calls during that transition, but none of the new protected fields may be written through anonymous direct entity calls.
+They are not renamed. Prompt 2 adds 55 optional, field-restricted properties to the local `ProFormDraft` schema while preserving its 30 original properties, sole `session_id` requirement, unconstrained string `status`, and absent entity-level RLS. The other three schemas remain plan-only. The current public questionnaire may continue its compatibility draft/event calls, but none of the new protected fields may be written through anonymous direct entity calls.
 
-The manifest is deliberately stored under `docs/durable-draft-recovery/data`, outside `base44/entities`. It is strict JSON but is not a Base44 entity resource and cannot be included by an entity-directory push. No generated `base44/.types/types.d.ts` exists at this baseline; type generation must occur only after a later authorized schema edit.
+The manifest is deliberately stored under `docs/durable-draft-recovery/data`, outside `base44/entities`. It is strict JSON but is not a Base44 entity resource and cannot be included by an entity-directory push. No generated `base44/.types/types.d.ts` exists; Prompt 2 does not generate types because no schema is pushed or deployed.
 
 ## Current compatibility baseline
 
 | Entity | Existing top-level fields | Existing required array | Repository RLS/FLS | Current compatibility callers |
 | --- | ---: | --- | --- | --- |
-| `ProFormDraft` | 30 | `session_id` | No entity RLS; no FLS | Public browser filter/create/update; admin browser update/list; backend repair/retry reads and writes |
+| `ProFormDraft` | 30 original + 55 local optional extensions | `session_id` | No entity RLS; all 55 new fields use admin read/write FLS | Public browser filter/create/update remains compatible; later backend service-role functions own new fields |
 | `ProFormDraftEvent` | 12 | `session_id` | No entity RLS; no FLS | Public browser create; backend repair create |
 | `ProFormSubmission` | 2 large objects | `metadata`, `userdata` | Existing creator/admin read-update-delete and open create/write objects; no FLS | Public and admin browser create; backend fallback/retry/repair create/filter |
 | `ProFormSubmissionIntake` | 33 | `questionnaire_session_id` | Existing admin-only read/update/delete/write; no FLS | Admin browser list; backend fallback/retry/repair create/filter/update |
@@ -38,7 +40,7 @@ Compatibility findings:
 - `ProFormSubmission.metadata` and `userdata` are preserved without restructuring.
 - Runtime backend code already writes/searches `metadata.questionnaire_session_id`, although that nested key is not declared in the current submission schema. The planned top-level `questionnaire_session_id` is therefore conditional and must not be added until one canonical write/backfill/projection rule prevents divergence.
 - Existing direct browser operations remain compatibility-only. Future authorization must move to scoped backend functions before draft/event entity RLS is tightened.
-- The committed schemas contain 27 pre-existing missing-description paths: 5 in `ProFormSubmission` and 22 in `ProFormSubmissionIntake`. The validator freezes those exact exceptions, requires descriptions on every proposed/future field, and rejects any new missing description. This prompt cannot repair the legacy descriptions because schema edits are prohibited.
+- The schemas contain 27 pre-existing missing-description paths outside Draft: 5 in `ProFormSubmission` and 22 in `ProFormSubmissionIntake`. The validator freezes those exact exceptions, requires descriptions on every new/future field, and rejects any new missing description.
 
 ## Field classification system
 
@@ -77,7 +79,7 @@ No entity may contain a raw recovery code, normalized recovery-code input, recov
 
 For every proposed field, the manifest is normative and supplies: entity membership, name, type, optional format/enum, no default unless explicitly present, `required:false`, classifications, sensitive flag, FLS requirement, purpose/migration use, public projection rule, and description. Its `group` selects a policy containing canonical-state source, legacy fallback, migration behavior, admin projection, retention behavior, and test requirement. Thus every field has all sixteen required planning attributes without repeating security prose in every row below.
 
-All current definitions intentionally omit a schema default. Application/backend normalization supplies safe fallbacks so adding an optional field cannot rewrite legacy records implicitly.
+Definitions omit schema defaults except Prompt 2's explicit `retention_hold: false`. That optional default applies to new writes and does not make the field required or assign an expiration to legacy records.
 
 ## Common migration metadata
 
@@ -102,100 +104,67 @@ These 12 optional fields are planned on all four entities and are admin/backend-
 
 The fields support ADR-002 initial full migration, overlapping incremental deltas, final freeze delta, late-write reconciliation, and green-to-blue rollback. Every direction uses deterministic upsert, content hashes, stable checkpoints/tie-breakers, relationship validation, and fail-closed integrity reports.
 
-## `ProFormDraft` extension plan
+## `ProFormDraft` local extension
 
-Planned count: **58** optional fields: 12 common migration fields plus 46 draft-specific fields.
+Implementation status: **55 optional fields implemented locally and not pushed**: 43 draft-specific fields plus the 12 common migration fields. All 55 use admin read/write FLS. Existing browser payloads remain valid because `session_id` is still the only required field.
 
-### Canonical state
+### Canonical state (7)
 
-- `canonical_state_json` — string; `backend_only`, `sensitive_pii`, `canonical_state`; strict canonical v4 state and sole future server authority.
-- `canonical_state_contract_version` — number; `backend_only`, `canonical_state`; selects parser/migration behavior.
-- `field_change_metadata_json` — string; `backend_only`, `sensitive_pii`, `canonical_state`, `audit_metadata`; preserves field-level conflict metadata.
+- `form_type` (string), `draft_schema_version` (number), and `draft_state_json` (string) identify and carry the future authoritative canonical envelope.
+- `text_validation_meta_json`, `ui_draft_state_json`, and `field_change_metadata_json` (strings) preserve lossless validation/editor/conflict compatibility state.
+- `credentials_json` (string) holds only approved allowlisted identity metadata; raw codes, tokens, grants, and provider secrets are prohibited.
 
-Legacy fallback reconstructs independently from existing compatibility JSON fields, preserves warnings, and never overwrites the source record on failure. Existing `responses_json`, validation/touched/expanded maps, mapped payload fields, and draft metadata remain intact as server-controlled compatibility projections.
+Legacy fallback continues to use the original response, validation, touched, expanded, mapped-payload, and draft-metadata columns. The new envelope is not authoritative until later backend migration.
 
-### Revisions and hash
+### Revisions and state hash (6)
 
-- `client_revision` — number; `backend_only`, `canonical_state`, `audit_metadata`; highest coordinated client revision.
-- `server_revision` — number; `backend_only`, `canonical_state`, `audit_metadata`; authoritative monotonic revision.
-- `state_hash` — string; `backend_only`, `canonical_state`, `sensitive_hash`; canonical equality/conflict hash.
-- `saved_at_server` — string/date-time; `backend_only`, `canonical_state`, `audit_metadata`; authoritative acknowledgement time distinct from legacy client time.
+- `client_revision` and `server_revision` (numbers) distinguish client-monotonic and server-authoritative revisions.
+- `state_hash` (string) is the SHA-256 canonical hash projection.
+- `source_tab_id` (string) is opaque and contains no PII.
+- `last_sync_reason` (string) is a bounded diagnostic.
+- `last_restored_at` (string/date-time) is populated later from server time.
 
-Legacy records use revision zero and no authoritative server timestamp. Migration preserves but never increments revision/hash metadata.
+No defaults invent revision, hash, tab, synchronization, or restoration history for legacy records.
 
-### Identity association
+### Recovery email (5)
 
-- `recovery_email_display` — string/email; `admin_only`, `backend_only`, `sensitive_pii`; trimmed display form.
-- `recovery_email_normalized` — string/email; `admin_only`, `backend_only`, `sensitive_pii`; validated lowercase normalization.
-- `recovery_email_lookup_hash` — string; `admin_only`, `backend_only`, `sensitive_hash`; keyed equality lookup.
-- `recovery_email_lookup_hash_version` — number; `admin_only`, `backend_only`, `sensitive_hash`; keyed-hash rotation version.
-- `email_source` — string with the approved seven-value identity-source enum; `admin_only`, `backend_only`, `sensitive_pii`, `audit_metadata`; provenance only.
-- `verification_status` — string with the four explicit verification states; `admin_only`, `backend_only`, `sensitive_pii`, `audit_metadata`; never inferred from URL or migration.
-- `identity_context_version` — number; `backend_only`, `audit_metadata`; identity contract version.
+- `recovery_email` (string/email), `recovery_email_lookup_hash` (string), `recovery_email_source` (string), `recovery_email_verification_status` (string), and `recovery_email_verified_at` (string/date-time).
 
-Legacy `user_email` stays unchanged. Backfill occurs only through explicit normalization and defaults to `migrated_legacy`/`unverified`; it never upgrades verification. Public projections omit normalized email and lookup hash.
+These fields are `admin_only`/`backend_only`; email values are `sensitive_pii` and the lookup value is `sensitive_hash`. `user_email` is not copied automatically, no normalized email is public, and migration never upgrades verification.
 
-### Recovery authorization
+### Recovery authorization (6)
 
-- `recovery_code_hash` — string; `admin_only`, `backend_only`, `sensitive_hash`; secure/keyed verifier only.
-- `recovery_code_hash_version` — number; same classification; verifier algorithm/key version.
-- `recovery_code_version` — number; plus `audit_metadata`; rotation/revocation sequence.
-- `recovery_code_last_four_hint` — string; same protected classification; optional support hint only if separately approved.
+- `recovery_code_hash` (string), `recovery_code_version` (number), `recovery_code_hint` (string), `resume_token_hash` (string), `identity_key_hash` (string), and `recovery_session_version` (number).
 
-No raw code is stored or migrated. Legacy drafts remain readable but are not code-recoverable until a reviewed backend issuance/migration path exists.
+Only hashes, versions, and an optional non-authorizing last-four hint are retained. Raw recovery codes, resume tokens, recovery-session tokens, identity material, and admin grants are never stored or migrated.
 
-### Supersession
+### Draft generation and supersession (6)
 
-- `superseded_at` — string/date-time; `backend_only`, `audit_metadata`, `retention_metadata`; authoritative transition time.
-- `superseded_reason` — string; `backend_only`, `sensitive_pii`, `audit_metadata`; controlled reason.
-- `replacement_draft_id` — string; `backend_only`, `sensitive_pii`, `audit_metadata`; old-to-new link.
-- `previous_draft_id` — string; same classification; new-to-old link.
-- `generation_sequence` — number; `backend_only`, `audit_metadata`; chain generation.
-- `clear_idempotency_key_hash` — string; `backend_only`, `sensitive_hash`, `audit_metadata`; duplicate replacement guard.
+- `draft_generation` (number), `previous_draft_id` (string), `replacement_draft_id` (string), `superseded_at` (string/date-time), `superseded_reason` (string), and `status_version` (number).
 
-Relationship IDs are remapped through the forward/reverse ID map. Missing fields mean no recorded supersession and do not invalidate legacy drafts.
+Clear All and Start New create a new record, link both retained records, and later mark the old record `cleared_superseded`. These fields sequence drafts within an email association and supplement rather than constrain the existing `status` string.
 
-### Submission lock
+### Submission lock (5)
 
-- `submission_snapshot_json` — string; `backend_only`, `sensitive_pii`, `canonical_state`, `submission_lock`; immutable submit snapshot.
-- `submission_snapshot_hash` — string; `backend_only`, `sensitive_hash`, `submission_lock`; snapshot integrity.
-- `submission_idempotency_key_hash` — string; same classification; duplicate submission guard.
-- `pdf_source_snapshot_json` — string; `backend_only`, `sensitive_pii`, `canonical_state`, `submission_lock`; immutable PDF source.
-- `pdf_source_state_hash` — string; `backend_only`, `sensitive_hash`, `submission_lock`; exact PDF/source binding.
+- `submitted_state_hash` and `pdf_source_state_hash` (strings), `submitted_lock_version` (number), `status_locked_at` (string/date-time), and `last_submission_error_code` (string).
 
-Legacy `final_submission_id`, mapped payloads, and submission timestamps remain readable. Missing new snapshots/hashes are valid legacy state and require explicit compatibility handling.
+They supplement `submitted_at`, `final_submission_id`, and `submit_error`. The safe error code excludes exception stacks, external response bodies, and secrets.
 
-### Recovery email delivery
+### Recovery-email delivery (4)
 
-- `recovery_email_delivery_status` — string; `backend_only`, `audit_metadata`; safe lifecycle status.
-- `recovery_email_delivery_attempt_count` — number; same classification; bounded retry count.
-- `recovery_email_last_sent_at` — string/date-time; same classification; provider-accepted server time.
-- `recovery_email_delivery_error_code` — string; same classification; safe bounded failure code.
+- `recovery_email_delivery_status` (string), `last_recovery_email_sent_at` (string/date-time), `recovery_email_delivery_error_code` (string), and `recovery_email_delivery_attempt_count` (number).
 
-No recipient, message body, raw code, provider token, or credential is stored. Staging delivery context/test IDs are excluded from green.
+These admin/backend diagnostics contain no recipient, message body, raw code, provider token, credential, or response body. Email delivery is not implemented by this schema change.
 
-### Retention
+### Retention (4)
 
-- `retention_class` — string; `admin_only`, `backend_only`, `retention_metadata`.
-- `retention_anchor_at` — string/date-time; same classification; authoritative policy anchor.
-- `support_hold` — boolean; same classification; cleanup exemption.
-- `support_hold_reason` — string; plus `sensitive_pii`; controlled reason.
-- `support_hold_set_at` — string/date-time; plus `audit_metadata`.
-- `support_hold_released_at` — string/date-time; plus `audit_metadata`.
-- `cleanup_dry_run_batch_id` — string; `admin_only`, `backend_only`, `retention_metadata`, `audit_metadata`.
-- `expired_at` — string/date-time; `backend_only`, `retention_metadata`, `audit_metadata`.
-- `deleted_at` — string/date-time; `admin_only`, `backend_only`, `retention_metadata`, `audit_metadata`; inactive unless soft deletion is separately approved.
+- `retention_expires_at` (string/date-time), `retention_hold` (boolean, default `false`), `retention_hold_reason` (string), and `retention_policy_version` (number).
 
-Absence never shortens legacy retention. Cleanup remains dry-run-first and must preserve holds, events, supersession chains, submissions, and rollback evidence.
+All are admin/backend-only; the reason is sensitive PII. Missing expiration/version values keep legacy records valid, no existing expiration is assigned, and no cleanup is run.
 
-### Diagnostics
+### Environment and migration (12)
 
-- `last_mutation_id` — string; `backend_only`, `audit_metadata`; opaque mutation correlation.
-- `last_authorization_method` — string; `admin_only`, `backend_only`, `audit_metadata`; safe method code.
-- `last_authorization_outcome` — string; same classification; internal safe outcome without an enumeration oracle.
-- `last_conflict_code` — string; `backend_only`, `audit_metadata`; bounded conflict code.
-
-Diagnostics never contain answer values, raw email, code, token, grant, provider response body, or credentials.
+The common fields in the preceding table are implemented with their planned types and admin read/write FLS. The composite source identity supports full, incremental, late-write, and reverse migration without replacing local Base44 IDs.
 
 ## `ProFormDraftEvent` extension plan
 
@@ -207,7 +176,7 @@ Planned count: **25** optional fields: 12 common migration fields plus 13 event-
 - `server_revision` — number; same classification; resulting server revision.
 - `base_server_revision` — number; `backend_only`, `audit_metadata`; mutation base revision.
 - `mutation_id` — string; `backend_only`, `audit_metadata`; mutation correlation.
-- `source_tab_id` — string; `backend_only`, `sensitive_pii`, `audit_metadata`; safe per-tab origin.
+- `source_tab_id` — string; `backend_only`, `audit_metadata`; opaque non-PII per-tab origin.
 - `event_metadata_json` — string; `backend_only`, `sensitive_pii`, `audit_metadata`; allowlisted metadata only.
 - `safe_value_hash` — string; `backend_only`, `sensitive_hash`, `audit_metadata`; optional integrity comparison without projection.
 - `canonical_state_hash` — string; `backend_only`, `sensitive_hash`, `audit_metadata`; links the event to accepted state.
@@ -257,16 +226,17 @@ The existing status enum, retry counters/errors, AI repair fields, `zapier_sent`
 
 ## Validator contract
 
-`npm run test:entity-schemas -- --plan-only`:
+`npm run test:entity-schemas`:
 
 - parses strict manifest JSON and all four JSONC schemas with `jsonc-parser`;
 - detects duplicate keys from the JSONC syntax tree;
 - verifies exact entity names, uppercase paths, top-level object shape, existing field types, required arrays, Intake enum/default, and RLS baselines;
-- verifies every proposed field is optional, described, classified, nonsecret, and assigned admin/backend FLS;
+- requires every locally implemented Draft field to exist and verifies it is optional, described, classified, nonsecret, and assigned exact admin/backend FLS;
 - verifies all four entities carry the same 12 migration fields and types;
 - rejects raw code/token/grant field names;
 - freezes the exact 27 legacy missing-description exceptions and rejects new ones;
-- verifies baseline SHA-256 values and proves no proposed field entered a schema in plan-only mode;
+- verifies the pre-extension baseline hash, the implemented local Draft schema hash, and plan-only baselines for the other three entities;
+- runs six focused Vitest cases covering exact Prompt 2 fields, legacy compatibility, raw-material prohibitions, and synthetic legacy/future payload validation;
 - exits nonzero for every violation.
 
 ## Deferred implementation gates
@@ -275,13 +245,13 @@ No schema push is authorized by this plan. Before a later staging-only entity pu
 
 1. Review every field against Base44 staging FLS behavior and generated types.
 2. Resolve the conditional submission session linkage.
-3. Add fields only as optional and retain exact required arrays/RLS.
+3. Keep Draft additions optional and add later entity fields only as optional while retaining exact required arrays/RLS.
 4. Generate local types after schema edits.
 5. Run validator, normal/canonical/identity suites, lint, typecheck, build, and staging authorization tests.
 6. Export/checkpoint staging data and compare pre/post schemas.
 7. Push only staging after separate authorization; never use blue production for schema experiments.
 8. Keep Durable Draft V2 and public recovery disabled until later acceptance gates.
 
-## Planning action statement
+## Local implementation action statement
 
-This plan and manifest do not edit an entity schema, change RLS/FLS, create a record, read production record contents, generate types, push entities, deploy code, send email, invoke recovery, change a domain, or enable a feature.
+Prompt 2 edits only the local `ProFormDraft` schema and its validation/planning artifacts. It adds field-level admin restrictions but no entity-level RLS. It does not create or read a record, generate types, push entities, deploy code, send email, run cleanup, invoke recovery, change a domain, or enable a feature.

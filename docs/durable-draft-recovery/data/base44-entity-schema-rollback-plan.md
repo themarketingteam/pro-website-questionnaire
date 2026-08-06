@@ -1,14 +1,15 @@
 # Base44 entity schema rollback plan
 
-- Status: planning only
+- Status: `ProFormDraft` schema extended locally; no Base44 push
 - Date: 2026-08-05
-- Source baseline commit: `50c7379c1cfc30e2d242e917b0abe951e3f75584`
+- Source planning baseline commit: `50c7379c1cfc30e2d242e917b0abe951e3f75584`
+- Prompt 2 implementation baseline commit: `8b5aac603bb9c568b7bdc726423852c4e146582a`
 - Active branch: `feature/durable-draft-recovery`
 - Applies to: `ProFormDraft`, `ProFormDraftEvent`, `ProFormSubmission`, and `ProFormSubmissionIntake`
 
 ## Current baseline
 
-The committed uppercase schema files and their planning-baseline SHA-256 values are recorded in [pro-form-field-manifest.json](./pro-form-field-manifest.json). The validator's `--plan-only` mode verifies those files are unchanged. This prompt does not push a schema anywhere.
+The uppercase schema files and their pre-extension SHA-256 values are recorded in [pro-form-field-manifest.json](./pro-form-field-manifest.json). The manifest additionally records the local implemented `ProFormDraft` hash, while the other three entities remain at their planning baselines. The validator checks this mixed implementation state. This prompt does not push a schema anywhere.
 
 The first future schema change must be staging-only. Blue production remains intact and green production receives no schema until the staging field/FLS/compatibility matrix passes and a separate production-candidate change is authorized.
 
@@ -21,7 +22,7 @@ Before editing or pushing staging schemas:
 3. Export or otherwise checkpoint staging entity data and record counts/status distributions using synthetic data only.
 4. Preserve the four pre-change schema files and generated type output as release evidence.
 5. Capture current entity RLS and FLS from source and manually verify them in the Base44 dashboard.
-6. Run `npm run test:entity-schemas -- --plan-only` before schema edits.
+6. Run `npm run test:entity-schemas` before any staging push and preserve its exact local schema hashes.
 7. Resolve all conditional fields, especially submission session linkage, before adding them.
 
 No production record content is used during staging rehearsal.
@@ -117,4 +118,4 @@ Schema field deletion is not part of that emergency path. Optional fields can re
 
 ## Planning action statement
 
-This rollback plan does not edit or push schemas, access production records, create an export, alter Base44 resources, deploy code, move a domain, or execute a rollback.
+Prompt 2 changes the local Draft schema but does not push it. This rollback plan does not access production records, create an export, alter a Base44 cloud resource, deploy code, move a domain, run cleanup, or execute a rollback.
