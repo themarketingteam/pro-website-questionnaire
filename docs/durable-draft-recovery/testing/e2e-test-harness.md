@@ -1,8 +1,8 @@
 # Safe multi-browser E2E test harness
 
 - Status: local foundation implemented; staging execution awaits an explicit deployed staging URL
-- Date: 2026-08-05
-- Scope: read-only questionnaire-shell smoke and fixture-mechanics validation
+- Date: 2026-08-06
+- Scope: read-only questionnaire shell, fixture mechanics, and synthetic recovery-bootstrap controller validation
 
 ## Safety contract
 
@@ -44,6 +44,14 @@ npm run test:e2e:smoke
 Use `npm run test:e2e:harness` for storage/network/lifecycle/concurrency fixture mechanics. `npm run test:e2e:pending-report` lists future V2 scenarios without failing foundation work; `npm run test:e2e:pending-strict` is the release guard and intentionally fails while any remain pending. See `browser-failure-fixtures.md` for the full mode API and activation rules.
 
 Use `npm run test:e2e`, `npm run test:e2e:headed`, or `npm run test:e2e:debug` for the complete current E2E set, headed inspection, or Playwright debugging. Local runs use zero retries; CI may use one retry and must still preserve the first failure evidence. Skipped V2 tests are visible release debt, not passing recovery evidence.
+
+`tests/e2e/draft-v2/bootstrap-controller.spec.js` activates the six nonvisual
+recovery scenarios supported before the opening modal exists: explicit new
+draft creation, stored resume, email/code API handoff, submitted read-only
+hydration, and memory-only credentials. It uses injected synthetic clients and
+creates no Base44 record or external request. Modal rendering/accessibility
+assertions remain deferred, and the eight server-sync/concurrency/offline
+`fixme` cases remain explicit release debt.
 
 ## Staging use
 

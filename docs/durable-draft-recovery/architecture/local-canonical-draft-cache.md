@@ -2,8 +2,8 @@
 
 - Cache envelope version: `1`
 - Canonical schema version: `4`
-- Browser namespace/key version: `v4`
-- Cache key: `pro-questionnaire:v4:<hashed-namespace>:draft-cache`
+- Browser namespace/key version: `v5`
+- Cache key: `pro-questionnaire:v5:<hashed-namespace>:draft-cache`
 - Runtime modules: `src/lib/questionnaireCanonicalDraftCache.js` and `src/components/store/localCanonicalDraftPersistence.js`
 - Authority: browser-local recovery aid only; never server authority
 
@@ -11,7 +11,7 @@
 
 The cache stores the complete canonical questionnaire projection after Redux reducers finish. It provides deterministic same-browser reload continuity through the existing resilient IndexedDB → localStorage → page-memory adapter. It does not create a Base44 record, acknowledge a server revision, authorize recovery, enable Draft V2, synchronize tabs, or prove cross-device durability.
 
-The cache key contains only the established hashed questionnaire namespace. Credentials may exist inside the encrypted-by-origin browser record as questionnaire state, but raw email, business, domain, user ID, token, or recovery material never appears in the key. Browser-origin access controls are not a server authorization boundary.
+The cache key contains only the established hashed questionnaire namespace. Canonical identity metadata and the normalized recovery-email association may exist in canonical state, but authorization tokens and raw recovery codes are forbidden. The separate `draft-credentials` vault owns recovery authorization material. Raw email, business, domain, user ID, token, or recovery material never appears in either key name. Browser-origin access controls are not a server authorization boundary.
 
 ## Envelope
 
@@ -20,7 +20,7 @@ Every write validates this complete envelope before replacing the prior value:
 ```json
 {
   "cacheVersion": 1,
-  "namespaceVersion": "v4",
+  "namespaceVersion": "v5",
   "canonicalStateJson": "{...stable canonical schema-v4 JSON...}",
   "canonicalStateHash": "64-lowercase-hex-sha256",
   "canonicalStateSchemaVersion": 4,
@@ -49,6 +49,16 @@ After a successful write, Redux receives local-only status:
 Local persistence never increments `clientRevision` or `serverRevision`, never reports `server_saved`, and never invokes a Base44 client or network API.
 
 ## Bootstrap selection
+
+The V2 recovery coordinator reads this cache before its scoped credential
+vault and before any authoritative API call. It does not dispatch an empty
+state while client choice is pending. Authorized local/server reconciliation
+uses canonical compatibility and freshness, protects submitted server state,
+marks local-newer/local-only selections for later server sync, and preserves
+both sides of a divergence. Malformed and incompatible caches are not deleted.
+
+The existing `ReduxProvider` local-only selection remains the active flow when
+V2 is disabled. Ongoing server autosave has not been migrated in this batch.
 
 `ReduxProvider` follows this order:
 

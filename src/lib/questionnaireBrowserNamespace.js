@@ -15,6 +15,7 @@ export const QUESTIONNAIRE_STORAGE_PURPOSES = Object.freeze([
   'redux-state',
   'legacy-session',
   'draft-cache',
+  'draft-credentials',
   'failure-backup',
   'migration-marker',
   'submitted-receipt',

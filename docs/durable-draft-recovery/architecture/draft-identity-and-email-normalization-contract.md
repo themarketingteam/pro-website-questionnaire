@@ -3,7 +3,7 @@
 - Identity version: `1`
 - Recovery-email normalization version: `1`
 - Modules: `src/lib/proDraftIdentity.js`; `src/lib/proDraftClientIdentityContext.js`
-- Status: client contract integrated with canonical state, Redux, browser namespace/cache, and bootstrap; no recovery UI, backend authorization, Base44 schema, or deployment change
+- Status: client contract integrated with canonical state, Redux, browser namespace/cache, and the source-only V2 recovery coordinator; no recovery modal, feature enablement, schema push, or deployment change
 - Sources: [ADR-001](./ADR-001-approved-product-and-security-decisions.md), [ADR-003](./ADR-003-draft-identity-recovery-and-lifecycle-contract.md), [canonical draft state](./canonical-draft-state-contract.md), [browser namespace policy](./browser-namespace-and-legacy-key-policy.md)
 
 ## Purpose and boundary
@@ -162,7 +162,7 @@ When a signed email changes, context creation forces:
 - intent `changed_signed_email`;
 - `signedInvitationEmailChanged=true`.
 
-No draft lookup or Base44 operation occurs. A later coordinator must create/associate a new draft and must not search the replacement email's existing drafts.
+Identity normalization itself performs no lookup. The V2 coordinator now enforces this boundary: it does not exchange a signed invitation to search a changed replacement email and returns the explicit client-choice boundary instead.
 
 An `anonymous_start` with no email is invalid until `anonymousRecoveryAcknowledged=true`. This records only the future recovery-risk acknowledgement; it does not create a code or modal.
 
@@ -176,7 +176,7 @@ The existing browser namespace continues to reduce its identity seed to an opaqu
 
 `proDraftClientIdentityContext.js` exports `readProQuestionnaireIdentityParams`, `createClientDraftIdentityContext`, `compareSignedAndEnteredEmail`, `deriveClientDraftAssociationDecision`, and `getSafeClientIdentityContextDiagnostics`. URL parameters are always untrusted claims: they cannot create a verified state or select a signed namespace. Only an explicit trusted-backend result may do so. The adapter maps signed-email changes to a new unverified association and emits diagnostics limited to approved enums, versions, booleans, and an error code.
 
-Canonical schema v4 stores normalized raw recovery email only at `credentials.recoveryEmail`. Redux stores the six non-email metadata fields in `draftContext`. Cache/bootstrap identity mismatch fails closed without deleting the prior value. This integration adds no lookup, entity, recovery-session, email, Base44, or authorization operation.
+Canonical schema v4 stores normalized raw recovery email only at `credentials.recoveryEmail`. Redux stores the six non-email metadata fields in `draftContext`. Cache/bootstrap identity mismatch fails closed without deleting the prior value. When V2 is enabled later, the coordinator performs explicit email/code recovery or signed/resume authorization through the existing API clients. Email recovery remains `unverified`; tokens and raw codes stay outside both canonical state and Redux. URL email never triggers recovery automatically.
 
 ## Future backend lookup and verification
 

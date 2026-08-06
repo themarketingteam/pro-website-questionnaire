@@ -295,3 +295,20 @@ unknown and unconfigured.
 No risk rating changes. `RISK-008` remains without live redirect/inbox proof
 and `RISK-009` remains blocking. No AWS/Base44 configuration, schema, function,
 record, email, inbox, provider, production, domain, or remote Git operation ran.
+
+## 2026-08-06 client credential vault and bootstrap source evidence
+
+The source-only credential vault and bootstrap coordinator reduce design and
+local-test uncertainty for `RISK-003`, `RISK-006`, `RISK-018`, `RISK-026`, and
+`RISK-027`. IndexedDB/localStorage/page-memory fallback is truthful; malformed
+credentials do not replace canonical cache; submitted server state wins;
+changed signed email cannot search a replacement association; exact credentials
+never enter Redux or canonical state. Possession of a browser-stored token is
+still authorization, and browser storage is not encryption. XSS, same-origin
+script compromise, shared-profile access, extension access, and page-lifetime
+loss remain material risks.
+
+No rating is lowered and no risk is closed. The visual choice/modal gate,
+ongoing autosave ordering, deployed browser matrix, staging API operation, and
+production-disabled evidence remain pending. No flag, schema, Base44 resource,
+deployment, production system, or Git remote was changed.
