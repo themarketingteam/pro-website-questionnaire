@@ -11,7 +11,7 @@
     "source_record_id": {"type": "string", "description": "Protected immediate source record identifier."},
     "destination_app_id": {"type": "string", "description": "Protected destination application identifier."},
     "destination_record_id": {"type": "string", "description": "Protected destination record identifier when one exists."},
-    "conflict_type": {"type": "string", "description": "Safe machine-readable conflict category."},
+    "conflict_type": {"type": "string", "enum": ["source_and_destination_modified", "destination_native_record_collision", "relationship_target_missing", "source_fingerprint_changed_after_export", "destination_fingerprint_changed_before_apply", "submitted_state_mismatch", "status_regression_attempt", "origin_identity_collision", "file_reference_inaccessible", "unsupported_schema_version"], "description": "Safe machine-readable conflict category."},
     "source_content_hash": {"type": "string", "description": "SHA-256 hash of the source migration projection."},
     "destination_content_hash": {"type": "string", "description": "SHA-256 hash of the destination migration projection."},
     "base_content_hash": {"type": "string", "description": "SHA-256 hash of the last common migration projection when known."},

@@ -448,3 +448,21 @@ blocks the future encrypted option, redacts URLs and permits only content-free
 reports/checkpoints. This addendum does not certify a live app or migration:
 no `_next` app, secret configuration, production access, data transfer,
 function deployment, schema push, domain action or branch push occurred.
+
+## 2026-08-06 incremental and reverse-control addendum
+
+The local utility now implements the single-direction lease, eight explicit
+operation modes, per-entity server-`updated_date` high-water tuple, five-minute
+default overlap, two-pass final-freeze closure, reverse origin/ID-map behavior,
+late-write quiet windows, content-free conflict policy, file-reference audit,
+and 18-dimension integrity verdict that the preceding addenda deferred.
+
+Only an integrity verdict of `PASS` authorizes later cutover consideration.
+`PASS_WITH_WARNINGS`, `FAIL`, and `BLOCKED` are not cutover-ready. Reverse apply
+requires `APPLY_GREEN_TO_BLUE_MIGRATION`; it never deletes, merges answer
+payloads, or regresses submitted status. File references are independent data
+dependencies and signed, scoped, embedded, unknown, or missing references block
+cutover.
+
+This is local source evidence, not operational acceptance. No app, data, file,
+domain, secret, Base44 deployment, migration apply, or branch push occurred.

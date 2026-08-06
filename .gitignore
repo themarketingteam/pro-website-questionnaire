@@ -32,6 +32,10 @@ dist-ssr
 
 base44/.app.jsonc
 
+# Protected local migration reports; commit only separately sanitized evidence.
+.migration-reports/
+migration-reports/
+
 # Playwright outputs and generated E2E runtime evidence
 playwright-report/
 test-results/

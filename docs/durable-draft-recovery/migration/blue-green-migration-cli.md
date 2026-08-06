@@ -11,8 +11,12 @@
 | `plan` | Validate environment-only configuration and print a redacted, content-free plan. |
 | `export` | Request one bounded signed source batch, keep it in memory, emit only safe counts, then discard it. |
 | `import` | Stream every dependency-ordered source batch directly to destination dry-run/import. |
+| `sync` | Run an overlap-safe incremental blue-to-green delta. |
+| `reverse` | Run green-to-blue full/delta reconciliation through reverse identity maps. |
+| `late-write` | Reconcile post-freeze blue writes and emit a quiet-window report. |
 | `finalize` | Plan or apply ID-map relationship patches. |
 | `verify` | Read safe status and require zero open conflicts/unresolved mappings. |
+| `file-audit` | Produce classification/blocker metadata without downloading files. |
 | `status` | Return checkpoint, entity, mapping, conflict and unresolved counts only. |
 
 ## Environment-only configuration
@@ -58,6 +62,22 @@ Confirmed apply records only sequence, previous hash, entity index, cursor and
 snapshot cutoff in an owner-only resume report. Dry run does not advance that
 checkpoint. `--encrypted-export` fails with
 `MIGRATION_CLI_ENCRYPTED_EXPORT_NOT_IMPLEMENTED`; raw export has no option.
+
+Reverse apply uses a separate exact phrase:
+
+```text
+npm run migration:blue-green -- reverse --apply --confirm APPLY_GREEN_TO_BLUE_MIGRATION
+```
+
+`reverse` refuses any direction except `green_to_blue`; forward sync and
+late-write operations refuse `green_to_blue`. Every request carries an opaque
+lease ID/owner, and an active opposite-direction lease fails closed.
+
+The local report directory is ignored by Git. Stable names are
+`migration-plan.json`, `migration-progress.json`,
+`migration-verification.json`, `migration-conflicts.json`,
+`migration-file-audit.json`, and `migration-late-writes.json`. The structural
+sanitizer rejects payload-bearing keys and removes URL query/fragment material.
 
 ## Operational boundary
 

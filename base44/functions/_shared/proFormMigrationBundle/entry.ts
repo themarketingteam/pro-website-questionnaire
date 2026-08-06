@@ -3,6 +3,7 @@ import {
   sha256Hex,
   timingSafeEqualStrings,
 } from '../proDraftSecurity/entry.ts';
+import { assertMigrationOperationMode } from '../proFormMigrationDelta/entry.ts';
 
 export const PRO_FORM_MIGRATION_BUNDLE_VERSION = 1;
 export const MIGRATION_BUNDLE_ERROR_CODES = Object.freeze({
@@ -85,6 +86,7 @@ export async function createMigrationBundle(
     bundleVersion: PRO_FORM_MIGRATION_BUNDLE_VERSION,
     migrationVersion: input.migrationVersion,
     migrationDirection: input.migrationDirection,
+    operationMode: input.operationMode ?? 'initial_full',
     sourceAppId: input.sourceAppId,
     sourceAppFingerprint: input.sourceAppFingerprint,
     destinationAppId: input.destinationAppId,
@@ -97,6 +99,7 @@ export async function createMigrationBundle(
     snapshotCutoff: input.snapshotCutoff,
     exportedAt: input.exportedAt,
     previousBundleHash: input.previousBundleHash ?? null,
+    highWater: input.highWater ?? null,
     records: input.records,
     recordCount: Array.isArray(input.records) ? input.records.length : -1,
   };
@@ -172,6 +175,10 @@ export async function validateMigrationBundle(
     || (options.requireSignature !== false && !SIGNATURE.test(String(value.signature ?? '')))) {
     return fail(value && isRecord(value) && value.sourceAppId === value.destinationAppId
       ? MIGRATION_BUNDLE_ERROR_CODES.SAME_APP : MIGRATION_BUNDLE_ERROR_CODES.INVALID);
+  }
+  assertMigrationOperationMode(value.operationMode);
+  if (value.highWater !== null && !isRecord(value.highWater)) {
+    return fail(MIGRATION_BUNDLE_ERROR_CODES.INVALID);
   }
   if (value.recordCount !== value.records.length) {
     return fail(MIGRATION_BUNDLE_ERROR_CODES.RECORD_COUNT);
@@ -250,6 +257,7 @@ export function getSafeMigrationBundleDiagnostics(bundle: unknown) {
     bundleVersion: value.bundleVersion ?? null,
     migrationVersion: value.migrationVersion ?? null,
     migrationDirection: value.migrationDirection ?? null,
+    operationMode: value.operationMode ?? null,
     entityName: value.entityName ?? null,
     batchId: value.batchId ?? null,
     sequence: value.sequence ?? null,

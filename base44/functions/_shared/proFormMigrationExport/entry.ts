@@ -134,6 +134,8 @@ export async function buildMigrationExportRecord(
     originUpdatedAt: typeof record.origin_updated_at === 'string'
       ? record.origin_updated_at : (record.source_updated_date ?? record.updated_date ?? null),
     sourceContentHash,
+    immediateBaseContentHash: typeof record.source_content_hash === 'string'
+      ? record.source_content_hash : null,
     data: Object.freeze(data),
   });
 }
@@ -145,6 +147,7 @@ export async function buildMigrationExportBundle(
     secret: string;
     migrationVersion: number;
     migrationDirection: string;
+    operationMode?: string;
     sourceAppId: string;
     destinationAppId: string;
     sourceEnvironment: string;
@@ -158,6 +161,7 @@ export async function buildMigrationExportBundle(
     testRunId?: string;
     maxBundleBytes?: number;
     cryptoProvider?: Pick<Crypto, 'subtle'>;
+    highWater?: Record<string, unknown> | null;
   },
 ) {
   const envelopes = await Promise.all(records.map((record) => buildMigrationExportRecord(

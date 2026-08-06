@@ -38,6 +38,7 @@ export const ADMIN_API_OPERATION_NAMES = Object.freeze({
   IMPORT_CROSS_APP_MIGRATION: 'import_cross_app_migration',
   FINALIZE_CROSS_APP_MIGRATION: 'finalize_cross_app_migration',
   STATUS_CROSS_APP_MIGRATION: 'status_cross_app_migration',
+  MANAGE_CROSS_APP_MIGRATION_LEASE: 'manage_cross_app_migration_lease',
 } as const);
 
 export const ADMIN_API_ERROR_CODES = Object.freeze({
@@ -116,6 +117,7 @@ const ATTEMPT_TYPES: Readonly<Record<AdminApiOperationName, AdminAuthAttemptType
   import_cross_app_migration: 'admin_migration_apply',
   finalize_cross_app_migration: 'admin_migration_apply',
   status_cross_app_migration: 'admin_migration_analyze',
+  manage_cross_app_migration_lease: 'admin_migration_apply',
 };
 
 function fail(code: AdminApiErrorCode, status = 400): never {

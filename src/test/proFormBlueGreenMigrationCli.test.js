@@ -79,8 +79,8 @@ describe('blue/green migration CLI safety', () => {
     const result = await runMigrationCli(parseMigrationCliArguments(['import', '--dry-run']), { env: env(reportDir), fetch });
     expect(result).toMatchObject({ complete: true, protectedPayloadPersistence: false, counts: { created: 5 } });
     const files = await readdir(reportDir);
-    expect(files).toEqual(['import-batch-1.json']);
-    const report = await readFile(path.join(reportDir, files[0]), 'utf8');
+    expect(files).toEqual(['migration-plan.json', 'migration-progress.json']);
+    const report = await readFile(path.join(reportDir, 'migration-progress.json'), 'utf8');
     expect(report).not.toContain('synthetic-private-answer');
     expect(report).not.toContain('synthetic.source-grant');
   });

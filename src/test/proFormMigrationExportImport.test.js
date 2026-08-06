@@ -107,7 +107,7 @@ describe('identity-only destination upsert', () => {
     await upsertMigratedRecord(store, first, policy, importOptions);
     store.ProFormSubmission.rows[0].userdata = { answer: 'native-destination-change' };
     const second = await buildMigrationExportRecord(source({ userdata: { answer: 'source-change' } }), policy, exportOptions);
-    await expect(upsertMigratedRecord(store, second, policy, importOptions)).resolves.toMatchObject({ outcome: 'conflicted', conflictType: 'destination_changed_independently' });
+    await expect(upsertMigratedRecord(store, second, policy, importOptions)).resolves.toMatchObject({ outcome: 'conflicted', conflictType: 'source_and_destination_modified' });
   });
 
   it('performs a dry-run plan without writes', async () => {
@@ -118,7 +118,7 @@ describe('identity-only destination upsert', () => {
   });
 
   it('builds content-free conflict records and diagnostics', async () => {
-    const conflict = await buildMigrationConflictRecord({ migrationDirection: 'blue_to_green', batchId: 'batch-1', entityName: 'ProFormSubmission', sourceAppId: 'blue', sourceRecordId: 'source-1', destinationAppId: 'green', conflictType: 'destination_changed_independently', environment: 'production' });
+    const conflict = await buildMigrationConflictRecord({ migrationDirection: 'blue_to_green', batchId: 'batch-1', entityName: 'ProFormSubmission', sourceAppId: 'blue', sourceRecordId: 'source-1', destinationAppId: 'green', conflictType: 'source_and_destination_modified', environment: 'production' });
     expect(conflict.conflict_id).toMatch(/^pmc_/u);
     expect(conflict).not.toHaveProperty('payload');
     expect(getSafeMigrationImportDiagnostics({ entityName: 'ProFormSubmission', conflicted: 1 })).toMatchObject({ conflicted: 1, matchesByEmail: false, deleted: 0 });

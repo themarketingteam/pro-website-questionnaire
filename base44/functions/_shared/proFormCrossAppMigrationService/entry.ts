@@ -7,6 +7,14 @@ import {
   upsertMigratedRecord,
 } from '../proFormMigrationImport/entry.ts';
 import { getProFormMigrationRuntimePolicy, PRO_FORM_MIGRATION_RUNTIME_POLICIES } from '../proFormMigrationPolicy/entry.ts';
+import {
+  advanceMigrationHighWaterCheckpoint,
+  assertMigrationOperationMode,
+  createMigrationHighWaterCheckpoint,
+  detectMigrationAdapterCapabilities,
+  selectMigrationDeltaRecords,
+} from '../proFormMigrationDelta/entry.ts';
+import { calculateMigrationBundleHash } from '../proFormMigrationBundle/entry.ts';
 
 export class CrossAppMigrationServiceError extends Error {
   readonly code: string;
@@ -54,6 +62,8 @@ export async function exportMigrationBatch(
     maxBundleBytes: number;
     now?: () => Date;
     cryptoProvider?: Pick<Crypto, 'subtle'>;
+    deltaOverlapSeconds?: number;
+    supportsUpdatedDateSort?: boolean;
   },
 ) {
   const policy = getProFormMigrationRuntimePolicy(input.entityName);
@@ -67,19 +77,42 @@ export async function exportMigrationBatch(
   const cursor = cursorDecode(input.cursor, String(input.entityName), snapshotCutoff);
   const source = entityMethods(entities[String(input.entityName)]);
   if (typeof source.list !== 'function') return fail('MIGRATION_ENTITY_UNAVAILABLE');
+  const operationMode = assertMigrationOperationMode(input.operationMode ?? 'initial_full');
+  const isDelta = operationMode !== 'initial_full' && operationMode !== 'reverse_full';
   const skip = cursor.offset > 0 ? cursor.offset - 1 : 0;
-  const rows = await (source.list as Function)('created_date', pageSize + 2, skip);
+  const adapterCapabilities = detectMigrationAdapterCapabilities(source);
+  const supportsUpdatedDateSort = options.supportsUpdatedDateSort
+    ?? adapterCapabilities.updatedDateSort;
+  const requestedSort = isDelta && supportsUpdatedDateSort === true
+    ? 'updated_date' : 'created_date';
+  const rows = await (source.list as Function)(requestedSort, pageSize + 2, skip);
   if (!Array.isArray(rows)) return fail('MIGRATION_ENTITY_RESULT_INVALID');
-  const ordered = [...rows].sort((left, right) => String(left.created_date ?? '')
-    .localeCompare(String(right.created_date ?? ''))
-    || String(left.id ?? '').localeCompare(String(right.id ?? '')));
+  const highWater = isDelta ? createMigrationHighWaterCheckpoint({
+    entityName: String(input.entityName), snapshotCutoff,
+    lastLogicalUpdatedAt: typeof input.lastLogicalUpdatedAt === 'string'
+      ? input.lastLogicalUpdatedAt : null,
+    lastSourceRecordId: typeof input.lastSourceRecordId === 'string'
+      ? input.lastSourceRecordId : null,
+    overlapSeconds: options.deltaOverlapSeconds ?? 300,
+    pageOffset: cursor.offset,
+    passNumber: Number(input.passNumber ?? 1),
+    sourceCountObserved: Number(input.sourceCountObserved ?? rows.length),
+    lastBundleHash: typeof input.previousBundleHash === 'string'
+      ? input.previousBundleHash : null,
+    quietPassCount: Number(input.quietPassCount ?? 0),
+  }) : null;
+  const ordered = isDelta && highWater
+    ? [...selectMigrationDeltaRecords(rows, highWater)]
+    : [...rows].sort((left, right) => String(left.created_date ?? '')
+      .localeCompare(String(right.created_date ?? ''))
+      || String(left.id ?? '').localeCompare(String(right.id ?? '')));
   let start = 0;
   if (cursor.offset > 0) {
-    if (ordered[0]?.id !== cursor.anchorId
-      || String(ordered[0]?.created_date ?? '') !== cursor.anchorCreatedDate) {
+    if (!isDelta && (ordered[0]?.id !== cursor.anchorId
+      || String(ordered[0]?.created_date ?? '') !== cursor.anchorCreatedDate)) {
       return fail('MIGRATION_CURSOR_ANCHOR_CHANGED');
     }
-    start = 1;
+    if (!isDelta) start = 1;
   }
   const withinSnapshot = ordered.slice(start)
     .filter((record) => Date.parse(String(record.created_date ?? '')) <= Date.parse(snapshotCutoff));
@@ -92,6 +125,13 @@ export async function exportMigrationBatch(
       && options.destinationEnvironment !== 'production'
       && record.test_run_id === input.testRunId;
   });
+  const last = scanned.at(-1);
+  const hasMore = withinSnapshot.length > pageSize;
+  const nextHighWaterBase = highWater
+    ? advanceMigrationHighWaterCheckpoint(highWater, scanned, {
+      pageOffset: cursor.offset + scanned.length,
+      sourceCountObserved: rows.length,
+    }) : null;
   const bundle = await buildMigrationExportBundle(exportable, policy, {
     secret: options.secret,
     migrationVersion: Number(input.migrationVersion ?? 1),
@@ -105,13 +145,18 @@ export async function exportMigrationBatch(
     snapshotCutoff,
     exportedAt: options.now?.().toISOString() ?? new Date().toISOString(),
     previousBundleHash: input.previousBundleHash as string | null | undefined,
+    operationMode,
+    highWater: nextHighWaterBase,
     includeTestRecords: includeTest,
     testRunId: input.testRunId as string | undefined,
     maxBundleBytes: options.maxBundleBytes,
     cryptoProvider: options.cryptoProvider,
   });
-  const last = scanned.at(-1);
-  const hasMore = withinSnapshot.length > pageSize;
+  const bundleHash = await calculateMigrationBundleHash(bundle, {
+    cryptoProvider: options.cryptoProvider,
+  });
+  const nextHighWater = nextHighWaterBase
+    ? Object.freeze({ ...nextHighWaterBase, lastBundleHash: bundleHash }) : null;
   return Object.freeze({
     bundle,
     nextCursor: hasMore && last ? cursorEncode({
@@ -124,6 +169,11 @@ export async function exportMigrationBatch(
     }) : null,
     hasMore,
     snapshotCutoff,
+    operationMode,
+    queryStrategy: isDelta && supportsUpdatedDateSort === true
+      ? 'server_updated_date_sort' : isDelta ? 'sorted_page_overlap_fallback' : 'created_date_snapshot',
+    highWater: nextHighWater,
+    bundleHash,
     counts: Object.freeze({
       scanned: scanned.length,
       exported: exportable.length,
@@ -248,7 +298,7 @@ export async function finalizeMigrationRelationships(
         sourceRecordId: mapping.source_record_id,
         destinationAppId: options.destinationAppId,
         destinationRecordId: mapping.destination_record_id,
-        conflictType: 'relationship_changed_independently',
+        conflictType: 'source_and_destination_modified',
         sourceContentHash: mapping.source_content_hash,
         destinationContentHash: mapping.destination_content_hash,
         detectedAt: options.now?.().toISOString() ?? new Date().toISOString(),
@@ -329,6 +379,8 @@ export async function getMigrationStatus(
     mappingCount: mappings,
     conflictCount: conflicts,
     unresolvedRelationshipCount: unresolved,
+    verificationVerdict: 'BLOCKED',
+    verificationEvidenceComplete: false,
     checkpoint: checkpoint ? Object.freeze({
       status: checkpoint.status ?? null,
       phase: checkpoint.phase ?? null,

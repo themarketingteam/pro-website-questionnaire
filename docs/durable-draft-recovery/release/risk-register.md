@@ -643,3 +643,18 @@ their existing ratings. The cross-app secret and routes are unconfigured; no
 live Base44 function, RLS behavior, source record, file object, reverse run,
 interruption recovery or cutover closure has been exercised. Encrypted disk
 export remains explicitly blocked rather than partially implemented.
+
+## 2026-08-06 incremental and reverse-control risk evidence
+
+The bounded pair lease reduces design risk from simultaneous forward/reverse
+runs. Server-time high-water tuples, overlap, ID deduplication and two quiet
+passes reduce omission risk from equal timestamps, delayed visibility and page
+shifts. Reverse origin mapping, mapped-base comparison, submitted guards, and
+no-delete/no-merge policy reduce rollback duplication and overwrite risk. The
+file audit and full integrity verdict reduce hidden asset and partial-validation
+risk; report sanitization reduces credential and questionnaire-content leakage.
+
+`RISK-010`, `RISK-011`, `RISK-016`, `RISK-019`, and `RISK-025` remain open at
+their prior ratings. Adapter behavior, live leases, real pagination, file
+reachability/copy, staging reverse rehearsal, late-write observation, RLS, and
+cutover/rollback remain unproved. No cloud or production action occurred.

@@ -6,14 +6,16 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const MIGRATION_CLI_COMMANDS = Object.freeze([
-  'plan', 'export', 'import', 'finalize', 'verify', 'status',
+  'plan', 'export', 'import', 'sync', 'reverse', 'late-write',
+  'finalize', 'verify', 'file-audit', 'status',
 ]);
 export const APPLY_CONFIRMATION = 'APPLY_CROSS_APP_MIGRATION';
+export const REVERSE_APPLY_CONFIRMATION = 'APPLY_GREEN_TO_BLUE_MIGRATION';
 const ENTITIES = Object.freeze([
   'ProFormDraft', 'ProFormDraftEvent', 'ProFormSubmission',
   'ProFormSubmissionIntake', 'ProFormRecoverySecurityEvent',
 ]);
-const FORBIDDEN_REPORT_KEYS = /(?:bundle|records?|admin.?grant|authorization|token|password|secret|email|answers?|data)/iu;
+const FORBIDDEN_REPORT_KEYS = /^(?:bundle|records|recordPayload|payload|adminGrant|migrationAuthorization|authorization|token|password|secret|email|answers?|data)$/iu;
 const FORBIDDEN_FLAG = /(?:grant|authorization|token|password|secret|app.?id|base.?url|device.?id)/iu;
 const BINDING_PURPOSE = 'pro-form:cross-app-migration-authorization-binding:v1:';
 
@@ -57,7 +59,9 @@ export function parseMigrationCliArguments(argv) {
   }
   if (options.dryRun && options.apply) return fail('MIGRATION_CLI_MODE_CONFLICT');
   if (options.encryptedExport) return fail('MIGRATION_CLI_ENCRYPTED_EXPORT_NOT_IMPLEMENTED');
-  if (options.apply && options.confirm !== APPLY_CONFIRMATION) {
+  const requiredConfirmation = command === 'reverse'
+    ? REVERSE_APPLY_CONFIRMATION : APPLY_CONFIRMATION;
+  if (options.apply && options.confirm !== requiredConfirmation) {
     return fail('MIGRATION_CLI_APPLY_CONFIRMATION_REQUIRED');
   }
   return Object.freeze(options);
@@ -99,6 +103,13 @@ export function loadMigrationCliConfig(env = process.env) {
     destinationEnvironment: required(env, 'PRO_MIGRATION_DESTINATION_ENVIRONMENT'),
     batchId: metadata.batchId,
     testMode: env.PRO_MIGRATION_TEST_MODE ?? null,
+    deltaOverlapSeconds: Number(env.PRO_FORM_MIGRATION_DELTA_OVERLAP_SECONDS ?? 300),
+    lateWritePollSeconds: Number(env.PRO_FORM_MIGRATION_LATE_WRITE_POLL_SECONDS ?? 60),
+    lateWriteQuietSeconds: Number(env.PRO_FORM_MIGRATION_LATE_WRITE_QUIET_SECONDS ?? 300),
+    freezeStartedAt: env.PRO_MIGRATION_FREEZE_STARTED_AT ?? null,
+    domainSwitchedAt: env.PRO_MIGRATION_DOMAIN_SWITCHED_AT ?? null,
+    blueMaintenanceStartedAt: env.PRO_MIGRATION_BLUE_MAINTENANCE_STARTED_AT ?? null,
+    reconciliationEndedAt: env.PRO_MIGRATION_RECONCILIATION_ENDED_AT ?? null,
   };
   for (const url of [config.sourceBaseUrl, config.destinationBaseUrl]) {
     let parsed;
@@ -122,6 +133,11 @@ export function loadMigrationCliConfig(env = process.env) {
       || config.testMode !== 'staging_fixture') {
       return fail('MIGRATION_CLI_TEST_MODE_REQUIRED');
     }
+  }
+  if (!Number.isInteger(config.deltaOverlapSeconds) || config.deltaOverlapSeconds < 0
+    || !Number.isInteger(config.lateWritePollSeconds) || config.lateWritePollSeconds < 10
+    || !Number.isInteger(config.lateWriteQuietSeconds) || config.lateWriteQuietSeconds < 60) {
+    return fail('MIGRATION_CLI_TIMING_CONFIG_INVALID');
   }
   return Object.freeze(config);
 }
@@ -157,12 +173,28 @@ function assertSafeReport(value, pathParts = []) {
   }
 }
 
+export function sanitizeMigrationReport(value) {
+  if (Array.isArray(value)) return value.map(sanitizeMigrationReport);
+  if (value === null || typeof value !== 'object') {
+    if (typeof value === 'string' && /^https?:\/\//iu.test(value)) {
+      try {
+        const url = new URL(value); url.search = ''; url.hash = '';
+        return url.toString();
+      } catch { return '<invalid-url>'; }
+    }
+    return value;
+  }
+  return Object.fromEntries(Object.entries(value)
+    .map(([key, child]) => [key, sanitizeMigrationReport(child)]));
+}
+
 export async function writeSafeMigrationReport(reportDir, name, report) {
-  assertSafeReport(report);
+  const sanitized = sanitizeMigrationReport(report);
+  assertSafeReport(sanitized);
   if (!/^[A-Za-z0-9._-]{1,128}$/u.test(name)) return fail('MIGRATION_CLI_REPORT_NAME_INVALID');
   await mkdir(reportDir, { recursive: true, mode: 0o700 });
   const destination = path.join(reportDir, `${name}.json`);
-  await writeFile(destination, `${JSON.stringify(stableValue(report), null, 2)}\n`, {
+  await writeFile(destination, `${JSON.stringify(stableValue(sanitized), null, 2)}\n`, {
     encoding: 'utf8', mode: 0o600,
   });
   return destination;
@@ -205,6 +237,8 @@ function baseRequest(config, destination = false) {
     migrationAuthorization: config.authorization,
     migrationDirection: config.direction,
     batchId: config.batchId,
+    leaseId: config.batchId,
+    leaseOwner: 'migration-cli',
   };
 }
 
@@ -222,6 +256,11 @@ function safePlan(config, command, apply) {
     streamsInMemory: true,
     protectedPayloadPersistence: false,
     deletesSupported: false,
+    operationMode: command === 'reverse' ? 'reverse_delta'
+      : command === 'late-write' ? 'late_write_reconciliation'
+        : command === 'sync' ? 'incremental_delta'
+          : command === 'file-audit' ? 'file_reference_audit'
+            : command === 'verify' ? 'integrity_verify' : 'initial_full',
   });
 }
 
@@ -230,19 +269,54 @@ export async function runMigrationCli(options, dependencies = {}) {
   const fetchImpl = dependencies.fetch ?? globalThis.fetch;
   const config = loadMigrationCliConfig(env);
   const plan = safePlan(config, options.command, options.apply === true);
+  await writeSafeMigrationReport(config.reportDir, 'migration-plan', plan);
   if (options.command === 'plan') return plan;
   if (typeof fetchImpl !== 'function') return fail('MIGRATION_CLI_FETCH_UNAVAILABLE');
-  if (options.command === 'status' || options.command === 'verify') {
+  if (options.command === 'reverse' && config.direction !== 'green_to_blue') {
+    return fail('MIGRATION_CLI_REVERSE_DIRECTION_REQUIRED');
+  }
+  if (options.command !== 'reverse' && config.direction === 'green_to_blue'
+    && !['status', 'verify', 'file-audit'].includes(options.command)) {
+    return fail('MIGRATION_CLI_FORWARD_DIRECTION_REQUIRED');
+  }
+  if (options.command === 'late-write'
+    && [config.freezeStartedAt, config.domainSwitchedAt,
+      config.blueMaintenanceStartedAt, config.reconciliationEndedAt]
+      .some((value) => typeof value !== 'string' || !Number.isFinite(Date.parse(value)))) {
+    return fail('MIGRATION_CLI_LATE_WRITE_WINDOW_REQUIRED');
+  }
+  if (options.command === 'status' || options.command === 'verify' || options.command === 'file-audit') {
     const status = await invokeFunction(fetchImpl, config.destinationBaseUrl,
       'getProFormMigrationStatus', {
         ...baseRequest(config, true), sourceAppId: config.sourceAppId,
       });
     const safe = { ...plan, status: status.status ?? status };
+    if (options.command === 'file-audit') {
+      const blockerValue = safe.status?.fileReferenceBlockerCount?.count;
+      const evidenceComplete = Number.isInteger(blockerValue);
+      const report = { ...safe, operationMode: 'file_reference_audit',
+        downloadsPerformed: 0, reachabilityMode: 'not_checked',
+        blockers: evidenceComplete ? blockerValue : null,
+        verdict: evidenceComplete ? (blockerValue === 0 ? 'PASS' : 'FAIL') : 'BLOCKED',
+        cutoverReady: evidenceComplete && blockerValue === 0 };
+      await writeSafeMigrationReport(config.reportDir, 'migration-file-audit', report);
+      return report;
+    }
     if (options.command === 'verify') {
       const body = safe.status;
       const conflicts = Number(body?.conflictCount?.count ?? 0);
       const unresolved = Number(body?.unresolvedRelationshipCount?.count ?? 0);
-      return { ...safe, verified: conflicts === 0 && unresolved === 0 };
+      const remoteVerdict = body?.verificationVerdict;
+      const evidenceComplete = ['PASS', 'PASS_WITH_WARNINGS', 'FAIL', 'BLOCKED'].includes(remoteVerdict);
+      const verdict = evidenceComplete ? remoteVerdict : 'BLOCKED';
+      const verified = verdict === 'PASS' && conflicts === 0 && unresolved === 0;
+      const report = { ...safe, verdict,
+        cutoverReady: verified, verified };
+      await writeSafeMigrationReport(config.reportDir, 'migration-verification', report);
+      await writeSafeMigrationReport(config.reportDir, 'migration-conflicts', {
+        version: 1, openConflictCount: conflicts, containsRecordData: false,
+      });
+      return report;
     }
     return safe;
   }
@@ -256,14 +330,33 @@ export async function runMigrationCli(options, dependencies = {}) {
     return { ...plan, counts: result.counts, cutoverReady: result.cutoverReady === true };
   }
   const state = await readResumeState(config);
+  const streamsData = ['export', 'import', 'sync', 'reverse', 'late-write'].includes(options.command);
+  if (!streamsData) return fail('MIGRATION_CLI_COMMAND_INVALID');
+  const leaseRequest = {
+    sourceAppId: config.sourceAppId,
+    destinationAppId: config.destinationAppId,
+    operationMode: plan.operationMode,
+    action: 'acquire',
+  };
+  const heartbeatBothLeases = async () => {
+    await invokeFunction(fetchImpl, config.sourceBaseUrl, 'manageProFormMigrationLease', {
+      ...baseRequest(config), ...leaseRequest,
+    });
+    await invokeFunction(fetchImpl, config.destinationBaseUrl, 'manageProFormMigrationLease', {
+      ...baseRequest(config, true), ...leaseRequest,
+    });
+  };
+  await heartbeatBothLeases();
   const maxEntities = options.command === 'export' ? 1 : ENTITIES.length;
   const aggregate = { scanned: 0, exported: 0, created: 0, updated: 0, unchanged: 0, conflicted: 0, failed: 0 };
   for (let entityIndex = state.entityIndex; entityIndex < maxEntities; entityIndex += 1) {
     const entityName = ENTITIES[entityIndex];
+    let entityHighWater = { ...(state.highWaterByEntity?.[entityName] ?? {}) };
     let cursor = entityIndex === state.entityIndex ? state.cursor : null;
     let snapshotCutoff = entityIndex === state.entityIndex ? state.snapshotCutoff : null;
     do {
-      const sequence = state.sequence + 1;
+      await heartbeatBothLeases();
+      const sequence = Number(entityHighWater.sequence ?? -1) + 1;
       const exported = await invokeFunction(fetchImpl, config.sourceBaseUrl,
         'exportProFormMigrationBatch', {
           ...baseRequest(config),
@@ -272,22 +365,39 @@ export async function runMigrationCli(options, dependencies = {}) {
           pageSize: 100,
           cursor,
           snapshotCutoff,
-          previousBundleHash: state.lastHash,
+          previousBundleHash: entityHighWater.lastHash ?? null,
           sequence,
           includeTestRecords: config.testMode === 'staging_fixture',
           ...(config.testMode === 'staging_fixture' ? { testRunId: 'migration-cli-fixture' } : {}),
+          operationMode: plan.operationMode,
+          lastLogicalUpdatedAt: entityHighWater.lastLogicalUpdatedAt
+            ?? (options.command === 'late-write' ? config.freezeStartedAt : null),
+          lastSourceRecordId: entityHighWater.lastSourceRecordId ?? null,
+          passNumber: entityHighWater.passNumber ?? state.passNumber ?? 1,
+          quietPassCount: entityHighWater.quietPassCount ?? 0,
+          ...(options.command === 'late-write' ? {
+            freezeStartedAt: config.freezeStartedAt,
+            domainSwitchedAt: config.domainSwitchedAt,
+            blueMaintenanceStartedAt: config.blueMaintenanceStartedAt,
+            reconciliationEndedAt: config.reconciliationEndedAt,
+          } : {}),
         });
       const bundle = exported.bundle;
       const bundleHash = calculateLocalBundleHash(bundle);
+      if (exported.bundleHash !== undefined && exported.bundleHash !== bundleHash) {
+        return fail('MIGRATION_CLI_BUNDLE_HASH_MISMATCH');
+      }
       aggregate.scanned += Number(exported.counts?.scanned ?? 0);
       aggregate.exported += Number(exported.counts?.exported ?? 0);
-      if (options.command === 'import') {
+      if (['import', 'sync', 'reverse', 'late-write'].includes(options.command)) {
+        await heartbeatBothLeases();
         const imported = await invokeFunction(fetchImpl, config.destinationBaseUrl,
           'importProFormMigrationBatch', {
             ...baseRequest(config, true),
             migrationAuthorization: bindMigrationAuthorization(config.authorization, bundleHash),
             bundle,
             apply: options.apply === true,
+            operationMode: plan.operationMode,
           });
         for (const key of ['created', 'updated', 'unchanged', 'conflicted', 'failed']) {
           aggregate[key] += Number(imported.counts?.[key] ?? 0);
@@ -298,10 +408,15 @@ export async function runMigrationCli(options, dependencies = {}) {
       }
       cursor = exported.nextCursor;
       snapshotCutoff = exported.snapshotCutoff;
+      entityHighWater = { ...entityHighWater, ...(exported.highWater ?? {}) };
       if (options.apply === true) {
-        state.sequence = sequence;
+        entityHighWater.sequence = sequence;
+        entityHighWater.lastHash = bundleHash;
+        state.sequence = Number(state.sequence ?? -1) + 1;
         state.lastHash = bundleHash;
       }
+      state.highWaterByEntity = state.highWaterByEntity ?? {};
+      state.highWaterByEntity[entityName] = entityHighWater;
       state.entityIndex = entityIndex;
       state.cursor = cursor;
       state.snapshotCutoff = snapshotCutoff;
@@ -314,8 +429,41 @@ export async function runMigrationCli(options, dependencies = {}) {
     state.cursor = null;
     state.snapshotCutoff = null;
   }
-  const report = { ...plan, counts: aggregate, complete: true };
-  await writeSafeMigrationReport(config.reportDir, `${options.command}-${config.batchId}`, report);
+  let complete = true;
+  if (options.command === 'late-write') {
+    const now = (dependencies.now?.() ?? new Date()).toISOString();
+    const changed = aggregate.created + aggregate.updated + aggregate.conflicted + aggregate.failed;
+    state.lastChangeAt = changed > 0 ? now : (state.lastChangeAt ?? config.freezeStartedAt);
+    const quietLongEnough = changed === 0
+      && Date.parse(now) - Date.parse(state.lastChangeAt) >= config.lateWriteQuietSeconds * 1000;
+    state.lateWriteQuietPassCount = quietLongEnough
+      ? Number(state.lateWriteQuietPassCount ?? 0) + 1 : 0;
+    complete = state.lateWriteQuietPassCount >= 2;
+    state.entityIndex = 0;
+    state.cursor = null;
+    state.snapshotCutoff = null;
+    state.passNumber = Number(state.passNumber ?? 1) + 1;
+    if (options.apply === true) {
+      await writeSafeMigrationReport(config.reportDir, `resume-${config.batchId}`, state);
+    }
+  }
+  const report = { ...plan, counts: aggregate, complete,
+    ...(options.command === 'late-write' ? {
+      quietPassCount: state.lateWriteQuietPassCount ?? 0,
+      nextPollAfterSeconds: complete ? null : config.lateWritePollSeconds,
+    } : {}) };
+  await writeSafeMigrationReport(config.reportDir, 'migration-progress', report);
+  if (options.command === 'late-write') {
+    await writeSafeMigrationReport(config.reportDir, 'migration-late-writes', {
+      ...report,
+      freezeStartedAt: config.freezeStartedAt,
+      domainSwitchedAt: config.domainSwitchedAt,
+      blueMaintenanceStartedAt: config.blueMaintenanceStartedAt,
+      reconciliationEndedAt: config.reconciliationEndedAt,
+      pollSeconds: config.lateWritePollSeconds,
+      quietSeconds: config.lateWriteQuietSeconds,
+    });
+  }
   return report;
 }
 

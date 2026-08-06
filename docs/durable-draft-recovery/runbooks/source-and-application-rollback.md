@@ -284,7 +284,26 @@ Use approved synthetic test data and the designated non-production or controlled
 
 ### Green-to-blue delta migration
 
-`[PLACEHOLDER — DO NOT EXECUTE]` Insert the approved dry-run, execution, reconciliation, and idempotent retry commands from the later bidirectional blue/green migration utility. This placeholder grants no database access or mutation authority.
+The utility is now locally implemented, but these examples remain
+non-authorizing. First verify a `green_to_blue` route and confirm no active
+`blue_to_green` lease:
+
+```text
+npm run migration:blue-green -- reverse --dry-run
+npm run migration:blue-green -- verify
+```
+
+Apply is permitted only under a separately approved incident/data procedure:
+
+```text
+npm run migration:blue-green -- reverse --apply --confirm APPLY_GREEN_TO_BLUE_MIGRATION
+```
+
+Stop before domain reversal unless the reverse run has two quiet passes, zero
+open conflicts/unresolved relationships/file blockers, and the complete
+verification report says `PASS`. Preserve blue-origin IDs through the reverse
+map, create one blue record for green-native origins, quarantine independent
+blue changes, preserve submitted state, and perform no delete.
 
 ### Domain reassignment
 

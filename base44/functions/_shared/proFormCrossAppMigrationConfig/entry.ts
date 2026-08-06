@@ -5,6 +5,10 @@ export const CROSS_APP_MIGRATION_DEFAULTS = Object.freeze({
   maxBatchRecords: 100,
   maxBundleBytes: 1024 * 1024,
   clockSkewSeconds: 60,
+  deltaOverlapSeconds: 300,
+  lateWritePollSeconds: 60,
+  lateWriteQuietSeconds: 300,
+  directionLeaseSeconds: 300,
 });
 
 export const CROSS_APP_MIGRATION_ERROR_CODES = Object.freeze({
@@ -101,6 +105,22 @@ export function getCrossAppMigrationConfig(
       getEnvironmentValue('PRO_FORM_MIGRATION_CLOCK_SKEW_SECONDS'),
       CROSS_APP_MIGRATION_DEFAULTS.clockSkewSeconds, 0, 300,
     ),
+    deltaOverlapSeconds: boundedInteger(
+      getEnvironmentValue('PRO_FORM_MIGRATION_DELTA_OVERLAP_SECONDS'),
+      CROSS_APP_MIGRATION_DEFAULTS.deltaOverlapSeconds, 0, 86400,
+    ),
+    lateWritePollSeconds: boundedInteger(
+      getEnvironmentValue('PRO_FORM_MIGRATION_LATE_WRITE_POLL_SECONDS'),
+      CROSS_APP_MIGRATION_DEFAULTS.lateWritePollSeconds, 10, 3600,
+    ),
+    lateWriteQuietSeconds: boundedInteger(
+      getEnvironmentValue('PRO_FORM_MIGRATION_LATE_WRITE_QUIET_SECONDS'),
+      CROSS_APP_MIGRATION_DEFAULTS.lateWriteQuietSeconds, 60, 86400,
+    ),
+    directionLeaseSeconds: boundedInteger(
+      getEnvironmentValue('PRO_FORM_MIGRATION_DIRECTION_LEASE_SECONDS'),
+      CROSS_APP_MIGRATION_DEFAULTS.directionLeaseSeconds, 30, 1800,
+    ),
   });
 }
 
@@ -155,6 +175,10 @@ export async function getCrossAppMigrationConfigDiagnostics(config: Record<strin
     maxBatchRecords: config.maxBatchRecords ?? null,
     maxBundleBytes: config.maxBundleBytes ?? null,
     clockSkewSeconds: config.clockSkewSeconds ?? null,
+    deltaOverlapSeconds: config.deltaOverlapSeconds ?? null,
+    lateWritePollSeconds: config.lateWritePollSeconds ?? null,
+    lateWriteQuietSeconds: config.lateWriteQuietSeconds ?? null,
+    directionLeaseSeconds: config.directionLeaseSeconds ?? null,
     secretConfigured: typeof config.secret === 'string',
   });
 }

@@ -1,5 +1,9 @@
 import { sha256Hex } from '../proDraftSecurity/entry.ts';
 import { hashMigratableRecord } from '../proFormMigrationContentHash/entry.ts';
+import {
+  PRO_FORM_MIGRATION_CONFLICT_TYPES,
+  resolveProFormMigrationConflict,
+} from '../proFormMigrationConflict/entry.ts';
 
 export class MigrationImportError extends Error {
   readonly code: string;
@@ -199,6 +203,13 @@ export async function upsertMigratedRecord(
   } else {
     existing = await findExistingDestinationRecord(destinationEntity, identity);
   }
+  const reverseToOrigin = options.migrationDirection === 'green_to_blue'
+    && envelope.originAppId === options.destinationAppId
+    && envelope.originEntity === policy.entityName
+    && typeof envelope.originRecordId === 'string';
+  if (!existing && reverseToOrigin && typeof destinationEntity.get === 'function') {
+    existing = await (destinationEntity.get as Function)(envelope.originRecordId);
+  }
   const prepared = prepareImportedEntityData(envelope, policy, options);
   let currentHash: string | null = null;
   if (existing) {
@@ -209,19 +220,33 @@ export async function upsertMigratedRecord(
       relationshipIdentities,
       cryptoProvider: options.cryptoProvider,
     });
-    const baseHash = mapping?.destination_content_hash ?? existing.source_content_hash ?? null;
-    if (typeof baseHash === 'string' && currentHash !== baseHash) {
+    const baseHash = reverseToOrigin
+      ? envelope.immediateBaseContentHash ?? mapping?.destination_content_hash ?? null
+      : mapping?.destination_content_hash ?? existing.source_content_hash ?? null;
+    const decision = resolveProFormMigrationConflict({
+      sourceHash: String(envelope.sourceContentHash ?? ''),
+      destinationHash: currentHash,
+      baseHash: typeof baseHash === 'string' ? baseHash : null,
+      sourceUpdatedAt: String(envelope.sourceUpdatedDate ?? ''),
+      destinationUpdatedAt: String(existing.source_updated_date ?? existing.updated_date ?? ''),
+      sourceStatus: typeof envelope.data === 'object' && envelope.data
+        ? String((envelope.data as Record<string, unknown>).status ?? '') : null,
+      destinationStatus: String(existing.status ?? ''),
+      destinationNative: !mapping && !reverseToOrigin,
+    });
+    if (decision.manual === true) {
       return Object.freeze({
         outcome: 'conflicted',
-        conflictType: 'destination_changed_independently',
+        conflictType: decision.conflictType ?? 'source_and_destination_modified',
         sourceContentHash: envelope.sourceContentHash,
         destinationContentHash: currentHash,
         baseContentHash: baseHash,
         destinationRecordId: existing.id,
       });
     }
-    if (envelope.sourceContentHash === existing.source_content_hash
-      && envelope.sourceContentHash === currentHash) {
+    if (decision.policy === 'noop'
+      || (envelope.sourceContentHash === existing.source_content_hash
+        && envelope.sourceContentHash === currentHash)) {
       return Object.freeze({ outcome: 'unchanged', record: existing, mapping });
     }
   }
@@ -330,6 +355,11 @@ export async function buildRelationshipPatch(
 }
 
 export async function buildMigrationConflictRecord(input: Record<string, unknown>) {
+  if (!PRO_FORM_MIGRATION_CONFLICT_TYPES.includes(
+    input.conflictType as (typeof PRO_FORM_MIGRATION_CONFLICT_TYPES)[number],
+  )) {
+    return fail('MIGRATION_IMPORT_CONFLICT_TYPE_INVALID');
+  }
   const identity = [input.migrationDirection, input.batchId, input.entityName,
     input.sourceAppId, input.sourceRecordId, input.conflictType].join(':');
   return Object.freeze({

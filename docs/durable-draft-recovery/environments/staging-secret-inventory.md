@@ -62,6 +62,10 @@ The four production names observed through the names-only Base44 secret command 
 | 19o | `PRO_FORM_MIGRATION_MAX_BATCH_RECORDS` | Bounded record count; default and maximum 100 | Optional | Optional | No | Yes; reviewed integer only |
 | 19p | `PRO_FORM_MIGRATION_MAX_BUNDLE_BYTES` | Bounded signed bundle size; default and maximum 1048576 bytes | Optional | Optional | No | Yes; reviewed integer only |
 | 19q | `PRO_FORM_MIGRATION_CLOCK_SKEW_SECONDS` | Bounded signature/auth clock tolerance; default 60, maximum 300 | Optional | Optional | No | Yes; reviewed integer only |
+| 19r | `PRO_FORM_MIGRATION_DELTA_OVERLAP_SECONDS` | Incremental server-updated overlap; default 300, maximum 86400 | Optional | Optional | No | Yes; reviewed integer only |
+| 19s | `PRO_FORM_MIGRATION_LATE_WRITE_POLL_SECONDS` | Late-write polling cadence; default 60, minimum 10 | Optional | Optional | No | Yes; reviewed integer only |
+| 19t | `PRO_FORM_MIGRATION_LATE_WRITE_QUIET_SECONDS` | Required quiet-window duration; default 300, minimum 60 | Optional | Optional | No | Yes; reviewed integer only |
+| 19u | `PRO_FORM_MIGRATION_DIRECTION_LEASE_SECONDS` | Single-direction lease TTL; default 300, range 30–1800 | Optional | Optional | No | Yes; reviewed integer only |
 | 20 | `CAPTCHA_SITE_KEY` | Future public staging CAPTCHA site key | Later | Later | Yes | No |
 | 21 | `CAPTCHA_SECRET_KEY` | Future backend CAPTCHA verification secret | Later | Later | Yes | No |
 | 20a | `PRO_DRAFT_CAPTCHA_PROVIDER` | Backend provider selector: disabled, turnstile, or staging_test | Later; start `disabled` | Later | Prefer Yes | Safe `disabled` only |

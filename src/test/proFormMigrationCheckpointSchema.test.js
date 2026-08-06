@@ -26,4 +26,13 @@ describe('ProFormMigrationCheckpoint schema', () => {
     expect(schema.properties.retention_cutoff.format).toBe('date-time');
     for (const forbidden of ['apply_token','admin_grant','password','answer_content','email']) expect(schema.properties).not.toHaveProperty(forbidden);
   });
+  it('adds optional lease, high-water, operation, and quiet-pass state', () => {
+    expect(schema.properties.operation_mode.enum).toContain('late_write_reconciliation');
+    expect(schema.properties.operation_mode.enum).toContain('reverse_delta');
+    for (const field of ['active_direction', 'lease_id', 'lease_owner', 'lease_expires_at',
+      'snapshot_cutoff', 'last_logical_updated_at', 'last_source_record_id',
+      'overlap_started_at', 'page_offset', 'pass_number', 'source_count_observed',
+      'last_bundle_hash', 'quiet_pass_count']) expect(schema.properties).toHaveProperty(field);
+    expect(schema.required).not.toContain('operation_mode');
+  });
 });

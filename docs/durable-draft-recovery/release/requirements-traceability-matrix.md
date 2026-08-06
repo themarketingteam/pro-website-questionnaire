@@ -599,3 +599,16 @@ This remains source evidence only. No variable is configured, no function or
 schema is deployed, no record is read or migrated, and no `_next` app exists.
 Live Base44 authorization, RLS, real batch limits, interruption, file transfer,
 forward/reverse reconciliation and cutover verification remain mandatory.
+
+## 2026-08-06 incremental, reverse, and integrity source evidence
+
+`DR-MIG-001`, `DR-MIG-002`, `DR-MIG-003`, `DR-ID-001`, and `DR-OBS-001` now
+have local source and synthetic-test evidence for direction leases, per-entity
+server-time high-water checkpoints, overlap/deduplication, two-pass freeze
+closure, reverse original/native identities, independent-write conflicts,
+late-write polling, file-reference blockers, safe report sanitization, and all
+18 integrity dimensions. Only `PASS` is represented as cutover-ready.
+
+No requirement advances to staging or production acceptance. No cloud app,
+record, file, secret, function, schema, domain, deployment, migration apply, or
+remote branch was accessed or changed.

@@ -6,6 +6,10 @@ import { getCrossAppMigrationCheckpoint, readCrossAppCheckpointState, writeCross
 import { calculateMigrationBundleHash, verifyMigrationBundle } from '../_shared/proFormMigrationBundle/entry.ts';
 import { getProFormMigrationRuntimePolicy } from '../_shared/proFormMigrationPolicy/entry.ts';
 import { importMigrationBatch } from '../_shared/proFormCrossAppMigrationService/entry.ts';
+import {
+  assertMigrationDirectionAvailable,
+  findActiveMigrationDirectionLease,
+} from '../_shared/proFormMigrationLease/entry.ts';
 
 Deno.serve(createAdminFunctionHandler({
   operation: ADMIN_API_OPERATION_NAMES.IMPORT_CROSS_APP_MIGRATION,
@@ -40,11 +44,21 @@ Deno.serve(createAdminFunctionHandler({
     });
     const entities = client.asServiceRole?.entities as Record<string, Record<string, unknown>>;
     const checkpointEntity = entities.ProFormMigrationCheckpoint;
+    const activeLease = await findActiveMigrationDirectionLease(
+      checkpointEntity, String(bundle.sourceAppId), config.localAppId,
+    );
+    if (!activeLease) throw new Error('MIGRATION_DIRECTION_LEASE_REQUIRED');
+    assertMigrationDirectionAvailable(activeLease, String(bundle.migrationDirection));
+    if (activeLease && (activeLease.lease_id !== payload.leaseId
+      || activeLease.lease_owner !== payload.leaseOwner)) {
+      throw new Error('MIGRATION_DIRECTION_LEASE_OWNER_MISMATCH');
+    }
     const identity = {
       environment: config.environment,
       batchId: String(bundle.batchId),
       migrationDirection: String(bundle.migrationDirection),
       migrationVersion: Number(bundle.migrationVersion),
+      entityName: String(bundle.entityName),
     };
     const checkpoint = await getCrossAppMigrationCheckpoint(checkpointEntity, identity);
     const state = readCrossAppCheckpointState(checkpoint);
@@ -74,9 +88,23 @@ Deno.serve(createAdminFunctionHandler({
       testRunId: payload.testRunId as string | undefined,
     });
     if (payload.apply === true) {
+      const changedCount = result.counts.created + result.counts.updated
+        + result.counts.conflicted + result.counts.failed;
+      const quietPassCount = changedCount === 0 ? state.quietPassCount + 1 : 0;
+      const highWater = bundle.highWater && typeof bundle.highWater === 'object'
+        ? { ...(bundle.highWater as Record<string, unknown>), quietPassCount } : null;
       await writeCrossAppMigrationCheckpoint(checkpointEntity, checkpoint, {
         ...identity,
         mode: 'apply',
+        operationMode: payload.operationMode ?? 'initial_full',
+        sourceAppId: bundle.sourceAppId,
+        destinationAppId: config.localAppId,
+        activeDirection: activeLease?.active_direction,
+        leaseId: activeLease?.lease_id,
+        leaseOwner: activeLease?.lease_owner,
+        leaseAcquiredAt: activeLease?.lease_acquired_at,
+        leaseExpiresAt: activeLease?.lease_expires_at,
+        leaseHeartbeatAt: activeLease?.lease_heartbeat_at,
         entityName: bundle.entityName,
         status: result.counts.failed > 0 ? 'failed' : 'running',
         phase: 'import',
@@ -86,6 +114,15 @@ Deno.serve(createAdminFunctionHandler({
         recordsFailed: result.counts.failed,
         sequence: bundle.sequence,
         lastBundleHash: bundleHash,
+        highWater,
+        snapshotCutoff: highWater?.snapshotCutoff ?? bundle.snapshotCutoff,
+        lastLogicalUpdatedAt: highWater?.lastLogicalUpdatedAt,
+        lastSourceRecordId: highWater?.lastSourceRecordId,
+        overlapStartedAt: highWater?.overlapStartedAt,
+        pageOffset: highWater?.pageOffset,
+        passNumber: highWater?.passNumber,
+        sourceCountObserved: highWater?.sourceCountObserved,
+        quietPassCount,
         dependencyOrder: policy.dependencyOrder,
         counts: result.counts,
         testRunId: payload.testRunId,
