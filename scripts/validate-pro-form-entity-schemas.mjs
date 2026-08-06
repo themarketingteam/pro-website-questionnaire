@@ -39,6 +39,11 @@ const EXPECTED_CLASSIFICATIONS = Object.freeze([
 const EXPECTED_COMMON_MIGRATION_TYPES = Object.freeze({
   environment: { type: 'string' },
   test_run_id: { type: 'string' },
+  origin_app_id: { type: 'string' },
+  origin_entity: { type: 'string' },
+  origin_record_id: { type: 'string' },
+  origin_created_at: { type: 'string', format: 'date-time' },
+  origin_updated_at: { type: 'string', format: 'date-time' },
   source_app_id: { type: 'string' },
   source_entity: { type: 'string' },
   source_record_id: { type: 'string' },

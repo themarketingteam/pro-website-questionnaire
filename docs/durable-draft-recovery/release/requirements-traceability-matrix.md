@@ -569,3 +569,17 @@ retention, security-probe, cleanup, and push action.
 `DR-MIG-001`, `DR-MIG-002`, `DR-MIG-003`, `DR-RET-001`, `DR-RLS-001`, and
 `DR-OBS-001` receive no staging acceptance. Resume/idempotency and test-only
 deletion were not observed live.
+
+## 2026-08-06 bidirectional migration identity source foundation
+
+`DR-MIG-001`, `DR-MIG-002`, `DR-MIG-003`, `DR-ID-001`, and `DR-OBS-001` now
+have a strict nine-entity forward/reverse policy, first-origin versus immediate-
+source identity, logical created/updated time, deterministic ID-map/conflict
+schemas, policy-driven SHA-256 projection, relationship-normalized comparison,
+and logical email-recovery selection. The validator fails on a new unclassified
+entity, unsafe staging/test policy, missing relationship/sensitive/file path,
+meaningful-answer hash exclusion, or schema/selection drift.
+
+This is local source evidence only. No app, record, bundle, deployment, schema
+push, production read, or live bidirectional execution exists, so no staging or
+production acceptance advances.

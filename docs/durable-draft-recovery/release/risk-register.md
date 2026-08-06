@@ -614,3 +614,17 @@ migration/retention/security gates passed. `RISK-010`, `RISK-011`, `RISK-016`,
 live checkpoint, apply/resume, duplicate, rollback, retention, RLS, or cleanup
 evidence was gathered. The hard stop prevented all Base44 and production
 operations, so no risk is lowered or closed.
+
+## 2026-08-06 bidirectional migration identity source evidence
+
+The machine-readable entity policy, origin/source split, logical time helpers,
+ID map, conflict row and content-hash projection reduce design uncertainty for
+destination-ID changes, import-time ordering, duplicate appends, relationship
+remapping, staging/test contamination, and content-bearing diagnostics.
+
+`RISK-010`, `RISK-011`, `RISK-016`, `RISK-019`, and `RISK-025` remain open at
+their existing ratings. No protected export/import runner, encrypted bundle,
+single-direction lease, real file transfer, checkpoint execution, conflict
+resolution, production inventory, staging rehearsal, reverse synchronization,
+or late-write reconciliation has been exercised. No cloud or production action
+occurred.

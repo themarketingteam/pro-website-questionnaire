@@ -1,0 +1,39 @@
+{
+  "name": "ProFormMigrationIdMap",
+  "type": "object",
+  "properties": {
+    "source_app_id": {"type": "string", "description": "Protected Base44 application identifier for the immediate source record."},
+    "source_entity": {"type": "string", "description": "Entity name for the immediate source record."},
+    "source_record_id": {"type": "string", "description": "Protected record identifier in the immediate source application."},
+    "destination_app_id": {"type": "string", "description": "Protected Base44 application identifier for the destination record."},
+    "destination_entity": {"type": "string", "description": "Entity name for the destination record."},
+    "destination_record_id": {"type": "string", "description": "Protected record identifier assigned by the destination application."},
+    "origin_app_id": {"type": "string", "description": "First known application identifier in the migration chain."},
+    "origin_entity": {"type": "string", "description": "First known entity name in the migration chain."},
+    "origin_record_id": {"type": "string", "description": "First known record identifier in the migration chain."},
+    "migration_direction": {"type": "string", "enum": ["blue_to_green", "green_to_blue"], "description": "Direction of the latest mapping reconciliation."},
+    "migration_version": {"type": "number", "description": "Positive migration contract version that produced the mapping."},
+    "first_migrated_at": {"type": "string", "format": "date-time", "description": "Server timestamp when this mapping was first created."},
+    "last_migrated_at": {"type": "string", "format": "date-time", "description": "Server timestamp when this mapping was last reconciled."},
+    "source_content_hash": {"type": "string", "description": "SHA-256 hash of the policy-driven source projection."},
+    "destination_content_hash": {"type": "string", "description": "SHA-256 hash of the policy-driven destination projection."},
+    "last_migration_batch_id": {"type": "string", "description": "Opaque identifier of the latest migration batch that used the mapping."},
+    "relationship_finalized": {"type": "boolean", "default": false, "description": "Whether all destination relationship identifiers have been finalized."},
+    "environment": {"type": "string", "description": "Exact environment owning this local mapping record."},
+    "test_run_id": {"type": "string", "description": "Synthetic test-run identifier; absent from ordinary migration mappings."}
+  },
+  "required": [
+    "source_app_id",
+    "source_entity",
+    "source_record_id",
+    "destination_app_id",
+    "destination_entity",
+    "destination_record_id"
+  ],
+  "rls": {
+    "create": {"user_condition": {"role": "admin"}},
+    "read": {"user_condition": {"role": "admin"}},
+    "update": {"user_condition": {"role": "admin"}},
+    "delete": {"user_condition": {"role": "admin"}}
+  }
+}

@@ -93,13 +93,14 @@ Eligibility and selection do not inspect email fields. They assume an upstream b
 
 `selectNewestEligibleDraft(records, options)` operates on a copied list and does not modify records or input order. It filters lifecycle, deletion, supersession, and environment metadata, then sorts with this exact descending tuple:
 
-1. Base44 `created_date`.
-2. Explicit `created_at_server` when present and valid.
-3. Stable record ID using documented bytewise string order, descending.
+1. Logical creation time: valid `origin_created_at`, then valid `source_created_date`, then Base44 `created_date`.
+2. `origin_record_id`.
+3. `source_record_id`.
+4. Destination Base44 record ID.
 
-`updated_date`, `last_saved_at`, all client timestamps, answer content, and email values are ignored. Consequently, an older draft updated more recently cannot win. A newest-created `submitted` record wins over an older `active` record.
+Identity ties use documented bytewise string order descending. `updated_date`, `last_saved_at`, all client timestamps, answer content, email values, and destination import order are ignored. Consequently, an older draft updated or imported more recently cannot win. A newest-logically-created `submitted` record wins over an older `active` record, while a native green record remains newer than an older blue record imported later.
 
-When at least one otherwise eligible record has a valid server-created timestamp, otherwise eligible records with no valid `created_date` or `created_at_server` are excluded and diagnostics include `INVALID_CREATION_TIMESTAMP_EXCLUDED`. If all eligible records lack valid creation timestamps, selection falls back deterministically to stable ID descending and emits `ALL_CREATION_TIMESTAMPS_INVALID_ID_FALLBACK`. This fallback preserves deterministic legacy behavior but is a data-quality warning, not preferred production ordering.
+When at least one otherwise eligible record has a valid logical creation timestamp, otherwise eligible records with no valid `origin_created_at`, `source_created_date`, or `created_date` are excluded and diagnostics include `INVALID_CREATION_TIMESTAMP_EXCLUDED`. If all eligible records lack valid logical creation timestamps, selection falls back deterministically through the same logical identity tuple and emits `ALL_CREATION_TIMESTAMPS_INVALID_ID_FALLBACK`. This fallback preserves deterministic legacy behavior but is a data-quality warning, not preferred production ordering.
 
 The result contains the selected internal record, eligible/excluded counts, and a separate safe diagnostic object. Diagnostics contain only version, selection presence, counts, and warning enums; they contain no email, answer, code, hint, or record payload.
 

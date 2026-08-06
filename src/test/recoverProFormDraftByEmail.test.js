@@ -366,6 +366,23 @@ describe('recoverProFormDraftByEmail selection and session issuance', () => {
     )).json.draft.draftId).toBe('newer-submitted');
   });
 
+  it('selects by logical creation time after blue-to-green migration', async () => {
+    const subject = await harness([
+      await draftRecord({
+        id: 'historical-blue-import',
+        origin_record_id: 'blue-record',
+        origin_created_at: '2032-01-01T00:00:00.000Z',
+        created_date: '2033-05-18T03:33:20.000Z',
+      }),
+      await draftRecord({
+        id: 'native-green-newest',
+        created_date: '2032-06-01T00:00:00.000Z',
+      }),
+    ]);
+    const recovered = await responseJson(await subject.recover(request(emailBody())));
+    expect(recovered.json.draft.draftId).toBe('native-green-newest');
+  });
+
   it('excludes superseded, expired, deleted, retention-expired, and other environments', async () => {
     const records = [
       await draftRecord({ id: 'eligible-oldest', created_date: '2033-01-01T00:00:00.000Z' }),

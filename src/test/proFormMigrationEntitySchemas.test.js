@@ -148,7 +148,7 @@ describe('Pro Form migration entity schema extensions', () => {
       field,
       schema.properties[field],
     ])))).toBe(plan.baselineExistingPropertiesSha256);
-    expect(plan.proposedFields).toHaveLength(25);
+    expect(plan.proposedFields).toHaveLength(30);
     for (const field of ['event_id', 'client_revision', 'server_revision', 'source_tab_id', 'mutation_id']) {
       expect(schema.properties[field], field).toBeDefined();
       expect(schema.required).not.toContain(field);
@@ -169,7 +169,7 @@ describe('Pro Form migration entity schema extensions', () => {
       metadata: schema.properties.metadata,
       userdata: schema.properties.userdata,
     })).toBe(plan.baselineExistingPropertiesSha256);
-    expect(plan.proposedFields).toHaveLength(16);
+    expect(plan.proposedFields).toHaveLength(21);
     for (const field of plan.proposedFields) expect(schema.required).not.toContain(field);
   });
 
@@ -191,7 +191,7 @@ describe('Pro Form migration entity schema extensions', () => {
     expect(schema.properties.zapier_sent).toMatchObject({ type: 'boolean', default: false });
     expect(schema.properties.zapier_suppressed).toMatchObject({ type: 'boolean', default: false });
     expect(schema.properties.zapier_redirected).toMatchObject({ type: 'boolean', default: false });
-    expect(plan.proposedFields).toHaveLength(18);
+    expect(plan.proposedFields).toHaveLength(23);
     for (const field of plan.proposedFields) expect(schema.required).not.toContain(field);
   });
 

@@ -352,6 +352,10 @@ export type DraftSelectionRecord = Readonly<{
   status?: unknown;
   created_date?: unknown;
   created_at_server?: unknown;
+  origin_created_at?: unknown;
+  origin_record_id?: unknown;
+  source_created_date?: unknown;
+  source_record_id?: unknown;
   environment?: unknown;
   source_environment?: unknown;
   replacement_draft_id?: unknown;
@@ -422,15 +426,22 @@ const parseServerTimestamp = (value: unknown): number | null => {
   return Number.isFinite(timestamp) ? timestamp : null;
 };
 
-const hasAnyValidServerCreatedTimestamp = (
+const getLogicalCreatedAt = (record: DraftSelectionRecord): string | null => {
+  for (const field of ['origin_created_at', 'source_created_date', 'created_date'] as const) {
+    const value = record[field];
+    if (parseServerTimestamp(value) !== null) return String(value).trim();
+  }
+  return null;
+};
+
+const hasAnyValidLogicalCreatedTimestamp = (
   record: DraftSelectionRecord,
 ): boolean => (
-  parseServerTimestamp(record.created_date) !== null
-  || parseServerTimestamp(record.created_at_server) !== null
+  getLogicalCreatedAt(record) !== null
 );
 
 const isValidLegacyDraftRecord = (record: DraftSelectionRecord): boolean => (
-  readStableId(record) !== null && hasAnyValidServerCreatedTimestamp(record)
+  readStableId(record) !== null && hasAnyValidLogicalCreatedTimestamp(record)
 );
 
 export function normalizeLegacyDraftStatus(
@@ -539,18 +550,21 @@ const compareIndexedDrafts = <T extends DraftSelectionRecord>(
   left: IndexedDraft<T>,
   right: IndexedDraft<T>,
 ): number => {
-  const leftCreated = parseServerTimestamp(left.record.created_date);
-  const rightCreated = parseServerTimestamp(right.record.created_date);
+  const leftCreated = parseServerTimestamp(getLogicalCreatedAt(left.record));
+  const rightCreated = parseServerTimestamp(getLogicalCreatedAt(right.record));
   if (leftCreated !== rightCreated) {
     return (rightCreated ?? Number.NEGATIVE_INFINITY)
       - (leftCreated ?? Number.NEGATIVE_INFINITY);
   }
 
-  const leftServerCreated = parseServerTimestamp(left.record.created_at_server);
-  const rightServerCreated = parseServerTimestamp(right.record.created_at_server);
-  if (leftServerCreated !== rightServerCreated) {
-    return (rightServerCreated ?? Number.NEGATIVE_INFINITY)
-      - (leftServerCreated ?? Number.NEGATIVE_INFINITY);
+  for (const key of ['origin_record_id', 'source_record_id'] as const) {
+    const leftIdentity = typeof left.record[key] === 'string'
+      ? left.record[key].trim()
+      : '';
+    const rightIdentity = typeof right.record[key] === 'string'
+      ? right.record[key].trim()
+      : '';
+    if (leftIdentity !== rightIdentity) return leftIdentity > rightIdentity ? -1 : 1;
   }
 
   const leftId = readStableId(left.record) ?? '';
@@ -604,7 +618,7 @@ export function selectNewestEligibleDraft<T extends DraftSelectionRecord>(
       eligible.push(record);
     }
   }
-  const withValidTimestamp = eligible.filter(hasAnyValidServerCreatedTimestamp);
+  const withValidTimestamp = eligible.filter(hasAnyValidLogicalCreatedTimestamp);
   const warnings: DraftSelectionWarning[] = [];
   let candidates = eligible;
 

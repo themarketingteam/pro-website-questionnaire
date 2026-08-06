@@ -410,3 +410,25 @@ An RPO 0 target is not a claim of success until forward migration, reverse migra
 Any change to environment roles, migration identity, integrity gates, cutover ordering, rollback ordering, or RPO/RTO targets requires a version-controlled superseding ADR approved by Isaac Hines and Engineering. Implementation cannot silently weaken this contract.
 
 This prompt created documentation only. It did not create or link blue, staging, or green apps; run a Base44 command; access or export production records; create migration code; change an entity schema; configure a secret or integration; deploy source; move a domain; change application behavior; push the feature branch; or push `main`.
+
+## 2026-08-06 bidirectional identity foundation addendum
+
+The local implementation now makes the ADR identity and ordering rules
+machine-verifiable. The strict entity-policy manifest classifies all nine local
+schemas, permits only `blue_to_green` and `green_to_blue`, requires one active
+direction, excludes staging/test records, and defaults to no deletion.
+
+The four required business entities carry optional protected `origin_*`
+identity and logical timestamps in addition to immediate `source_*` metadata.
+Destination `created_date` is therefore only a fallback, never the historical
+business creation date. `ProFormMigrationIdMap` defines deterministic upsert
+and relationship remapping; `ProFormMigrationConflict` stores only hashes,
+revisions, safe status and content-free diagnostics. Policy-driven SHA-256
+projections retain meaningful answers while excluding destination and
+migration bookkeeping.
+
+This is source foundation only. No `_next` app, Base44 command, schema push,
+record read/export, protected bundle, deployment, domain action, or remote Git
+operation occurred. The exporter/importer, active-direction lease, encrypted
+bundle, checkpoint execution, file transfer and live forward/reverse rehearsal
+remain future gates.

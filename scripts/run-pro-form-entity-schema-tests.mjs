@@ -40,6 +40,7 @@ runNode(
     'src/test/proFormMigrationEntitySchemas.test.js',
     'src/test/proFormRecoverySecurityEventSchema.test.js',
     'src/test/proFormEmailVerificationAttemptSchema.test.js',
+    'src/test/proFormBlueGreenMigrationSchemas.test.js',
     '--reporter=dot',
     '--no-coverage',
   ],

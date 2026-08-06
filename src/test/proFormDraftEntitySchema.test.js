@@ -101,6 +101,11 @@ const FIELD_CATEGORIES = {
   migration: [
     'environment',
     'test_run_id',
+    'origin_app_id',
+    'origin_entity',
+    'origin_record_id',
+    'origin_created_at',
+    'origin_updated_at',
     'source_app_id',
     'source_entity',
     'source_record_id',
@@ -216,8 +221,8 @@ describe('ProFormDraft entity schema extension', () => {
     expect(Object.keys(draftPlan.existingFields)).toHaveLength(30);
   });
 
-  it('implements exactly the 71 optional protected fields with admin/backend FLS', () => {
-    expect(new Set(EXPECTED_NEW_FIELDS).size).toBe(71);
+  it('implements exactly the 76 optional protected fields with admin/backend FLS', () => {
+    expect(new Set(EXPECTED_NEW_FIELDS).size).toBe(76);
     expect([...draftPlan.proposedFields].sort()).toEqual([...EXPECTED_NEW_FIELDS].sort());
 
     for (const fieldName of EXPECTED_NEW_FIELDS) {

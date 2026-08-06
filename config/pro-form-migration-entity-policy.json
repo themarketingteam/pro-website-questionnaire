@@ -1,0 +1,261 @@
+{
+  "manifestVersion": 1,
+  "status": "local_contract_not_deployed",
+  "supportedDirections": [
+    "blue_to_green",
+    "green_to_blue"
+  ],
+  "singleActiveDirectionRequired": true,
+  "defaultNoDelete": true,
+  "entities": [
+    {
+      "entityName": "ProFormDraft",
+      "migrationPolicy": "required",
+      "reverseMigrationPolicy": "required",
+      "dependencyOrder": 10,
+      "logicalIdentityFields": ["origin_app_id", "origin_entity", "origin_record_id"],
+      "relationshipFields": [
+        {"path": "previous_draft_id", "targetEntity": "ProFormDraft", "required": false},
+        {"path": "replacement_draft_id", "targetEntity": "ProFormDraft", "required": false},
+        {"path": "final_submission_id", "targetEntity": "ProFormSubmission", "required": false}
+      ],
+      "serverManagedFields": ["id", "created_date", "updated_date", "created_by"],
+      "excludedFields": [],
+      "sensitiveFields": [
+        "responses_json", "metadata_json", "userdata_json", "mapped_payload_json",
+        "draft_metadata_json", "draft_state_json", "ui_draft_state_json",
+        "credentials_json", "recovery_email", "recovery_email_lookup_hash",
+        "recovery_code_hash", "resume_token_hash", "identity_key_hash",
+        "source_app_id", "source_record_id"
+      ],
+      "contentHashExcludedFields": [
+        "id", "created_date", "updated_date", "created_by", "environment", "test_run_id",
+        "source_app_id", "source_entity", "source_record_id", "source_created_date",
+        "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at",
+        "source_content_hash", "migration_version"
+      ],
+      "fileReferencePaths": [],
+      "productionAllowed": true,
+      "stagingAllowed": false,
+      "testRecordPolicy": "never_migrate",
+      "conflictPolicy": "manual_review_on_bidirectional_change",
+      "retentionPolicy": "preserve_lifecycle_hold_and_submitted_state"
+    },
+    {
+      "entityName": "ProFormDraftEvent",
+      "migrationPolicy": "required",
+      "reverseMigrationPolicy": "required",
+      "dependencyOrder": 20,
+      "logicalIdentityFields": ["origin_app_id", "origin_entity", "origin_record_id"],
+      "relationshipFields": [
+        {"path": "draft_id", "targetEntity": "ProFormDraft", "required": false}
+      ],
+      "serverManagedFields": ["id", "created_date", "updated_date", "created_by"],
+      "excludedFields": [],
+      "sensitiveFields": [
+        "value_json", "business_name", "domain", "user_id", "admin_actor_hash",
+        "source_app_id", "source_record_id"
+      ],
+      "contentHashExcludedFields": [
+        "id", "created_date", "updated_date", "created_by", "environment", "test_run_id",
+        "source_app_id", "source_entity", "source_record_id", "source_created_date",
+        "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at",
+        "source_content_hash", "migration_version"
+      ],
+      "fileReferencePaths": [],
+      "productionAllowed": true,
+      "stagingAllowed": false,
+      "testRecordPolicy": "never_migrate",
+      "conflictPolicy": "append_only_identity_conflict_manual_review",
+      "retentionPolicy": "preserve_with_parent_draft_and_event_retention"
+    },
+    {
+      "entityName": "ProFormSubmission",
+      "migrationPolicy": "required",
+      "reverseMigrationPolicy": "required",
+      "dependencyOrder": 30,
+      "logicalIdentityFields": ["origin_app_id", "origin_entity", "origin_record_id"],
+      "relationshipFields": [
+        {"path": "source_draft_id", "targetEntity": "ProFormDraft", "required": false}
+      ],
+      "serverManagedFields": ["id", "created_date", "updated_date", "created_by"],
+      "excludedFields": [],
+      "sensitiveFields": ["metadata", "userdata", "source_app_id", "source_record_id"],
+      "contentHashExcludedFields": [
+        "id", "created_date", "updated_date", "created_by", "environment", "test_run_id",
+        "source_app_id", "source_entity", "source_record_id", "source_created_date",
+        "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at",
+        "source_content_hash", "migration_version"
+      ],
+      "fileReferencePaths": [
+        "userdata.additional_pages_list.meet_the_team_page.team_photo_with_tags.imageUrl",
+        "userdata.certifications_partnerships[].cert_item_image_url",
+        "userdata.certifications_partnerships[].cert_item_file_url",
+        "userdata.service_guarantee_items[].guarantee_file_url"
+      ],
+      "productionAllowed": true,
+      "stagingAllowed": false,
+      "testRecordPolicy": "never_migrate",
+      "conflictPolicy": "submitted_immutable_manual_review",
+      "retentionPolicy": "preserve_submitted_record_and_file_references"
+    },
+    {
+      "entityName": "ProFormSubmissionIntake",
+      "migrationPolicy": "required",
+      "reverseMigrationPolicy": "required",
+      "dependencyOrder": 40,
+      "logicalIdentityFields": ["origin_app_id", "origin_entity", "origin_record_id"],
+      "relationshipFields": [
+        {"path": "source_draft_id", "targetEntity": "ProFormDraft", "required": false},
+        {"path": "linked_submission_id", "targetEntity": "ProFormSubmission", "required": false}
+      ],
+      "serverManagedFields": ["id", "created_date", "updated_date", "created_by"],
+      "excludedFields": [],
+      "sensitiveFields": [
+        "user_email", "user_id", "raw_responses_json", "transformed_payload_json",
+        "ai_repaired_payload_json", "source_app_id", "source_record_id"
+      ],
+      "contentHashExcludedFields": [
+        "id", "created_date", "updated_date", "created_by", "environment", "test_run_id",
+        "source_app_id", "source_entity", "source_record_id", "source_created_date",
+        "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at",
+        "source_content_hash", "migration_version"
+      ],
+      "fileReferencePaths": [],
+      "productionAllowed": true,
+      "stagingAllowed": false,
+      "testRecordPolicy": "never_migrate",
+      "conflictPolicy": "status_and_delivery_conflict_manual_review",
+      "retentionPolicy": "preserve_retry_repair_and_submission_linkage"
+    },
+    {
+      "entityName": "ProFormRecoverySecurityEvent",
+      "migrationPolicy": "audit_optional",
+      "reverseMigrationPolicy": "audit_optional",
+      "dependencyOrder": 50,
+      "logicalIdentityFields": ["source_app_id", "source_entity", "source_record_id"],
+      "relationshipFields": [
+        {"path": "draft_id", "targetEntity": "ProFormDraft", "required": false}
+      ],
+      "serverManagedFields": ["id", "created_date", "updated_date", "created_by"],
+      "excludedFields": [],
+      "sensitiveFields": [
+        "subject_hash", "ip_hash", "device_hash", "recovery_email_lookup_hash",
+        "source_app_id", "source_record_id"
+      ],
+      "contentHashExcludedFields": [
+        "id", "created_date", "updated_date", "created_by", "environment", "test_run_id",
+        "source_app_id", "source_entity", "source_record_id", "source_created_date",
+        "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at",
+        "source_content_hash", "migration_version"
+      ],
+      "fileReferencePaths": [],
+      "productionAllowed": true,
+      "stagingAllowed": false,
+      "testRecordPolicy": "never_migrate",
+      "conflictPolicy": "append_only_audit_manual_review",
+      "retentionPolicy": "optional_copy_subject_to_security_retention_window"
+    },
+    {
+      "entityName": "ProFormEmailVerificationAttempt",
+      "migrationPolicy": "environment_local",
+      "reverseMigrationPolicy": "environment_local",
+      "dependencyOrder": 60,
+      "logicalIdentityFields": ["attempt_id"],
+      "relationshipFields": [],
+      "serverManagedFields": ["id", "created_date", "updated_date", "created_by"],
+      "excludedFields": [],
+      "sensitiveFields": [
+        "recovery_email_lookup_hash", "verification_token_hash", "device_hash", "ip_hash",
+        "redirect_path_hash", "email_provider_message_id", "source_app_id", "source_record_id"
+      ],
+      "contentHashExcludedFields": [
+        "id", "created_date", "updated_date", "created_by", "environment", "test_run_id",
+        "source_app_id", "source_entity", "source_record_id", "source_created_date",
+        "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at",
+        "source_content_hash", "migration_version"
+      ],
+      "fileReferencePaths": [],
+      "productionAllowed": false,
+      "stagingAllowed": false,
+      "testRecordPolicy": "never_migrate",
+      "conflictPolicy": "never_merge_environment_local_attempts",
+      "retentionPolicy": "expire_in_source_environment"
+    },
+    {
+      "entityName": "ProFormMigrationCheckpoint",
+      "migrationPolicy": "never_migrate",
+      "reverseMigrationPolicy": "never_migrate",
+      "dependencyOrder": 70,
+      "logicalIdentityFields": ["migration_name", "environment", "batch_id"],
+      "relationshipFields": [],
+      "serverManagedFields": ["id", "created_date", "updated_date", "created_by"],
+      "excludedFields": [],
+      "sensitiveFields": [
+        "apply_token_hash", "retention_apply_token_hash", "requested_by_grant_token_hash",
+        "report_json", "last_record_id"
+      ],
+      "contentHashExcludedFields": [
+        "id", "created_date", "updated_date", "created_by", "cursor", "draft_cursor",
+        "event_cursor", "apply_draft_cursor", "apply_event_cursor", "updated_at",
+        "completed_at", "migrated_at"
+      ],
+      "fileReferencePaths": [],
+      "productionAllowed": false,
+      "stagingAllowed": false,
+      "testRecordPolicy": "never_migrate",
+      "conflictPolicy": "never_merge_environment_local_checkpoint",
+      "retentionPolicy": "retain_locally_for_operation_and_audit_window"
+    },
+    {
+      "entityName": "ProFormMigrationIdMap",
+      "migrationPolicy": "environment_local",
+      "reverseMigrationPolicy": "environment_local",
+      "dependencyOrder": 80,
+      "logicalIdentityFields": [
+        "source_app_id", "source_entity", "source_record_id",
+        "destination_app_id", "destination_entity"
+      ],
+      "relationshipFields": [],
+      "serverManagedFields": ["id", "created_date", "updated_date", "created_by"],
+      "excludedFields": [],
+      "sensitiveFields": [
+        "source_app_id", "source_record_id", "destination_app_id", "destination_record_id",
+        "origin_app_id", "origin_record_id"
+      ],
+      "contentHashExcludedFields": [
+        "id", "created_date", "updated_date", "created_by", "first_migrated_at",
+        "last_migrated_at", "last_migration_batch_id"
+      ],
+      "fileReferencePaths": [],
+      "productionAllowed": false,
+      "stagingAllowed": false,
+      "testRecordPolicy": "never_migrate",
+      "conflictPolicy": "unique_source_per_destination_manual_review",
+      "retentionPolicy": "retain_through_forward_reverse_and_rollback_window"
+    },
+    {
+      "entityName": "ProFormMigrationConflict",
+      "migrationPolicy": "environment_local",
+      "reverseMigrationPolicy": "environment_local",
+      "dependencyOrder": 90,
+      "logicalIdentityFields": ["conflict_id", "environment"],
+      "relationshipFields": [],
+      "serverManagedFields": ["id", "created_date", "updated_date", "created_by"],
+      "excludedFields": [],
+      "sensitiveFields": [
+        "source_app_id", "source_record_id", "destination_app_id", "destination_record_id",
+        "safe_diagnostics_json"
+      ],
+      "contentHashExcludedFields": [
+        "id", "created_date", "updated_date", "created_by", "detected_at", "resolved_at"
+      ],
+      "fileReferencePaths": [],
+      "productionAllowed": false,
+      "stagingAllowed": false,
+      "testRecordPolicy": "never_migrate",
+      "conflictPolicy": "manual_resolution_required",
+      "retentionPolicy": "retain_safe_diagnostics_through_resolution_and_audit_window"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Base44 Pro Form entity extension and compatibility plan
 
-- Status: four Pro Form extensions plus draft-recovery admin-only RLS implemented locally; no entity schema pushed
+- Status: four Pro Form extensions, origin metadata, and two migration-control entities implemented locally; no entity schema pushed
 - Date: 2026-08-05
 - Planning baseline: `50c7379c1cfc30e2d242e917b0abe951e3f75584`
 - Prompt 2 implementation baseline: `8b5aac603bb9c568b7bdc726423852c4e146582a`
@@ -21,7 +21,7 @@ The four existing uppercase schema files remain the authoritative repository con
 3. `base44/entities/ProFormSubmission.jsonc`
 4. `base44/entities/ProFormSubmissionIntake.jsonc`
 
-They are not renamed. The local foundation now has 71 optional protected properties on `ProFormDraft`: the prior 64 extensions plus seven Clear All/Start New transaction fields. Prompt 3 added 25 to `ProFormDraftEvent`, 16 to `ProFormSubmission`, and 18 to `ProFormSubmissionIntake`. The schemas retain every existing field, required array, nested submission object, enum/default, and entity-level RLS. Current public compatibility payloads remain valid, while every new field is restricted to admin read/write.
+They are not renamed. The local foundation now has 76 optional protected properties on `ProFormDraft`, 30 on `ProFormDraftEvent`, 21 on `ProFormSubmission`, and 23 on `ProFormSubmissionIntake`. The five new fields on each entity preserve first-origin identity and logical creation/update time. The schemas retain every existing field, required array, nested submission object, enum/default, and entity-level RLS. Current public compatibility payloads remain valid, while every new field is restricted to admin read/write.
 
 The manifest is deliberately stored under `docs/durable-draft-recovery/data`, outside `base44/entities`. It is strict JSON but is not a Base44 entity resource and cannot be included by an entity-directory push. No types are generated because these local schema changes are not pushed or deployed.
 
@@ -74,10 +74,10 @@ byte-frozen by tests. See the
 
 | Entity | Existing top-level fields | Existing required array | Repository RLS/FLS | Current compatibility callers |
 | --- | ---: | --- | --- | --- |
-| `ProFormDraft` | 30 original + 71 local optional extensions | `session_id` | Local admin-only entity RLS; all 71 new fields use admin read/write FLS | Scoped backend functions use service role after authorization; no browser entity CRUD |
-| `ProFormDraftEvent` | 12 original + 25 local optional extensions | `session_id` | Local admin-only entity RLS; all new fields use admin read/write FLS | Backend event append uses service role after exact-draft authorization; no browser entity create |
-| `ProFormSubmission` | 2 original large objects + 16 local optional extensions | `metadata`, `userdata` | Existing creator/admin entity RLS unchanged; all new fields use admin read/write FLS | Existing submission payload remains compatible; trusted backend/migration owns linkage fields |
-| `ProFormSubmissionIntake` | 33 original + 18 local optional extensions | `questionnaire_session_id` | Existing admin-only entity RLS unchanged; all new fields use admin read/write FLS | Existing fallback/retry/repair behavior remains compatible |
+| `ProFormDraft` | 30 original + 76 local optional extensions | `session_id` | Local admin-only entity RLS; all 76 new fields use admin read/write FLS | Scoped backend functions use service role after authorization; no browser entity CRUD |
+| `ProFormDraftEvent` | 12 original + 30 local optional extensions | `session_id` | Local admin-only entity RLS; all new fields use admin read/write FLS | Backend event append uses service role after exact-draft authorization; no browser entity create |
+| `ProFormSubmission` | 2 original large objects + 21 local optional extensions | `metadata`, `userdata` | Existing creator/admin entity RLS unchanged; all new fields use admin read/write FLS | Existing submission payload remains compatible; trusted backend/migration owns linkage fields |
+| `ProFormSubmissionIntake` | 33 original + 23 local optional extensions | `questionnaire_session_id` | Existing admin-only entity RLS unchanged; all new fields use admin read/write FLS | Existing fallback/retry/repair behavior remains compatible |
 
 Compatibility findings:
 
@@ -129,15 +129,20 @@ Definitions omit schema defaults except explicit `retention_hold: false`, `zapie
 
 ## Common migration metadata
 
-These 12 optional fields are planned on all four entities and are admin/backend-only:
+These 17 optional fields are implemented locally on all four entities and are admin/backend-only:
 
 | Field | Type/format | Classification | Purpose |
 | --- | --- | --- | --- |
 | `environment` | string | `backend_only`, `migration_metadata` | Separate blue/staging/green records and enforce environment filtering. |
 | `test_run_id` | string | `backend_only`, `test_metadata`, `migration_metadata` | Identify synthetic records that must never enter green production. |
-| `source_app_id` | string | `backend_only`, `migration_metadata`, `sensitive_pii` | First component of logical migration identity; full internal ID is allowed only in the protected row. |
-| `source_entity` | string | `backend_only`, `migration_metadata` | Second component of logical migration identity. |
-| `source_record_id` | string | `backend_only`, `migration_metadata`, `sensitive_pii` | Third identity component and relationship-map source ID. |
+| `origin_app_id` | string | `backend_only`, `migration_metadata`, `sensitive_pii` | Preserve the first known application identity across every hop. |
+| `origin_entity` | string | `backend_only`, `migration_metadata` | Preserve the first known entity identity. |
+| `origin_record_id` | string | `backend_only`, `migration_metadata`, `sensitive_pii` | Preserve the first known record identity and stable selection tie-breaker. |
+| `origin_created_at` | string/date-time | `backend_only`, `migration_metadata`, `audit_metadata` | Preserve historical creation ordering independently of destination import time. |
+| `origin_updated_at` | string/date-time | `backend_only`, `migration_metadata`, `audit_metadata` | Carry the origin update only until a newer immediate source update exists. |
+| `source_app_id` | string | `backend_only`, `migration_metadata`, `sensitive_pii` | First component of the immediate-source identity for the current hop. |
+| `source_entity` | string | `backend_only`, `migration_metadata` | Second component of the immediate-source identity. |
+| `source_record_id` | string | `backend_only`, `migration_metadata`, `sensitive_pii` | Third immediate-source component and relationship-map source ID. |
 | `source_created_date` | string/date-time | `backend_only`, `migration_metadata` | Preserve authoritative source creation ordering. |
 | `source_updated_date` | string/date-time | `backend_only`, `migration_metadata` | Drive incremental checkpoints and late-write overlap scans. |
 | `migration_batch_id` | string | `admin_only`, `backend_only`, `migration_metadata`, `audit_metadata` | Correlate one full, delta, reconciliation, or reverse batch. |
@@ -146,13 +151,13 @@ These 12 optional fields are planned on all four entities and are admin/backend-
 | `source_content_hash` | string | `backend_only`, `migration_metadata`, `sensitive_hash` | Detect equality, conflicts, corruption, and idempotent reruns. |
 | `migration_version` | number | `backend_only`, `migration_metadata` | Select the transformation and integrity contract. |
 
-`source_app_id + source_entity + source_record_id` is the logical migration identity. Destination Base44 IDs may differ; an external durable ID map remaps relationships. Existing local IDs remain valid. Migration utilities must reject staging app IDs and any `test_run_id` when targeting green production. Full secret-bearing configuration never belongs in these fields.
+`origin_app_id + origin_entity + origin_record_id` is the first-known logical identity. `source_app_id + source_entity + source_record_id` identifies only the immediate hop. Destination Base44 IDs may differ; `ProFormMigrationIdMap` remaps relationships deterministically. Existing local IDs remain valid. Migration utilities must reject staging app IDs and any `test_run_id` when targeting green production. Full secret-bearing configuration never belongs in these fields.
 
 The fields support ADR-002 initial full migration, overlapping incremental deltas, final freeze delta, late-write reconciliation, and green-to-blue rollback. Every direction uses deterministic upsert, content hashes, stable checkpoints/tie-breakers, relationship validation, and fail-closed integrity reports.
 
 ## `ProFormDraft` local extension
 
-Implementation status: **71 optional fields implemented locally and not pushed**: 59 draft-specific fields plus the 12 common migration fields. All 71 use admin read/write FLS. Existing browser payloads remain valid because `session_id` is still the only required field. The latest seven fields support recoverable replacement transactions and incomplete-replacement email exclusion.
+Implementation status: **76 optional fields implemented locally and not pushed**: 59 draft-specific fields plus the 17 common migration fields. All 76 use admin read/write FLS. Existing browser payloads remain valid because `session_id` is still the only required field. The latest seven replacement fields support recoverable replacement transactions and incomplete-replacement email exclusion.
 
 ### Canonical state (7)
 
@@ -231,7 +236,7 @@ The common fields in the preceding table are implemented with their planned type
 
 ## `ProFormDraftEvent` local extension
 
-Implementation status: **25 optional fields implemented locally and not pushed**: 12 common migration fields plus 13 event-specific fields.
+Implementation status: **30 optional fields implemented locally and not pushed**: 17 common migration fields plus 13 event-specific fields.
 
 - `draft_id` — string; `backend_only`, `sensitive_pii`, `audit_metadata`; direct relationship to the draft, remapped during migration.
 - `event_id` — string; `backend_only`, `audit_metadata`; stable retry-safe append and deterministic migration idempotency key.
@@ -251,7 +256,7 @@ Existing `session_id`, event/value fields, and browser writers remain compatible
 
 ## `ProFormSubmission` local extension
 
-Implementation status: **16 optional fields implemented locally and not pushed**: 12 common migration fields plus 4 linkage/hash fields. The existing large `metadata` and `userdata` structures remain unchanged.
+Implementation status: **21 optional fields implemented locally and not pushed**: 17 common migration fields plus 4 linkage/hash fields. The existing large `metadata` and `userdata` structures remain unchanged.
 
 - `questionnaire_session_id` — string; `backend_only`, `sensitive_pii`, `audit_metadata`; optional top-level migration linkage governed by the equality/fallback/quarantine rule above.
 - `source_draft_id` — string; `backend_only`, `sensitive_pii`, `audit_metadata`; optional source-draft linkage with migration remapping.
@@ -262,7 +267,7 @@ No field changes final submission payload shape by itself. Existing creators may
 
 ## `ProFormSubmissionIntake` local extension
 
-Implementation status: **18 optional fields implemented locally and not pushed**: 12 common migration fields plus 6 intake-specific fields.
+Implementation status: **23 optional fields implemented locally and not pushed**: 17 common migration fields plus 6 intake-specific fields.
 
 - `source_draft_id` — string; `backend_only`, `sensitive_pii`, `audit_metadata`; optional source-draft relationship.
 - `canonical_state_hash` — string; `backend_only`, `sensitive_hash`, `audit_metadata`; optional integrity linkage.

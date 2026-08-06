@@ -164,6 +164,11 @@
   "commonMigrationFields": [
     "environment",
     "test_run_id",
+    "origin_app_id",
+    "origin_entity",
+    "origin_record_id",
+    "origin_created_at",
+    "origin_updated_at",
     "source_app_id",
     "source_entity",
     "source_record_id",
@@ -198,13 +203,70 @@
       "description": "Opaque synthetic test-run identifier; absent for ordinary production records.",
       "group": "common_migration"
     },
+    "origin_app_id": {
+      "type": "string",
+      "classifications": ["backend_only", "migration_metadata", "sensitive_pii"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the first known application identity through forward and reverse migration.",
+      "publicProjectionRule": "omit",
+      "description": "First known Base44 application identifier in the migration chain.",
+      "group": "common_migration"
+    },
+    "origin_entity": {
+      "type": "string",
+      "classifications": ["backend_only", "migration_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the first known entity identity through forward and reverse migration.",
+      "publicProjectionRule": "omit",
+      "description": "First known entity name in the migration chain.",
+      "group": "common_migration"
+    },
+    "origin_record_id": {
+      "type": "string",
+      "classifications": ["backend_only", "migration_metadata", "sensitive_pii"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the first known record identity and stable selection tie-breaker.",
+      "publicProjectionRule": "omit",
+      "description": "First known record identifier in the migration chain.",
+      "group": "common_migration"
+    },
+    "origin_created_at": {
+      "type": "string",
+      "format": "date-time",
+      "classifications": ["backend_only", "migration_metadata", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves historical business creation ordering independently of destination created_date.",
+      "publicProjectionRule": "omit",
+      "description": "Original logical creation timestamp preserved across migration hops.",
+      "group": "common_migration"
+    },
+    "origin_updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "classifications": ["backend_only", "migration_metadata", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Carries the origin update time without overriding a newer immediate source update.",
+      "publicProjectionRule": "omit",
+      "description": "Latest historical update timestamp carried from the first known origin when still current.",
+      "group": "common_migration"
+    },
     "source_app_id": {
       "type": "string",
       "classifications": ["backend_only", "migration_metadata", "sensitive_pii"],
       "sensitive": true,
       "required": false,
       "fieldLevelRlsRequirement": "admin_backend_only",
-      "migrationUse": "First component of the logical migration identity.",
+      "migrationUse": "First component of the immediate-source migration identity for the current hop.",
       "publicProjectionRule": "omit",
       "description": "Internal Base44 application identifier of the source record.",
       "group": "common_migration"
@@ -215,7 +277,7 @@
       "sensitive": false,
       "required": false,
       "fieldLevelRlsRequirement": "admin_backend_only",
-      "migrationUse": "Second component of the logical migration identity.",
+      "migrationUse": "Second component of the immediate-source migration identity for the current hop.",
       "publicProjectionRule": "omit",
       "description": "Source entity name used by the migration identity and integrity report.",
       "group": "common_migration"
@@ -226,7 +288,7 @@
       "sensitive": true,
       "required": false,
       "fieldLevelRlsRequirement": "admin_backend_only",
-      "migrationUse": "Third component of the logical migration identity and relationship map.",
+      "migrationUse": "Third component of the immediate-source migration identity and relationship map for the current hop.",
       "publicProjectionRule": "omit",
       "description": "Immutable Base44 identifier of the source record.",
       "group": "common_migration"
@@ -1708,7 +1770,7 @@
       "schemaFile": "base44/entities/ProFormDraft.jsonc",
       "baselineSha256": "134d638d3fd42f429022b694b1dc1ba8393341b8b133ff6eda22a3d12f06d1f6",
       "baselineExistingPropertiesSha256": "6b8993602c502ef8fdd119ed95ab10c4ddaafd7d16e531980888bad214873c5e",
-      "implementedSchemaSha256": "8b99d4ea51baa890ecc62616bd2bec731118f2f7aa4df1f42db29cd88a156f08",
+      "implementedSchemaSha256": "d209adaab0c62292a4fde16350f3c1d19673c498f248d9cec3739abc6664ad00",
       "implementationStatus": "local_schema_and_admin_rls_implemented_not_pushed",
       "existingRequired": ["session_id"],
       "expectedRls": {
@@ -1760,14 +1822,14 @@
         "submitted_state_hash", "pdf_source_state_hash", "submitted_lock_version", "status_locked_at", "last_submission_error_code",
         "recovery_email_delivery_status", "last_recovery_email_sent_at", "recovery_email_delivery_error_code", "recovery_email_delivery_attempt_count", "recovery_email_delivery_idempotency_hash", "recovery_email_delivery_purpose", "recovery_email_provider_message_id", "recovery_email_last_request_id",
         "retention_expires_at", "retention_hold", "retention_hold_reason", "retention_policy_version",
-        "environment", "test_run_id", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version"
+        "environment", "test_run_id", "origin_app_id", "origin_entity", "origin_record_id", "origin_created_at", "origin_updated_at", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version"
       ]
     },
     "ProFormDraftEvent": {
       "schemaFile": "base44/entities/ProFormDraftEvent.jsonc",
       "baselineSha256": "4828654d5a77525438daf4c61855542a1302a51b3860a0a671425edc3085f5ae",
       "baselineExistingPropertiesSha256": "0aed9cd3b0e1317f38d05331f1513fd511b9362b33364706570099a36b43bc37",
-      "implementedSchemaSha256": "e90ef810850895b22510432674cb7fc70f64285f6573944a9d139a826d71a220",
+      "implementedSchemaSha256": "74752ba8c6854f88bcc9f95421f220819d7abd5b5b07c450eb83d6bb4a7a1ee1",
       "implementationStatus": "local_schema_and_admin_rls_implemented_not_pushed",
       "existingRequired": ["session_id"],
       "expectedRls": {
@@ -1792,7 +1854,7 @@
         "created_at_iso": {"type": "string", "required": false}
       },
       "proposedFields": [
-        "environment", "test_run_id", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version",
+        "environment", "test_run_id", "origin_app_id", "origin_entity", "origin_record_id", "origin_created_at", "origin_updated_at", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version",
         "draft_id", "event_id", "client_revision", "server_revision", "source_tab_id", "mutation_id", "event_metadata_json", "value_hash", "redaction_level", "admin_actor_hash", "retention_expires_at", "retention_hold", "retention_hold_reason"
       ]
     },
@@ -1800,7 +1862,7 @@
       "schemaFile": "base44/entities/ProFormSubmission.jsonc",
       "baselineSha256": "dd876a669dc103f69464b0a77ec6bf55995dd8c3656d9bb16311ee4145dea5f0",
       "baselineExistingPropertiesSha256": "905e4b7cfd0b9bd8700cc42bad6c7413597e418cba2e40bcddabee24fa62adab",
-      "implementedSchemaSha256": "3014b208957ffbb721f32e412bd2551ed62d355f1cefb863f87ed39fc2fb3dc4",
+      "implementedSchemaSha256": "62bceebf3f2ada03ca4cf787222b5639517d43e9674878cbb29a4247598a9f66",
       "implementationStatus": "local_schema_implemented_not_pushed",
       "existingRequired": ["metadata", "userdata"],
       "expectedRls": {
@@ -1822,7 +1884,7 @@
         "userdata": {"type": "object", "required": true}
       },
       "proposedFields": [
-        "environment", "test_run_id", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version",
+        "environment", "test_run_id", "origin_app_id", "origin_entity", "origin_record_id", "origin_created_at", "origin_updated_at", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version",
         "questionnaire_session_id", "source_draft_id", "submitted_state_hash", "pdf_source_state_hash"
       ]
     },
@@ -1830,7 +1892,7 @@
       "schemaFile": "base44/entities/ProFormSubmissionIntake.jsonc",
       "baselineSha256": "3a97cde95ed2ac74158b6f2fe3d755f573c23860bd9b77695586e74db73b3328",
       "baselineExistingPropertiesSha256": "c5344f8fb288d79d5cf933935060b286fc9624ab40e8a319433eb5b31678a468",
-      "implementedSchemaSha256": "cd2fc8eb55ea769af1defea1b214fff52f198a19fab7a9d518f40b6f119f6745",
+      "implementedSchemaSha256": "a809858129984d17eba2f9115de2bfa033fb6f723e2680c45115cbe3a38b7be4",
       "implementationStatus": "local_schema_implemented_not_pushed",
       "existingRequired": ["questionnaire_session_id"],
       "expectedRls": {
@@ -1899,9 +1961,30 @@
         "ai_repair_source": {"type": "string", "required": false}
       },
       "proposedFields": [
-        "environment", "test_run_id", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version",
+        "environment", "test_run_id", "origin_app_id", "origin_entity", "origin_record_id", "origin_created_at", "origin_updated_at", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version",
         "source_draft_id", "canonical_state_hash", "submitted_state_hash", "zapier_suppressed", "zapier_redirected", "zapier_status"
       ]
+    }
+  },
+  "migrationControlEntities": {
+    "ProFormMigrationIdMap": {
+      "schemaFile": "base44/entities/ProFormMigrationIdMap.jsonc",
+      "implementationStatus": "local_schema_implemented_not_pushed",
+      "migrationPolicy": "environment_local",
+      "requiredFields": [
+        "source_app_id", "source_entity", "source_record_id",
+        "destination_app_id", "destination_entity", "destination_record_id"
+      ],
+      "contentPolicy": "Protected identities and hashes only; no answer, email, code, token, credential, or file content.",
+      "rlsPolicy": "admin_backend_only"
+    },
+    "ProFormMigrationConflict": {
+      "schemaFile": "base44/entities/ProFormMigrationConflict.jsonc",
+      "implementationStatus": "local_schema_implemented_not_pushed",
+      "migrationPolicy": "environment_local",
+      "requiredFields": ["conflict_id", "environment"],
+      "contentPolicy": "Opaque identities, hashes, revisions, status and safe diagnostics only; no complete record payload.",
+      "rlsPolicy": "admin_backend_only"
     }
   }
 }

@@ -12,6 +12,10 @@ const backendPath = path.join(
   repositoryRoot,
   'base44/functions/_shared/proDraftIdentity/entry.ts',
 );
+const logicalTimePath = path.join(
+  repositoryRoot,
+  'base44/functions/_shared/proFormLogicalRecordTime/entry.ts',
+);
 const fixturePath = path.join(
   repositoryRoot,
   'src/test/fixtures/proDraftIdentityConformance.json',
@@ -19,6 +23,7 @@ const fixturePath = path.join(
 
 const frontendSource = readFileSync(frontendPath, 'utf8');
 const backendSource = readFileSync(backendPath, 'utf8');
+const logicalTimeSource = readFileSync(logicalTimePath, 'utf8');
 const fixtures = JSON.parse(readFileSync(fixturePath, 'utf8'));
 const frontend = await import(pathToFileURL(frontendPath).href);
 const transpiledBackend = ts.transpileModule(backendSource, {
@@ -29,13 +34,24 @@ const transpiledBackend = ts.transpileModule(backendSource, {
   fileName: backendPath,
   reportDiagnostics: true,
 });
+const transpiledLogicalTime = ts.transpileModule(logicalTimeSource, {
+  compilerOptions: {
+    module: ts.ModuleKind.ESNext,
+    target: ts.ScriptTarget.ES2022,
+  },
+  fileName: logicalTimePath,
+  reportDiagnostics: true,
+});
 
 const failures = [];
 const requireContract = (condition, message) => {
   if (!condition) failures.push(message);
 };
 
-for (const diagnostic of transpiledBackend.diagnostics ?? []) {
+for (const diagnostic of [
+  ...(transpiledBackend.diagnostics ?? []),
+  ...(transpiledLogicalTime.diagnostics ?? []),
+]) {
   if (diagnostic.category === ts.DiagnosticCategory.Error) {
     failures.push(`backend transpilation error TS${diagnostic.code}`);
   }
@@ -43,7 +59,13 @@ for (const diagnostic of transpiledBackend.diagnostics ?? []) {
 
 let backend;
 try {
-  const encoded = Buffer.from(transpiledBackend.outputText).toString('base64');
+  const logicalTimeEncoded = Buffer.from(transpiledLogicalTime.outputText).toString('base64');
+  const logicalTimeUrl = `data:text/javascript;base64,${logicalTimeEncoded}`;
+  const linkedBackend = transpiledBackend.outputText.replace(
+    /from\s+['"]\.\.\/proFormLogicalRecordTime\/entry\.ts['"]/u,
+    `from "${logicalTimeUrl}"`,
+  );
+  const encoded = Buffer.from(linkedBackend).toString('base64');
   backend = await import(`data:text/javascript;base64,${encoded}`);
 } catch {
   failures.push('backend contract module could not be evaluated');

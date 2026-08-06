@@ -1,0 +1,34 @@
+{
+  "name": "ProFormMigrationConflict",
+  "type": "object",
+  "properties": {
+    "conflict_id": {"type": "string", "description": "Opaque deterministic identifier for this conflict."},
+    "environment": {"type": "string", "description": "Exact environment in which the conflict was detected."},
+    "migration_direction": {"type": "string", "enum": ["blue_to_green", "green_to_blue"], "description": "Migration direction active when the conflict was detected."},
+    "migration_batch_id": {"type": "string", "description": "Opaque migration batch identifier."},
+    "entity_name": {"type": "string", "description": "Entity whose logical record has conflicting representations."},
+    "source_app_id": {"type": "string", "description": "Protected immediate source application identifier."},
+    "source_record_id": {"type": "string", "description": "Protected immediate source record identifier."},
+    "destination_app_id": {"type": "string", "description": "Protected destination application identifier."},
+    "destination_record_id": {"type": "string", "description": "Protected destination record identifier when one exists."},
+    "conflict_type": {"type": "string", "description": "Safe machine-readable conflict category."},
+    "source_content_hash": {"type": "string", "description": "SHA-256 hash of the source migration projection."},
+    "destination_content_hash": {"type": "string", "description": "SHA-256 hash of the destination migration projection."},
+    "base_content_hash": {"type": "string", "description": "SHA-256 hash of the last common migration projection when known."},
+    "source_revision": {"type": "number", "description": "Safe source revision number when the entity exposes one."},
+    "destination_revision": {"type": "number", "description": "Safe destination revision number when the entity exposes one."},
+    "detected_at": {"type": "string", "format": "date-time", "description": "Server timestamp when the conflict was detected."},
+    "status": {"type": "string", "enum": ["open", "resolved_source", "resolved_destination", "resolved_manual", "ignored"], "description": "Controlled conflict-resolution state."},
+    "resolution_reason": {"type": "string", "description": "Bounded safe reason code or operator-safe summary."},
+    "resolved_at": {"type": "string", "format": "date-time", "description": "Server timestamp when the conflict was resolved."},
+    "test_run_id": {"type": "string", "description": "Synthetic test-run identifier; absent from ordinary conflicts."},
+    "safe_diagnostics_json": {"type": "string", "description": "Serialized allowlisted diagnostics containing no record payload, answer, email, code, token, or file content."}
+  },
+  "required": ["conflict_id", "environment"],
+  "rls": {
+    "create": {"user_condition": {"role": "admin"}},
+    "read": {"user_condition": {"role": "admin"}},
+    "update": {"user_condition": {"role": "admin"}},
+    "delete": {"user_condition": {"role": "admin"}}
+  }
+}

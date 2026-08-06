@@ -211,20 +211,56 @@ describe('backend status and email-recovery selection conformance', () => {
     expect(result.selected?.id).toBe('still-eligible');
   });
 
-  it('uses created_at_server only after created_date and never updated dates', () => {
+  it('keeps a native green draft newest when an older blue draft is imported later', () => {
     const records = [
       makeRecord('active', {
-        id: 'secondary-newer',
-        created_at_server: '2026-01-01T00:00:03.000Z',
-        updated_date: '2026-01-01T00:00:00.000Z',
+        id: 'imported-blue',
+        origin_record_id: 'blue-draft-1',
+        origin_created_at: '2025-01-01T00:00:00.000Z',
+        created_date: '2026-08-06T12:00:00.000Z',
       }),
       makeRecord('active', {
-        id: 'updated-newer',
-        created_at_server: '2026-01-01T00:00:02.000Z',
-        updated_date: '2026-12-01T00:00:00.000Z',
+        id: 'native-green',
+        created_date: '2025-06-01T00:00:00.000Z',
       }),
     ];
-    expect(sortDraftsForEmailRecovery(records)[0].id).toBe('secondary-newer');
+    expect(sortDraftsForEmailRecovery(records)[0].id).toBe('native-green');
+  });
+
+  it('preserves the original blue creation order for multiple migrated drafts', () => {
+    const records = [
+      makeRecord('active', {
+        id: 'green-import-later',
+        origin_record_id: 'blue-later',
+        origin_created_at: '2025-02-01T00:00:00.000Z',
+        created_date: '2026-08-06T12:00:00.000Z',
+      }),
+      makeRecord('active', {
+        id: 'green-import-earlier',
+        origin_record_id: 'blue-earlier',
+        origin_created_at: '2025-01-01T00:00:00.000Z',
+        created_date: '2026-08-06T12:01:00.000Z',
+      }),
+    ];
+    expect(sortDraftsForEmailRecovery(records).map(({ id }) => id)).toEqual([
+      'green-import-later',
+      'green-import-earlier',
+    ]);
+  });
+
+  it('uses origin, source, then destination identity as stable logical ties', () => {
+    const created = '2025-01-01T00:00:00.000Z';
+    const records = [
+      makeRecord('active', {
+        id: 'destination-z', origin_record_id: 'origin-a', source_record_id: 'source-z',
+        origin_created_at: created,
+      }),
+      makeRecord('active', {
+        id: 'destination-a', origin_record_id: 'origin-z', source_record_id: 'source-a',
+        origin_created_at: created,
+      }),
+    ];
+    expect(sortDraftsForEmailRecovery(records)[0].id).toBe('destination-a');
   });
 
   it('does not mutate source records or input order', () => {

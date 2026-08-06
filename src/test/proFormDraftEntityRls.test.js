@@ -25,8 +25,8 @@ const EXPECTED_REQUIRED = {
   ProFormEmailVerificationAttempt: ['attempt_id', 'environment'],
 };
 const EXCLUDED_SCHEMA_SHA256 = {
-  ProFormSubmission: '3014b208957ffbb721f32e412bd2551ed62d355f1cefb863f87ed39fc2fb3dc4',
-  ProFormSubmissionIntake: 'cd2fc8eb55ea769af1defea1b214fff52f198a19fab7a9d518f40b6f119f6745',
+  ProFormSubmission: '62bceebf3f2ada03ca4cf787222b5639517d43e9674878cbb29a4247598a9f66',
+  ProFormSubmissionIntake: 'a809858129984d17eba2f9115de2bfa033fb6f723e2680c45115cbe3a38b7be4',
 };
 
 const sources = Object.fromEntries(Object.entries(PATHS).map(([name, file]) => (
@@ -79,7 +79,7 @@ describe('draft-recovery entity RLS contract', () => {
     }
   });
 
-  it('leaves submission and intake schemas byte-for-byte unchanged', () => {
+  it('freezes the approved submission and intake origin-field extensions', () => {
     for (const [name, expected] of Object.entries(EXCLUDED_SCHEMA_SHA256)) {
       const actual = createHash('sha256').update(sources[name]).digest('hex');
       expect(actual, name).toBe(expected);

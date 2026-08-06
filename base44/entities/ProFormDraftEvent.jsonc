@@ -127,6 +127,33 @@
       "description": "Synthetic test-run identifier used to exclude test records from production migration.",
       "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
     },
+    "origin_app_id": {
+      "type": "string",
+      "description": "First known Base44 application identifier in the migration chain.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "origin_entity": {
+      "type": "string",
+      "description": "First known entity name in the migration chain.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "origin_record_id": {
+      "type": "string",
+      "description": "First known record identifier in the migration chain.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "origin_created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Original logical creation timestamp preserved across migration hops.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "origin_updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Latest historical update timestamp carried from the first known origin when still current.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
     "source_app_id": {
       "type": "string",
       "description": "Internal Base44 application identifier of the source record.",
