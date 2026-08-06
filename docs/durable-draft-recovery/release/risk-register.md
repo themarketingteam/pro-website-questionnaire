@@ -5,6 +5,18 @@
 - Owners: Isaac Hines; Engineering; Security; Operations
 - Sources: [ADR-001](../architecture/ADR-001-approved-product-and-security-decisions.md), [ADR-002](../architecture/ADR-002-blue-green-base44-cutover-and-data-continuity.md), [ADR-003](../architecture/ADR-003-draft-identity-recovery-and-lifecycle-contract.md), [identity normalization contract](../architecture/draft-identity-and-email-normalization-contract.md), [current system audit](../audit/current-system-audit-report.md), [current defect register](../audit/current-defect-register.md)
 
+## 2026-08-06 failed sync and mutation staging gate
+
+- The full normal source gate failed 5 of 1,586 tests after 254/254 focused
+  sync/conflict/listener/component/mutation/API cases passed.
+- Deployment, live revision/hash proof, offline/multi-tab behavior, lifecycle,
+  server-field inspection, load, and cleanup remain unobserved.
+- No staging or production write occurred, so there is no new data-integrity
+  exposure from this attempt; there is also no new risk reduction from staging
+  proof.
+- `RISK-004`, `RISK-005`, `RISK-006`, `RISK-029`, and all release-gate risks
+  remain open. Deployment authorization and feature-branch push remain denied.
+
 ## 2026-08-06 complete mutation-capture update
 
 - V2 server scheduling now occurs after reducers and reads the complete current

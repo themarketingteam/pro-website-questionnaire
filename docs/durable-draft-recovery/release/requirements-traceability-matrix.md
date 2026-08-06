@@ -11,6 +11,16 @@ Each row is a stable requirement. Evidence IDs name artifacts that later impleme
 
 All rows in this initial matrix are release blocking. Production-enabled evidence marked as a continuation check is collected immediately after the separate authorized enablement step; failure invokes the documented kill switch/rollback. No row may be removed or changed to non-blocking without a versioned architecture and risk review.
 
+### 2026-08-06 sync and mutation staging certification attempt
+
+The [certification report](../testing/staging-sync-and-mutation-certification.md)
+classifies candidate `56ef59fa02d10b5281e66907ca998af127c6644f` as
+**DRAFT_SYNC_AND_MUTATION_CAPTURE_FAILED**. Focused source coverage passed
+254/254, but `npm test` failed 5 of 1,586 tests. The hard stop prevented every
+staging target, deployment, authoritative server-field, browser, offline,
+multi-tab, lifecycle, performance, and cleanup check. No requirement advances
+to staging-certified; local Prompt 1–3 evidence remains local only.
+
 ### 2026-08-06 authoritative client sync-manager source evidence
 
 The [client synchronization contract](../frontend/draft-sync-manager-contract.md),

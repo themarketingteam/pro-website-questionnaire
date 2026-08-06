@@ -6,6 +6,14 @@ Audited branch: `feature/durable-draft-recovery`
 
 Scope: current public `/ProQuestionnaire` implementation and its submission/PDF helpers. This is an observation of current behavior, not a target design.
 
+## 2026-08-06 staging certification result
+
+No mutation row received live staging certification. Candidate `56ef59f`
+failed the mandatory full normal source gate before deployment, synthetic draft
+creation, or safe server-field inspection. Clear All replacement and final
+submission locking remain deferred and were not exercised. See the
+[failed certification](../testing/staging-sync-and-mutation-certification.md).
+
 ## 2026-08-06 implementation overlay
 
 The exhaustive inventory below records the pre-migration behavior. The V2
@@ -23,7 +31,8 @@ specified in the [complete mutation capture contract](../frontend/complete-mutat
 | Events | Immediate structural events; bounded text/UI debounce; no raw values | `UT-EVENT-MAP` | Implemented; Tested |
 | V2 handler persistence | Listener/backend manager only; legacy calls remain behind feature-mode guard | `UT-V2-HANDLER-GUARD` | Implemented; Tested |
 
-Clear All and final submission rows remain intentionally unchanged for Prompt 4.
+Clear All and final submission rows remain intentionally unchanged and
+uncertified after the failed Prompt 4 staging attempt.
 
 ## Reading the matrix
 

@@ -89,6 +89,14 @@ Safe network/artifact URL summaries remove every query parameter and fragment. T
 
 The current harness does not authenticate, submit, email, upload, call Zapier, or create Base44 records. Future production-disabled smoke testing requires a separately approved prompt, explicit production flag, production target review, and continued write prohibition.
 
+## 2026-08-06 sync and mutation staging attempt
+
+The certification attempt for candidate `56ef59fa02d10b5281e66907ca998af127c6644f`
+stopped at the failing full normal suite before local or staging Playwright and
+before rerunning the pending-test reporter. The last pending counts are not
+promoted to current certification evidence. No browser artifact, staging
+record, network write, cleanup action, or feature-branch push was produced.
+
 ## 2026-08-06 client recovery staging attempt
 
 The Prompt 4 certification attempt stopped at the failing full normal source

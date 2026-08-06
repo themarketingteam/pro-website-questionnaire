@@ -4,9 +4,20 @@
 - Review date: 2026-08-05 (America/Chicago)
 - Deployment authorization: **DENIED**
 - Primitive certification: [**SECURITY_PRIMITIVES_CERTIFIED_IN_STAGING**](../security/staging-security-primitives-certification.md)
-- Latest deployment evidence/report: [**STAGING SECURITY PRIMITIVES CERTIFICATION**](../security/staging-security-primitives-certification.md)
+- Latest deployment attempt/report: [**DRAFT_SYNC_AND_MUTATION_CAPTURE_FAILED**](../testing/staging-sync-and-mutation-certification.md)
 
 This checklist is fail-closed. `READY` means current evidence exists; `NOT_READY` blocks deployment. `MANUAL_VERIFICATION_REQUIRED` also blocks deployment until dated evidence is captured immediately before the authorized deployment.
+
+## 2026-08-06 sync and mutation staging attempt
+
+Candidate `56ef59fa02d10b5281e66907ca998af127c6644f` passed 254/254 focused
+sync/conflict/listener/component/mutation/API tests, but the mandatory full
+normal suite failed 5 of 1,586 tests. The attempt stopped before baseline
+characterization, lint, typecheck, build, local E2E, staging target guard,
+configuration verification, deployment, synthetic records, load, cleanup, and
+feature-branch push. Classification is
+**DRAFT_SYNC_AND_MUTATION_CAPTURE_FAILED**; deployment authorization remains
+**DENIED**.
 
 ## 2026-08-06 complete mutation-capture local evidence
 

@@ -4,6 +4,13 @@ Audit date: 2026-08-05
 
 Scope: every `useState`, `useRef`, or `useReducer` declaration under `src/components/pro-form`, plus the page-level state that assembles, saves, submits, or retains questionnaire answers.
 
+## 2026-08-06 staging certification result
+
+The migrated scopes below remain implemented and locally tested, but none was
+certified against staging. The Prompt 4 attempt failed at the full normal source
+gate before deployment or authoritative server inspection. See the
+[failed certification](../testing/staging-sync-and-mutation-certification.md).
+
 ## 2026-08-06 mutation-capture implementation overlay
 
 The inventory below remains the historical pre-migration audit. Prompt 3 now
