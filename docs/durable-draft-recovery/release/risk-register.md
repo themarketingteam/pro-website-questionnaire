@@ -454,3 +454,15 @@ No rating is lowered or risk closed. Live Base44 create/CAS/FLS behavior, multi-
 ## 2026-08-06 authoritative submission and PDF evidence
 
 Local controls now require an acknowledged `submit_attempted` state before an external call, preserve immutable submitted snapshots, reject delayed saves after terminal lock, and bind PDF generation to the recovered draft ID and canonical hash. External-success/final-lock failure is represented as a submitted read-only partial success and never automatically repeats the external call. These controls reduce source-level uncertainty for `RISK-024` and submitted-record mutation risks, but ratings remain pending live staging proof and full release gates. No deployment occurred.
+
+## 2026-08-06 full lifecycle staging hard stop
+
+The [full lifecycle attempt](../testing/staging-full-draft-lifecycle-certification.md)
+stopped on two repair-helper failures before deployment. No risk is closed or
+lowered. Live transaction atomicity, submitted-lock enforcement, SES redirect,
+PDF linkage, browser variance, RLS/FLS, duplicate prevention, and cleanup remain
+unproved. The source failure itself is release-blocking because payload repair
+must be deterministic before any staging submission can be certified.
+
+No Base44 resource, secret, record, email, PDF, integration, domain, production
+system, or remote Git branch was changed.

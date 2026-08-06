@@ -52,3 +52,11 @@ Namespace derivation uses only an opaque draft identifier hash. Cleanup calls ex
 - `npm run build` passed. Changed-file lint has no errors. Repository-wide lint remains blocked by 32 established errors and 16 warnings; repository-wide typecheck remains blocked by established project-wide JavaScript/dependency typing debt, with no errors in the replacement-flow file set.
 
 Local synthetic evidence is not staging or production certification. No real email, final submission, Base44 deployment, schema push, or production mutation is part of these tests.
+
+## Staging certification status — 2026-08-06
+
+The [full lifecycle staging attempt](../testing/staging-full-draft-lifecycle-certification.md)
+stopped before deployment after two submission-repair assertions failed.
+Replacement client tests passed 41/41 during this attempt, but no live Clear
+All, Start New, redirected email, recovery choice, delayed-save, submitted
+record, or cross-browser staging evidence was collected.

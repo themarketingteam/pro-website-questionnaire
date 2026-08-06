@@ -77,3 +77,12 @@ A later explicitly authorized staging prompt must verify target identity; push s
 | `npm run build` | 0 | Vite build passed with stale browser-data warnings |
 
 All email tests used injected synthetic transports. No Base44 deploy, schema push, live record mutation, SES call, or email delivery occurred.
+
+## Staging certification status — 2026-08-06
+
+The [full lifecycle staging attempt](../testing/staging-full-draft-lifecycle-certification.md)
+is **FULL_DRAFT_LIFECYCLE_BLOCKED**. Replacement backend and client focused
+sets passed, but the later submission/intake/repair prerequisite failed two
+assertions and activated the deployment hard stop. Clear All, Start New,
+replacement email, live CAS/FLS, idempotent retry, recovery selection, browser
+namespace isolation, and cleanup were not exercised against staging.

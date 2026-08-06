@@ -39,3 +39,12 @@ Start New uses the existing replacement transaction and creates an independent d
 The coordinator delegates entity creation, payload repair, retry, intake fallback, and environment-aware Zapier handling to `proQuestionnaireSubmit.js` and `proSubmissionResilience.js`. Existing ProFormSubmission shape is retained with the new top-level linkage metadata.
 
 Focused unit coverage contains 28 authoritative-submission/PDF cases plus submitted sync and Redux foundation suites. The synthetic Playwright specification contains the required 17 cases and runs under the five configured browser/device projects. Live staging behavior remains a separate release gate.
+
+## Staging certification status — 2026-08-06
+
+The [full lifecycle staging attempt](../testing/staging-full-draft-lifecycle-certification.md)
+is **FULL_DRAFT_LIFECYCLE_BLOCKED**. The coordinator/read-only/PDF/sync focused
+set passed 80/80, but a later required repair-helper gate failed 2 of 124 tests.
+No schema, function, site, record, external submission, PDF, or browser session
+was deployed or exercised. The source contract remains implemented but not
+environment-certified.

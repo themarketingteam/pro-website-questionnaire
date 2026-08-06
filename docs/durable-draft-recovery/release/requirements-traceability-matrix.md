@@ -404,3 +404,17 @@ This is source-only evidence. No entity schema or function was pushed, no Base44
 ## 2026-08-06 authoritative submission and read-only PDF source evidence
 
 `DR-SUBTERM-001` and `DR-PDF-001` now have local implementation evidence in the [authoritative submission contract](../frontend/authoritative-submission-and-read-only-pdf-contract.md), coordinator, submitted sync lock, read-only view, and hash-verified PDF service. The focused suite adds 28 cases and the synthetic browser matrix adds 17 cases across five projects. Live staging/API/PDF evidence remains release-blocking; no deployment occurred.
+
+## 2026-08-06 full lifecycle staging certification attempt
+
+The [full lifecycle report](../testing/staging-full-draft-lifecycle-certification.md)
+is **FULL_DRAFT_LIFECYCLE_BLOCKED**. Replacement, client, coordinator,
+read-only/PDF, sync, recovery, and entity focused gates passed, but the existing
+submission/intake/repair gate failed 2 of 124 tests. The prompt's hard stop
+prevented every staging mutation and live certification step.
+
+No requirement advances to staging certification. In particular,
+`DR-CLEAR-001`, `DR-CLEAR-002`, `DR-SUBTERM-001`, `DR-PDF-001`,
+`DR-EMAIL-002`, `DR-SAVE-001`, `DR-BROWSER-001`, and `DR-REL-001` remain
+release-blocking. Production and `main` were untouched, and the feature branch
+was not pushed.

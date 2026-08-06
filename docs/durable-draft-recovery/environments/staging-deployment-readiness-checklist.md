@@ -241,6 +241,19 @@ deployed-browser certification are still missing. The decision remains
 
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**
 
+### 2026-08-06 full lifecycle certification attempt
+
+Readiness remains **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**. The focused
+replacement, recovery, coordinator, read-only/PDF, sync, and schema suites
+passed, but the submission/intake/repair gate failed two assertions. The
+pre-deployment hard stop prevented target guarding, schema/function/site
+deployment, SES inbox work, synthetic records, browser certification, and
+cleanup. See the [blocked report](../testing/staging-full-draft-lifecycle-certification.md).
+
+No checklist item is promoted by this attempt. No client was emailed, no test
+record was created, production was untouched, and neither the feature branch
+nor `main` was pushed.
+
 The narrow backend result is **SECURITY_PRIMITIVES_CERTIFIED_IN_STAGING**. That classification authorizes no further deployment and does not change the overall **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT** decision. Five unrelated normal tests and broader entity/site/side-effect/data/browser/rollback gates remain incomplete. Do not run another Base44 deploy/push, production operation, OAuth authorization, data import, domain attachment, email, or webhook call without new exact authorization and passing applicable gates.
 
 ### 2026-08-05 authoritative API attempt
