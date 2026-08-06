@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -112,7 +112,7 @@ export default function TestZapier() {
         toast.info('No external delivery was reported.');
       }
     } catch (error) {
-      console.error('❌ Error:', error);
+      console.error('[TestZapier] Staging delivery failed.');
       setResponse({ error: error.message });
       toast.error('Failed to send to Zapier');
     } finally {

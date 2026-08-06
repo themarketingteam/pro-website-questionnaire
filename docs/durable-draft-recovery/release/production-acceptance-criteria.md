@@ -459,3 +459,6 @@ Evidence must record commit, environment, test-run ID, normalized status,
 duration, safe error code, and artifact checksums without answers, emails,
 credentials, recovery codes, grants, tokens, query-bearing URLs, or raw browser
 storage state. Deployment success alone never satisfies this requirement.
+## Operational observability acceptance gate
+
+Production promotion additionally requires: the operational entity and both functions deployed first to staging; the fingerprint secret independently configured in staging and production; zero PII/answer/credential findings in logs and telemetry evidence; verified admin-only RLS and denial of direct client access; verified event allowlists and privilege separation; save/recovery/SES/submission/conflict/RLS/migration/synthetic summary signals; approved ordinary and security-boundary retention windows; alert routing and incident ownership; test-run cleanup; latency/error thresholds; and rollback evidence. Local implementation or successful deployment alone is not certification.

@@ -1,6 +1,6 @@
 # Base44 Pro Form entity extension and compatibility plan
 
-- Status: four Pro Form extensions, origin metadata, and two migration-control entities implemented locally; no entity schema pushed
+- Status: five Pro Form extensions, origin metadata, and two migration-control entities implemented locally; no entity schema pushed
 - Date: 2026-08-05
 - Planning baseline: `50c7379c1cfc30e2d242e917b0abe951e3f75584`
 - Prompt 2 implementation baseline: `8b5aac603bb9c568b7bdc726423852c4e146582a`
@@ -382,3 +382,6 @@ resumable apply work. `ProFormRecoverySecurityEvent` gains allowlisted
 retention/admin operation and outcome values for content-free audit evidence.
 All changes remain local-only and admin-only. No schema was pushed and no
 record was created, read, updated, or deleted.
+## Operational telemetry extension (2026-08-06)
+
+`ProFormOperationalEvent` is a local, not-pushed admin/backend-only extension. It carries stable event dimensions, bounded metrics, safe metadata, synthetic `test_run_id`, optional approved retention controls, and common migration bookkeeping. Public clients never access it directly. The migration policy is `audit_optional`; staging/test rows are never migrated and no telemetry migration is automatic.

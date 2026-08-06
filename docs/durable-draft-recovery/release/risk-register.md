@@ -737,3 +737,13 @@ The fail-closed precheck now rejects an absent or uncertified predecessor, the p
 ## 2026-08-06 final staging RC gate
 
 No risk is closed or lowered. The final gate found 96 RC-precheck failures, 82 strict-coverage failures, 44 pending manual rows, blocked rollback/RLS/capacity/cleanup/runtime checks, a failed live migration report, and four dependency-policy blockers. The production-linked local Base44 context makes deployment unsafe. Local security and source boundary tests passed but do not mitigate absent live evidence. No certification tag or push occurred.
+## Operational telemetry risks (2026-08-06)
+
+| Risk | Control | Residual/acceptance condition |
+|---|---|---|
+| PII, answers, or credentials enter telemetry/logs | Explicit field/metadata allowlists, recursive redaction, no request-body/error serialization, tests and artifact scans | Staging evidence must show zero sensitive matches |
+| Telemetry becomes a second draft record | No canonical state/full IDs, bounded best-effort queue, aggregate-only reads | Critical invariant and client exclusion tests remain required |
+| Fingerprints used as authorization | Purpose-separated short HMAC is correlation-only; authorization precedes derivation/write | Security review must preserve this order |
+| Telemetry failure impacts saving | Best-effort writes and queue restoration are isolated from draft state | Failure-injection tests must pass |
+| Cross-environment/test contamination | Server-derived environment and exact `test_run_id` filtering; production test IDs rejected | Staging cleanup evidence required |
+| Excessive or unrestricted query | Password-issued device-bound admin grant, bounded projection and aggregate-only response | Capacity and access tests required before deployment |

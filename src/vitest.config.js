@@ -30,6 +30,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(root, '.'),
+      'npm:@base44/sdk': '@base44/sdk',
     },
   },
 });

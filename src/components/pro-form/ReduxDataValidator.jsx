@@ -258,10 +258,10 @@ export default function ReduxDataValidator() {
         console.log('   └─', check.details);
       });
       console.log('');
-      console.log('Responses:', responses);
-      console.log('Validation Status:', validationStatus);
-      console.log('Touched Questions:', touchedQuestions);
-      console.log('Expanded Questions:', expandedQuestions);
+      console.log('Response count:', Object.keys(responses).length);
+      console.log('Validation status count:', Object.keys(validationStatus).length);
+      console.log('Touched question count:', Object.keys(touchedQuestions).length);
+      console.log('Expanded question count:', Object.keys(expandedQuestions).length);
       console.log('Credentials summary:', {
         hasBusinessName: Boolean(credentials?.businessName),
         hasDomain: Boolean(credentials?.domain),

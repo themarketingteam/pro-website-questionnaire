@@ -311,3 +311,10 @@ values were not generated, configured, queried, printed, copied, or deleted.
 No temporary owner-only environment file was created. Synthetic peer IDs were
 not added, and no production or future `_next` ID was allowlisted. Existing
 staging and production names-only inventories were not refreshed or changed.
+## Operational telemetry fingerprinting
+
+| Variable | Staging requirement | Production requirement | Purpose | Status |
+|---|---|---|---|---|
+| `PRO_FORM_OPERATIONAL_FINGERPRINT_SECRET` | Unique secret, minimum 32 bytes | Independently generated unique secret, minimum 32 bytes | Purpose-separated HMAC for short operational draft/session/tab/admin-grant correlation fingerprints | Not configured by this change |
+
+This secret must not be reused for email lookup, recovery codes, abuse controls, signed invitations, recovery sessions, admin grants, retention, idempotency, or migration. Its value must never appear in source, logs, telemetry, tests, screenshots, or evidence bundles.

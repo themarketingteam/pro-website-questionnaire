@@ -694,3 +694,12 @@ disabled and no deployment or production operation occurred.
 ## 2026-08-06 final staging RC gate
 
 The [final gate summary](./staging-release-candidate-summary.md) is **NOT ISSUED — BLOCKED**. Strict coverage reported 82 failures across pending, missing, skipped, browser, evidence, and matrix conditions; 44 manual rows remain pending; live capacity, rollback, cleanup, runtime identity, RLS, migration, and comprehensive certification are not accepted. No row advances to staging certification, and all six green/production/cutover/post-cutover phases remain pending.
+## Operational readiness traceability (2026-08-06)
+
+| Requirement | Implementation | Verification | Status |
+|---|---|---|---|
+| Safe structured operational events | `ProFormOperationalEvent`, `proDraftOperationalEvents` | `proDraftOperationalEvents.test.js` | Local implemented; not deployed |
+| Purpose-separated safe correlation | `proDraftOperationalFingerprints` | consistency/separation/secret-length tests | Local implemented; secret unconfigured |
+| Non-authoritative browser telemetry | `proDraftOperationalTelemetry.js` | queue, bounds, failure, exclusion tests | Local implemented |
+| Authorized ingest and aggregate-only query | `recordProDraftOperationalEvents`, `getProDraftOperationalSummary` | authorization-order, allowlist, isolation, aggregate tests | Local implemented |
+| PII/credential-safe logs | client/server `safeLogger` | recursive redaction tests | Local implemented |

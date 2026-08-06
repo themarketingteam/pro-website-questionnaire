@@ -157,6 +157,24 @@
       "retentionPolicy": "optional_copy_subject_to_security_retention_window"
     },
     {
+      "entityName": "ProFormOperationalEvent",
+      "migrationPolicy": "audit_optional",
+      "reverseMigrationPolicy": "audit_optional",
+      "dependencyOrder": 55,
+      "logicalIdentityFields": ["source_app_id", "source_entity", "source_record_id"],
+      "relationshipFields": [],
+      "serverManagedFields": ["id", "created_date", "updated_date", "created_by"],
+      "excludedFields": [],
+      "sensitiveFields": ["draft_fingerprint", "session_fingerprint", "source_tab_fingerprint", "metadata_json", "source_app_id", "source_record_id"],
+      "contentHashExcludedFields": ["id", "created_date", "updated_date", "created_by", "environment", "test_run_id", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version"],
+      "fileReferencePaths": [],
+      "productionAllowed": true,
+      "stagingAllowed": false,
+      "testRecordPolicy": "never_migrate",
+      "conflictPolicy": "append_only_audit_manual_review",
+      "retentionPolicy": "optional_copy_under_approved_operational_and_security_retention"
+    },
+    {
       "entityName": "ProFormEmailVerificationAttempt",
       "migrationPolicy": "environment_local",
       "reverseMigrationPolicy": "environment_local",

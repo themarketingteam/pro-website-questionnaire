@@ -1987,6 +1987,17 @@
       "rlsPolicy": "admin_backend_only"
     }
   },
+  "operationalTelemetryEntity": {
+    "ProFormOperationalEvent": {
+      "schemaFile": "base44/entities/ProFormOperationalEvent.jsonc",
+      "implementationStatus": "local_schema_implemented_not_pushed",
+      "requiredFields": ["event_id", "event_type", "environment"],
+      "optionalFields": ["severity", "request_id", "draft_fingerprint", "session_fingerprint", "operation", "status", "error_code", "retryable", "latency_ms", "retry_count", "client_revision", "server_revision", "storage_mode", "browser_family", "device_class", "app_build_sha", "function_version", "source_tab_fingerprint", "test_run_id", "metadata_json", "created_at_server", "retention_expires_at", "retention_hold", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version"],
+      "contentPolicy": "Allowlisted metrics and short purpose-separated fingerprints only; no answers, canonical state, raw identifiers, PII, credentials, codes, tokens, URLs, or migration bundles.",
+      "rlsPolicy": "admin_backend_only",
+      "migrationPolicy": "audit_optional"
+    }
+  },
   "crossAppMigrationRuntime": {
     "implementationStatus": "local_functions_and_cli_not_deployed_or_configured",
     "policyModule": "base44/functions/_shared/proFormMigrationPolicy/entry.ts",

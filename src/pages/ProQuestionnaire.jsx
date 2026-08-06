@@ -339,10 +339,9 @@ function ProQuestionnaireContent({ runtimeConfig = frontendRuntimeConfig }) {
           updateQuestionValidation(id, value, responses);
         });
       }
-    } catch (error) {
-      console.error('Error in initialization useEffect:', error);
+    } catch {
+      console.error('[ProQuestionnaire] Initialization validation failed.');
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Helper: dispatch only when status meaningfully changes
@@ -1118,7 +1117,7 @@ function ProQuestionnaireContent({ runtimeConfig = frontendRuntimeConfig }) {
               ok: isPassingStatus
             };
           } catch (error) {
-            console.error(`Submit-time validation error for Q${qId}:`, error);
+            console.error(`[ProQuestionnaire] Submit-time validation failed for Q${qId}.`);
 
             dispatch(setValidationStatus({
               questionId: qId,
@@ -1174,8 +1173,8 @@ function ProQuestionnaireContent({ runtimeConfig = frontendRuntimeConfig }) {
       }
 
       return true;
-    } catch (error) {
-      console.error('Final validation error:', error);
+    } catch {
+      console.error('[ProQuestionnaire] Final validation failed.');
       setIsValidating(false);
       setValidatingQuestions([]);
       toast.error('Validation error occurred. Please check your answers.');

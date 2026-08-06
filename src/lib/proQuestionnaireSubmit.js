@@ -111,10 +111,7 @@ export const sendZapierSafe = async (transformedPayload, options = {}) => {
       errorCode: data.errorCode || ''
     };
   } catch (error) {
-    console.error(
-      'Zapier webhook failed after successful database save:',
-      serializeSubmitError(error)
-    );
+    console.error('[ProQuestionnaireSubmit] External delivery failed after database save.');
 
     return {
       ok: false,

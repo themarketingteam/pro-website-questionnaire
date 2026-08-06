@@ -19,6 +19,7 @@
     "test:runtime-config": "npm run test:manifest && vitest run --config src/vitest.config.js src/test/proDraftRuntimeConfig.test.js src/test/proDraftBackendRuntimeConfig.test.js src/test/environmentIdentification.test.jsx src/test/proExternalSideEffects.test.js --reporter=dot --no-coverage",
     "test:identity-contract": "node scripts/validate-pro-draft-identity-contract.mjs",
     "test:entity-schemas": "node scripts/run-pro-form-entity-schema-tests.mjs",
+    "test:operational-telemetry": "npm run test:manifest && vitest run --config src/vitest.config.js src/test/proDraftOperationalEvents.test.js src/test/proDraftOperationalFunctions.test.js src/test/proDraftOperationalTelemetry.test.js src/test/safeLogger.test.js --reporter=dot --no-coverage",
     "test:replacement-service": "npm run test:manifest && vitest run --config src/vitest.config.js src/test/proDraftReplacement.test.js --reporter=dot --no-coverage",
     "test:clear-all": "npm run test:manifest && vitest run --config src/vitest.config.js src/test/clearAndReplaceProFormDraft.test.js --reporter=dot --no-coverage",
     "test:start-new": "npm run test:manifest && vitest run --config src/vitest.config.js src/test/startNewProFormDraft.test.js --reporter=dot --no-coverage",

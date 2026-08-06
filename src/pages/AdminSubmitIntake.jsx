@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -253,12 +253,12 @@ export default function AdminSubmitIntake() {
             toast.success('Saved. Zapier delivery was also queued successfully.');
           } else {
             toast.warning?.('Submission saved, but Zapier delivery failed. Please check logs.');
-            console.warn('Admin Zapier send failed after save', zapierResult?.error);
+            console.warn('[AdminSubmitIntake] External delivery failed after save.');
           }
         })
-        .catch((error) => {
+        .catch(() => {
           toast.warning?.('Submission saved, but Zapier delivery failed. Please check logs.');
-          console.warn('Admin Zapier send failed after save', error);
+          console.warn('[AdminSubmitIntake] External delivery failed after save.');
         });
     } catch (e) {
       toast.error(e?.message || 'Submission failed');

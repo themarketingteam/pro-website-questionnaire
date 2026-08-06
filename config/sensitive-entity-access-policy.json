@@ -4,6 +4,7 @@
     "ProFormDraft",
     "ProFormDraftEvent",
     "ProFormRecoverySecurityEvent",
+    "ProFormOperationalEvent",
     "ProFormEmailVerificationAttempt",
     "ProFormSubmissionIntake"
   ],
