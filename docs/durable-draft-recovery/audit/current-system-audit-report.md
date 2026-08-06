@@ -1,5 +1,9 @@
 # Current Draft System Audit Report
 
+## 2026-08-06 backend administration addendum
+
+Source now provides five backend-only recovery administration functions plus a shared persistent-grant request boundary and bounded service. Retry and AI repair use the same environment/version/device-bound grant and no longer trust Base44 admin login, frontend role flags, or the legacy password-derived grant. Approved projections omit credential/idempotency hashes; edit keys are allowlisted, revision-checked, idempotent, submitted-lock aware, and audited. The current admin UI intentionally remains unmigrated, so its direct entity calls are a next-prompt release gap. No deployment, schema push, production access, or external delivery occurred.
+
 - Audit date: 2026-08-05
 - Immutable production baseline: `27ddc347d55db00796a0e3e19ac343245519b01e`
 - Audit evidence revision: `2a1c5cd51bdf5593d45ef95a5b7c46f19631367b`

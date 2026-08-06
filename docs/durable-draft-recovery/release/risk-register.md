@@ -1,5 +1,15 @@
 # Durable Draft Recovery Risk Register
 
+## 2026-08-06 backend administration update
+
+| Risk | Control | Residual status |
+|---|---|---|
+| Grant theft/cross-device replay | Environment/version claims, device HMAC, no URL/log transport | Staging abuse certification pending |
+| Bulk disclosure | Limits, signed query-bound cursors, projections, masking/hash omission | Staging response inspection pending |
+| Unsafe edit | Allowlist, validation, submitted lock, revision, idempotency, audit | Concurrent staging proof pending |
+| Retry/repair bypass or production side effect | Authorization precedes service role/AI/delivery; environment routing retained | Staging delivery proof pending |
+| Legacy UI direct entity calls | Migration explicitly deferred to next prompt | Open/release-blocking |
+
 ## 2026-08-06 password-only admin authorization source update
 
 `RISK-002` and `RISK-022` now have source controls for backend-only exact password verification, purpose-separated HMAC/timing-safe comparison, an environment/version/random-device-bound signed grant with `expiresAt=null`, IP/device attempt limits, lockout, minimum timing/jitter, safe audit records, an isolated resilient browser vault, invalid-grant removal, and Forget This Device. The accepted indefinite shared-password grant risk remains: this is not individual administrator identity, and theft from the same browser/device context may remain usable until revocation. Operational likelihood is not reduced until staging configuration, schema/function deployment, trusted-header/event-store proof, admin page/API migration, monitoring, and live rotation/version tests pass. No cloud or production state changed in this source batch.

@@ -1,5 +1,16 @@
 # Staging Deployment Readiness Checklist
 
+## Backend admin recovery gate (2026-08-06)
+
+- [x] Source functions require persistent environment/version/device-bound grants.
+- [x] Reads are bounded and projected; edits are allowlisted, revision-safe, idempotent, locked, and audited.
+- [x] Retry/repair retain external-side-effect controls behind the new boundary.
+- [ ] Migrate admin UI to `proDraftAdminApiClient` in the next prompt.
+- [ ] Confirm staging secrets without exposing values.
+- [ ] Deploy only to a verified staging target (not authorized here).
+- [ ] Certify API behavior, audit persistence, concurrency, and non-production delivery.
+- [ ] Keep production deployment/domain cutover blocked.
+
 ## 2026-08-06 Clear All / Start New source checkpoint
 
 - [x] Client methods call `clearAndReplaceProFormDraft` and `startNewProFormDraft` through `base44.functions.invoke` behind the durable-draft feature flag.

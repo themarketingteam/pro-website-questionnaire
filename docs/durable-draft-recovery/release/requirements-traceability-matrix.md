@@ -1,5 +1,15 @@
 # Durable Draft Recovery Requirements Traceability Matrix
 
+## 2026-08-06 backend-only administration increment
+
+| Requirement | Source evidence | Test evidence | Status |
+|---|---|---|---|
+| Persistent grant on every operation | `_shared/proDraftAdminRequest`, retry/repair | `proDraftAdminAuthorization`, `draftRecoveryAuthorization` | Source verified; staging pending |
+| Bounded read APIs and safe projections | `_shared/proDraftAdminService`, five functions | `proDraftAdminService` | Source verified; staging pending |
+| Allowlisted optimistic edit and audits | admin service/update function | `proDraftAdminService` | Source verified; staging pending |
+| Backend client transport | `proDraftAdminApiClient.js` | `proDraftAdminApiClient` | Source verified; UI migration pending |
+| No production mutation | Source/tests/docs only | Git/validation evidence | Satisfied |
+
 ## 2026-08-06 password-only admin authorization source evidence
 
 `DR-ADMIN-001` now has source implementation in `proDraftAdminAuthorization`, the refactored `verifyDraftRecoveryAccess`, `proDraftAdminGrantVault`, `proDraftAdminAuthorizationClient`, and `ProDraftAdminAuthorizationContext`, with focused unit/contract coverage for all password, grant, revocation, rate, lockout, storage, client, and Strict Mode boundaries. The admin pages deliberately remain on their legacy gate until the next migration prompt, so `DR-ADMIN-001` is source-implemented but not workflow/staging certified. `DR-ADMIN-002` and `DR-RLS-001` remain open: this batch adds no direct draft access and does not claim the existing page's direct entity calls are remediated.

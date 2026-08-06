@@ -4,6 +4,14 @@ import {
   performZapierSubmission,
   stampSyntheticEnvironmentMetadata,
 } from '../_shared/proExternalSideEffects/entry.ts';
+import {
+  ADMIN_API_OPERATION_NAMES,
+  authorizeAdminRecoveryRequest,
+  buildAdminErrorResponse,
+  recordDeniedAdminOperation,
+  recordAdminOperationEvent,
+} from '../_shared/proDraftAdminRequest/entry.ts';
+import { createServerRequestId } from '../_shared/proDraftPersistence/entry.ts';
 
 const parsePayload = (value) => {
   if (!value) return null;
@@ -30,77 +38,12 @@ const incrementRetryCount = (value) => {
   return Number.isFinite(count) ? count + 1 : 1;
 };
 
-const DRAFT_RECOVERY_SECRET_NAME = 'DRAFT_RECOVERY_PASSWORD';
-const DRAFT_RECOVERY_GRANT_SCOPE = 'draft-recovery';
-const DRAFT_RECOVERY_GRANT_VERSION = 1;
-const DRAFT_RECOVERY_GRANT_TTL_SECONDS = 7 * 24 * 60 * 60;
-const draftRecoveryEncoder = new TextEncoder();
-
-const draftRecoveryFromBase64Url = (value) => {
-  const base64 = value.replace(/-/g, '+').replace(/_/g, '/');
-  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
-  const binary = atob(padded);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+const withNoStore = (response) => {
+  const headers = new Headers(response.headers);
+  headers.set('Cache-Control', 'no-store, max-age=0');
+  headers.set('Pragma', 'no-cache');
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 };
-
-const importDraftRecoverySigningKey = (secret) => crypto.subtle.importKey(
-  'raw',
-  draftRecoveryEncoder.encode(secret),
-  { name: 'HMAC', hash: 'SHA-256' },
-  false,
-  ['verify']
-);
-
-const verifyDraftRecoveryGrant = async (token) => {
-  if (typeof token !== 'string' || !token) return false;
-
-  let configuredPassword = '';
-  try {
-    configuredPassword = Deno.env.get(DRAFT_RECOVERY_SECRET_NAME) || '';
-  } catch {
-    configuredPassword = '';
-  }
-  if (!configuredPassword) return false;
-
-  const [encodedPayload, encodedSignature, ...extraParts] = token.split('.');
-  if (!encodedPayload || !encodedSignature || extraParts.length > 0) return false;
-
-  try {
-    const signingKey = await importDraftRecoverySigningKey(configuredPassword);
-    const signatureIsValid = await crypto.subtle.verify(
-      'HMAC',
-      signingKey,
-      draftRecoveryFromBase64Url(encodedSignature),
-      draftRecoveryEncoder.encode(encodedPayload)
-    );
-    if (!signatureIsValid) return false;
-
-    const payload = JSON.parse(new TextDecoder().decode(draftRecoveryFromBase64Url(encodedPayload)));
-    const now = Math.floor(Date.now() / 1000);
-    return payload?.version === DRAFT_RECOVERY_GRANT_VERSION &&
-      payload?.scope === DRAFT_RECOVERY_GRANT_SCOPE &&
-      Number.isFinite(payload?.issuedAt) &&
-      Number.isFinite(payload?.expiresAt) &&
-      payload.issuedAt <= now + 60 &&
-      payload.expiresAt > now &&
-      payload.expiresAt <= payload.issuedAt + DRAFT_RECOVERY_GRANT_TTL_SECONDS;
-  } catch {
-    return false;
-  }
-};
-
-const authorizeDraftRecoveryRequest = async (base44, body) => {
-  try {
-    const user = await base44.auth.me();
-    if (user?.role === 'admin') return 'admin';
-  } catch {
-    // Public callers do not have a Base44 user session.
-  }
-
-  return await verifyDraftRecoveryGrant(body?.recoveryGrant) ? 'recovery_grant' : '';
-};
-
-// --- End draft recovery authorization helpers ---
 
 const parseDiagnosticObject = (value) => {
   if (!value) return {};
@@ -176,20 +119,28 @@ const respondAfterZapierDelivery = async (base44, payload, successData) => {
   });
 };
 
-export default async function retryProQuestionnaireIntakeSubmission(req) {
+async function retryProQuestionnaireIntakeSubmissionCore(req) {
   try {
     const base44 = createClientFromRequest(req);
-    const body = await req.json().catch(() => ({}));
-    const authorizationMode = await authorizeDraftRecoveryRequest(base44, body);
-
-    if (!authorizationMode) {
-      console.warn('Retry rejected: missing admin session or valid recovery grant');
-      return Response.json({
-        success: false,
-        error: { message: 'Forbidden: Admin session or valid draft recovery access is required' }
-      }, { status: 403 });
+    const rawBody = await req.json().catch(() => ({}));
+    const requestId = createServerRequestId();
+    let authorization;
+    try {
+      authorization = await authorizeAdminRecoveryRequest({ request: req, body: rawBody,
+        operation: ADMIN_API_OPERATION_NAMES.RETRY_SUBMISSION, requestId,
+        getEnvironmentValue: (name) => Deno.env.get(name) });
+      await recordAdminOperationEvent(base44.asServiceRole.entities.ProFormRecoverySecurityEvent, {
+        authorization, requestId, operation: ADMIN_API_OPERATION_NAMES.RETRY_SUBMISSION,
+        environment: authorization.environment, outcome: 'authorized', testRunId: authorization.payload.testRunId,
+      });
+    } catch (error) {
+      try { await recordDeniedAdminOperation(base44.asServiceRole.entities.ProFormRecoverySecurityEvent, {
+        body: rawBody, error, requestId, operation: ADMIN_API_OPERATION_NAMES.RETRY_SUBMISSION,
+        getEnvironmentValue: (name) => Deno.env.get(name),
+      }); } catch { /* invalid device input cannot be safely attributed */ }
+      return buildAdminErrorResponse(error, requestId);
     }
-    console.info('Retry authorized', { authorizationMode });
+    const body = authorization.payload;
 
     // Guard: useAiRepair must go through repairProQuestionnaireIntakeSubmission
     if (body?.useAiRepair === true) {
@@ -414,4 +365,8 @@ export default async function retryProQuestionnaireIntakeSubmission(req) {
   } catch (error) {
     return Response.json({ success: false, error: safeError(error) }, { status: 500 });
   }
+}
+
+export default async function retryProQuestionnaireIntakeSubmission(req) {
+  return withNoStore(await retryProQuestionnaireIntakeSubmissionCore(req));
 }
