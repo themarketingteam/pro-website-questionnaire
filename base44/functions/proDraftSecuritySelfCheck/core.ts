@@ -9,13 +9,13 @@ import {
   verifyAdminRecoveryGrant,
   verifyRecoverySessionToken,
   verifyStructuredToken,
-} from '../_shared/proDraftAuthorization/entry.ts';
+} from './vendor/proDraftAuthorization.ts';
 import {
   PRO_DRAFT_PERSISTENCE_VERSION,
   createServerRequestId,
   evaluateRevisionWrite,
   readBoundedJsonBody,
-} from '../_shared/proDraftPersistence/entry.ts';
+} from './vendor/proDraftPersistence.ts';
 import {
   PRO_DRAFT_SECURITY_VERSION,
   SECURITY_SECRET_NAMES,
@@ -25,7 +25,7 @@ import {
   hashRecoveryCode,
   hashResumeToken,
   sha256Hex,
-} from '../_shared/proDraftSecurity/entry.ts';
+} from './vendor/proDraftSecurity.ts';
 
 export const PRO_DRAFT_SECURITY_SELF_CHECK_REQUEST_LIMIT_BYTES = 16 * 1024;
 

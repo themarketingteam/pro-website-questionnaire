@@ -299,4 +299,31 @@ describe('proDraftSecuritySelfCheck safe successful response', () => {
     expect(entrySource).toContain('Deno.serve');
     expect(coreSource).not.toMatch(/console\s*\.|DRAFT_RECOVERY_PASSWORD/u);
   });
+
+  it('keeps bundled primitive sources byte-equivalent to the shared contracts', () => {
+    const pairs = [
+      ['proDraftIdentity', ''],
+      ['proDraftSecurity', "../proDraftIdentity/entry.ts"],
+      ['proDraftAuthorization', "../proDraftSecurity/entry.ts"],
+      ['proDraftPersistence', "../proDraftSecurity/entry.ts"],
+    ];
+
+    for (const [moduleName, sharedImport] of pairs) {
+      const sharedSource = readFileSync(resolve(
+        process.cwd(),
+        `base44/functions/_shared/${moduleName}/entry.ts`,
+      ), 'utf8');
+      let bundledSource = readFileSync(resolve(
+        process.cwd(),
+        `base44/functions/proDraftSecuritySelfCheck/vendor/${moduleName}.ts`,
+      ), 'utf8');
+      if (sharedImport) {
+        const localImport = moduleName === 'proDraftSecurity'
+          ? './proDraftIdentity.ts'
+          : './proDraftSecurity.ts';
+        bundledSource = bundledSource.replace(localImport, sharedImport);
+      }
+      expect(bundledSource).toBe(sharedSource);
+    }
+  });
 });
