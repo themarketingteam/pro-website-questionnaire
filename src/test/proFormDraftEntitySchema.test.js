@@ -47,6 +47,13 @@ const FIELD_CATEGORIES = {
     'identity_key_hash',
     'recovery_session_version',
   ],
+  apiIdempotency: [
+    'bootstrap_idempotency_key_hash',
+    'last_save_idempotency_key_hash',
+    'last_save_request_id',
+    'last_event_batch_idempotency_key_hash',
+    'last_event_batch_request_id',
+  ],
   supersession: [
     'draft_generation',
     'previous_draft_id',
@@ -188,8 +195,8 @@ describe('ProFormDraft entity schema extension', () => {
     expect(Object.keys(draftPlan.existingFields)).toHaveLength(30);
   });
 
-  it('implements exactly the 55 optional Prompt 2 fields with admin/backend FLS', () => {
-    expect(new Set(EXPECTED_NEW_FIELDS).size).toBe(55);
+  it('implements exactly the 60 optional protected fields with admin/backend FLS', () => {
+    expect(new Set(EXPECTED_NEW_FIELDS).size).toBe(60);
     expect([...draftPlan.proposedFields].sort()).toEqual([...EXPECTED_NEW_FIELDS].sort());
 
     for (const fieldName of EXPECTED_NEW_FIELDS) {

@@ -21,7 +21,7 @@ The four existing uppercase schema files remain the authoritative repository con
 3. `base44/entities/ProFormSubmission.jsonc`
 4. `base44/entities/ProFormSubmissionIntake.jsonc`
 
-They are not renamed. Prompt 2 added 55 optional protected properties to `ProFormDraft`. Prompt 3 adds 25 to `ProFormDraftEvent`, 16 to `ProFormSubmission`, and 18 to `ProFormSubmissionIntake`. The schemas retain every existing field, required array, nested submission object, enum/default, and entity-level RLS. Current public compatibility payloads remain valid, while every new field is restricted to admin read/write.
+They are not renamed. The local foundation now has 60 optional protected properties on `ProFormDraft`: the original 55 extensions plus five authoritative-API idempotency fields. Prompt 3 added 25 to `ProFormDraftEvent`, 16 to `ProFormSubmission`, and 18 to `ProFormSubmissionIntake`. The schemas retain every existing field, required array, nested submission object, enum/default, and entity-level RLS. Current public compatibility payloads remain valid, while every new field is restricted to admin read/write.
 
 The manifest is deliberately stored under `docs/durable-draft-recovery/data`, outside `base44/entities`. It is strict JSON but is not a Base44 entity resource and cannot be included by an entity-directory push. No types are generated because these local schema changes are not pushed or deployed.
 
@@ -29,7 +29,7 @@ The manifest is deliberately stored under `docs/durable-draft-recovery/data`, ou
 
 | Entity | Existing top-level fields | Existing required array | Repository RLS/FLS | Current compatibility callers |
 | --- | ---: | --- | --- | --- |
-| `ProFormDraft` | 30 original + 55 local optional extensions | `session_id` | No entity RLS; all 55 new fields use admin read/write FLS | Public browser filter/create/update remains compatible; later backend service-role functions own new fields |
+| `ProFormDraft` | 30 original + 60 local optional extensions | `session_id` | No entity RLS; all 60 new fields use admin read/write FLS | Public browser filter/create/update remains compatible; later backend service-role functions own new fields |
 | `ProFormDraftEvent` | 12 original + 25 local optional extensions | `session_id` | No entity RLS; all new fields use admin read/write FLS | Public browser create remains compatible; later backend event append owns new fields |
 | `ProFormSubmission` | 2 original large objects + 16 local optional extensions | `metadata`, `userdata` | Existing creator/admin entity RLS unchanged; all new fields use admin read/write FLS | Existing submission payload remains compatible; trusted backend/migration owns linkage fields |
 | `ProFormSubmissionIntake` | 33 original + 18 local optional extensions | `questionnaire_session_id` | Existing admin-only entity RLS unchanged; all new fields use admin read/write FLS | Existing fallback/retry/repair behavior remains compatible |
@@ -107,7 +107,7 @@ The fields support ADR-002 initial full migration, overlapping incremental delta
 
 ## `ProFormDraft` local extension
 
-Implementation status: **55 optional fields implemented locally and not pushed**: 43 draft-specific fields plus the 12 common migration fields. All 55 use admin read/write FLS. Existing browser payloads remain valid because `session_id` is still the only required field.
+Implementation status: **60 optional fields implemented locally and not pushed**: 48 draft-specific fields plus the 12 common migration fields. All 60 use admin read/write FLS. Existing browser payloads remain valid because `session_id` is still the only required field.
 
 ### Canonical state (7)
 
@@ -138,6 +138,13 @@ These fields are `admin_only`/`backend_only`; email values are `sensitive_pii` a
 - `recovery_code_hash` (string), `recovery_code_version` (number), `recovery_code_hint` (string), `resume_token_hash` (string), `identity_key_hash` (string), and `recovery_session_version` (number).
 
 Only hashes, versions, and an optional non-authorizing last-four hint are retained. Raw recovery codes, resume tokens, recovery-session tokens, identity material, and admin grants are never stored or migrated.
+
+### Authoritative API idempotency (5)
+
+- `bootstrap_idempotency_key_hash`, `last_save_idempotency_key_hash`, and `last_event_batch_idempotency_key_hash` are keyed hashes computed by future backend functions with the separately configured `PRO_FORM_IDEMPOTENCY_SECRET`; raw client idempotency keys are never stored.
+- `last_save_request_id` and `last_event_batch_request_id` are safe server-generated correlation IDs for the last accepted operations.
+
+All five fields are optional, admin/backend-only, and locally defined but not pushed. They do not change current direct-browser compatibility behavior.
 
 ### Draft generation and supersession (6)
 

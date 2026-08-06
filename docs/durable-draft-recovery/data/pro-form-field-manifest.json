@@ -112,6 +112,14 @@
       "retentionBehavior": "Retain for operational audit and incident windows without extending raw content retention.",
       "testRequirement": "Scan diagnostics for PII/secrets and validate bounded safe-code formats."
     },
+    "api_idempotency": {
+      "canonicalStateSource": "Accepted bootstrap, save, or event-batch requests after backend authorization and validation.",
+      "legacyFallback": "Absence means no authoritative API idempotency result is recorded; current legacy browser behavior remains compatible.",
+      "migrationBehavior": "Preserve keyed hashes and safe request IDs without copying raw client idempotency keys or secret material.",
+      "adminProjectionBehavior": "Omit hashes from all client and ordinary admin projections; safe request IDs are internal diagnostics only.",
+      "retentionBehavior": "Retain with the associated draft for retry, conflict, and audit integrity.",
+      "testRequirement": "Validate optionality, exact admin FLS, raw-key exclusion, retry deduplication, and projection omission."
+    },
     "event_contract": {
       "canonicalStateSource": "Accepted draft mutation or backend lifecycle/audit operation.",
       "legacyFallback": "Existing session-linked events remain valid without draft ID, revisions, mutation IDs, or hashes.",
@@ -1238,6 +1246,61 @@
       "description": "Backend-managed version used to revoke prior recovery-session grants.",
       "group": "recovery_authorization"
     },
+    "bootstrap_idempotency_key_hash": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "sensitive_hash", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Prevents duplicate new-draft creation across authorized bootstrap retries without storing the raw key.",
+      "publicProjectionRule": "omit",
+      "description": "Backend-only keyed hash used to make new-draft bootstrap creation idempotent.",
+      "group": "api_idempotency"
+    },
+    "last_save_idempotency_key_hash": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "sensitive_hash", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the latest accepted save retry verifier without storing the raw key.",
+      "publicProjectionRule": "omit",
+      "description": "Backend-only keyed hash of the most recently accepted save request idempotency key.",
+      "group": "api_idempotency"
+    },
+    "last_save_request_id": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Correlates the most recently accepted authoritative save using a server-generated safe identifier.",
+      "publicProjectionRule": "omit",
+      "description": "Safe server-generated request ID associated with the latest accepted save.",
+      "group": "api_idempotency"
+    },
+    "last_event_batch_idempotency_key_hash": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "sensitive_hash", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the latest accepted event-batch retry verifier without storing the raw key.",
+      "publicProjectionRule": "omit",
+      "description": "Backend-only keyed hash of the most recently accepted event batch idempotency key.",
+      "group": "api_idempotency"
+    },
+    "last_event_batch_request_id": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Correlates the most recently accepted authoritative event batch using a server-generated safe identifier.",
+      "publicProjectionRule": "omit",
+      "description": "Safe server request ID associated with the latest accepted event batch.",
+      "group": "api_idempotency"
+    },
     "draft_generation": {
       "type": "number",
       "classifications": ["backend_only", "audit_metadata"],
@@ -1358,7 +1421,7 @@
       "schemaFile": "base44/entities/ProFormDraft.jsonc",
       "baselineSha256": "134d638d3fd42f429022b694b1dc1ba8393341b8b133ff6eda22a3d12f06d1f6",
       "baselineExistingPropertiesSha256": "6b8993602c502ef8fdd119ed95ab10c4ddaafd7d16e531980888bad214873c5e",
-      "implementedSchemaSha256": "2ce3c45764594e426f0ca31d542643b2486210462fa196575372bdbd59946adf",
+      "implementedSchemaSha256": "2775a9ba531b19769656203958a4f2ca411572ff0575834ea8017e0a4da73e4c",
       "implementationStatus": "local_schema_implemented_not_pushed",
       "existingRequired": ["session_id"],
       "expectedRls": null,
@@ -1400,6 +1463,7 @@
         "client_revision", "server_revision", "state_hash", "source_tab_id", "last_sync_reason", "last_restored_at",
         "recovery_email", "recovery_email_lookup_hash", "recovery_email_source", "recovery_email_verification_status", "recovery_email_verified_at",
         "recovery_code_hash", "recovery_code_version", "recovery_code_hint", "resume_token_hash", "identity_key_hash", "recovery_session_version",
+        "bootstrap_idempotency_key_hash", "last_save_idempotency_key_hash", "last_save_request_id", "last_event_batch_idempotency_key_hash", "last_event_batch_request_id",
         "draft_generation", "previous_draft_id", "replacement_draft_id", "superseded_at", "superseded_reason", "status_version",
         "submitted_state_hash", "pdf_source_state_hash", "submitted_lock_version", "status_locked_at", "last_submission_error_code",
         "recovery_email_delivery_status", "last_recovery_email_sent_at", "recovery_email_delivery_error_code", "recovery_email_delivery_attempt_count",

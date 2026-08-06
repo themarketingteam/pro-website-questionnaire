@@ -318,6 +318,46 @@
         "write": { "user_condition": { "role": "admin" } }
       }
     },
+    "bootstrap_idempotency_key_hash": {
+      "type": "string",
+      "description": "Backend-only keyed hash used to make new-draft bootstrap creation idempotent",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "last_save_idempotency_key_hash": {
+      "type": "string",
+      "description": "Backend-only keyed hash of the most recently accepted save request idempotency key",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "last_save_request_id": {
+      "type": "string",
+      "description": "Safe server-generated request ID associated with the latest accepted save",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "last_event_batch_idempotency_key_hash": {
+      "type": "string",
+      "description": "Backend-only keyed hash of the most recently accepted event batch idempotency key",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "last_event_batch_request_id": {
+      "type": "string",
+      "description": "Safe server request ID associated with the latest accepted event batch",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
     "draft_generation": {
       "type": "number",
       "description": "Sequence number for drafts within one recovery-email association when Clear All or Start New creates a new record",
