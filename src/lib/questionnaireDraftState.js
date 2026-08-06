@@ -1190,7 +1190,9 @@ const resolveWebCrypto = async (injectedCrypto, injectionRequired = false) => {
   if (globalThis.crypto?.subtle) return globalThis.crypto;
   if (globalThis.process?.versions?.node) {
     try {
-      const nodeCrypto = await import('node:crypto');
+      // Keep the Node-only fallback out of browser/check-JS module resolution.
+      const nodeCryptoSpecifier = 'node:crypto';
+      const nodeCrypto = await import(/* @vite-ignore */ nodeCryptoSpecifier);
       if (nodeCrypto.webcrypto?.subtle) return nodeCrypto.webcrypto;
     } catch {
       // Return the typed error below without exposing runtime details.
