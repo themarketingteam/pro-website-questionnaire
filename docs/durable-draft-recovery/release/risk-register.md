@@ -628,3 +628,18 @@ single-direction lease, real file transfer, checkpoint execution, conflict
 resolution, production inventory, staging rehearsal, reverse synchronization,
 or late-write reconciliation has been exercised. No cloud or production action
 occurred.
+
+## 2026-08-06 cross-app migration utility source evidence
+
+Purpose-separated HMAC signatures, exact peer/role/direction/environment
+checks, one-megabyte/100-record limits, source-identity-only upserts, mapped
+base hashes, content-free conflicts, chained checkpoints and an in-memory-only
+CLI reduce design uncertainty for bundle tampering, duplicate append, native
+destination overwrite, relationship drift, replay and credential/report
+leakage.
+
+`RISK-010`, `RISK-011`, `RISK-016`, `RISK-019`, and `RISK-025` remain open at
+their existing ratings. The cross-app secret and routes are unconfigured; no
+live Base44 function, RLS behavior, source record, file object, reverse run,
+interruption recovery or cutover closure has been exercised. Encrypted disk
+export remains explicitly blocked rather than partially implemented.

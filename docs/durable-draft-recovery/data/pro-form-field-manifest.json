@@ -1986,5 +1986,26 @@
       "contentPolicy": "Opaque identities, hashes, revisions, status and safe diagnostics only; no complete record payload.",
       "rlsPolicy": "admin_backend_only"
     }
+  },
+  "crossAppMigrationRuntime": {
+    "implementationStatus": "local_functions_and_cli_not_deployed_or_configured",
+    "policyModule": "base44/functions/_shared/proFormMigrationPolicy/entry.ts",
+    "bundleModule": "base44/functions/_shared/proFormMigrationBundle/entry.ts",
+    "exportModule": "base44/functions/_shared/proFormMigrationExport/entry.ts",
+    "importModule": "base44/functions/_shared/proFormMigrationImport/entry.ts",
+    "serviceModule": "base44/functions/_shared/proFormCrossAppMigrationService/entry.ts",
+    "endpoints": [
+      "exportProFormMigrationBatch",
+      "importProFormMigrationBatch",
+      "finalizeProFormMigrationRelationships",
+      "getProFormMigrationStatus"
+    ],
+    "upsertIdentity": ["source_app_id", "source_entity", "source_record_id"],
+    "bundleVersion": 1,
+    "signatureAlgorithm": "HMAC-SHA-256",
+    "maximumBatchRecords": 100,
+    "maximumBundleBytes": 1048576,
+    "rawBundleDiskPersistence": false,
+    "deleteOperations": false
   }
 }

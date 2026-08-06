@@ -1,0 +1,69 @@
+# Blue/green migration CLI
+
+- Script: `scripts/pro-form-blue-green-migration.mjs`
+- Package entry: `npm run migration:blue-green -- <command>`
+- Status: local implementation only; no endpoint is deployed
+
+## Commands
+
+| Command | Behavior |
+| --- | --- |
+| `plan` | Validate environment-only configuration and print a redacted, content-free plan. |
+| `export` | Request one bounded signed source batch, keep it in memory, emit only safe counts, then discard it. |
+| `import` | Stream every dependency-ordered source batch directly to destination dry-run/import. |
+| `finalize` | Plan or apply ID-map relationship patches. |
+| `verify` | Read safe status and require zero open conflicts/unresolved mappings. |
+| `status` | Return checkpoint, entity, mapping, conflict and unresolved counts only. |
+
+## Environment-only configuration
+
+The CLI reads the eleven required `PRO_MIGRATION_*` names from the prompt plus
+`PRO_MIGRATION_SOURCE_ENVIRONMENT` and
+`PRO_MIGRATION_DESTINATION_ENVIRONMENT`. It accepts no app ID, URL, grant,
+device ID, authorization, token, password or secret flag. URLs printed in a
+plan are reduced to their scheme and `<redacted-host>`.
+
+The source and destination IDs must differ. Environments must match. Staging
+or test use additionally requires `PRO_MIGRATION_TEST_MODE=staging_fixture`;
+production/staging crossing is not implemented. The report directory should
+be an operator-owned location outside Git.
+
+## Dry run and apply
+
+Dry run is explicit and makes no destination write:
+
+```text
+npm run migration:blue-green -- import --dry-run
+```
+
+Apply requires both flags exactly:
+
+```text
+npm run migration:blue-green -- import --apply --confirm APPLY_CROSS_APP_MIGRATION
+```
+
+The confirmation phrase is not authorization. Backend admin-grant and
+migration-authorization verification still occur. Conflict threshold defaults
+to zero and may be set with `--conflict-threshold N`.
+
+## Streaming, resume and reports
+
+Bundles pass directly from source HTTP response to destination request in
+memory. Reports contain redacted endpoints, direction, environments, entity
+names and counts only. A structural guard rejects report keys resembling
+bundle, record, data, answer, email, grant, authorization, token, password or
+secret content.
+
+Confirmed apply records only sequence, previous hash, entity index, cursor and
+snapshot cutoff in an owner-only resume report. Dry run does not advance that
+checkpoint. `--encrypted-export` fails with
+`MIGRATION_CLI_ENCRYPTED_EXPORT_NOT_IMPLEMENTED`; raw export has no option.
+
+## Operational boundary
+
+Do not execute migration commands until both apps have separately configured
+and certified roles, exact allowlists, direction, shared cross-app secret,
+admin grants and a short-lived orchestrator authorization. Future `_next`
+certification must prove live RLS, bundle-size behavior, interruption resume,
+forward/reverse mapping, relationship closure, conflicts, counts/hashes and
+cleanup without using production data in staging.

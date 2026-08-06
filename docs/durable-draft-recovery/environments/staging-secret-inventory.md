@@ -2,7 +2,7 @@
 
 - Status: **STAGING_CRYPTOGRAPHIC_SECRETS_CONFIGURED**
 - Inventory date: 2026-08-05
-- Inventory rows: **97 names**
+- Inventory rows: **107 names**
 - Current production Base44 secret names observed: **4**
 - Current staging Base44 secret names observed: **8** (six cryptographic secrets and two ordinary staging controls)
 
@@ -52,6 +52,16 @@ The four production names observed through the names-only Base44 secret command 
 | 19e | `PRO_FORM_MAGIC_LINK_SECRET` | Future opaque magic-link-token HMAC; independent, at least 32 bytes | Later; reserved and not configured | Later; reserved and not configured | Yes | No |
 | 19f | `PRO_FORM_MIGRATION_APPLY_SECRET` | Independent HMAC key for two-hour one-time admin migration apply and rollback authorization | Later; reserved, not configured | Later; reserved, not configured | Yes | No |
 | 19g | `PRO_FORM_RETENTION_APPLY_SECRET` | Independent HMAC key for two-hour report-bound admin retention apply authorization | Later; reserved, not configured | Later; reserved, not configured | Yes | No |
+| 19h | `PRO_FORM_CROSS_APP_MIGRATION_SECRET` | Independent HMAC key for signed bundles and purpose-separated cross-app authorization | Later; reserved, not configured | Later; reserved, not configured | Yes per migration trust pair | No; provision independently through an approved exchange |
+| 19i | `PRO_FORM_MIGRATION_LOCAL_APP_ID` | Exact backend-local application identity; missing value fails closed | Later | Later | Yes | No |
+| 19j | `PRO_FORM_MIGRATION_LOCAL_APP_NAME` | Safe backend-local migration role label | Later | Later | Yes | No |
+| 19k | `PRO_FORM_MIGRATION_ROLE` | Exact `source`, `destination`, or reviewed `both` capability | Later | Later | Prefer Yes by cutover role | No |
+| 19l | `PRO_FORM_MIGRATION_ALLOWED_SOURCE_APP_IDS` | Comma-separated exact source application allowlist | Later | Later | Yes | No |
+| 19m | `PRO_FORM_MIGRATION_ALLOWED_DESTINATION_APP_IDS` | Comma-separated exact destination application allowlist | Later | Later | Yes | No |
+| 19n | `PRO_FORM_MIGRATION_ALLOWED_DIRECTIONS` | Comma-separated `blue_to_green`/`green_to_blue` allowlist | Later | Later | Review per role | No |
+| 19o | `PRO_FORM_MIGRATION_MAX_BATCH_RECORDS` | Bounded record count; default and maximum 100 | Optional | Optional | No | Yes; reviewed integer only |
+| 19p | `PRO_FORM_MIGRATION_MAX_BUNDLE_BYTES` | Bounded signed bundle size; default and maximum 1048576 bytes | Optional | Optional | No | Yes; reviewed integer only |
+| 19q | `PRO_FORM_MIGRATION_CLOCK_SKEW_SECONDS` | Bounded signature/auth clock tolerance; default 60, maximum 300 | Optional | Optional | No | Yes; reviewed integer only |
 | 20 | `CAPTCHA_SITE_KEY` | Future public staging CAPTCHA site key | Later | Later | Yes | No |
 | 21 | `CAPTCHA_SECRET_KEY` | Future backend CAPTCHA verification secret | Later | Later | Yes | No |
 | 20a | `PRO_DRAFT_CAPTCHA_PROVIDER` | Backend provider selector: disabled, turnstile, or staging_test | Later; start `disabled` | Later | Prefer Yes | Safe `disabled` only |
@@ -189,6 +199,16 @@ also reserved: `PRO_FORM_DRAFT_RETENTION_DAYS`,
 365/365/true/50/30 defaults; the two retention windows cannot be reduced below
 365 and the batch cannot exceed 200. This source increment did not create,
 query, print, configure, or copy any value.
+
+## 2026-08-06 cross-app migration source inventory
+
+Rows 19h-19q reserve one independent HMAC secret and nine fail-closed routing,
+role, allowlist and bounded-resource variables. No value was generated,
+configured, queried, copied or printed. `PRO_FORM_CROSS_APP_MIGRATION_SECRET`
+must be at least 32 bytes and must not reuse the admin-grant, legacy-migration
+apply, retention, recovery or Base44 platform credentials. App IDs remain out
+of Git. A later separately authorized configuration step must validate names
+and one-way fingerprints only.
 
 ## 2026-08-05 staging cryptographic configuration evidence
 

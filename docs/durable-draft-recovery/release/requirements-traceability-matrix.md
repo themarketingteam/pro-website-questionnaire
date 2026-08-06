@@ -583,3 +583,19 @@ meaningful-answer hash exclusion, or schema/selection drift.
 This is local source evidence only. No app, record, bundle, deployment, schema
 push, production read, or live bidirectional execution exists, so no staging or
 production acceptance advances.
+
+## 2026-08-06 cross-app export/import utility source evidence
+
+`DR-MIG-001`, `DR-MIG-002`, `DR-MIG-003`, `DR-ID-001`, `DR-RLS-001`, and
+`DR-OBS-001` now have local signed-bundle, bounded export, identity-only
+idempotent import, ID-map, safe conflict, relationship-finalization, checkpoint,
+status and in-memory CLI implementations. Synthetic tests cover signature and
+tamper rejection, exact routes/environments, count/hash/chain validation,
+create/update/unchanged/conflict, mapping replay, relationship closure, dry
+run/apply confirmation, secret-argument rejection, redaction and content-free
+reports/resume state.
+
+This remains source evidence only. No variable is configured, no function or
+schema is deployed, no record is read or migrated, and no `_next` app exists.
+Live Base44 authorization, RLS, real batch limits, interruption, file transfer,
+forward/reverse reconciliation and cutover verification remain mandatory.

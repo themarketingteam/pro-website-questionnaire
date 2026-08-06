@@ -432,3 +432,19 @@ record read/export, protected bundle, deployment, domain action, or remote Git
 operation occurred. The exporter/importer, active-direction lease, encrypted
 bundle, checkpoint execution, file transfer and live forward/reverse rehearsal
 remain future gates.
+
+## 2026-08-06 protected export/import implementation addendum
+
+The local implementation now supplies the previously deferred signed bundle,
+bounded snapshot export, exact source-identity upsert, ID-map persistence,
+conflict quarantine, relationship finalization, safe status and streaming CLI
+contracts. HMAC signatures cover every non-signature bundle field; content and
+chain hashes reject mutation/reordering. Import verifies route, environment,
+signature and bundle-bound migration authorization before entity operations.
+
+Dry run remains the default. Apply needs the exact confirmation phrase plus
+backend admin and migration authorization. The CLI has no raw export option,
+blocks the future encrypted option, redacts URLs and permits only content-free
+reports/checkpoints. This addendum does not certify a live app or migration:
+no `_next` app, secret configuration, production access, data transfer,
+function deployment, schema push, domain action or branch push occurred.

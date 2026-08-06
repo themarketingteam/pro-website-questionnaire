@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'jsonc-parser';
 import { describe, expect, it } from 'vitest';
+import { PRO_FORM_MIGRATION_RUNTIME_POLICIES } from '../../base44/functions/_shared/proFormMigrationPolicy/entry.ts';
 
 const ADMIN_RLS = {
   create: { user_condition: { role: 'admin' } },
@@ -14,6 +15,12 @@ const load = (name) => parse(readFileSync(path.resolve(
 ), 'utf8'));
 
 describe('blue/green migration control schemas', () => {
+  it('keeps runtime export allowlists exactly aligned with migratable schemas', () => {
+    for (const [entityName, policy] of Object.entries(PRO_FORM_MIGRATION_RUNTIME_POLICIES)) {
+      expect(new Set(policy.allowedFields)).toEqual(new Set(Object.keys(load(entityName).properties)));
+    }
+  });
+
   it('defines the deterministic ID map with only the six required identities', () => {
     const schema = load('ProFormMigrationIdMap');
     expect(schema.name).toBe('ProFormMigrationIdMap');
