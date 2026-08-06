@@ -59,8 +59,8 @@ export default function TextareaQuestion({
   const getStatusIcon = () => {
     switch (validation.status) {
       case 'red':
-      case 'error':
         return <AlertCircle className="w-4 h-4 text-red-600" />;
+      case 'error':
       case 'yellow':
         return <AlertTriangle className="w-4 h-4 text-amber-600" />;
       case 'green':
@@ -73,8 +73,8 @@ export default function TextareaQuestion({
   const getStatusBorderClass = () => {
     switch (validation.status) {
       case 'red':
-      case 'error':
         return 'border-red-500 focus:ring-red-500';
+      case 'error':
       case 'yellow':
         return 'border-amber-500 focus:ring-amber-500';
       case 'green':
@@ -87,8 +87,8 @@ export default function TextareaQuestion({
   const getStatusBgClass = () => {
     switch (validation.status) {
       case 'red':
-      case 'error':
         return 'bg-red-50 border-red-200 text-red-800';
+      case 'error':
       case 'yellow':
         return 'bg-amber-50 border-amber-200 text-amber-800';
       case 'green':
@@ -148,7 +148,7 @@ export default function TextareaQuestion({
             Validating...
           </>
         ) : (
-          'Validate Now'
+          'Check Answer (Optional)'
         )}
       </button>
     </div>

@@ -34,7 +34,7 @@ describe('TextareaQuestion manual validation', () => {
       />
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'Validate Now' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Check Answer (Optional)' }));
 
     expect(base44.functions.invoke).toHaveBeenCalledWith('validateQuestionText', {
       text: 'We provide proactive managed technology support.',
@@ -54,12 +54,12 @@ describe('TextareaQuestion manual validation', () => {
       />
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'Validate Now' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Check Answer (Optional)' }));
 
-    expect(await screen.findByText(/couldn't validate this answer right now/i)).toBeInTheDocument();
+    expect(await screen.findByText(/will not block submission/i)).toBeInTheDocument();
     expect(base44.functions.invoke).toHaveBeenCalledTimes(2);
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Validate Now' })).toBeEnabled();
+      expect(screen.getByRole('button', { name: 'Check Answer (Optional)' })).toBeEnabled();
     });
   });
 
@@ -79,7 +79,7 @@ describe('TextareaQuestion manual validation', () => {
       />
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'Validate Now' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Check Answer (Optional)' }));
 
     expect(await screen.findByText('Looking good!')).toBeInTheDocument();
     expect(base44.functions.invoke).toHaveBeenCalledTimes(2);
@@ -99,7 +99,7 @@ describe('TextareaQuestion manual validation', () => {
       />
     );
 
-    await userEvent.click(screen.getByRole('button', { name: 'Validate Now' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Check Answer (Optional)' }));
 
     expect(await screen.findByRole('button', { name: 'Validating...' })).toBeDisabled();
     expect(base44.functions.invoke).toHaveBeenCalledTimes(1);

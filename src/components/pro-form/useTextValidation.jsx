@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 
 const VALIDATION_UNAVAILABLE_MESSAGE =
-  "We couldn't validate this answer right now. Please try again. Your response has been preserved.";
+  "Optional AI feedback is unavailable right now. Your response is saved, and this will not block submission.";
 const TRANSIENT_RETRY_DELAY_MS = 300;
 
 export function useTextValidation(value, questionId, initialStatus = 'neutral', externalStatus = null) {

@@ -85,18 +85,8 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     expect(await screen.findByTestId('question-wrapper-23.1')).toBeInTheDocument();
   });
 
-  it('Final validation uses canonical validateQuestionText payloads and keeps parent intact for optional child', async () => {
+  it('does not call AI validation during submit when text validation is optional', async () => {
     const user = setupUser();
-
-    const invoke = base44.functions.invoke;
-    invoke.mockImplementation(async (_name, payload) => {
-      if (_name === 'validateQuestionText') {
-        // Ensure canonical context
-        expect(payload.questionContext === 'question_23_1' || payload.questionContext === 'question_25_1').toBe(true);
-        return { status: 200, data: { status: 'complete', message: 'ok', characterCount: (payload.text||'').length } };
-      }
-      return { status: 200, data: {} };
-    });
 
     const preloaded = {
       form: {
@@ -118,23 +108,12 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     const submit = await screen.findByRole('button', { name: /submit questionnaire/i });
     await user.click(submit);
 
-    await waitFor(() => {
-      const calls = base44.functions.invoke.mock.calls.filter(c => c[0] === 'validateQuestionText');
-      const contexts = calls.map(c => c[1].questionContext);
-      expect(contexts).toContain('question_23_1');
-      expect(contexts).toContain('question_25_1');
-    });
-
-    await waitFor(() => {
-      expect(store.getState().form.validationStatus['23']).not.toBe('incomplete');
-    });
+    expect(base44.functions.invoke.mock.calls.filter(c => c[0] === 'validateQuestionText')).toHaveLength(0);
+    expect(store.getState().form.validationStatus['23.1']).not.toBe('incomplete');
   });
 
-  it('Backend failure surfaces cleanly and sets textarea status to incomplete for submit-time validation', async () => {
+  it('does not turn a non-empty textarea incomplete during submit', async () => {
     const user = setupUser();
-
-    const invoke = base44.functions.invoke;
-    invoke.mockImplementationOnce(async () => { throw new Error('network down'); });
 
     const preloaded = {
       form: {
@@ -152,9 +131,8 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     const submit = await screen.findByRole('button', { name: /submit questionnaire/i });
     await user.click(submit);
 
-    await waitFor(() => {
-      expect(store.getState().form.validationStatus['23.1']).toBe('incomplete');
-    });
+    expect(base44.functions.invoke.mock.calls.filter(c => c[0] === 'validateQuestionText')).toHaveLength(0);
+    expect(store.getState().form.validationStatus['23.1']).not.toBe('incomplete');
   });
 
   it('Q24 normal radio option completes after one click', async () => {
@@ -213,7 +191,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     });
   });
 
-  it('submit-time validation blocks incomplete returned statuses', async () => {
+  it('opens confirmation without invoking AI validation when all required values are present', async () => {
     const user = setupUser();
 
     const invoke = base44.functions.invoke;
@@ -264,18 +242,14 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
       },
     };
 
-    const { store } = renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
+    renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
     await user.click(await screen.findByRole('button', { name: /submit questionnaire/i }));
 
-    await waitFor(() => {
-      expect(store.getState().form.validationStatus['1.1']).toBe('incomplete');
-      expect(store.getState().form.touchedQuestions['1.1']).toBe(true);
-    });
-
-    expect(screen.queryByText(/review your answers/i)).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /confirm & submit/i })).toBeInTheDocument();
+    expect(base44.functions.invoke.mock.calls.filter(c => c[0] === 'validateQuestionText')).toHaveLength(0);
   });
 
-  it('does not open the confirmation modal when final required textarea validation fails', async () => {
+  it('opens confirmation when saved AI statuses are incomplete and the service is unavailable', async () => {
     const user = setupUser();
 
     const invoke = base44.functions.invoke;
@@ -318,19 +292,27 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
         },
         validationStatus: {
           '1': 'complete',
+          '1.1': 'incomplete',
           '2': 'complete',
           '3': 'complete',
           '4': 'complete',
           '5': 'complete',
+          '6': 'incomplete',
           '7': 'complete',
           '8': 'complete',
+          '9': 'incomplete',
           '10': 'complete',
           '11': 'complete',
           '12': 'complete',
+          '13': 'incomplete',
           '14': 'complete',
+          '15': 'incomplete',
           '16': 'complete',
           '18': 'complete',
+          '19': 'incomplete',
           '20': 'complete',
+          '21': 'incomplete',
+          '22': 'incomplete',
           '23': 'complete',
           '24': 'complete',
           '25': 'complete'
@@ -342,17 +324,13 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
       },
     };
 
-    const { store } = renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
+    renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
 
     const submit = await screen.findByRole('button', { name: /submit questionnaire/i });
     await user.click(submit);
 
-    await waitFor(() => {
-      expect(store.getState().form.validationStatus['1.1']).toBe('incomplete');
-      expect(store.getState().form.touchedQuestions['1.1']).toBe(true);
-    });
-
-    expect(screen.queryByText(/review your answers/i)).not.toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /confirm & submit/i })).toBeInTheDocument();
+    expect(base44.functions.invoke.mock.calls.filter(c => c[0] === 'validateQuestionText')).toHaveLength(0);
   });
 
   it('writes a recoverable local backup when the database save fails', async () => {

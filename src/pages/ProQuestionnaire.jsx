@@ -44,6 +44,10 @@ import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import { trackValidationDispatch, trackParentStatusChange, devDiagEnabled } from '@/lib/devDiagnostics';
 import { getQuestionById, getParentQuestionByChildId, getAllQuestionIds, isChildQuestion } from '@/components/pro-form/questionUtils';
+import {
+  REQUIRE_AI_TEXT_VALIDATION_FOR_SUBMISSION,
+  hasNonEmptyTextValue
+} from '@/components/pro-form/validationPolicy';
 import { serializeError } from '@/components/pro-form/submissionPayload';
 import { submitProQuestionnaire } from '@/lib/proQuestionnaireSubmit';
 import {
@@ -532,8 +536,9 @@ export default function ProQuestionnaire() {
       }
 
       if (childQuestion?.type === 'textarea') {
-        if (!String(childAnswer || '').trim()) return 'incomplete';
-        return 'incomplete';
+        if (!hasNonEmptyTextValue(childAnswer)) return 'incomplete';
+        if (REQUIRE_AI_TEXT_VALIDATION_FOR_SUBMISSION) return 'incomplete';
+        continue;
       }
 
       if (childQuestion?.type === 'multi_certification') {
@@ -595,7 +600,7 @@ export default function ProQuestionnaire() {
         business_domain: credentials.domain || domainParam || 'unknown'
       });
     }
-    if (q?.type === 'textarea') {
+    if (q?.type === 'textarea' && REQUIRE_AI_TEXT_VALIDATION_FOR_SUBMISSION) {
       const prevStatus = validationStatus[questionId];
       const prevValue = responses[questionId] || '';
       const nextValue = value || '';
@@ -873,9 +878,10 @@ export default function ProQuestionnaire() {
         newStatus = 'complete';
         break;
 
-      // Textarea questions get validated by AI agent - don't set here
       case 'textarea':
-        return;
+        if (REQUIRE_AI_TEXT_VALIDATION_FOR_SUBMISSION) return;
+        newStatus = hasNonEmptyTextValue(value) ? 'complete' : 'incomplete';
+        break;
     }
 
     updateValidationState(questionId, newStatus);
@@ -994,17 +1000,33 @@ export default function ProQuestionnaire() {
       return true;
     }
 
+    const answer = responses[questionId];
+    const otherValue = responses[`${questionId}_other`];
+
+    // While AI validation is optional, a non-empty textarea is complete even if
+    // the validation function is unavailable or previously returned an error.
+    if (
+      question.type === 'textarea' &&
+      !REQUIRE_AI_TEXT_VALIDATION_FOR_SUBMISSION
+    ) {
+      return hasNonEmptyTextValue(answer);
+    }
+
     // Check validation status first - if it exists and is complete/needs_work, question is complete
     const status = validationStatus[questionId];
-    if (status === 'complete' || status === 'needs_work') {
+    const hasActiveRequiredChildren =
+      question.type === 'yes_no' &&
+      answer === 'yes' &&
+      (question.conditionalChildren || []).some(child => child.requiredIfParentYes === true);
+
+    const hasPassingStatus = status === 'complete' || status === 'needs_work';
+
+    if (!hasActiveRequiredChildren && hasPassingStatus) {
       return true;
     }
 
     // Don't show complete until question is touched
-    if (!touchedQuestions[questionId]) return false;
-
-    const answer = responses[questionId];
-    const otherValue = responses[`${questionId}_other`];
+    if (!touchedQuestions[questionId] && !hasPassingStatus) return false;
 
     switch (question.type) {
       case 'yes_no':
@@ -1017,21 +1039,27 @@ export default function ProQuestionnaire() {
       if (hasValidAnswer && answer === 'yes' && question.conditionalChildren) {
       const requiredChildren = question.conditionalChildren.filter(c => c.requiredIfParentYes);
       const allChildrenComplete = requiredChildren.every(child => {
+        const childQuestion = getQuestionById(QUESTIONS, child.id);
+        if (!childQuestion) return false;
+
+        const childAnswer = responses[child.id];
+
+        if (
+          childQuestion.type === 'textarea' &&
+          !REQUIRE_AI_TEXT_VALIDATION_FOR_SUBMISSION
+        ) {
+          return hasNonEmptyTextValue(childAnswer);
+        }
+
         // Check validation status first for child questions
         const childStatus = validationStatus[child.id];
         if (childStatus === 'complete' || childStatus === 'needs_work') {
           return true;
         }
 
-        const childQuestion = getQuestionById(QUESTIONS, child.id);
-        if (!childQuestion) return false;
-
-        // Check child completion directly without requiring touched status
-        const childAnswer = responses[child.id];
-
         switch (childQuestion.type) {
           case 'textarea':
-            return childAnswer && childAnswer.trim().length > 0;
+            return false;
 
           case 'multi_certification': {
             const items = Array.isArray(childAnswer) ? childAnswer : [];
@@ -1104,7 +1132,9 @@ export default function ProQuestionnaire() {
       
       case 'textarea': {
         const status = validationStatus[questionId];
-        return status === 'complete';
+        return REQUIRE_AI_TEXT_VALIDATION_FOR_SUBMISSION
+          ? status === 'complete' || status === 'needs_work'
+          : hasNonEmptyTextValue(answer);
       }
       
       case 'multi_text': {
@@ -1160,6 +1190,13 @@ export default function ProQuestionnaire() {
   };
 
   const getQuestionValidationStatus = (questionId) => {
+    const question = getQuestionById(QUESTIONS, questionId);
+    if (
+      question?.type === 'textarea' &&
+      !REQUIRE_AI_TEXT_VALIDATION_FOR_SUBMISSION
+    ) {
+      return hasNonEmptyTextValue(responses[questionId]) ? 'complete' : 'neutral';
+    }
     return validationStatus[questionId] || 'neutral';
   };
 
@@ -1216,6 +1253,8 @@ export default function ProQuestionnaire() {
   };
 
   const getQuestionsNeedingValidation = () => {
+    if (!REQUIRE_AI_TEXT_VALIDATION_FOR_SUBMISSION) return [];
+
     const needsValidation = [];
     
     // Check all textarea questions
@@ -1248,6 +1287,8 @@ export default function ProQuestionnaire() {
   };
 
   const runFinalValidations = async () => {
+    if (!REQUIRE_AI_TEXT_VALIDATION_FOR_SUBMISSION) return true;
+
     const questionsToValidate = getQuestionsNeedingValidation();
 
     if (questionsToValidate.length === 0) {
