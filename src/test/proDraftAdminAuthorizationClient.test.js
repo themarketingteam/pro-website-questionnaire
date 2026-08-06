@@ -112,7 +112,7 @@ describe('admin authorization client', () => {
     expect(state.status).toBe('password_required');
   });
 
-  it('normalizes throttling to locked state without credential details', async () => {
+  it('normalizes throttling to rate-limited state without credential details', async () => {
     const client = createProDraftAdminAuthorizationClient({
       invoke: vi.fn(async () => {
         throw { response: { status: 429, data: { retryAfterSeconds: 30 } } };
@@ -120,7 +120,7 @@ describe('admin authorization client', () => {
       vault: makeVault(),
     });
     expect(await client.authorizeWithRecoveryPassword('synthetic')).toEqual(expect.objectContaining({
-      status: 'locked', locked: true, retryAfterSeconds: 30,
+      status: 'rate_limited', locked: false, retryAfterSeconds: 30,
     }));
   });
 

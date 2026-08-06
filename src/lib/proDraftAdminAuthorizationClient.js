@@ -21,9 +21,10 @@ function responseData(response) {
 
 export function normalizeAdminAuthorizationError(error) {
   const payload = responseData(error?.response) ?? {};
-  if (payload?.locked === true || error?.response?.status === 429) {
+  if (payload?.locked === true) {
     return safeState('locked', payload);
   }
+  if (error?.response?.status === 429) return safeState('rate_limited', payload);
   return safeState('error', payload);
 }
 

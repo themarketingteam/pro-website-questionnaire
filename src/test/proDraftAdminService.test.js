@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   getDraftForRecovery,
   getDraftLineageForRecovery,
+  getIntakeForRecovery,
   listDraftEventsForRecovery,
   listDraftsForRecovery,
+  listIntakesForRecovery,
   maskRecoveryEmail,
   normalizeAdminDomain,
   parseAdminJsonField,
@@ -14,12 +16,13 @@ import {
 import { hashNormalizedRecoveryEmail } from '../../base44/functions/_shared/proDraftSecurity/entry.ts';
 
 const secret = 'a'.repeat(64);
-const makeEntities = (draftRows = [], eventRows = []) => {
+const makeEntities = (draftRows = [], eventRows = [], intakeRows = []) => {
   const drafts = draftRows.map((v) => ({ ...v }));
   const events = eventRows.map((v) => ({ ...v }));
+  const intakes = intakeRows.map((v) => ({ ...v }));
   const filter = (rows) => async (query, _sort, limit = 100, skip = 0) => rows.filter((row) => Object.entries(query).every(([k,v]) => row[k] === v)).slice(skip, skip + limit);
   return {
-    drafts, events,
+    drafts, events, intakes,
     entities: {
       ProFormDraft: {
         get: async (id) => drafts.find((v) => v.id === id),
@@ -31,6 +34,7 @@ const makeEntities = (draftRows = [], eventRows = []) => {
         },
       },
       ProFormDraftEvent: { filter: filter(events), create: async (value) => { events.push(value); return value; } },
+      ProFormSubmissionIntake: { get: async (id) => intakes.find((v) => v.id === id), filter: filter(intakes) },
     },
   };
 };
@@ -74,6 +78,12 @@ describe('admin draft reads', () => {
     const result = await listDraftsForRecovery(entities, { search: { mode: 'session_id', value: 's2' } }, { cursor: secret, email: secret });
     expect(result.items.map((v) => v.id)).toEqual(['d2']);
   });
+  it('applies allowlisted status and environment filters at the entity boundary', async () => {
+    let query;
+    const entities = { ProFormDraft: { filter: async (value) => { query = value; return []; } }, ProFormDraftEvent: { filter: async () => [] } };
+    await listDraftsForRecovery(entities, { filters: { status: 'submit_failed', environment: 'staging' } }, { cursor: secret, email: secret });
+    expect(query).toMatchObject({ status: 'submit_failed', environment: 'staging' });
+  });
   it('normalizes and hashes an exact recovery email search', async () => {
     let query; const entities = { ProFormDraft: { filter: async (value) => { query = value; return []; } }, ProFormDraftEvent: { filter: async () => [] } };
     await listDraftsForRecovery(entities, { search: { mode: 'recovery_email', value: 'Person@Example.COM' } }, { cursor: secret, email: secret });
@@ -105,6 +115,32 @@ describe('admin draft reads', () => {
   it('paginates events at the requested bound', async () => {
     const { entities } = makeEntities([{ id: 'd1' }], [{ id: 'e1', draft_id: 'd1' }, { id: 'e2', draft_id: 'd1' }]);
     const result = await listDraftEventsForRecovery(entities, { draftId: 'd1', pageSize: 1 }, secret); expect(result.items).toHaveLength(1); expect(result.nextCursor).toEqual(expect.any(String));
+  });
+});
+
+describe('admin intake reads', () => {
+  it('returns a safe paginated intake projection', async () => {
+    const { entities } = makeEntities([], [], [
+      { id: 'i1', status: 'received_intake', user_email: 'private@example.test', diagnostics_json: '{"browserOnline":true}' },
+      { id: 'i2', status: 'received_intake' },
+    ]);
+    const result = await listIntakesForRecovery(entities, { pageSize: 1, filters: { status: 'received_intake' } }, secret);
+    expect(result.items).toEqual([expect.objectContaining({ id: 'i1', status: 'received_intake' })]);
+    expect(result.items[0]).not.toHaveProperty('user_email');
+    expect(result.nextCursor).toEqual(expect.any(String));
+  });
+
+  it('loads bounded detail and parses diagnostic JSON', async () => {
+    const { entities } = makeEntities([], [], [{ id: 'i1', diagnostics_json: '{"browserOnline":true}', transformed_payload_json: '{"safe":true}' }]);
+    const result = await getIntakeForRecovery(entities, { intakeId: 'i1' });
+    expect(result.intake.jsonDiagnostics.diagnostics_json).toMatchObject({ valid: true, parsed: { browserOnline: true } });
+    expect(result.intake).not.toHaveProperty('raw_responses_json');
+  });
+
+  it('rejects unsafe intake identifiers and unknown list filters', async () => {
+    const { entities } = makeEntities();
+    await expect(getIntakeForRecovery(entities, { intakeId: '../unsafe' })).rejects.toMatchObject({ status: 400 });
+    await expect(listIntakesForRecovery(entities, { filters: { arbitrary: true } }, secret)).rejects.toMatchObject({ status: 400 });
   });
 });
 

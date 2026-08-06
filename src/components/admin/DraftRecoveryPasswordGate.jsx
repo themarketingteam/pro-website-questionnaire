@@ -1,191 +1,79 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { KeyRound, Loader2, LockKeyhole } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useProDraftAdminAuthorization } from '@/hooks/useProDraftAdminAuthorization';
 
-const STORAGE_KEY = 'pro_draft_recovery_access_v1';
-
-export const DraftRecoveryAccessContext = createContext({ recoveryGrant: '' });
-
-export const useDraftRecoveryAccess = () => useContext(DraftRecoveryAccessContext);
-
-const readSavedGrant = () => {
-  try {
-    const savedGrant = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || 'null');
-    if (!savedGrant?.token || !Number.isFinite(savedGrant?.expiresAt)) return null;
-    if (savedGrant.expiresAt <= Date.now()) {
-      window.localStorage.removeItem(STORAGE_KEY);
-      return null;
-    }
-    return savedGrant;
-  } catch {
-    window.localStorage.removeItem(STORAGE_KEY);
-    return null;
-  }
-};
-
-const getResponseData = (response) => response?.data ?? response;
-
-const getErrorMessage = (error, fallback) => (
-  error?.response?.data?.error
-  || error?.data?.error
-  || error?.message
-  || fallback
-);
-
-const getErrorStatus = (error) => error?.status || error?.response?.status;
+const PERSISTENT_NOTICE = 'This device will remain authorized until access is revoked, the recovery authorization is rotated, or you choose Forget this device.';
+const MEMORY_NOTICE = 'This browser is not allowing persistent storage. You may need to enter the recovery password again after closing it.';
 
 export default function DraftRecoveryPasswordGate({ children }) {
-  const [accessState, setAccessState] = useState('checking');
-  const [recoveryGrant, setRecoveryGrant] = useState('');
+  const { authorizationState, authorizeWithPassword } = useProDraftAdminAuthorization();
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    const savedGrant = readSavedGrant();
-
-    if (!savedGrant) {
-      setAccessState('locked');
-      return () => {
-        active = false;
-      };
-    }
-
-    const verifySavedGrant = async () => {
-      try {
-        const response = await base44.functions.invoke('verifyDraftRecoveryAccess', {
-          token: savedGrant.token
-        });
-        const data = getResponseData(response);
-
-        if (!active) return;
-        if (data?.authorized) {
-          setRecoveryGrant(savedGrant.token);
-          setAccessState('authorized');
-          return;
-        }
-
-        window.localStorage.removeItem(STORAGE_KEY);
-        setRecoveryGrant('');
-        setError(data?.error || 'Your saved access has expired. Enter the password again.');
-      } catch (verifyError) {
-        if (!active) return;
-        if ([401, 403].includes(getErrorStatus(verifyError))) {
-          window.localStorage.removeItem(STORAGE_KEY);
-        }
-        setRecoveryGrant('');
-        setError(getErrorMessage(
-          verifyError,
-          'Unable to verify saved access. Please enter the password again.'
-        ));
-      }
-
-      if (active) setAccessState('locked');
-    };
-
-    verifySavedGrant();
-    return () => {
-      active = false;
-    };
-  }, []);
+  const [submittedError, setSubmittedError] = useState('');
+  const submitting = authorizationState.status === 'authenticating';
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!password || submitting) return;
-
-    setSubmitting(true);
-    setError('');
-
-    try {
-      const response = await base44.functions.invoke('verifyDraftRecoveryAccess', { password });
-      const data = getResponseData(response);
-
-      if (!data?.authorized || !data?.token || !Number.isFinite(data?.expiresAt)) {
-        throw new Error(data?.error || 'Access could not be verified.');
-      }
-
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        token: data.token,
-        expiresAt: data.expiresAt
-      }));
-      setRecoveryGrant(data.token);
-      setPassword('');
-      setAccessState('authorized');
-    } catch (submitError) {
-      setPassword('');
-      setError(getErrorMessage(submitError, 'Incorrect password.'));
-    } finally {
-      setSubmitting(false);
-    }
+    const submitted = password;
+    setPassword('');
+    setSubmittedError('');
+    const result = await authorizeWithPassword(submitted);
+    if (!result.authorized) setSubmittedError('Draft Recovery access could not be verified. Check the password and try again.');
   };
 
-  if (accessState === 'authorized') {
-    return (
-      <DraftRecoveryAccessContext.Provider value={{ recoveryGrant }}>
-        {children}
-      </DraftRecoveryAccessContext.Provider>
-    );
-  }
+  if (authorizationState.authorized) return children;
 
-  if (accessState === 'checking') {
+  if (authorizationState.status === 'loading') {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6" aria-live="polite">
+      <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6" aria-live="polite">
         <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
           <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-          Verifying access…
+          Loading stored Draft Recovery access…
         </div>
-      </div>
+      </main>
     );
   }
 
+  const limited = authorizationState.status === 'rate_limited' || authorizationState.status === 'locked';
+  const retry = authorizationState.retryAfterSeconds > 0
+    ? ` Try again in ${authorizationState.retryAfterSeconds} seconds.` : '';
+
   return (
-    <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+    <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4 sm:p-6">
       <Card className="w-full max-w-md shadow-sm">
         <CardHeader className="space-y-4 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-700">
             <LockKeyhole className="h-6 w-6" aria-hidden="true" />
           </div>
           <div className="space-y-2">
-            <CardTitle className="text-2xl text-slate-900">Draft Recovery Access</CardTitle>
-            <p className="text-sm leading-6 text-slate-600">
-              Enter the admin password to open draft recovery. Access remains available in this browser for seven days.
-            </p>
+            <h1 className="text-2xl font-semibold leading-none tracking-tight text-slate-900">Draft Recovery Access</h1>
+            <p className="text-sm leading-6 text-slate-600">{PERSISTENT_NOTICE}</p>
           </div>
         </CardHeader>
         <CardContent>
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <label htmlFor="draft-recovery-password" className="text-sm font-medium text-slate-800">
-                Password
+                Recovery access password
               </label>
-              <Input
-                id="draft-recovery-password"
-                type="password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete="current-password"
-                autoFocus
-                required
-                disabled={submitting}
-                aria-describedby={error ? 'draft-recovery-error' : undefined}
-              />
+              <Input id="draft-recovery-password" type="password" value={password}
+                onChange={(event) => setPassword(event.target.value)} autoComplete="current-password"
+                required disabled={submitting || limited} aria-describedby="draft-recovery-status" />
             </div>
-            {error ? (
-              <p id="draft-recovery-error" className="text-sm text-red-600" role="alert">
-                {error}
+            {(submittedError || limited || authorizationState.status === 'error') ? (
+              <p id="draft-recovery-status" className="text-sm text-red-700" role="alert">
+                {limited ? `Draft Recovery access is temporarily unavailable.${retry}` : submittedError || 'Draft Recovery access could not be verified. Try again.'}
               </p>
             ) : null}
-            <Button type="submit" className="w-full" disabled={submitting || !password}>
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <KeyRound className="h-4 w-4" aria-hidden="true" />
-              )}
-              {submitting ? 'Verifying…' : 'Unlock draft recovery'}
+            {authorizationState.storageMode === 'memory_only' ? (
+              <p className="rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{MEMORY_NOTICE}</p>
+            ) : null}
+            <Button type="submit" className="w-full gap-2" disabled={submitting || limited || !password}>
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <KeyRound className="h-4 w-4" aria-hidden="true" />}
+              {submitting ? 'Authenticating…' : 'Unlock Draft Recovery'}
             </Button>
           </form>
         </CardContent>
@@ -193,3 +81,5 @@ export default function DraftRecoveryPasswordGate({ children }) {
     </main>
   );
 }
+
+export { MEMORY_NOTICE, PERSISTENT_NOTICE };

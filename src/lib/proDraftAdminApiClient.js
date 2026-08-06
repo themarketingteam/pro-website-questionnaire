@@ -9,6 +9,8 @@ const FUNCTIONS = Object.freeze({
   listDraftEvents: 'listProFormDraftEventsForRecovery',
   updateDraft: 'updateProFormDraftForRecovery',
   getDraftLineage: 'getProFormDraftLineageForRecovery',
+  listIntakes: 'listProFormSubmissionIntakesForRecovery',
+  getIntake: 'getProFormSubmissionIntakeForRecovery',
   retrySubmission: 'retryProQuestionnaireIntakeSubmission',
   repairSubmission: 'repairProQuestionnaireIntakeSubmission',
 });
@@ -85,3 +87,5 @@ export const updateDraft = (...args) => proDraftAdminApiClient.updateDraft(...ar
 export const getDraftLineage = (...args) => proDraftAdminApiClient.getDraftLineage(...args);
 export const retrySubmission = (...args) => proDraftAdminApiClient.retrySubmission(...args);
 export const repairSubmission = (...args) => proDraftAdminApiClient.repairSubmission(...args);
+export const listIntakes = (...args) => proDraftAdminApiClient.listIntakes(...args);
+export const getIntake = (...args) => proDraftAdminApiClient.getIntake(...args);

@@ -12,7 +12,9 @@ The current application is a Vite/React single-page app backed by Base44. Questi
 
 The public submit path first attempts a direct `ProFormSubmission.create`, then invokes a server fallback that is intended to create a final submission or a durable `ProFormSubmissionIntake`. The local fallback implementation is packaged under a nested `entry/entry.ts`, but the read-only Base44 function listing did not show that function as deployed. The successful path resets Redux and retains a React-only response snapshot for the thank-you modal and client-side PDF download.
 
-The admin recovery surfaces read draft and intake entities directly from the browser. The draft-recovery route has a server-verified password grant, while the other two admin routes require a Base44 admin user or the source-coded email allowlist. The entity schemas do not declare RLS for `ProFormDraft` or `ProFormDraftEvent`, so the source alone does not establish a server-side authorization boundary for those direct calls.
+The original audited revision's admin recovery surfaces read draft and intake entities directly from the browser. As of the 2026-08-06 admin UI migration overlay, `/admin/draft-recovery` and `/admin/questionnaire-intake-recovery` instead share the persistent password-issued grant and call bounded backend-only admin functions. A static source guard rejects prohibited direct entity access in those frontend surfaces. This is source evidence, not live staging authorization or cloud-policy certification.
+
+See [Admin recovery UI and grant lifecycle](../admin/admin-recovery-ui-and-grant-lifecycle.md) for the current overlay; the counts below remain the historical `73ece4c` baseline and are not rewritten as current-head counts.
 
 This is a static inventory, not a runtime certification. No production records were accessed, no submission was sent, no email was sent, and no Base44 resource was mutated.
 

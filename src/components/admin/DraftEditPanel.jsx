@@ -1,187 +1,83 @@
-import React, { useEffect, useState } from 'react';
-import { base44 } from '@/api/base44Client';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, CheckCircle2, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, X, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { useProDraftAdminRecoveryShell } from '@/components/admin/ProDraftAdminRecoveryShell';
 
-/**
- * DraftEditPanel
- * Lets admins edit key draft fields (business_name, domain, user_email)
- * and the raw mapped_payload_json (the final-style payload that gets submitted).
- *
- * Props:
- *   draft        — the ProFormDraft record
- *   computedPayload — the live-computed payload (used as initial JSON value when mapped_payload_json is absent)
- *   onSaved(updatedDraft) — called after a successful save with the updated draft
- *   onCancel()   — called when the user cancels
- */
+let fallbackKeySequence = 0;
+const idempotencyKey = () => `admin-edit-${Date.now()}-${globalThis.crypto?.randomUUID?.() || `local-${fallbackKeySequence += 1}`}`;
+
 export default function DraftEditPanel({ draft, computedPayload, onSaved, onCancel }) {
-  const [businessName, setBusinessName] = useState(draft.business_name || '');
-  const [domain, setDomain] = useState(draft.domain || '');
-  const [userEmail, setUserEmail] = useState(draft.user_email || '');
-
-  // Initialise JSON editor: prefer stored mapped_payload_json, fallback to computed
-  const initialJson = (() => {
-    if (draft.mapped_payload_json) {
-      try {
-        const parsed = typeof draft.mapped_payload_json === 'string'
-          ? JSON.parse(draft.mapped_payload_json)
-          : draft.mapped_payload_json;
-        return JSON.stringify(parsed, null, 2);
-      } catch { /* fall through */ }
-    }
-    return JSON.stringify(computedPayload ?? {}, null, 2);
-  })();
-
-  const [jsonText, setJsonText] = useState(initialJson);
-  const [jsonError, setJsonError] = useState('');
+  const { api, setEditDirty } = useProDraftAdminRecoveryShell();
+  const initialJson = useMemo(() => {
+    const value = draft.mapped_payload_json || JSON.stringify(computedPayload ?? {});
+    try { return JSON.stringify(typeof value === 'string' ? JSON.parse(value) : value, null, 2); }
+    catch { return String(value || ''); }
+  }, [draft.mapped_payload_json, computedPayload]);
+  const [values, setValues] = useState({ business_name: draft.business_name || '', domain: draft.domain || '', user_email: draft.user_email || '', recovery_email: draft.recovery_email || '', retention_hold: draft.retention_hold === true, retention_hold_reason: draft.retention_hold_reason || '', mapped_payload_json: initialJson, reason: '' });
+  const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [conflict, setConflict] = useState(null);
+  const currentServerDraft = conflict?.latest || draft;
+  const submitted = currentServerDraft.status === 'submitted';
 
-  // Validate JSON as user types
-  useEffect(() => {
-    if (!jsonText.trim()) {
-      setJsonError('');
-      return;
-    }
-    try {
-      JSON.parse(jsonText);
-      setJsonError('');
-    } catch (e) {
-      setJsonError(e.message);
-    }
-  }, [jsonText]);
+  useEffect(() => () => setEditDirty(false), [setEditDirty]);
+  const change = (name, value) => { setValues((current) => ({ ...current, [name]: value })); setEditDirty(true); setSaved(false); };
 
-  const handleSave = async () => {
-    // Validate JSON before saving
-    let parsedPayload = null;
-    try {
-      parsedPayload = JSON.parse(jsonText);
-    } catch (e) {
-      toast.error(`Invalid JSON — fix errors before saving: ${e.message}`);
-      return;
-    }
+  const validate = () => {
+    const next = {};
+    if (!values.reason.trim()) next.reason = 'An edit reason is required.';
+    try { JSON.parse(values.mapped_payload_json); } catch { next.mapped_payload_json = 'Mapped payload must be valid JSON.'; }
+    if (values.retention_hold && !values.retention_hold_reason.trim()) next.retention_hold_reason = 'Explain why retention is held.';
+    if (submitted && [values.business_name !== (draft.business_name || ''), values.domain !== (draft.domain || ''), values.user_email !== (draft.user_email || ''), values.recovery_email !== (draft.recovery_email || ''), values.mapped_payload_json !== initialJson].some(Boolean)) next.submitted = 'Submitted draft content is read-only.';
+    setErrors(next); return Object.keys(next).length === 0;
+  };
 
-    setSaving(true);
-    try {
-      const trimmedName = businessName.trim();
-      const trimmedDomain = domain.trim();
-
-      // Sync the business name + domain from the input fields into the payload
-      // metadata so the draft record fields AND the JSON payload stay in sync.
-      if (parsedPayload && typeof parsedPayload === 'object' && !Array.isArray(parsedPayload)) {
-        const metadata = (typeof parsedPayload.metadata === 'object' && parsedPayload.metadata)
-          ? parsedPayload.metadata
-          : {};
-        metadata.business_name = trimmedName;
-        metadata.businessDomain = trimmedDomain;
-        parsedPayload.metadata = metadata;
-      }
-
-      const updates = {
-        business_name: trimmedName,
-        domain: trimmedDomain,
-        user_email: userEmail.trim(),
-        mapped_payload_json: JSON.stringify(parsedPayload),
+  const save = async () => {
+    if (!validate()) return;
+    setSaving(true); setConflict(null);
+    const changes = { retention_hold: values.retention_hold, retention_hold_reason: values.retention_hold_reason.trim() };
+    if (!submitted) {
+      const candidates = {
+        business_name: values.business_name.trim(), domain: values.domain.trim(), user_email: values.user_email.trim(),
+        recovery_email: values.recovery_email.trim(), mapped_payload_json: JSON.stringify(JSON.parse(values.mapped_payload_json)),
       };
-
-      await base44.entities.ProFormDraft.update(draft.id, updates);
-      toast.success('Draft saved successfully');
-      onSaved?.({ ...draft, ...updates });
-    } catch (err) {
-      toast.error(`Save failed: ${err?.message || 'Unknown error'}`);
-    } finally {
-      setSaving(false);
+      for (const [name, value] of Object.entries(candidates)) {
+        const original = name === 'mapped_payload_json'
+          ? JSON.stringify(JSON.parse(currentServerDraft.mapped_payload_json || initialJson))
+          : (currentServerDraft[name] || '');
+        if (value !== original && !(name === 'recovery_email' && !value)) changes[name] = value;
+      }
     }
+    try {
+      const result = await api.updateDraft({ draftId: draft.id, expectedServerRevision: currentServerDraft.server_revision, changes, reason: values.reason.trim(), idempotencyKey: idempotencyKey() });
+      setConflict(null); setSaved(true); setEditDirty(false); onSaved?.(result.draft);
+    } catch (caught) {
+      const status = caught?.response?.status || caught?.response?.data?.errorCode;
+      if (status === 409 || status === 'ADMIN_API_CONFLICT') {
+        try { const latest = await api.getDraft({ draftId: draft.id, includeCompatibilityJson: true, includeMigrationMetadata: true }); setConflict({ latest: latest.draft, unsaved: { ...values } }); }
+        catch { setConflict({ latest: null, unsaved: { ...values } }); }
+      } else setErrors({ request: caught?.message || 'Draft could not be saved.' });
+    } finally { setSaving(false); }
   };
 
   return (
-    <div className="space-y-5 rounded-lg border border-blue-200 bg-blue-50/40 p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-blue-900">Edit Draft</p>
-        <Button type="button" variant="ghost" size="sm" onClick={onCancel} className="h-7 px-2">
-          <X className="w-4 h-4" />
-        </Button>
+    <section className="space-y-5 rounded-lg border border-blue-200 bg-blue-50/40 p-4" aria-label="Edit draft">
+      <div className="flex items-center justify-between"><p className="font-semibold text-blue-900">Edit Draft</p><Button type="button" variant="ghost" size="sm" onClick={onCancel}><X className="h-4 w-4" /><span className="sr-only">Close editor</span></Button></div>
+      {errors.submitted ? <p role="alert" className="text-sm text-red-700">{errors.submitted}</p> : null}
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+        {[['business_name','Business Name'],['domain','Business Domain'],['user_email','User Email'],['recovery_email','Recovery Email']].map(([name,label]) => <div className="space-y-1" key={name}><Label htmlFor={`edit-${name}`}>{label}</Label><Input id={`edit-${name}`} value={values[name]} disabled={submitted} onChange={(e) => change(name,e.target.value)} /></div>)}
       </div>
-
-      {/* Key detail fields */}
-      <div className="grid gap-3 md:grid-cols-3">
-        <div className="space-y-1">
-          <Label className="text-xs font-medium text-slate-700">Business Name</Label>
-          <Input
-            value={businessName}
-            onChange={(e) => setBusinessName(e.target.value)}
-            placeholder="Business name"
-            className="h-8 text-sm"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs font-medium text-slate-700">Business Domain</Label>
-          <Input
-            value={domain}
-            onChange={(e) => setDomain(e.target.value)}
-            placeholder="e.g. acme.com"
-            className="h-8 text-sm"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs font-medium text-slate-700">User Email</Label>
-          <Input
-            value={userEmail}
-            onChange={(e) => setUserEmail(e.target.value)}
-            placeholder="user@example.com"
-            className="h-8 text-sm"
-          />
-        </div>
-      </div>
-
-      {/* JSON payload editor */}
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <Label className="text-xs font-medium text-slate-700">
-            Mapped Payload JSON
-            <span className="ml-1 font-normal text-slate-500">(used by Retry Submission)</span>
-          </Label>
-          {jsonError ? (
-            <span className="flex items-center gap-1 text-xs text-red-600">
-              <AlertTriangle className="w-3 h-3" /> {jsonError}
-            </span>
-          ) : jsonText.trim() ? (
-            <span className="flex items-center gap-1 text-xs text-green-600">
-              <CheckCircle2 className="w-3 h-3" /> Valid JSON
-            </span>
-          ) : null}
-        </div>
-        <textarea
-          value={jsonText}
-          onChange={(e) => setJsonText(e.target.value)}
-          spellCheck={false}
-          className={`w-full min-h-[28rem] rounded-md border bg-slate-950 text-slate-100 p-3 text-xs font-mono resize-y focus:outline-none focus:ring-2 ${
-            jsonError ? 'border-red-400 focus:ring-red-400' : 'border-slate-700 focus:ring-blue-500'
-          }`}
-        />
-        <p className="text-xs text-slate-500">
-          This payload is persisted to <code>mapped_payload_json</code> on the draft record. When present, Retry Submission will use this payload instead of re-computing from raw responses.
-        </p>
-      </div>
-
-      {/* Save / Cancel */}
-      <div className="flex items-center gap-2 justify-end pt-1">
-        <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={saving}>
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          className="gap-2 bg-blue-700 hover:bg-blue-800 text-white"
-          onClick={handleSave}
-          disabled={saving || !!jsonError}
-        >
-          <Save className="w-4 h-4" />
-          {saving ? 'Saving...' : 'Save Changes'}
-        </Button>
-      </div>
-    </div>
+      <div className="space-y-1"><Label htmlFor="edit-payload">Mapped Payload JSON</Label><textarea id="edit-payload" value={values.mapped_payload_json} disabled={submitted} onChange={(e) => change('mapped_payload_json',e.target.value)} className="min-h-72 w-full rounded border bg-slate-950 p-3 font-mono text-xs text-slate-100" />{errors.mapped_payload_json ? <p role="alert" className="text-xs text-red-700">{errors.mapped_payload_json}</p> : null}</div>
+      <div className="grid gap-3 md:grid-cols-[auto_1fr]"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={values.retention_hold} onChange={(e) => change('retention_hold',e.target.checked)} />Retention hold</label><div><Label htmlFor="retention-reason">Retention hold reason</Label><Input id="retention-reason" value={values.retention_hold_reason} onChange={(e) => change('retention_hold_reason',e.target.value)} />{errors.retention_hold_reason ? <p role="alert" className="text-xs text-red-700">{errors.retention_hold_reason}</p> : null}</div></div>
+      <div><Label htmlFor="edit-reason">Edit reason</Label><Input id="edit-reason" value={values.reason} onChange={(e) => change('reason',e.target.value)} required />{errors.reason ? <p role="alert" className="text-xs text-red-700">{errors.reason}</p> : null}</div>
+      {draft.source_app_id || draft.source_record_id ? <p className="text-xs text-slate-500">Migration source (read-only): {draft.source_app_id || '—'} / {draft.source_record_id || '—'}</p> : null}
+      {conflict ? <div role="alert" className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"><AlertTriangle className="mr-2 inline h-4 w-4" />The draft changed on the server. Latest revision: {conflict.latest?.server_revision ?? 'unavailable'}. Your unsaved values remain in this form for comparison.</div> : null}
+      {errors.request ? <p role="alert" className="text-sm text-red-700">{errors.request}</p> : null}
+      {saved ? <p role="status" className="flex items-center gap-2 text-sm text-green-700"><CheckCircle2 className="h-4 w-4" />Saved and audit event recorded.</p> : null}
+      <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onCancel} disabled={saving}>Cancel</Button><Button type="button" onClick={save} disabled={saving}><Save className="h-4 w-4" />{saving ? 'Saving…' : 'Save Changes'}</Button></div>
+    </section>
   );
 }

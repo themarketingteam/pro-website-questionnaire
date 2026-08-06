@@ -12,8 +12,8 @@ describe('admin API client', () => {
   });
   it('maps all backend-only operations', async () => {
     const invoke = vi.fn(async () => ({ data: { success: true } })); const client = createProDraftAdminApiClient({ invoke, vault: vault() });
-    await client.getDraft({}); await client.listDraftEvents({}); await client.updateDraft({}); await client.getDraftLineage({}); await client.retrySubmission({}); await client.repairSubmission({});
-    expect(invoke.mock.calls.map(([name]) => name)).toEqual(['getProFormDraftForRecovery','listProFormDraftEventsForRecovery','updateProFormDraftForRecovery','getProFormDraftLineageForRecovery','retryProQuestionnaireIntakeSubmission','repairProQuestionnaireIntakeSubmission']);
+    await client.getDraft({}); await client.listDraftEvents({}); await client.updateDraft({}); await client.getDraftLineage({}); await client.listIntakes({}); await client.getIntake({}); await client.retrySubmission({}); await client.repairSubmission({});
+    expect(invoke.mock.calls.map(([name]) => name)).toEqual(['getProFormDraftForRecovery','listProFormDraftEventsForRecovery','updateProFormDraftForRecovery','getProFormDraftLineageForRecovery','listProFormSubmissionIntakesForRecovery','getProFormSubmissionIntakeForRecovery','retryProQuestionnaireIntakeSubmission','repairProQuestionnaireIntakeSubmission']);
   });
   it('fails before invocation if no persistent credentials exist', async () => {
     const invoke = vi.fn(); const client = createProDraftAdminApiClient({ invoke, vault: vault('missing') });

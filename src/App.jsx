@@ -15,6 +15,8 @@ import ProFormDraftRecovery from './pages/ProFormDraftRecovery';
 import ProDraftRecovery from './pages/ProDraftRecovery';
 import QuestionnaireIntakeRecoveryPage from './pages/QuestionnaireIntakeRecovery';
 import DraftRecoveryPasswordGate from '@/components/admin/DraftRecoveryPasswordGate';
+import ProDraftAdminRecoveryShell from '@/components/admin/ProDraftAdminRecoveryShell';
+import { ProDraftAdminAuthorizationProvider } from '@/contexts/ProDraftAdminAuthorizationContext';
 import AppRuntimeShell from '@/components/common/AppRuntimeShell';
 import AppInitializationError from '@/components/common/AppInitializationError';
 import { base44ClientInitialization } from '@/api/base44Client';
@@ -72,7 +74,9 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
 export const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
   const location = useLocation();
-  const isPublicRecoveryRoute = location.pathname === '/recover-draft';
+  const bypassesBase44UserLogin = location.pathname === '/recover-draft'
+    || location.pathname === '/admin/draft-recovery'
+    || location.pathname === '/admin/questionnaire-intake-recovery';
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -84,7 +88,7 @@ export const AuthenticatedApp = () => {
   }
 
   // Handle authentication errors
-  if (authError && !isPublicRecoveryRoute) {
+  if (authError && !bypassesBase44UserLogin) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
@@ -131,18 +135,14 @@ export const AuthenticatedApp = () => {
       } />
       {/* Password-only access is verified server-side by a Base44 function. */}
       <Route path="/admin/draft-recovery" element={
-        <DraftRecoveryPasswordGate>
-          <LayoutWrapper currentPageName={"admin/draft-recovery"}>
-            <ProFormDraftRecovery />
-          </LayoutWrapper>
-        </DraftRecoveryPasswordGate>
+        <ProDraftAdminAuthorizationProvider><DraftRecoveryPasswordGate><ProDraftAdminRecoveryShell>
+          <LayoutWrapper currentPageName={"admin/draft-recovery"}><ProFormDraftRecovery /></LayoutWrapper>
+        </ProDraftAdminRecoveryShell></DraftRecoveryPasswordGate></ProDraftAdminAuthorizationProvider>
       } />
       <Route path="/admin/questionnaire-intake-recovery" element={
-        <AdminOnly>
-          <LayoutWrapper currentPageName={"admin/questionnaire-intake-recovery"}>
-            <QuestionnaireIntakeRecoveryPage />
-          </LayoutWrapper>
-        </AdminOnly>
+        <ProDraftAdminAuthorizationProvider><DraftRecoveryPasswordGate><ProDraftAdminRecoveryShell>
+          <LayoutWrapper currentPageName={"admin/questionnaire-intake-recovery"}><QuestionnaireIntakeRecoveryPage /></LayoutWrapper>
+        </ProDraftAdminRecoveryShell></DraftRecoveryPasswordGate></ProDraftAdminAuthorizationProvider>
       } />
       <Route path="*" element={<PageNotFound />} />
     </Routes>

@@ -1,111 +1,63 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { base44 } from '@/api/base44Client';
-import DraftRecoveryPasswordGate, { useDraftRecoveryAccess } from '@/components/admin/DraftRecoveryPasswordGate';
+import { describe, expect, it, vi } from 'vitest';
+import DraftRecoveryPasswordGate, { MEMORY_NOTICE, PERSISTENT_NOTICE } from '@/components/admin/DraftRecoveryPasswordGate';
 
-const STORAGE_KEY = 'pro_draft_recovery_access_v1';
+const hookValue = vi.hoisted(() => ({ current: null }));
+vi.mock('@/hooks/useProDraftAdminAuthorization', () => ({
+  useProDraftAdminAuthorization: () => hookValue.current,
+}));
 
-beforeEach(() => {
-  const values = new Map();
-  const storage = {
-    getItem: (key) => values.get(key) ?? null,
-    setItem: (key, value) => values.set(key, String(value)),
-    removeItem: (key) => values.delete(key),
-    clear: () => values.clear()
-  };
-
-  Object.defineProperty(window, 'localStorage', {
-    configurable: true,
-    value: storage
-  });
+const state = (status, overrides = {}) => ({
+  status, authorized: status === 'authorized', locked: status === 'locked',
+  retryAfterSeconds: 0, storageMode: 'persistent', ...overrides,
 });
 
-const renderGate = () => render(
-  <DraftRecoveryPasswordGate>
-    <div>Protected draft recovery</div>
-  </DraftRecoveryPasswordGate>
-);
-
-const ProtectedGrant = () => {
-  const { recoveryGrant } = useDraftRecoveryAccess();
-  return <div>Recovery grant: {recoveryGrant}</div>;
-};
+function renderGate(authorizationState, authorizeWithPassword = vi.fn()) {
+  hookValue.current = { authorizationState, authorizeWithPassword };
+  return { authorizeWithPassword, ...render(<DraftRecoveryPasswordGate><div>Protected draft recovery</div></DraftRecoveryPasswordGate>) };
+}
 
 describe('DraftRecoveryPasswordGate', () => {
-  it('does not mount protected content before password verification', async () => {
-    renderGate();
-
-    expect(await screen.findByLabelText('Password')).toBeInTheDocument();
+  it('waits for stored-grant validation before mounting protected content', () => {
+    renderGate(state('loading'));
+    expect(screen.getByText(/Loading stored Draft Recovery access/)).toBeInTheDocument();
     expect(screen.queryByText('Protected draft recovery')).not.toBeInTheDocument();
   });
 
-  it('stores a seven-day grant and unlocks after a valid password', async () => {
-    const expiresAt = Date.now() + (7 * 24 * 60 * 60 * 1000);
-    base44.functions.invoke.mockResolvedValueOnce({
-      data: { authorized: true, token: 'signed-grant', expiresAt }
-    });
-
-    renderGate();
-    fireEvent.change(await screen.findByLabelText('Password'), {
-      target: { value: 'correct horse battery staple' }
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Unlock draft recovery' }));
-
-    expect(await screen.findByText('Protected draft recovery')).toBeInTheDocument();
-    expect(base44.functions.invoke).toHaveBeenCalledWith('verifyDraftRecoveryAccess', {
-      password: 'correct horse battery staple'
-    });
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY))).toEqual({
-      token: 'signed-grant',
-      expiresAt
-    });
+  it('bypasses password entry for a stored authorized grant without rendering it', () => {
+    const view = renderGate(state('authorized'));
+    expect(screen.getByText('Protected draft recovery')).toBeInTheDocument();
+    expect(view.container).not.toHaveTextContent('synthetic-grant');
   });
 
-  it('shows a generic error and remains locked after an invalid password', async () => {
-    base44.functions.invoke.mockRejectedValueOnce({
-      response: { data: { error: 'Incorrect password.' } }
-    });
-
-    renderGate();
-    fireEvent.change(await screen.findByLabelText('Password'), {
-      target: { value: 'wrong-password' }
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Unlock draft recovery' }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect password.');
-    expect(screen.queryByText('Protected draft recovery')).not.toBeInTheDocument();
-    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  it('submits the password once, clears the input, and uses the required copy', async () => {
+    const authorizeWithPassword = vi.fn(async () => state('authorized'));
+    renderGate(state('password_required'), authorizeWithPassword);
+    expect(screen.getByText(PERSISTENT_NOTICE)).toBeInTheDocument();
+    const input = screen.getByLabelText('Recovery access password');
+    fireEvent.change(input, { target: { value: 'synthetic-password' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock Draft Recovery' }));
+    await waitFor(() => expect(authorizeWithPassword).toHaveBeenCalledOnce());
+    expect(authorizeWithPassword).toHaveBeenCalledWith('synthetic-password');
+    expect(input).toHaveValue('');
   });
 
-  it('revalidates a saved grant before unlocking', async () => {
-    const expiresAt = Date.now() + 60_000;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: 'saved-grant', expiresAt }));
-    base44.functions.invoke.mockResolvedValueOnce({
-      data: { authorized: true, expiresAt }
-    });
-
-    renderGate();
-
-    expect(await screen.findByText('Protected draft recovery')).toBeInTheDocument();
-    await waitFor(() => {
-      expect(base44.functions.invoke).toHaveBeenCalledWith('verifyDraftRecoveryAccess', {
-        token: 'saved-grant'
-      });
-    });
+  it('uses generic wrong-password wording', async () => {
+    renderGate(state('password_required'), vi.fn(async () => state('password_required')));
+    fireEvent.change(screen.getByLabelText('Recovery access password'), { target: { value: 'wrong' } });
+    fireEvent.submit(screen.getByRole('button', { name: 'Unlock Draft Recovery' }).closest('form'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Draft Recovery access could not be verified');
+    expect(screen.getByRole('alert')).not.toHaveTextContent('wrong');
   });
 
-  it('provides the verified grant to public recovery actions', async () => {
-    const expiresAt = Date.now() + 60_000;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: 'saved-grant', expiresAt }));
-    base44.functions.invoke.mockResolvedValueOnce({
-      data: { authorized: true, expiresAt }
-    });
+  it.each(['locked', 'rate_limited'])('shows retry-after and disables repeat submit for %s', (status) => {
+    renderGate(state(status, { retryAfterSeconds: 42 }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Try again in 42 seconds');
+    expect(screen.getByRole('button', { name: 'Unlock Draft Recovery' })).toBeDisabled();
+  });
 
-    render(
-      <DraftRecoveryPasswordGate>
-        <ProtectedGrant />
-      </DraftRecoveryPasswordGate>
-    );
-
-    expect(await screen.findByText('Recovery grant: saved-grant')).toBeInTheDocument();
+  it('truthfully identifies memory-only authorization', () => {
+    renderGate(state('password_required', { storageMode: 'memory_only' }));
+    expect(screen.getByText(MEMORY_NOTICE)).toBeInTheDocument();
   });
 });

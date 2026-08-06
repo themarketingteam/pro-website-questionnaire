@@ -9,7 +9,7 @@ import {
 import { createProDraftAdminAuthorizationClient } from '@/lib/proDraftAdminAuthorizationClient';
 
 export const ADMIN_AUTHORIZATION_STATES = Object.freeze([
-  'loading', 'password_required', 'authorized', 'locked', 'error',
+  'loading', 'password_required', 'authenticating', 'authorized', 'rate_limited', 'locked', 'error',
 ]);
 
 const INITIAL_STATE = Object.freeze({
@@ -28,6 +28,7 @@ export function ProDraftAdminAuthorizationProvider({ children, client: clientPro
   const mountedRef = useRef(false);
   const restorePromiseRef = useRef(null);
   const passwordAttemptRef = useRef(null);
+  const invalidationHandlerRef = useRef(null);
 
   const validateStoredGrant = useCallback(async () => {
     if (restorePromiseRef.current) return restorePromiseRef.current;
@@ -53,6 +54,7 @@ export function ProDraftAdminAuthorizationProvider({ children, client: clientPro
 
   const authorizeWithPassword = useCallback(async (password) => {
     if (passwordAttemptRef.current) return passwordAttemptRef.current;
+    if (mountedRef.current) setAuthorizationState((current) => ({ ...current, status: 'authenticating', authorized: false }));
     const operation = client.authorizeWithRecoveryPassword(password)
       .then((state) => {
         if (mountedRef.current) setAuthorizationState(state);
@@ -76,15 +78,31 @@ export function ProDraftAdminAuthorizationProvider({ children, client: clientPro
     return client.getGrantForAuthorizedRequest();
   }, [authorizationState.authorized, client]);
 
+  const registerAuthorizationInvalidationHandler = useCallback((handler) => {
+    invalidationHandlerRef.current = typeof handler === 'function' ? handler : null;
+    return () => { if (invalidationHandlerRef.current === handler) invalidationHandlerRef.current = null; };
+  }, []);
+
+  const handleAdminGrantRejected = useCallback(async () => {
+    try { await invalidationHandlerRef.current?.(); } finally {
+      if (mountedRef.current) setAuthorizationState((current) => ({
+        ...current, status: 'password_required', authorized: false, locked: false,
+      }));
+    }
+  }, []);
+
   const value = useMemo(() => Object.freeze({
     authorizationState,
     authorizeWithPassword,
     validateStoredGrant,
     forgetThisDevice,
     getAdminGrantForAuthorizedRequest,
+    handleAdminGrantRejected,
+    registerAuthorizationInvalidationHandler,
   }), [
     authorizationState, authorizeWithPassword, validateStoredGrant,
     forgetThisDevice, getAdminGrantForAuthorizedRequest,
+    handleAdminGrantRejected, registerAuthorizationInvalidationHandler,
   ]);
 
   return (

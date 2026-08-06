@@ -17,6 +17,18 @@ vi.mock('@/lib/AuthContext', () => ({
 vi.mock('@/pages/ProDraftRecovery', () => ({
   default: () => <main>Public recovery route fixture</main>,
 }));
+vi.mock('@/pages/ProFormDraftRecovery', () => ({
+  default: () => <main>Password-only admin recovery fixture</main>,
+}));
+vi.mock('@/components/admin/DraftRecoveryPasswordGate', () => ({
+  default: ({ children }) => children,
+}));
+vi.mock('@/components/admin/ProDraftAdminRecoveryShell', () => ({
+  default: ({ children }) => children,
+}));
+vi.mock('@/contexts/ProDraftAdminAuthorizationContext', () => ({
+  ProDraftAdminAuthorizationProvider: ({ children }) => children,
+}));
 
 vi.mock('@/pages.config', () => ({
   pagesConfig: {
@@ -40,6 +52,16 @@ describe('public recovery route', () => {
       </MemoryRouter>,
     );
     expect(screen.getByText('Public recovery route fixture')).toBeVisible();
+    expect(navigateToLogin).not.toHaveBeenCalled();
+  });
+
+  it('uses the password-only admin gate without requiring Base44 user login', () => {
+    render(
+      <MemoryRouter initialEntries={['/admin/draft-recovery']}>
+        <AuthenticatedApp />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Password-only admin recovery fixture')).toBeVisible();
     expect(navigateToLogin).not.toHaveBeenCalled();
   });
 });

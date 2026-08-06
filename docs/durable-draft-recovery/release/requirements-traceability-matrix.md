@@ -1,5 +1,17 @@
 # Durable Draft Recovery Requirements Traceability Matrix
 
+## 2026-08-06 admin recovery UI source evidence
+
+The password-only admin recovery UI now uses the persistent grant lifecycle
+and protected backend-only draft/event/intake/update/lineage/retry/repair APIs.
+Local evidence includes bounded pagination and exact search, lazy detail/event
+loads, allowlisted conflict-safe editing, explicit event-value disclosure,
+duplicate partition warnings, device forgetting, grant isolation, and a
+frontend direct-entity static guard. See the
+[admin UI and grant lifecycle contract](../admin/admin-recovery-ui-and-grant-lifecycle.md).
+This advances source implementation evidence only; credentialed staging and
+production-disabled acceptance remain pending and no deployment occurred.
+
 ## 2026-08-06 backend-only administration increment
 
 | Requirement | Source evidence | Test evidence | Status |

@@ -10,6 +10,16 @@
 | Retry/repair bypass or production side effect | Authorization precedes service role/AI/delivery; environment routing retained | Staging delivery proof pending |
 | Legacy UI direct entity calls | Migration explicitly deferred to next prompt | Open/release-blocking |
 
+### Admin UI migration update
+
+The legacy direct-call risk is now source-mitigated: both recovery routes use
+the persistent password-issued grant, the browser UI uses only bounded backend
+APIs, and a static guard rejects prohibited draft/event/intake/security entity
+access. Grant rejection clears the invalid credential and returns to the gate;
+active edit invalidation produces a discard warning. Remaining residual risk
+is live staging authorization, audit, projection, revocation, concurrency, and
+side-effect certification. `RISK-028` remains mitigated pending that proof.
+
 ## 2026-08-06 password-only admin authorization source update
 
 `RISK-002` and `RISK-022` now have source controls for backend-only exact password verification, purpose-separated HMAC/timing-safe comparison, an environment/version/random-device-bound signed grant with `expiresAt=null`, IP/device attempt limits, lockout, minimum timing/jitter, safe audit records, an isolated resilient browser vault, invalid-grant removal, and Forget This Device. The accepted indefinite shared-password grant risk remains: this is not individual administrator identity, and theft from the same browser/device context may remain usable until revocation. Operational likelihood is not reduced until staging configuration, schema/function deployment, trusted-header/event-store proof, admin page/API migration, monitoring, and live rotation/version tests pass. No cloud or production state changed in this source batch.

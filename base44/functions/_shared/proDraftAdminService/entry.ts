@@ -21,10 +21,10 @@ type Entity = Readonly<{
   updateMany?: (query: RecordValue, value: RecordValue) => Promise<unknown>;
   create?: (value: RecordValue) => Promise<RecordValue>;
 }>;
-export type AdminDraftEntities = Readonly<{ ProFormDraft: Entity; ProFormDraftEvent: Entity }>;
+export type AdminDraftEntities = Readonly<{ ProFormDraft: Entity; ProFormDraftEvent: Entity; ProFormSubmissionIntake?: Entity }>;
 
-const SUMMARY_FIELDS = ['id','session_id','business_name','domain','user_name','user_email','recovery_email','status','current_question_id','last_changed_question_id','last_changed_at','last_saved_at','submitted_at','submit_error','final_submission_id','client_revision','server_revision','retention_hold','retention_hold_reason','environment','test_run_id','draft_generation','previous_draft_id','replacement_draft_id','source_app_id','source_entity','source_record_id','migration_batch_id','created_date','updated_date'];
-const SAFE_SUMMARY_FIELDS = ['id','session_id','status','business_name','recovery_email','domain','created_date','updated_date','last_saved_at','client_revision','server_revision','retention_hold','environment','test_run_id','draft_generation'];
+const SUMMARY_FIELDS = ['id','session_id','business_name','domain','user_name','user_email','recovery_email','status','current_question_id','last_changed_question_id','last_changed_at','last_saved_at','submitted_at','submit_error','final_submission_id','client_revision','server_revision','retention_hold','retention_hold_reason','environment','test_run_id','draft_generation','previous_draft_id','replacement_draft_id','replacement_transaction_id','replacement_transaction_status','superseded_at','superseded_reason','source_app_id','source_entity','source_record_id','migration_batch_id','created_date','updated_date'];
+const SAFE_SUMMARY_FIELDS = ['id','session_id','status','business_name','recovery_email','domain','created_date','updated_date','last_saved_at','client_revision','server_revision','retention_hold','environment','test_run_id','draft_generation','previous_draft_id','replacement_draft_id','replacement_transaction_id','replacement_transaction_status','superseded_at','superseded_reason'];
 const DETAIL_FIELDS = [...SUMMARY_FIELDS,'form_type','draft_schema_version','responses_json','validation_status_json','touched_questions_json','expanded_questions_json','text_validation_meta_json','ui_draft_state_json','field_change_metadata_json','credentials_json','draft_state_json','metadata_json','userdata_json','mapped_payload_json','draft_metadata_json','save_error','submit_error','submit_attempted_at','last_sync_reason','recovery_email_source','recovery_email_verification_status','recovery_email_verified_at','retention_expires_at','retention_policy_version','ai_repair_status','last_ai_repair_at','ai_repair_error_json','ai_repair_report_json','ai_repaired_payload_json','ai_repair_applied'];
 const EVENT_FIELDS = ['id','draft_id','session_id','event_id','event_type','question_id','question_type','value_summary','value_length','selected_option_count','business_name','domain','created_at_iso','client_revision','server_revision','source_tab_id','mutation_id','event_metadata_json','redaction_level','retention_hold','retention_hold_reason','environment','test_run_id','source_app_id','source_entity','source_record_id','migration_batch_id','created_date','updated_date'];
 const SAFE_EVENT_FIELDS = ['id','draft_id','session_id','event_id','event_type','question_id','question_type','value_summary','value_length','selected_option_count','created_at_iso','client_revision','server_revision','source_tab_id','mutation_id','redaction_level','environment','test_run_id'];
@@ -32,6 +32,8 @@ const JSON_FIELDS = new Set(['responses_json','validation_status_json','touched_
 const EDIT_FIELDS = new Set(['business_name','domain','user_name','user_email','recovery_email','mapped_payload_json','metadata_json','userdata_json','retention_hold','retention_hold_reason','ai_repair_status','last_ai_repair_at','ai_repair_error_json','ai_repair_report_json','ai_repaired_payload_json','ai_repair_applied']);
 const AI_FIELDS = new Set(['ai_repair_status','last_ai_repair_at','ai_repair_error_json','ai_repair_report_json','ai_repaired_payload_json','ai_repair_applied']);
 const AI_STATUS_VALUES = new Set(['','pending','running','completed','failed','skipped','diagnosed','needs_human_review','repair_ready','retry_failed','retry_success']);
+const INTAKE_SUMMARY_FIELDS = ['id','questionnaire_session_id','status','business_name','business_domain','primary_failure_kind','fallback_failure_kind','linked_submission_id','retry_count','last_retry_at','ai_repair_status','created_at_server','environment','test_run_id','created_date','updated_date'];
+const INTAKE_DETAIL_FIELDS = [...INTAKE_SUMMARY_FIELDS,'intake_reason','diagnostics_json','retry_error_json','transformed_payload_json','ai_repair_report_json','ai_repair_error_json','ai_repaired_payload_json','ai_repair_applied','ai_repair_attempt_count','ai_repair_retry_attempted','ai_repair_retry_result_json','last_ai_repair_at'];
 const FORBIDDEN_VALUE_KEYS = /(?:password|secret|token|grant|recovery.?code|private.?key|authorization|cookie)/iu;
 const PAGE_MAX = 100;
 const SCAN_MAX = 500;
@@ -102,6 +104,51 @@ function entity(entities: AdminDraftEntities, name: keyof AdminDraftEntities): E
   const value = entities[name];
   if (!value || typeof value.filter !== 'function') adminApiError(ADMIN_API_ERROR_CODES.INTERNAL_ERROR, 503);
   return value;
+}
+
+function intakeEntity(entities: AdminDraftEntities): Entity {
+  const value = entities.ProFormSubmissionIntake;
+  if (!value || typeof value.filter !== 'function') adminApiError(ADMIN_API_ERROR_CODES.INTERNAL_ERROR, 503);
+  return value;
+}
+
+export function safeIntakeSummary(record: RecordValue): RecordValue {
+  return project(record, INTAKE_SUMMARY_FIELDS);
+}
+
+export function safeIntakeDetail(record: RecordValue): RecordValue {
+  const out = project(record, INTAKE_DETAIL_FIELDS);
+  const jsonDiagnostics: RecordValue = {};
+  for (const field of INTAKE_DETAIL_FIELDS.filter((name) => name.endsWith('_json'))) {
+    if (field in out) jsonDiagnostics[field] = parseAdminJsonField(out[field]);
+  }
+  return { ...out, jsonDiagnostics };
+}
+
+export async function listIntakesForRecovery(entities: AdminDraftEntities, payload: RecordValue, cursorSecret: string): Promise<RecordValue> {
+  const size = pageSize(payload.pageSize);
+  const filters = plain(payload.filters) ? payload.filters : {};
+  if (Object.keys(filters).some((key) => !['status','environment','testRunId'].includes(key))) adminApiError(ADMIN_API_ERROR_CODES.INVALID_REQUEST);
+  const query: RecordValue = {};
+  if (typeof filters.status === 'string') query.status = filters.status;
+  if (typeof filters.environment === 'string') query.environment = filters.environment;
+  if (typeof filters.testRunId === 'string') query.test_run_id = filters.testRunId;
+  const spec = { filters, sort: 'created_desc' };
+  const offset = await decodeCursor(payload.cursor, cursorSecret, 'list_intakes', spec);
+  const rows = await intakeEntity(entities).filter(query, '-created_at_server', size + 1, offset, INTAKE_SUMMARY_FIELDS);
+  return {
+    items: rows.slice(0, size).map(safeIntakeSummary), pageSize: size,
+    nextCursor: rows.length > size ? await encodeCursor(cursorSecret, 'list_intakes', offset + size, spec) : null,
+  };
+}
+
+export async function getIntakeForRecovery(entities: AdminDraftEntities, payload: RecordValue): Promise<RecordValue> {
+  if (!isSafeAdminIdentifier(payload.intakeId)) adminApiError(ADMIN_API_ERROR_CODES.INVALID_REQUEST);
+  const intakes = intakeEntity(entities);
+  const found = typeof intakes.get === 'function' ? await intakes.get(payload.intakeId)
+    : (await intakes.filter({ id: payload.intakeId }, undefined, 1, 0, INTAKE_DETAIL_FIELDS))[0];
+  if (!found) adminApiError(ADMIN_API_ERROR_CODES.NOT_FOUND, 404);
+  return { intake: safeIntakeDetail(found) };
 }
 
 async function getDraft(drafts: Entity, id: unknown): Promise<RecordValue> {
@@ -301,7 +348,7 @@ export async function getDraftLineageForRecovery(entities: AdminDraftEntities, p
     replacement: summaries.find((v) => v.id === current.replacement_draft_id) ?? null,
     related: summaries,
     supersededCandidates: summaries.filter((v) => v.superseded === true || v.status === 'cleared_superseded'),
-    transactionStatus: current.replacement_draft_id ? 'replacement_linked' : current.previous_draft_id ? 'replacement_candidate' : 'standalone',
+    transactionStatus: text(current.replacement_transaction_status) || (current.replacement_draft_id ? 'replacement_linked' : current.previous_draft_id ? 'replacement_candidate' : 'standalone'),
     diagnostic: { duplicateCount: unique.length, brokenPreviousLink: Boolean(current.previous_draft_id) && !linked.some((v) => v.id === current.previous_draft_id), brokenReplacementLink: Boolean(current.replacement_draft_id) && !linked.some((v) => v.id === current.replacement_draft_id), recommendation: unique.length ? 'review_records_individually_no_automatic_merge' : 'no_related_records_found' },
   };
 }

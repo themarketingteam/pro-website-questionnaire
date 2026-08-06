@@ -5,11 +5,27 @@
 - [x] Source functions require persistent environment/version/device-bound grants.
 - [x] Reads are bounded and projected; edits are allowlisted, revision-safe, idempotent, locked, and audited.
 - [x] Retry/repair retain external-side-effect controls behind the new boundary.
-- [ ] Migrate admin UI to `proDraftAdminApiClient` in the next prompt.
+- [x] Migrate draft and intake recovery UI to `proDraftAdminApiClient`; static source guard confirms no prohibited frontend entity calls.
+- [x] Add server-paginated intake list/detail functions following the protected admin API contract.
+- [x] Add synthetic gate, shell, page, edit, event, lineage, intake, and local browser coverage.
+- [ ] Run credentialed staging browser flows with an explicitly configured synthetic admin password and safe corpus.
 - [ ] Confirm staging secrets without exposing values.
 - [ ] Deploy only to a verified staging target (not authorized here).
 - [ ] Certify API behavior, audit persistence, concurrency, and non-production delivery.
 - [ ] Keep production deployment/domain cutover blocked.
+
+The [admin UI and grant lifecycle contract](../admin/admin-recovery-ui-and-grant-lifecycle.md)
+is source/local-test evidence only. It does not certify live Base44 grants,
+service-role projections, audit persistence, or staging delivery. Deployment
+authorization remains denied.
+
+Local results: 73/73 focused admin tests, the direct-access guard, the build,
+and 12 executable browser cases passed. The full normal suite remains blocked
+by its five established failures (1,789/1,794 passed); lint remains 28 errors
+and 14 warnings in established non-admin files; repository typecheck debt also
+remains. Eight browser entries are intentionally skipped because mobile layout
+does not apply to desktop projects and credentialed admin workflows require an
+explicit synthetic staging password/corpus.
 
 ## 2026-08-06 Clear All / Start New source checkpoint
 

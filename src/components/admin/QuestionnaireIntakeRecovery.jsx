@@ -1,421 +1,126 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { base44 } from '@/api/base44Client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from '@/components/ui/select';
-import { ChevronDown, ChevronUp, Loader2, Copy, Stethoscope, Wrench, RefreshCw } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ChevronDown, ChevronUp, Loader2, RefreshCw, Stethoscope, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useProDraftAdminRecoveryShell } from '@/components/admin/ProDraftAdminRecoveryShell';
 
-const statusStyles = {
-  received_intake: 'bg-amber-100 text-amber-800',
-  retry_failed: 'bg-red-100 text-red-700',
-  retry_success: 'bg-green-100 text-green-700',
-  submitted: 'bg-slate-100 text-slate-700'
-};
+const formatDate = (value) => value && !Number.isNaN(Date.parse(value)) ? new Date(value).toLocaleString() : '—';
+const parsed = (diagnostic) => diagnostic?.valid ? diagnostic.parsed : null;
 
-const aiStatusStyles = {
-  diagnosed: 'bg-blue-100 text-blue-700',
-  repair_ready: 'bg-indigo-100 text-indigo-700',
-  retry_success: 'bg-green-100 text-green-700',
-  retry_failed: 'bg-red-100 text-red-700',
-  needs_human_review: 'bg-amber-100 text-amber-800',
-  running: 'bg-slate-100 text-slate-600'
-};
+function IntakeDetail({ summary, refreshList }) {
+  const { api } = useProDraftAdminRecoveryShell();
+  const [intake, setIntake] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [working, setWorking] = useState('');
 
-const formatDate = (value) => {
-  if (!value) return '—';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
-  return date.toLocaleString();
-};
+  const load = async () => {
+    setLoading(true); setError('');
+    try { const result = await api.getIntake({ intakeId: summary.id }); setIntake(result.intake); }
+    catch (caught) { setError(caught?.message || 'Intake detail could not be loaded.'); }
+    finally { setLoading(false); }
+  };
+  useEffect(() => { void load(); }, [summary.id]);
 
-const parseJson = (value) => {
-  try {
-    if (!value) return null;
-    if (typeof value === 'object') return value;
-    return JSON.parse(value);
-  } catch {
-    return null;
-  }
-};
+  const act = async (mode) => {
+    setWorking(mode);
+    try {
+      const payload = { intakeId: summary.id, questionnaireSessionId: summary.questionnaire_session_id, forceRetry: false };
+      const result = mode === 'retry'
+        ? await api.retrySubmission(payload)
+        : await api.repairSubmission({ ...payload, mode, autoRetry: mode === 'repair_and_retry' });
+      if (result.zapierSuppressed) toast.info('Completed; external delivery was suppressed by environment policy.');
+      else if (result.zapierRedirected) toast.success('Completed and delivered to the staging destination.');
+      else toast.success(mode === 'retry' ? 'Submission retry completed.' : 'Recovery action completed.');
+      await load(); refreshList();
+    } catch (caught) { toast.error(caught?.message || 'Intake recovery action failed.'); }
+    finally { setWorking(''); }
+  };
 
-const copyText = async (text, label) => {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast.success(`${label} copied`);
-  } catch {
-    toast.error('Copy failed');
-  }
-};
+  if (loading) return <div className="border-t p-4 text-sm text-slate-600"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Loading intake detail…</div>;
+  if (error) return <div className="border-t p-4 text-sm text-red-700" role="alert">{error}</div>;
+  if (!intake) return null;
+  const diagnostics = parsed(intake.jsonDiagnostics?.diagnostics_json);
+  const retryError = parsed(intake.jsonDiagnostics?.retry_error_json);
+  const report = parsed(intake.jsonDiagnostics?.ai_repair_report_json);
 
-function AiRepairSection({ intake }) {
-  const report = parseJson(intake.ai_repair_report_json);
-  const repairError = parseJson(intake.ai_repair_error_json);
-  const retryResult = parseJson(intake.ai_repair_retry_result_json);
-
-  if (!intake.ai_repair_status && !report) return null;
-
-  return (
-    <div className="space-y-3 rounded-lg border border-indigo-200 bg-indigo-50/50 p-3">
-      <p className="text-sm font-semibold text-indigo-900">AI Repair Status</p>
-
-      <div className="grid gap-2 md:grid-cols-2 text-sm">
-        {intake.ai_repair_status && (
-          <p><span className="font-medium">Status:</span>{' '}
-            <Badge className={aiStatusStyles[intake.ai_repair_status] || 'bg-slate-100 text-slate-700'}>
-              {intake.ai_repair_status}
-            </Badge>
-          </p>
-        )}
-        {intake.last_ai_repair_at && (
-          <p><span className="font-medium">Last Repair:</span> {formatDate(intake.last_ai_repair_at)}</p>
-        )}
-        {intake.ai_repair_attempt_count != null && (
-          <p><span className="font-medium">Attempt Count:</span> {intake.ai_repair_attempt_count}</p>
-        )}
-        <p><span className="font-medium">Repair Applied:</span> {intake.ai_repair_applied ? '✓ Yes' : 'No'}</p>
-        <p><span className="font-medium">Retry Attempted:</span> {intake.ai_repair_retry_attempted ? '✓ Yes' : 'No'}</p>
-      </div>
-
-      {report && (
-        <div className="space-y-2 text-sm">
-          <p><span className="font-medium">Decision:</span> <code className="bg-white px-1 rounded">{report.decision}</code></p>
-          <p><span className="font-medium">Confidence:</span> {typeof report.confidence === 'number' ? `${Math.round(report.confidence * 100)}%` : '—'}</p>
-          {report.diagnosis && <p><span className="font-medium">Diagnosis:</span> {report.diagnosis}</p>}
-          {Array.isArray(report.repair_summary) && report.repair_summary.length > 0 && (
-            <div>
-              <p className="font-medium">Repair Summary:</p>
-              <ul className="ml-3 list-disc text-slate-700">
-                {report.repair_summary.slice(0, 10).map((s, i) => <li key={i}>{s}</li>)}
-              </ul>
-            </div>
-          )}
-          {Array.isArray(report.changed_paths) && report.changed_paths.length > 0 && (
-            <div>
-              <p className="font-medium">Changed Paths ({report.changed_paths.length}):</p>
-              <ul className="ml-3 list-disc text-slate-700 text-xs">
-                {report.changed_paths.slice(0, 15).map((cp, i) => (
-                  <li key={i}><code>{cp.path}</code>: {cp.before_type} → {cp.after_type} ({cp.reason})</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {Array.isArray(report.warnings) && report.warnings.length > 0 && (
-            <div>
-              <p className="font-medium text-amber-700">Warnings ({report.warnings.length}):</p>
-              <ul className="ml-3 list-disc text-amber-700 text-xs">
-                {report.warnings.slice(0, 10).map((w, i) => <li key={i}>{w}</li>)}
-              </ul>
-            </div>
-          )}
-        </div>
-      )}
-
-      {repairError && (
-        <div className="text-xs text-red-700 bg-red-50 rounded p-2">
-          <span className="font-semibold">Repair Error:</span> {repairError.message || JSON.stringify(repairError)}
-        </div>
-      )}
-
-      {retryResult && (
-        <div className="text-xs rounded p-2 bg-white border">
-          <span className="font-semibold">Retry Result:</span> {retryResult.linkedSubmissionId ? `Submission: ${retryResult.linkedSubmissionId}` : (retryResult.message || JSON.stringify(retryResult))}
-        </div>
-      )}
-
-      {intake.ai_repair_report_json && (
-        <details className="text-xs">
-          <summary className="cursor-pointer text-indigo-700 font-medium">Raw AI report JSON</summary>
-          <pre className="mt-2 bg-white rounded p-2 overflow-auto max-h-60 whitespace-pre-wrap break-words text-slate-700">
-            {JSON.stringify(report, null, 2)}
-          </pre>
-        </details>
-      )}
+  return <div className="space-y-4 border-t bg-slate-50/70 p-4">
+    <div className="grid gap-3 text-sm md:grid-cols-2 lg:grid-cols-4">
+      <p><strong>Retry count:</strong> {intake.retry_count ?? 0}</p>
+      <p><strong>Last retry:</strong> {formatDate(intake.last_retry_at)}</p>
+      <p><strong>Intake reason:</strong> {intake.intake_reason || '—'}</p>
+      <p><strong>Fallback failure:</strong> {intake.fallback_failure_kind || '—'}</p>
     </div>
-  );
+    <div className="rounded border bg-white p-3 text-sm">
+      <p className="font-medium">Diagnostics summary</p>
+      <p>Browser online: {String(diagnostics?.browserOnline ?? 'unknown')}</p>
+      <p>Payload size: {diagnostics?.payloadSizeChars ?? '—'}</p>
+      <p>Fallback attempted: {String(diagnostics?.fallbackAttempted ?? 'unknown')}</p>
+      {retryError?.message ? <p className="text-red-700">Last retry error: {retryError.message}</p> : null}
+    </div>
+    {intake.ai_repair_status || report ? <div className="rounded border border-indigo-200 bg-indigo-50 p-3 text-sm">
+      <p className="font-medium">AI repair status: {intake.ai_repair_status || '—'}</p>
+      {report?.decision ? <p>Decision: {report.decision}</p> : null}
+      {report?.diagnosis ? <p>Diagnosis: {report.diagnosis}</p> : null}
+    </div> : null}
+    <div className="flex flex-wrap gap-2">
+      <Button size="sm" disabled={!!working} onClick={() => act('retry')}><RefreshCw className="h-3 w-3" />Retry Submission</Button>
+      <Button size="sm" variant="outline" disabled={!!working} onClick={() => act('diagnose_only')}><Stethoscope className="h-3 w-3" />Diagnose Structure</Button>
+      <Button size="sm" variant="outline" disabled={!!working} onClick={() => act('repair_only')}><Wrench className="h-3 w-3" />AI Repair Only</Button>
+      <Button size="sm" disabled={!!working} onClick={() => act('repair_and_retry')}><Wrench className="h-3 w-3" />AI Repair + Retry</Button>
+    </div>
+    <p className="text-xs text-slate-500">AI Repair + Retry can create a final ProFormSubmission if repair succeeds.</p>
+    <details className="rounded border bg-white p-3 text-xs"><summary className="cursor-pointer font-medium">Admin diagnostic JSON</summary><pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-words">{JSON.stringify({ diagnostics, retry_error: retryError, ai_repair_report: report }, null, 2)}</pre></details>
+  </div>;
 }
 
-function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, aiRunning }) {
-  const diagnostics = parseJson(intake.diagnostics_json);
-  const retryError = parseJson(intake.retry_error_json);
-
-  return (
-    <Card className="overflow-hidden">
-      <button type="button" onClick={onToggle} className="w-full text-left hover:bg-slate-50 transition-colors">
-        <CardContent className="p-4">
-          <div className="grid gap-3 md:grid-cols-[1.1fr_1fr_1.1fr_auto_1fr_1fr] items-start">
-            <div>
-              <p className="font-medium text-slate-900">{intake.business_name || 'Unnamed business'}</p>
-              <p className="text-sm text-slate-500 break-all">{intake.business_domain || '—'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-slate-500">Session</p>
-              <p className="text-xs text-slate-900 break-all">{intake.questionnaire_session_id || '—'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-slate-500">Created</p>
-              <p className="text-sm text-slate-900">{formatDate(intake.created_at_server || intake.created_date)}</p>
-            </div>
-            <div className="space-y-1">
-              <Badge className={statusStyles[intake.status] || 'bg-slate-100 text-slate-700'}>{intake.status || '—'}</Badge>
-              {intake.ai_repair_status && (
-                <Badge className={aiStatusStyles[intake.ai_repair_status] || 'bg-slate-100 text-slate-600'}>
-                  AI: {intake.ai_repair_status}
-                </Badge>
-              )}
-            </div>
-            <div>
-              <p className="text-sm text-slate-500">Primary Failure</p>
-              <p className="text-sm text-slate-900">{intake.primary_failure_kind || '—'}</p>
-            </div>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm text-slate-500">Linked Submission</p>
-                <p className="text-xs text-slate-900 break-all">{intake.linked_submission_id || '—'}</p>
-              </div>
-              {expanded ? <ChevronUp className="w-4 h-4 text-slate-500 mt-1" /> : <ChevronDown className="w-4 h-4 text-slate-500 mt-1" />}
-            </div>
-          </div>
-        </CardContent>
-      </button>
-
-      {expanded && (
-        <div className="border-t bg-slate-50/70 p-4 space-y-4">
-          <div className="grid gap-3 md:grid-cols-2 text-sm">
-            <p><span className="font-medium">Retry Count:</span> {intake.retry_count ?? 0}</p>
-            <p><span className="font-medium">Last Retry:</span> {formatDate(intake.last_retry_at)}</p>
-            <p><span className="font-medium">Intake Reason:</span> {intake.intake_reason || '—'}</p>
-            <p><span className="font-medium">Fallback Failure:</span> {intake.fallback_failure_kind || '—'}</p>
-          </div>
-
-          <div className="rounded-lg border bg-white p-3 text-sm space-y-1">
-            <p className="font-medium text-slate-900">Diagnostics Summary</p>
-            <p className="text-slate-600">Browser online: {String(diagnostics?.browserOnline ?? 'unknown')}</p>
-            <p className="text-slate-600">Payload size: {diagnostics?.payloadSizeChars ?? '—'}</p>
-            <p className="text-slate-600">Fallback attempted: {String(diagnostics?.fallbackAttempted ?? 'unknown')}</p>
-            {retryError?.message ? <p className="text-red-700">Last retry error: {retryError.message}</p> : null}
-          </div>
-
-          {/* AI Repair status panel */}
-          <AiRepairSection intake={intake} />
-
-          {/* Action buttons */}
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</p>
-            <div className="flex flex-wrap gap-2">
-              {/* Existing retry */}
-              <Button
-                size="sm"
-                onClick={() => onRetry(intake)}
-                disabled={retrying || aiRunning}
-                className="gap-2"
-              >
-                {retrying ? <><Loader2 className="w-3 h-3 animate-spin" /> Retrying...</> : <><RefreshCw className="w-3 h-3" /> Retry Submission</>}
-              </Button>
-
-              {/* Diagnose Structure — deterministic only, no AI agent, no submission */}
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
-                disabled={retrying || aiRunning}
-                onClick={() => onAiAction(intake, 'diagnose_only')}
-                title="Runs deterministic structure validation only. Does not call the AI agent or create a submission."
-              >
-                {aiRunning === 'diagnose_only' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Stethoscope className="w-3 h-3" />}
-                Diagnose Structure
-              </Button>
-
-              {/* AI Repair Only */}
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-                disabled={retrying || aiRunning}
-                onClick={() => onAiAction(intake, 'repair_only')}
-              >
-                {aiRunning === 'repair_only' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
-                AI Repair Only
-              </Button>
-
-              {/* AI Repair + Retry — clearly labeled as creates submission */}
-              <Button
-                size="sm"
-                className="gap-2 bg-indigo-700 hover:bg-indigo-800 text-white"
-                disabled={retrying || aiRunning}
-                onClick={() => onAiAction(intake, 'repair_and_retry')}
-                title="This will attempt to create a final ProFormSubmission if repair succeeds"
-              >
-                {aiRunning === 'repair_and_retry' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
-                AI Repair + Retry ⚡
-              </Button>
-            </div>
-            <p className="text-xs text-slate-400">⚡ AI Repair + Retry will create a final ProFormSubmission if repair succeeds.</p>
-          </div>
-
-          <details className="rounded-lg border bg-white p-3 text-xs">
-            <summary className="cursor-pointer font-medium text-slate-800">Admin raw JSON</summary>
-            <pre className="mt-3 overflow-auto max-h-80 whitespace-pre-wrap break-words text-slate-700">{JSON.stringify({
-              id: intake.id,
-              questionnaire_session_id: intake.questionnaire_session_id,
-              status: intake.status,
-              linked_submission_id: intake.linked_submission_id,
-              diagnostics,
-              retry_error: retryError
-            }, null, 2)}</pre>
-          </details>
-        </div>
-      )}
-    </Card>
-  );
+function IntakeRow({ intake, expanded, onToggle, refreshList }) {
+  return <Card className="overflow-hidden">
+    <button type="button" onClick={onToggle} className="w-full p-4 text-left hover:bg-slate-50" aria-expanded={expanded}>
+      <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_auto_1fr_1fr_auto]">
+        <div><p className="font-medium">{intake.business_name || 'Unnamed business'}</p><p className="text-sm text-slate-500">{intake.business_domain || '—'}</p></div>
+        <div><p className="text-xs text-slate-500">Session</p><p className="break-all text-xs">{intake.questionnaire_session_id || '—'}</p></div>
+        <Badge>{intake.status || '—'}</Badge>
+        <div><p className="text-xs text-slate-500">Created</p><p className="text-sm">{formatDate(intake.created_at_server || intake.created_date)}</p></div>
+        <div><p className="text-xs text-slate-500">Linked submission</p><p className="break-all text-xs">{intake.linked_submission_id || '—'}</p></div>
+        {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+      </div>
+    </button>
+    {expanded ? <IntakeDetail summary={intake} refreshList={refreshList} /> : null}
+  </Card>;
 }
 
-export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
+export default function QuestionnaireIntakeRecovery() {
+  const { api } = useProDraftAdminRecoveryShell();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('received_intake');
   const [expandedId, setExpandedId] = useState('');
-  const [retryingId, setRetryingId] = useState('');
-  // aiRunningId: { id: string, mode: string } | null
-  const [aiRunning, setAiRunning] = useState(null);
+  const [cursor, setCursor] = useState(null);
+  const [nextCursor, setNextCursor] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [refresh, setRefresh] = useState(0);
 
-  const loadRecords = async () => {
-    setLoading(true);
-    try {
-      const data = await base44.entities.ProFormSubmissionIntake.list();
-      const sorted = [...(Array.isArray(data) ? data : [])].sort((a, b) => {
-        const aTime = new Date(a.created_at_server || a.created_date || 0).getTime();
-        const bTime = new Date(b.created_at_server || b.created_date || 0).getTime();
-        return bTime - aTime;
-      });
-      setRecords(sorted);
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    let active = true; setLoading(true); setError('');
+    api.listIntakes({ pageSize: 25, cursor, filters: statusFilter === 'all' ? {} : { status: statusFilter } })
+      .then((result) => { if (active) { setRecords(result.items || []); setNextCursor(result.nextCursor || null); } })
+      .catch((caught) => { if (active) setError(caught?.message || 'Intake records could not be loaded.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [api, cursor, refresh, statusFilter]);
 
-  useEffect(() => { loadRecords(); }, []);
-
-  const filtered = useMemo(() => {
-    if (statusFilter === 'all') return records;
-    return records.filter((record) => record.status === statusFilter);
-  }, [records, statusFilter]);
-
-  const handleRetry = async (intake) => {
-    try {
-      setRetryingId(intake.id);
-      const response = await base44.functions.invoke('retryProQuestionnaireIntakeSubmission', {
-        intakeId: intake.id,
-        questionnaireSessionId: intake.questionnaire_session_id,
-        forceRetry: false,
-        ...(recoveryGrant ? { recoveryGrant } : {})
-      });
-      const data = response?.data;
-      if (data?.success) {
-        if (data?.zapierSuppressed) {
-          toast.info('Submission saved; external delivery was suppressed by environment policy.');
-        } else if (data?.zapierRedirected) {
-          toast.success('Submission saved and delivered to the staging destination.');
-        } else {
-          toast.success(data?.alreadySubmitted ? 'Already linked to a submission' : 'Submission retry completed');
-        }
-      } else {
-        toast.error(data?.error?.message || 'Retry failed');
-      }
-      await loadRecords();
-    } catch (error) {
-      toast.error(error?.response?.data?.error?.message || error?.response?.data?.error || error?.message || 'Retry failed');
-    } finally {
-      setRetryingId('');
-    }
-  };
-
-  const handleAiAction = async (intake, mode) => {
-    setAiRunning({ id: intake.id, mode });
-    // Keep row expanded while running
-    setExpandedId(intake.id);
-    try {
-      const modeLabels = { diagnose_only: 'Diagnose Structure', repair_only: 'AI Repair Only', repair_and_retry: 'AI Repair + Retry' };
-      const response = await base44.functions.invoke('repairProQuestionnaireIntakeSubmission', {
-        intakeId: intake.id,
-        questionnaireSessionId: intake.questionnaire_session_id,
-        mode,
-        autoRetry: mode === 'repair_and_retry',
-        forceRetry: false,
-        ...(recoveryGrant ? { recoveryGrant } : {})
-      });
-      const data = response?.data;
-      if (data?.success) {
-        if (data?.zapierSuppressed) {
-          toast.info('Repair completed; external delivery was suppressed by environment policy.');
-        } else if (data?.zapierRedirected) {
-          toast.success('Repair completed and delivered to the staging destination.');
-        } else if (data?.linkedSubmissionId) {
-          toast.success(`AI Repair + Retry succeeded — Submission: ${data.linkedSubmissionId}`);
-        } else {
-          toast.success(`${modeLabels[mode]} completed`);
-        }
-      } else {
-        toast.error(data?.error?.message || data?.errors?.[0] || `${modeLabels[mode]} failed`);
-      }
-      await loadRecords();
-    } catch (err) {
-      toast.error(err?.response?.data?.error?.message || err?.response?.data?.error || err?.message || 'AI action failed');
-    } finally {
-      setAiRunning(null);
-    }
-  };
-
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Questionnaire Intake Recovery</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="max-w-xs">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="received_intake">received_intake</SelectItem>
-                <SelectItem value="retry_failed">retry_failed</SelectItem>
-                <SelectItem value="retry_success">retry_success</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {loading ? (
-            <div className="text-sm text-slate-600">Loading intake records...</div>
-          ) : filtered.length === 0 ? (
-            <div className="text-sm text-slate-600">No intake records found for this status.</div>
-          ) : (
-            <div className="space-y-4">
-              {filtered.map((intake) => (
-                <IntakeRow
-                  key={intake.id}
-                  intake={intake}
-                  expanded={expandedId === intake.id}
-                  onToggle={() => setExpandedId(expandedId === intake.id ? '' : intake.id)}
-                  onRetry={handleRetry}
-                  retrying={retryingId === intake.id}
-                  onAiAction={handleAiAction}
-                  aiRunning={aiRunning?.id === intake.id ? aiRunning.mode : null}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
+  const reset = () => { setCursor(null); setHistory([]); setExpandedId(''); };
+  return <Card><CardHeader><CardTitle>Questionnaire Intake Recovery</CardTitle></CardHeader><CardContent className="space-y-4">
+    <div className="max-w-xs"><Select value={statusFilter} onValueChange={(value) => { setStatusFilter(value); reset(); }}><SelectTrigger aria-label="Intake status filter"><SelectValue /></SelectTrigger><SelectContent>{['all','received_intake','retry_failed','retry_success','submitted'].map((value) => <SelectItem value={value} key={value}>{value}</SelectItem>)}</SelectContent></Select></div>
+    {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
+    {loading ? <p className="text-sm text-slate-600">Loading intake records…</p> : null}
+    {!loading && !records.length ? <p className="text-sm text-slate-600">No intake records found for this status.</p> : null}
+    <div className="space-y-3">{records.map((intake) => <IntakeRow key={intake.id} intake={intake} expanded={expandedId === intake.id} onToggle={() => setExpandedId((id) => id === intake.id ? '' : intake.id)} refreshList={() => setRefresh((value) => value + 1)} />)}</div>
+    <div className="flex justify-between"><Button variant="outline" disabled={!history.length || loading} onClick={() => { const copy = [...history]; const previous = copy.pop(); setHistory(copy); setCursor(previous || null); }}>Previous intake page</Button><Button variant="outline" disabled={!nextCursor || loading} onClick={() => { setHistory((values) => [...values, cursor]); setCursor(nextCursor); }}>Next intake page</Button></div>
+  </CardContent></Card>;
 }

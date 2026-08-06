@@ -94,4 +94,17 @@ describe('ProDraftAdminAuthorizationContext', () => {
     expect(subject.forgetAdminRecoveryDevice).toHaveBeenCalledTimes(1);
     expect(capture.current.authorizationState.status).toBe('password_required');
   });
+
+  it('warns through the registered shell handler and returns to the gate after grant rejection', async () => {
+    const subject = client({ validateStoredAdminRecoveryGrant: vi.fn(async () => state('authorized')) });
+    const capture = { current: null };
+    const invalidation = vi.fn(async () => {});
+    render(<ProDraftAdminAuthorizationProvider client={subject}><Probe capture={capture} /></ProDraftAdminAuthorizationProvider>);
+    await waitFor(() => expect(capture.current.authorizationState.status).toBe('authorized'));
+    act(() => capture.current.registerAuthorizationInvalidationHandler(invalidation));
+    await act(async () => capture.current.handleAdminGrantRejected());
+    expect(invalidation).toHaveBeenCalledOnce();
+    expect(capture.current.authorizationState.status).toBe('password_required');
+    expect(capture.current.authorizationState.authorized).toBe(false);
+  });
 });

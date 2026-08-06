@@ -145,40 +145,30 @@ PDF generation is entirely in the browser and does not persist or email the PDF.
 
 ```mermaid
 flowchart TD
-    Route["/admin/draft-recovery"] --> SavedGrant{"Stored grant exists?"}
-    SavedGrant -->|"yes"| VerifyToken["verifyDraftRecoveryAccess(token)"]
-    SavedGrant -->|"no"| Password["Enter recovery password"]
-    Password --> VerifyPassword["verifyDraftRecoveryAccess(password)"]
-    VerifyPassword -->|"authorized"| StoreGrant["Store HMAC grant + expiry in localStorage"]
-    VerifyToken -->|"authorized"| RecoveryUI["ProFormDraftRecovery"]
-    StoreGrant --> RecoveryUI
-    VerifyToken -->|"expired/invalid"| Password
-
-    RecoveryUI --> DraftList["Direct ProFormDraft.list"]
-    RecoveryUI --> IntakeList["Direct ProFormSubmissionIntake.list"]
-    DraftList --> BrowserFilter["Browser sort/filter/render payload"]
-    IntakeList --> BrowserFilter
-    BrowserFilter --> Edit["DraftEditPanel"]
-    Edit --> DirectUpdate["Direct ProFormDraft.update"]
-
-    BrowserFilter --> Retry["retryProQuestionnaireIntakeSubmission"]
-    BrowserFilter --> Repair["repairProQuestionnaireIntakeSubmission"]
-    Retry --> Reauthorize["Function: Base44 admin OR recovery grant"]
-    Repair --> Reauthorize
-    Reauthorize --> ServiceRole["Service-role entity reads/writes"]
+    Routes["Draft and intake recovery routes"] --> Restore["Validate isolated stored grant"]
+    Restore -->|"missing or rejected"| Password["Password gate"]
+    Password --> Issue["Backend password verification and grant issue"]
+    Restore -->|"authorized"| Shell["Authorized recovery shell"]
+    Issue --> Shell
+    Shell --> Client["proDraftAdminApiClient"]
+    Client --> Lists["Protected paginated draft/intake lists"]
+    Client --> Details["Protected lazy detail/events/lineage"]
+    Client --> Update["Protected allowlisted revision-safe update"]
+    Client --> Actions["Protected retry/diagnose/repair"]
+    Lists --> ServiceRole["Authorized service-role entity access"]
+    Details --> ServiceRole
+    Update --> ServiceRole
+    Actions --> ServiceRole
     ServiceRole --> Submission["Possible ProFormSubmission create"]
     ServiceRole --> Lifecycle["Draft/intake/event updates"]
     ServiceRole --> Zapier["Possible Zapier delivery"]
-
-    AdminRoutes["Other admin recovery routes"] --> AdminOnly["Base44 admin / source allowlist"]
-    AdminOnly --> IntakeList
-    AdminOnly --> Manual["Manual intake repair → direct submission create"]
-
-    UIOnly["Password UI gate"] -. "grant not attached to direct list/update" .-> DraftList
-    UIOnly -. "grant not attached to direct list" .-> IntakeList
+    Shell --> Forget["Forget this device"]
+    Forget --> Audit["Best-effort backend audit"]
+    Forget --> Clear["Clear only admin grant/device/cache"]
+    Clear --> Password
 ```
 
-Retry and repair functions reauthorize before service-role access. Direct entity list/update calls rely on entity policy, not on the recovery grant.
+No draft, draft-event, intake, recovery-security, or email-verification-attempt entity is queried directly by the migrated browser recovery UI. The diagram is source-state evidence; live staging behavior remains uncertified.
 
 ## 6. Current failure and backup path
 

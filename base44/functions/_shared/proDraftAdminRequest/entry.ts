@@ -24,6 +24,8 @@ export const ADMIN_API_OPERATION_NAMES = Object.freeze({
   LIST_EVENTS: 'list_events',
   UPDATE_DRAFT: 'update_draft',
   GET_LINEAGE: 'get_lineage',
+  LIST_INTAKES: 'list_intakes',
+  GET_INTAKE: 'get_intake',
   RETRY_SUBMISSION: 'retry_submission',
   REPAIR_SUBMISSION: 'repair_submission',
 } as const);
@@ -90,6 +92,8 @@ const ATTEMPT_TYPES: Readonly<Record<AdminApiOperationName, AdminAuthAttemptType
   list_events: 'admin_event_list',
   update_draft: 'admin_draft_update',
   get_lineage: 'admin_draft_detail',
+  list_intakes: 'admin_draft_list',
+  get_intake: 'admin_draft_detail',
   retry_submission: 'admin_retry_submission',
   repair_submission: 'admin_repair_submission',
 };
