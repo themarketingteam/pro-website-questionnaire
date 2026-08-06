@@ -1,5 +1,13 @@
 # Durable Draft Recovery Risk Register
 
+## 2026-08-06 comprehensive certification stop
+
+The `staging_security` coverage gate failed with 25 release blockers before any
+live staging operation. Security, browser, capacity, integrity, cleanup, and
+deployment risks remain open at their existing severity. No mitigation is
+downgraded and no production approval is implied. See the
+[blocked certification report](../testing/staging-comprehensive-automated-certification.md).
+
 ## 2026-08-06 load, capacity, and controlled-failure controls
 
 | Risk | Control added | Residual / release gate |

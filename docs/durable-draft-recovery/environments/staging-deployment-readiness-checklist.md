@@ -1,5 +1,17 @@
 # Staging Deployment Readiness Checklist
 
+## 2026-08-06 comprehensive automated certification attempt
+
+- [x] Confirm clean feature branch and authenticated Base44 CLI.
+- [x] Run `npm ci` and the mandatory staging-security coverage gate.
+- [ ] Resolve all 25 release-blocking coverage findings.
+- [ ] Verify staging target, deployment commit, flags, banner, and external-side-effect suppression.
+- [ ] Run functional/browser, security, capacity, failure, integrity, and cleanup suites.
+- [ ] Achieve `COMPREHENSIVE_AUTOMATED_STAGING_CERTIFIED` before pushing the feature branch.
+
+Current classification: **COMPREHENSIVE_AUTOMATED_STAGING_BLOCKED**. The stop
+occurred before deployment or live staging access. Production remains untouched.
+
 ## 2026-08-06 load/capacity harness checkpoint
 
 - [x] Add staging/production target rejection and explicit soak/full confirmations.

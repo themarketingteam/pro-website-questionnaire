@@ -1,5 +1,13 @@
 # Durable Draft Recovery Production Acceptance Criteria
 
+## Comprehensive staging gate status — 2026-08-06
+
+Candidate `023ed7c9feb3e7b8baf8da09aedd785406ca59cb` did not enter live staging
+certification because the mandatory security coverage validator failed with 25
+release-blocking findings. Production acceptance remains denied. The feature
+branch must not be pushed under this prompt's certification-only push rule.
+See the [blocked certification report](../testing/staging-comprehensive-automated-certification.md).
+
 ## Load, capacity, and controlled-failure acceptance
 
 Requirement `DR-PERF-LOAD-001` must pass against the exact staging release

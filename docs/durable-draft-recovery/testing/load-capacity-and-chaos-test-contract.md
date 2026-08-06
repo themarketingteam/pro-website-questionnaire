@@ -1,5 +1,12 @@
 # Durable Draft Load, Capacity, and Chaos Test Contract
 
+## 2026-08-06 staging execution result
+
+The comprehensive prompt stopped at the failing `staging_security` source
+coverage gate. No remote smoke, load, full-capacity, soak, or controlled-failure
+profile ran; no staging metric or cleanup result exists. Capacity certification
+remains **BLOCKED** without weakening any threshold.
+
 - Status: Source/local harness implemented; final staging capacity execution deferred
 - Date: 2026-08-06
 - Requirement: `DR-PERF-LOAD-001`

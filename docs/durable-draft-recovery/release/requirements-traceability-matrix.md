@@ -1,5 +1,13 @@
 # Durable Draft Recovery Requirements Traceability Matrix
 
+## 2026-08-06 comprehensive staging certification attempt
+
+Candidate `023ed7c9feb3e7b8baf8da09aedd785406ca59cb` is
+**COMPREHENSIVE_AUTOMATED_STAGING_BLOCKED**. The authoritative
+`staging_security` coverage gate reported 25 failures, so every live staging,
+browser, security, capacity, integrity, and cleanup requirement remains pending.
+No requirement advances to certified. Evidence: [blocked certification report](../testing/staging-comprehensive-automated-certification.md).
+
 ## 2026-08-06 load/capacity/chaos gate
 
 | Requirement | Source controls | Automated evidence | Release status |

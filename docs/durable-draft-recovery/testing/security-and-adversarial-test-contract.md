@@ -1,5 +1,12 @@
 # Durable Draft Security and Adversarial Test Contract
 
+## 2026-08-06 staging execution result
+
+The authoritative `staging_security` coverage gate reported 25 release-blocking
+findings. The prompt therefore stopped before all live security attacks and
+browser leakage checks. Security certification remains **BLOCKED**; no boundary
+was certified and no staging or production behavior was modified.
+
 - Status: Authoritative source and local-test contract; staging execution remains separately gated
 - Date: 2026-08-06
 - Requirement: `DR-SEC-ADV-001`
