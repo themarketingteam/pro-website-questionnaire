@@ -392,6 +392,17 @@ deployed-browser certification are still missing. The decision remains
 
 Current classification: **STAGING_APPLICATION_ROLLBACK_DRILL_BLOCKED**. No live mutation was authorized or performed.
 
+## 2026-08-06 final staging certification gate
+
+- [ ] Final RC precheck passes (observed: 96 failures).
+- [ ] Strict coverage passes (observed: 82 failures).
+- [ ] Manual evidence passes (observed: 0 passed, 44 pending).
+- [ ] Full staging browser/security/capacity run completes (staging URL unavailable).
+- [ ] Rollback, migration, RLS, cleanup, and runtime commit verification certify.
+- [ ] Dependency policy has zero blockers (observed: four).
+
+Decision: **BLOCKED; STAGING PHASE NOT CERTIFIED**. No tag, push, deployment, or cleanup mutation occurred.
+
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**
 
 ### 2026-08-06 full lifecycle certification attempt

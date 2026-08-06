@@ -97,3 +97,5 @@ to test relaxed RLS.
 ## Staging source rollback drill boundary
 
 The application rollback drill must preserve the current hardened RLS and entity contracts. It may not deploy `pre-durable-draft-recovery-2026-08-05` into staging or relax RLS to make an old source build function. If no earlier `DRAFT_RLS_CERTIFIED_IN_STAGING` commit exists, source rollback is blocked; keep the kill switch fail-closed and leave staging unchanged. See the [staging rollback drill plan](./staging-application-rollback-drill-plan.md).
+
+The 2026-08-06 final gate retained `DRAFT_RLS_BLOCKED`; the local target guard also reported a forbidden production-linked app context. No deploy, RLS change, tag, or push is authorized until a verified staging target and complete live RLS evidence exist.

@@ -19,6 +19,8 @@ Source rollback alone does not restore or reconcile database records written aft
 
 An RLS-hardened staging app may roll back only to a commit independently certified with `DRAFT_RLS_CERTIFIED_IN_STAGING`. The pre-durable baseline is a blue-production fallback reference, not a deployable predecessor for the hardened staging schema. Before any staging source rollback, run `npm run release:precheck-staging-rollback`, preserve a backup/checkpoint, activate the bounded kill switch, prove no migration lease or replacement is active, and follow the [staging drill plan](./staging-application-rollback-drill-plan.md). The 2026-08-06 attempt is blocked because no certified compatible predecessor or complete staging target evidence exists.
 
+The 2026-08-06 final RC gate did not create a staging certification tag. Do not treat branch commit `a31c4574a9717ddb686156509ba50c5a34aa6e95` as a certified rollback or green-app source. Resume only after all final-gate blockers are remediated and a new full certification succeeds.
+
 ## Approved baseline references
 
 - Repository: `https://github.com/themarketingteam/pro-website-questionnaire.git`

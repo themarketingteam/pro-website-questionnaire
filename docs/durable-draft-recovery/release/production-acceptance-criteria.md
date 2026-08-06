@@ -416,6 +416,10 @@ Requirement IDs: `DR-REL-001`, `DR-REL-002`.
 5. Global enablement is a separate, explicitly authorized step and cannot begin until all pre-enable release-blocking evidence is present and the verdict is `CERTIFIED`.
 6. Immediately after enablement, synthetic save/recovery/submission/PDF checks run at `1`, `5`, `15`, and `60` minutes. Any security boundary or submitted regression fails immediately; other threshold breaches invoke the documented rollback decision.
 7. ADR-002 rollback trigger thresholds, kill switch, owners, dashboards, and data-reconciliation jobs are active before enablement.
+
+## 2026-08-06 final staging gate outcome
+
+The staging candidate did not satisfy this acceptance contract. RC precheck, strict coverage, manual evidence, capacity, rollback, RLS, dependency, cleanup, and runtime-identity gates blocked. The only accepted final verdict remains `STAGING_RELEASE_CANDIDATE_CERTIFIED`; it was not issued. Green creation, migration, production-disabled deployment, domain cutover, enablement, and post-cutover evidence remain prohibited/pending.
 8. A successful deployment or domain attachment without the full evidence set leaves the verdict `BLOCKED`.
 
 ## Release verdict contract

@@ -1,0 +1,52 @@
+{
+  "manifestVersion": 1,
+  "generatedDate": "2026-08-06",
+  "candidateCommit": "a31c4574a9717ddb686156509ba50c5a34aa6e95",
+  "requestedCertificationTag": "durable-draft-staging-certified-2026-08-06",
+  "certificationIssued": false,
+  "finalVerdict": null,
+  "gateVerdict": "BLOCKED",
+  "stagingAppFingerprint": null,
+  "stagingUrlFingerprint": null,
+  "runtimeBuildMarker": null,
+  "productionDeployed": false,
+  "nextAppCreated": false,
+  "tagCreated": false,
+  "tagPushed": false,
+  "featureBranchPushed": false,
+  "gateResults": {
+    "releaseCandidatePrecheck": "FAILED_96",
+    "strictCoverage": "FAILED_82",
+    "manualEvidence": "BLOCKED_0_PASS_44_PENDING",
+    "automatedCertification": "BLOCKED_MISSING_STAGING_URL",
+    "localSecurity": "PASSED_460_OF_460",
+    "stagingCapacity": "BLOCKED_MISSING_STAGING_URL",
+    "rollback": "STAGING_APPLICATION_ROLLBACK_DRILL_BLOCKED",
+    "migrationUtility": "MIGRATION_UTILITY_FAILED",
+    "draftRls": "DRAFT_RLS_BLOCKED",
+    "directEntitySource": "PASSED",
+    "serviceRoleBoundary": "PASSED",
+    "buildAndSensitiveBundle": "PASSED",
+    "sourceSafety": "FAILED_2_EXISTING_TEST_FIXTURES",
+    "dependencyAudit": "BLOCKED_4_PRODUCTION_FINDINGS",
+    "cleanup": "BLOCKED_TARGET_UNAVAILABLE",
+    "runtimeCommitVerification": "BLOCKED_TARGET_UNAVAILABLE"
+  },
+  "checksums": {
+    "coverageReportSha256": "047bd63eb299059d8c00adc4f8e24a00d24cd1d4d98347bc9abc0ded98f2cc8d",
+    "manualEvidenceReportSha256": "f29a8c7d1af7ced260eb67898ee8a3e20adbe2c03ffb7d4b17b2287e93d611a3",
+    "rollbackReportSha256": "f92775133bb2734eb20d28f5dbdfee9f7357fc146fed114890bedf1d71ae1b75",
+    "migrationReportSha256": "08973c21254e9bce6eb5765b52cf6e723718e2cd3216433615cdab38839c115c",
+    "rlsReportSha256": "1feb987291b2a6c1f819547565eac336cc89916e76a5cda6056273a2d7f0673b",
+    "automatedReportSha256": "0e22ea6b38c1d8aa3598e04d276ac9de127a6e0f715177e27c6ecb46fd791084"
+  },
+  "pendingBatches": [
+    "green_app_creation_and_pre_migration_certification",
+    "live_green_migration_and_post_migration_certification",
+    "production_disabled_deployment_certification",
+    "domain_cutover",
+    "production_enablement",
+    "post_cutover_monitoring_and_acceptance"
+  ],
+  "blockingRule": "STAGING_RELEASE_CANDIDATE_CERTIFIED is the only verdict that permits certification tagging or pushes."
+}

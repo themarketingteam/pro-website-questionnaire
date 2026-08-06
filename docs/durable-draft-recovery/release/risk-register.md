@@ -733,3 +733,7 @@ or closed.
 The fail-closed precheck now rejects an absent or uncertified predecessor, the pre-durable baseline, ambiguous staging identity, missing deployment/backup/secret-set evidence, production inputs, dirty source, build gaps, and missing authorization. The local synthetic drill exercises nine entity classes, a green update and green-native record, submitted preservation, reverse interruption/resume, duplicate/hash checks, browser-state models, and exact cleanup.
 
 `RISK-010`, `RISK-011`, `RISK-016`, `RISK-019`, and `RISK-025` remain open at their prior ratings. No live RLS-compatible predecessor exists in the evidence, so no Base44 kill switch, deployment, adapter, record, browser, lease, cleanup, domain, or production behavior was exercised. Synthetic evidence lowers no release risk classification.
+
+## 2026-08-06 final staging RC gate
+
+No risk is closed or lowered. The final gate found 96 RC-precheck failures, 82 strict-coverage failures, 44 pending manual rows, blocked rollback/RLS/capacity/cleanup/runtime checks, a failed live migration report, and four dependency-policy blockers. The production-linked local Base44 context makes deployment unsafe. Local security and source boundary tests passed but do not mitigate absent live evidence. No certification tag or push occurred.

@@ -690,3 +690,7 @@ disabled and no deployment or production operation occurred.
 ## 2026-08-06 staging rollback drill evidence
 
 `DR-ROLLBACK-001`, `DR-MIG-001`, `DR-MIG-002`, `DR-MIG-003`, `DR-RLS-001`, and `DR-OBS-001` now have a fail-closed staging rollback precheck plus local synthetic kill-switch, nine-entity reverse migration, interruption/resume, submitted-state, duplicate/hash, Chromium/WebKit state-model, and cleanup coverage. The [certification](../testing/staging-rollback-drill-certification.md) is **STAGING_APPLICATION_ROLLBACK_DRILL_BLOCKED**: the certified compatible predecessor and staging target/backup/secret evidence are unavailable. These requirements receive local test evidence only and do not advance to staging or production acceptance.
+
+## 2026-08-06 final staging RC gate
+
+The [final gate summary](./staging-release-candidate-summary.md) is **NOT ISSUED — BLOCKED**. Strict coverage reported 82 failures across pending, missing, skipped, browser, evidence, and matrix conditions; 44 manual rows remain pending; live capacity, rollback, cleanup, runtime identity, RLS, migration, and comprehensive certification are not accepted. No row advances to staging certification, and all six green/production/cutover/post-cutover phases remain pending.
