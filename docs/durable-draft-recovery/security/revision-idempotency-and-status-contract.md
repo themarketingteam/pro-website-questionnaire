@@ -3,11 +3,16 @@
 - Contract version: `1`
 - Module: `base44/functions/_shared/proDraftPersistence/entry.ts`
 - Canonical draft schema: `4`
-- Deployment status: local shared source only; no API or Base44 resource is deployed by this contract
+- Deployment status: local shared source and save/event API integration only; no Base44 resource is deployed by this contract
 
 ## Scope and boundary
 
-This module supplies runtime-neutral persistence safety primitives for later draft bootstrap, save, event, Clear All, submission, recovery, migration, and administration functions. It performs no Base44 SDK call, entity mutation, environment lookup, logging, authorization, or network request. A future API must authenticate and authorize the exact operation before using any authorized conflict projection or persisting returned compatibility columns.
+This module supplies runtime-neutral persistence safety primitives. The local
+`saveProFormDraft` and `appendProFormDraftEvents` functions now authenticate and
+authorize the exact operation before using an authorized conflict projection or
+persisting compatibility columns. The primitive itself still performs no SDK
+call, entity mutation, environment lookup, logging, authorization, or network
+request.
 
 The server revision is authoritative. A client revision records monotonic client intent within its coordinated draft stream, but it is not a global ordering source and cannot overrule a newer server record. Client or server timestamps never decide whether a write is accepted.
 
@@ -162,9 +167,9 @@ Safe diagnostics expose public bounds, normalized status, revisions, decision, s
 
 Submission is terminal. A submitted self-update succeeds only when revision/state identity makes it an exact idempotent repeat. A changed hash, changed status, or stale client write cannot alter it. Clear All is not an allowed submitted transition. Later submission code must additionally compare final submission identity and submitted/PDF source hashes before any terminal metadata completion.
 
-## Future API integration
+## Save/event API integration
 
-Later APIs must:
+The local save/event APIs now:
 
 1. authenticate and authorize the exact draft before reading or mutating it;
 2. parse through the bounded reader before using request data;
@@ -173,11 +178,17 @@ Later APIs must:
 5. load the current record and evaluate revision/status under an atomic or compare-and-set write boundary;
 6. persist the returned next server revision and compatibility columns exactly once;
 7. return exact-draft canonical conflict state only after authorization;
-8. append value-free audit events and use request/key fingerprints rather than raw values; and
+8. append bounded audit events and use request/key hashes rather than raw authorization values; and
 9. apply separately documented migration rules before enabling any `migrationMode` transition.
 
-No public function, Base44 call, entity modification, secret setting, deployment, or feature enablement is part of this contract.
+The save repository path uses only a guarded `updateMany` `$set`/`$inc` update,
+requires exactly one changed row, and verifies the post-read. Event appends are
+separate, ID-deduplicated writes and do not advance snapshot server revision.
+Local mocks cover the race contract, but live Base44 atomicity and event
+uniqueness remain mandatory staging blockers. No deployment, schema push,
+secret setting, frontend enablement, or feature enablement is part of this
+change.
 
 ## Test coverage
 
-`src/test/proDraftPersistence.test.js` enumerates the complete new/recognized status matrix, conditional terminal self-transitions, every revision decision, new-draft revision conventions, idempotency-key reuse, request method/media/declared and streaming limits, malformed/aborted/multibyte bodies, canonical size/serialization, active/submitted/legacy duplicate selection, safe and authorized conflict projections, all 20 compatibility columns, response headers/error mapping, secure request IDs, diagnostics PII exclusion, and the no-endpoint/no-Base44 boundary.
+`src/test/proDraftPersistence.test.js` enumerates the complete new/recognized status matrix, conditional terminal self-transitions, every revision decision, new-draft revision conventions, idempotency-key reuse, request method/media/declared and streaming limits, malformed/aborted/multibyte bodies, canonical size/serialization, active/submitted/legacy duplicate selection, safe and authorized conflict projections, all 20 compatibility columns, response headers/error mapping, secure request IDs, diagnostics PII exclusion, and the runtime-neutral boundary. `saveProFormDraft.test.js`, `appendProFormDraftEvents.test.js`, and `proDraftSaveEvents.integration.test.js` cover the authoritative integration, including conditional-count/post-read failures, exact retries, terminal submission, bounded event deduplication, and concurrent local writes.

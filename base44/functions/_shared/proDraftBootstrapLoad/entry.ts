@@ -249,7 +249,9 @@ function emptyCanonicalState(
   };
 }
 
-async function canonicalStateHash(state: Record<string, unknown>): Promise<string> {
+export async function calculateCanonicalDraftStateHash(
+  state: Record<string, unknown>,
+): Promise<string> {
   const normalized = JSON.parse(
     validateCanonicalPayloadSize(state).serialized,
   ) as Record<string, unknown>;
@@ -287,7 +289,7 @@ function safeJsonObject(
   return {};
 }
 
-function canonicalRecord(
+export function reconstructCanonicalDraftRecord(
   record: DraftRecord,
 ): Readonly<{ record: DraftRecord; warnings: readonly string[] }> {
   if (typeof record.draft_state_json === 'string' && record.draft_state_json.length > 0) {
@@ -400,7 +402,7 @@ function project(
   scopes: readonly string[],
   includeCanonicalState = true,
 ): Readonly<{ draft: Readonly<Record<string, unknown>>; readOnly: boolean; canWrite: boolean; warnings: readonly string[] }> {
-  const normalized = canonicalRecord(recordInput);
+  const normalized = reconstructCanonicalDraftRecord(recordInput);
   const status = statusOrFail(normalized.record);
   const submitted = status === 'submitted';
   const canWrite = !submitted && scopes.includes(PRO_DRAFT_ACCESS_SCOPES.WRITE);
@@ -582,7 +584,7 @@ async function createNewDraft(
       : Promise.resolve(undefined),
   ]);
   const state = emptyCanonicalState(request.clientContext, sessionId, null, timestamp);
-  const stateHash = await canonicalStateHash(state);
+  const stateHash = await calculateCanonicalDraftStateHash(state);
   const compatibility = buildDraftCompatibilityColumns(
     state,
     { metadata: {}, userdata: {} },
@@ -641,7 +643,7 @@ async function createNewDraft(
       created.id,
       timestamp,
     );
-    const boundHash = await canonicalStateHash(boundState);
+    const boundHash = await calculateCanonicalDraftStateHash(boundState);
     const boundCompatibility = buildDraftCompatibilityColumns(
       boundState,
       { metadata: {}, userdata: {} },

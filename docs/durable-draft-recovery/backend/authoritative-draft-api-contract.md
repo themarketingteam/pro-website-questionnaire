@@ -1,7 +1,7 @@
 # Authoritative draft API contract
 
 - Contract version: 1
-- Implementation state: local bootstrap/load functions implemented and tested; deployment pending
+- Implementation state: local bootstrap/load/save/event functions implemented and tested; deployment pending
 - Public functions: source present, not deployed
 - Deployment/entity push: not performed
 - Current frontend persistence: unchanged
@@ -111,15 +111,31 @@ responsibility of later migration tooling.
 ```
 
 Canonical state is required and uses the shared canonical shape and byte limit.
-Its optional `draftId` must equal the request draft ID, its `sessionId` is later
-compared to the authorized record, and its status must equal
-`requestedStatus`. `expectedServerRevision` and an idempotency key are required.
+Its `draftId` must equal the request and authorized record, its `sessionId` must
+equal the stored session, its form type must equal the record form type, and
+its status must equal `requestedStatus`. `canonicalState.clientRevision` is the
+request revision. `canonicalState.serverRevision` must equal the required
+`expectedServerRevision`.
 The sync-reason allowlist is `autosave`, `manual_save`, `bootstrap_upload`,
 `submit_attempt`, `submit_failed`, `submitted`, `clear_all`, and `restore`.
 
 `mappedPayload`, when present, must be plain JSON. Canonical and mapped payloads
 are scanned recursively for authorization-bearing field names. Raw recovery
 codes, tokens, grants, passwords, private keys, and client secrets are rejected.
+
+The server computes the canonical state hash and evaluates stored and incoming
+revisions/status before mutation. An exact repeat returns current accepted
+revision/hash/status without increment. A stale/equal-different/server-revision
+conflict returns HTTP 409, `mergeRequired: true`, and the safe exact-draft
+canonical projection. Accepted writes use one `updateMany` compare-and-increment
+over draft ID, server revision, and current status. The changed count must be
+exactly one, and a post-read verifies the new revision/hash/status. Unsupported
+conditional semantics fail closed; no unguarded fallback exists.
+
+Submission is accepted only from `submit_attempted` with final submission ID,
+submission time, and submitted/PDF source hashes matching the server-calculated
+state hash. Submitted authorization is read-only and terminal states cannot be
+reactivated.
 
 ### Append events
 
@@ -136,8 +152,15 @@ required and IDs must be unique within the batch. Value omission is valid.
 Credential-bearing metadata is rejected.
 
 Canonical state remains authoritative. Event failure does not undo an already
-accepted snapshot; a future endpoint must report and retry event persistence as
-a separate idempotent step.
+accepted snapshot. The function queries requested event IDs, creates only
+missing rows, and reports accepted/duplicate/rejected counts. Batch keys are
+stored only as purpose-bound hashes. Event append updates only diagnostic batch
+fields and does not change canonical state, status, or server revision. Full
+email metadata, authorization/recovery material, and raw file bytes are
+rejected.
+
+The detailed execution and staging gates are in
+[save-and-event-api-flow.md](save-and-event-api-flow.md).
 
 ## Limits and response policy
 

@@ -74,8 +74,8 @@ The register's likelihood/severity columns describe the risk before planned cont
 | `RISK-002` | Medium | Critical | Current password grant flow exists; future indefinite-grant acceptance remains unchanged. See [admin audit](../audit/current-system-audit-report.md#admin-recovery-summary). |
 | `RISK-003` | Medium | High | Confirmed storage exceptions can fail module import. [DRAFT-001](../audit/current-defect-register.md#draft-001--unsafe-module-evaluation-storage-access). |
 | `RISK-004` | High | High | Continuous canonical browser capture and deterministic same-browser rehydration are implemented/tested locally, but no server acknowledgement, durable outbox, reconnect proof, or deployed storage matrix exists. The latest release gate blocked staging. [DRAFT-005](../audit/current-defect-register.md#draft-005--local-backups-are-write-only), [DRAFT-006](../audit/current-defect-register.md#draft-006--lifecycle-persistence-relies-only-on-beforeunload). |
-| `RISK-005` | High | Critical | The revision/idempotency decision primitive is certified in staging, including idempotent and stale rejection checks. Risk remains high because current writers are non-atomic and no save endpoint applies the primitive. [Certification](../security/staging-security-primitives-certification.md); [DRAFT-015](../audit/current-defect-register.md#draft-015--draft-upsert-and-mutation-ordering-are-non-atomic). |
-| `RISK-006` | Medium | Critical | Submitted-regression rejection is certified at the transition-primitive level in staging. Risk remains because current autosave/submit writers do not yet enforce it through a server endpoint. [Certification](../security/staging-security-primitives-certification.md); [DRAFT-016](../audit/current-defect-register.md#draft-016--delayed-draft-writes-can-regress-submitted-state). |
+| `RISK-005` | High | Critical | The revision/idempotency primitive and a guarded `updateMany` save writer are locally integrated. Mocked two-writer, zero/multiple-count, and post-read tests pass, with no unguarded fallback. Risk remains high because the function is not deployed, current frontend writers are unchanged, and live Base44 atomicity is uncertified. [Save/event flow](../backend/save-and-event-api-flow.md); [DRAFT-015](../audit/current-defect-register.md#draft-015--draft-upsert-and-mutation-ordering-are-non-atomic). |
+| `RISK-006` | Medium | Critical | Submitted-regression protection, immutable submission identity fields, read-only submitted grants, and delayed-active rejection are integrated in the local writer tests. Risk is not reduced because the function is not deployed, frontend writers are unchanged, and live terminal behavior is uncertified. [Save/event flow](../backend/save-and-event-api-flow.md); [DRAFT-016](../audit/current-defect-register.md#draft-016--delayed-draft-writes-can-regress-submitted-state). |
 | `RISK-007` | High | Critical | Clear All retains old identity/draft; delayed-save protection absent. `BC-CLEAR-001/002`; [DRAFT-010](../audit/current-defect-register.md#draft-010--clear-all-races-browser-persistence-and-leaves-the-old-server-draft-active). |
 | `RISK-008` | Low (path absent) | Critical | Future staging SES risk; current audit found no active email path and performed no email operation. |
 | `RISK-009` | Medium (unverified) | High | Future SES readiness risk; no production SES inventory was authorized or performed. |
@@ -114,6 +114,18 @@ The [staging entity schema certification](../data/staging-entity-schema-certific
 The [staging security-primitives certification](../security/staging-security-primitives-certification.md) is **SECURITY_PRIMITIVES_CERTIFIED_IN_STAGING**. Six independently generated purpose secrets and two ordinary diagnostic controls are configured only in staging. The only deployed staging function is a POST/JSON/16-KB, environment-gated, diagnostics-gated, Base44-admin-only in-memory self-check. The authenticated live response passed all 17 checks and exact-schema/sensitive-pattern validation.
 
 This evidence reduces uncertainty about the primitive implementations for `RISK-005`, `RISK-006`, `RISK-018`, `RISK-020`, `RISK-021`, and `RISK-022`; it does not lower their release likelihood/severity ratings. No save/bootstrap/public-recovery/admin-migration API exists, and rate limits, CAPTCHA, email, entity authorization, migration, and full application certification remain absent. The full normal suite still has five unrelated failures, so application readiness remains blocked.
+
+### 2026-08-05 authoritative save/event source integration
+
+The guarded save and bounded event functions are implemented and locally
+tested, but were not deployed. Local mocked evidence covers exact-draft
+authorization, canonical hashing/projection, conditional updated-count and
+post-read invariants, terminal submission, two concurrent writers, event
+deduplication, and snapshot survival after event failure. It does not prove
+live Base44 `updateMany` atomicity, post-read consistency, event-ID uniqueness,
+service-role/FLS behavior, or deployed response/log confidentiality. Those are
+release blockers, so `RISK-005` and `RISK-006` retain their prior ratings. No
+schema, flag, frontend, production, email, domain, or deployment state changed.
 
 ## Knowingly accepted risks
 
