@@ -355,3 +355,12 @@ This audit does not implement changes. The source evidence makes these later mig
 4. Persist complete recoverable state, define transient-state behavior, and consume/expire backups.
 5. Route every answer/reset/clear/validation transition through one snapshot writer.
 6. Reconcile the missing remote submit fallback before relying on durable intake behavior.
+
+## 2026-08-06 admin direct-access staging evidence
+
+The admin recovery static validator passed across all eight migrated frontend
+source files on candidate `b794300`. The full normal suite then failed, so the
+required browser-network inspection did not run and no claim is made about the
+deployed staging bundle. See the
+[failed staging certification](../admin/staging-password-only-admin-recovery-certification.md).
+No Base44 resource or production system was changed.

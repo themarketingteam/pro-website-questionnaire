@@ -490,3 +490,16 @@ must be deterministic before any staging submission can be certified.
 
 No Base44 resource, secret, record, email, PDF, integration, domain, production
 system, or remote Git branch was changed.
+
+## 2026-08-06 password-only admin recovery staging hard stop
+
+The [staging admin recovery attempt](../admin/staging-password-only-admin-recovery-certification.md)
+failed at the normal suite after 75/75 focused admin tests and the static
+backend-only boundary passed. Six normal-suite failures prevent any risk from
+being closed or lowered. Persistent-grant exposure, shared-password
+attribution, revocation correctness, lockout behavior, network grant leakage,
+service-role audit integrity, RLS, side-effect isolation, and cleanup all remain
+live-evidence gaps.
+
+No staging secret, function, site, record, integration, domain, production
+resource, or remote Git branch was changed.

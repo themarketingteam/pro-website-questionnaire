@@ -144,3 +144,11 @@ Firefox, WebKit, mobile Chromium, and mobile WebKit.
 
 No deployment, schema push, Base44 data mutation, production access, or Git
 push is part of this source change.
+
+## Staging certification status
+
+The 2026-08-06 [password-only staging attempt](./staging-password-only-admin-recovery-certification.md)
+is **PASSWORD_ONLY_ADMIN_RECOVERY_FAILED**. Its focused suite passed 75/75 and
+the static boundary passed across eight files, but `npm test` failed 6 of 1,798
+tests. The hard stop prevented staging configuration/deployment and all live
+browser, operation, network, revocation, security-event, and cleanup matrices.

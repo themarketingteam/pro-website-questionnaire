@@ -444,3 +444,16 @@ No requirement advances to staging certification. In particular,
 `DR-EMAIL-002`, `DR-SAVE-001`, `DR-BROWSER-001`, and `DR-REL-001` remain
 release-blocking. Production and `main` were untouched, and the feature branch
 was not pushed.
+
+## 2026-08-06 password-only admin recovery staging attempt
+
+The [admin recovery report](../admin/staging-password-only-admin-recovery-certification.md)
+is **PASSWORD_ONLY_ADMIN_RECOVERY_FAILED**. The focused authorization, backend
+API, UI, retry/repair, and route suite passed 75/75, and the static admin entity
+boundary passed across eight frontend files. The full normal suite then failed
+6 of 1,798 tests, activating the explicit pre-deployment hard stop.
+
+No admin-recovery requirement advances to staging acceptance. Password/grant
+persistence, revocation, live backend-only networking, security events, RLS,
+retry/repair, and cleanup remain uncertified. No staging or production resource
+was mutated, and no branch was pushed.

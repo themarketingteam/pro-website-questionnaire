@@ -236,3 +236,13 @@ recorded.
 All ten preferred email configuration names remain planned/unconfigured by
 this attempt. OTP and magic-link secrets also remain unconfigured. Existing
 names-only staging and production inventories were not refreshed or mutated.
+
+## 2026-08-06 password-only admin recovery staging attempt
+
+The [admin recovery certification attempt](../admin/staging-password-only-admin-recovery-certification.md)
+stopped at the full normal test suite. `DRAFT_RECOVERY_PASSWORD` was not
+generated, stored, imported, printed, or copied. No temporary environment file
+was created. `PRO_FORM_ADMIN_GRANT_SECRET` presence was not freshly queried,
+and none of the nine version/rate/lockout/timing values was configured or
+changed. Existing names-only staging and production inventories were not
+refreshed or mutated.

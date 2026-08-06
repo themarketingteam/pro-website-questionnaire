@@ -53,7 +53,9 @@ Events use allowlisted admin attempt/outcome enums and contain only request/envi
 
 `proDraftAdminAuthorizationClient.js` is the only client adapter for the endpoint. It stores no password and returns UI state without a raw grant. `ProDraftAdminAuthorizationContext.jsx` exposes `loading`, `password_required`, `authorized`, `locked`, and `error`; it restores a stored grant on mount, deduplicates concurrent password submissions, is React Strict Mode safe, and keeps raw-grant retrieval behind `getAdminGrantForAuthorizedRequest` after authorization.
 
-This context is intentionally not mounted into `App.jsx` or the admin recovery page by this batch. Ordinary questionnaire clients cannot obtain or use this grant.
+The context is mounted only around the two admin recovery routes in `App.jsx`.
+Those routes use the shared-password gate without requiring Base44 admin login.
+Ordinary questionnaire clients cannot obtain or use the grant.
 
 ## Configuration names
 
@@ -61,7 +63,14 @@ The backend reserves exactly: `DRAFT_RECOVERY_PASSWORD`, `PRO_FORM_ADMIN_GRANT_S
 
 ## Test and release requirements
 
-Unit/contract coverage includes exact password semantics, HMAC comparison, missing configuration, every grant revocation dimension, tampering, IP/device limits, lockout/expiry, safe events, IndexedDB/localStorage/memory vault behavior, malformed/wrong-environment bundles, client clearing and no-logging behavior, Strict Mode/deduplication, and Redux/URL absence. Before release, staging must separately configure reviewed values, push/verify the entity enum extension, deploy to the staging app only, prove trusted network headers and service-role event writes, run live rate/lockout/revocation tests, and migrate admin pages to scoped backend APIs. Production deployment requires a later explicit cutover authorization.
+Unit/contract coverage includes exact password semantics, HMAC comparison, missing configuration, every grant revocation dimension, tampering, IP/device limits, lockout/expiry, safe events, IndexedDB/localStorage/memory vault behavior, malformed/wrong-environment bundles, client clearing and no-logging behavior, Strict Mode/deduplication, and Redux/URL absence. The admin pages now use scoped backend APIs in source. Before release, staging must separately configure reviewed values, push/verify any required entity enum extension, deploy to the staging app only, prove trusted network headers and service-role event writes, and run live rate/lockout/revocation tests. Production deployment requires a later explicit cutover authorization.
+
+## 2026-08-06 staging certification attempt
+
+The [certification report](./staging-password-only-admin-recovery-certification.md)
+is **PASSWORD_ONLY_ADMIN_RECOVERY_FAILED**. Source-focused coverage passed
+75/75, but six full-suite failures activated the hard stop before any staging
+configuration, deployment, browser, revocation, event, or cleanup evidence.
 
 ## Future individual-admin migration
 
