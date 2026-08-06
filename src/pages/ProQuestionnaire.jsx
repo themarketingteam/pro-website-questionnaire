@@ -63,6 +63,7 @@ import { defaultResilientStorage } from '@/lib/resilientStorage';
 import { deriveQuestionnaireBrowserNamespace } from '@/lib/questionnaireBrowserNamespace';
 import { useQuestionnairePersistence } from '@/components/store/QuestionnairePersistenceContext';
 import ProDraftBootstrapGate from '@/components/pro-form/ProDraftBootstrapGate';
+import ProDraftRecoveryPanel from '@/components/pro-form/ProDraftRecoveryPanel';
 import {
   frontendRuntimeConfig,
   isDurableDraftClientEnabled,
@@ -1792,6 +1793,10 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
                 </h2>
               </div>
 
+              {sectionIndex === 0 && !legacyPersistenceEnabled && (
+                <ProDraftRecoveryPanel />
+              )}
+
               {sectionQuestions.map((question, qIndex) => {
                 // For questions 3-5, render with background wrapper
                 if (question.id === "3") {
@@ -1954,12 +1959,17 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
               <Suspense fallback={<DeferredSectionLoader />}>
                 <ValidationGuide />
               </Suspense>
+              {!legacyPersistenceEnabled && (
+                <footer aria-label="Questionnaire draft recovery">
+                  <ProDraftRecoveryPanel variant="footer" />
+                </footer>
+              )}
               </div>
               </div>
               </main>
 
       <AutoSaveIndicator
-        show={showAutoSave}
+        show={legacyPersistenceEnabled ? showAutoSave : false}
         storageMode={questionnairePersistence.storageMode}
         getStorageDiagnostics={questionnairePersistence.getStorageDiagnostics}
         getLocalPersistenceStatus={questionnairePersistence.getLocalPersistenceStatus}

@@ -1,10 +1,40 @@
 import { act, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import AutoSaveIndicator from '@/components/pro-form/AutoSaveIndicator';
+import AutoSaveIndicator, {
+  AUTO_SAVE_STATUS_WORDING,
+} from '@/components/pro-form/AutoSaveIndicator';
 
 afterEach(() => vi.useRealTimers());
 
 describe('truthful autosave status', () => {
+  it.each(Object.entries(AUTO_SAVE_STATUS_WORDING).filter(([state]) => (
+    state !== 'server_saved'
+  )))('renders the exact %s wording', (syncState, expected) => {
+    vi.useFakeTimers();
+    render(<AutoSaveIndicator show={1} syncState={syncState} />);
+    expect(screen.getByText(expected)).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveAttribute('aria-atomic', 'true');
+  });
+
+  it('does not claim a secure save until a server revision and time are acknowledged', () => {
+    vi.useFakeTimers();
+    const { rerender } = render(
+      <AutoSaveIndicator show={1} syncState="server_saved" />,
+    );
+    expect(screen.getByText('Saving securely…')).toBeInTheDocument();
+    expect(screen.queryByText('Saved securely')).not.toBeInTheDocument();
+
+    rerender(
+      <AutoSaveIndicator
+        show={2}
+        syncState="server_saved"
+        confirmedServerRevision={2}
+        lastServerSavedAt="2033-05-18T12:00:00.000Z"
+      />,
+    );
+    expect(screen.getByText('Saved securely')).toBeInTheDocument();
+  });
+
   it.each([
     ['indexeddb', 'Progress saved in this browser.'],
     ['localstorage', 'Progress saved in this browser.'],

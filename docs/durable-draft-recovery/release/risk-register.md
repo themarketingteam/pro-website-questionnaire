@@ -333,3 +333,20 @@ No rating is lowered and no risk is closed. The visual choice/modal gate,
 ongoing autosave ordering, deployed browser matrix, staging API operation, and
 production-disabled evidence remain pending. No flag, schema, Base44 resource,
 deployment, production system, or Git remote was changed.
+
+## 2026-08-06 public recovery page and panel source evidence
+
+The [public recovery page and panel contract](../frontend/public-recovery-page-and-panel-contract.md)
+reduces local UI uncertainty for `RISK-001`, `RISK-003`, `RISK-006`, and
+`RISK-018`: email recovery remains visibly unverified, code recovery cannot
+enumerate other drafts, choice fields are allowlisted, email is masked, full
+code display depends on the credential vault, and server-saved wording requires
+an acknowledged revision and timestamp. The panel is outside the header and
+the footer omits the full code.
+
+No risk is closed or lowered. Exact-email knowledge remains an accepted
+authorization risk; XSS/shared-browser/extension access to visible or stored
+credentials remains material; and deployed DOM, analytics, accessibility,
+CAPTCHA, API-scope, and browser evidence remain pending. This is source and
+synthetic local-browser work only. No autosave migration, email, Base44 cloud
+change, deployment, production action, or remote Git operation occurred.

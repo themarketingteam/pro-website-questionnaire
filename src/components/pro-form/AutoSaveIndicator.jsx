@@ -1,12 +1,50 @@
 import { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
 
+export const AUTO_SAVE_STATUS_WORDING = Object.freeze({
+  local_saving: 'Saving in this browser…',
+  local_saved: 'Saved in this browser',
+  server_saving: 'Saving securely…',
+  server_saved: 'Saved securely',
+  offline_local_only: 'Offline — saved in this browser and will sync when reconnected',
+  retrying: 'We could not sync yet — retrying',
+  error: 'We could not save securely yet',
+  restored: 'Your previous draft was restored',
+  submitted: 'Submitted — read-only',
+});
+
+/**
+ * @param {{
+ *   state?: string | null,
+ *   confirmedServerRevision?: number | null,
+ *   lastServerSavedAt?: string | null,
+ * }} [options]
+ */
+export const resolveAutoSaveStatus = ({
+  state,
+  confirmedServerRevision,
+  lastServerSavedAt,
+} = {}) => {
+  if (!Object.hasOwn(AUTO_SAVE_STATUS_WORDING, state)) return null;
+  if (state === 'server_saved') {
+    const serverAcknowledged = Number.isSafeInteger(confirmedServerRevision)
+      && confirmedServerRevision > 0
+      && typeof lastServerSavedAt === 'string'
+      && Number.isFinite(Date.parse(lastServerSavedAt));
+    if (!serverAcknowledged) return 'server_saving';
+  }
+  return state;
+};
+
 export default function AutoSaveIndicator({
   show,
   storageMode = 'unknown',
   getStorageDiagnostics,
   getLocalPersistenceStatus,
   serverConfirmed = false,
+  syncState = null,
+  confirmedServerRevision = null,
+  lastServerSavedAt = null,
 }) {
   const [visible, setVisible] = useState(false);
   const [fading, setFading] = useState(false);
@@ -16,6 +54,11 @@ export default function AutoSaveIndicator({
   const savedDelayMs = 200;
   const fadeDelayMs = 3000;
   const hideDelayMs = 3500;
+  const explicitStatus = resolveAutoSaveStatus({
+    state: syncState,
+    confirmedServerRevision,
+    lastServerSavedAt,
+  });
 
   useEffect(() => {
     if (!show) return;
@@ -27,6 +70,7 @@ export default function AutoSaveIndicator({
     setResolvedStorageMode(storageMode);
 
     let savedTimer;
+    if (explicitStatus) setSaved(true);
     let attempts = 0;
     const resolveSavedState = () => {
       let nextMode = storageMode;
@@ -48,7 +92,7 @@ export default function AutoSaveIndicator({
       setResolvedStorageMode(nextMode);
       setSaved(true);
     };
-    savedTimer = setTimeout(resolveSavedState, savedDelayMs);
+    if (!explicitStatus) savedTimer = setTimeout(resolveSavedState, savedDelayMs);
 
     const fadeTimer = setTimeout(() => {
       setFading(true);
@@ -71,6 +115,7 @@ export default function AutoSaveIndicator({
     savedDelayMs,
     fadeDelayMs,
     hideDelayMs,
+    explicitStatus,
   ]);
 
   if (!visible) return null;
@@ -79,6 +124,7 @@ export default function AutoSaveIndicator({
     <div
       role="status"
       aria-live="polite"
+      aria-atomic="true"
       className={`fixed bottom-6 right-6 bg-white border border-slate-200 shadow-lg rounded-xl px-4 py-3 flex items-center gap-3 z-50 transition-opacity duration-500 ${fading ? 'opacity-0' : 'opacity-100'}`}
     >
       <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
@@ -87,7 +133,9 @@ export default function AutoSaveIndicator({
       <div>
         <p className="font-semibold text-slate-900 text-sm">💾 Auto-Save</p>
         <p className="text-xs text-slate-500">
-          {!saved
+          {explicitStatus
+            ? AUTO_SAVE_STATUS_WORDING[explicitStatus]
+            : !saved
             ? 'Saving your progress in this browser…'
             : localSaveFailed
               ? 'Browser save could not be confirmed.'

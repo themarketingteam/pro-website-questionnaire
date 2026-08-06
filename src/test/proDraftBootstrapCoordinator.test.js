@@ -90,6 +90,8 @@ const harness = (overrides = {}) => {
   const recoveryApiClient = overrides.recoveryApiClient || {
     recoverProFormDraftByEmail: vi.fn(async () => ({ success: false })),
     recoverProFormDraftByCode: vi.fn(async () => ({ success: false })),
+    listProFormDraftRecoveryChoices: vi.fn(async () => ({ success: false })),
+    selectProFormDraftRecoveryChoice: vi.fn(async () => ({ success: false })),
   };
   const cache = overrides.cache || {
     loadCanonicalDraftCache: vi.fn(async () => ({ ok: true, present: false, state: null })),
@@ -357,6 +359,74 @@ describe('pro draft bootstrap coordinator', () => {
     expect(request).not.toHaveProperty('email');
     expect(subject.coordinator.getRecoveryCodeForDisplay())
       .toBe('2345-6789-ABCD-EFGH-JKMN');
+    expect(subject.coordinator.canListRecoveryChoices()).toBe(false);
+    expect(await subject.coordinator.listRecoveryChoices()).toMatchObject({
+      success: false,
+      errorCode: 'RECOVERY_CHOICES_NOT_AUTHORIZED',
+    });
+    expect(subject.recoveryApiClient.listProFormDraftRecoveryChoices).not.toHaveBeenCalled();
+  });
+
+  it('lists and selects only through an email-authorized recovery session', async () => {
+    const token = `${'a'.repeat(43)}.${'b'.repeat(43)}`;
+    const selectedToken = `${'c'.repeat(43)}.${'d'.repeat(43)}`;
+    const subject = harness();
+    await subject.coordinator.bootstrap();
+    subject.recoveryApiClient.recoverProFormDraftByEmail.mockResolvedValue({
+      success: true,
+      recoveryCompleted: true,
+      recoverySessionToken: token,
+      recoverySessionExpiresAt: '2033-05-19T00:00:00.000Z',
+      otherEligibleDraftsAvailable: true,
+      draft: { draftId: 'draft-synthetic-1', recoveryCodeHint: 'JKMN' },
+    });
+    subject.apiClient.loadProFormDraft.mockResolvedValueOnce(response());
+    await subject.coordinator.recoverDraftByEmail('synthetic.owner@example.invalid');
+
+    subject.recoveryApiClient.listProFormDraftRecoveryChoices.mockResolvedValue({
+      success: true,
+      choices: [{
+        draftId: 'draft-submitted-older',
+        status: 'submitted',
+        readOnly: true,
+        businessNameDisplay: 'Synthetic Submitted Business',
+        isCurrentSelection: false,
+      }],
+    });
+    expect((await subject.coordinator.listRecoveryChoices()).choices).toHaveLength(1);
+    expect(subject.recoveryApiClient.listProFormDraftRecoveryChoices).toHaveBeenCalledWith({
+      recoverySessionToken: token,
+    });
+    expect(subject.recoveryApiClient.listProFormDraftRecoveryChoices.mock.calls[0][0])
+      .not.toHaveProperty('email');
+
+    const submitted = canonical({
+      draftId: 'draft-submitted-older',
+      sessionId: 'session-submitted-older',
+      draftStatus: 'submitted',
+    });
+    subject.recoveryApiClient.selectProFormDraftRecoveryChoice.mockResolvedValue({
+      success: true,
+      recoveryCompleted: true,
+      recoverySessionToken: selectedToken,
+      recoverySessionExpiresAt: '2033-05-19T00:00:00.000Z',
+      draft: { draftId: submitted.draftId, recoveryCodeHint: 'JKMN' },
+    });
+    subject.apiClient.loadProFormDraft.mockResolvedValueOnce(response(submitted));
+    const result = await subject.coordinator.selectRecoveryChoice(submitted.draftId);
+    expect(result).toMatchObject({ success: true, readOnly: true });
+    expect(JSON.stringify(result)).not.toContain(selectedToken);
+    expect(subject.recoveryApiClient.selectProFormDraftRecoveryChoice).toHaveBeenCalledWith({
+      recoverySessionToken: token,
+      selectedDraftId: submitted.draftId,
+    });
+  });
+
+  it('rejects a malformed or other-email choice before any backend selection call', async () => {
+    const subject = harness();
+    expect(await subject.coordinator.selectRecoveryChoice('draft id from another email'))
+      .toMatchObject({ success: false, errorCode: 'RECOVERY_CHOICE_NOT_AUTHORIZED' });
+    expect(subject.recoveryApiClient.selectProFormDraftRecoveryChoice).not.toHaveBeenCalled();
   });
 
   it('hydrates submitted recovery as read-only', async () => {

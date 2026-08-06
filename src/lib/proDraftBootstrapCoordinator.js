@@ -90,6 +90,7 @@ export const PRO_DRAFT_BOOTSTRAP_ERROR_CODES = Object.freeze({
 
 const PHASE_SET = new Set(PRO_DRAFT_BOOTSTRAP_PHASES);
 const TERMINAL_DRAFT_STATUSES = new Set(['cleared_superseded', 'expired', 'deleted']);
+const SAFE_DRAFT_ID = /^[A-Za-z0-9._:-]{1,128}$/u;
 
 const nowIso = (now = Date.now) => new Date(typeof now === 'function' ? now() : now).toISOString();
 
@@ -579,6 +580,7 @@ export const createProDraftBootstrapCoordinator = (options = {}) => {
       environment: runtimeConfig.environment,
       browserNamespace,
       draft: response.draft,
+      resumeToken: null,
       recoverySessionToken: response.recoverySessionToken,
       recoverySessionExpiresAt: response.recoverySessionExpiresAt,
       recoveryCode: fullCode,
@@ -666,6 +668,89 @@ export const createProDraftBootstrapCoordinator = (options = {}) => {
       readOnly: response.readOnly === true || response.draft?.readOnly === true,
       outcome,
       draftMetadata: response.draft,
+    });
+  };
+
+  const canListRecoveryChoices = () => Boolean(
+    credentials?.authorizationMethod === 'email'
+    && credentials?.recoverySessionToken,
+  );
+
+  const listRecoveryChoices = async () => {
+    if (!canListRecoveryChoices()) {
+      return Object.freeze({
+        success: false,
+        errorCode: 'RECOVERY_CHOICES_NOT_AUTHORIZED',
+        choices: Object.freeze([]),
+      });
+    }
+    const response = await recoveryApiClient.listProFormDraftRecoveryChoices({
+      recoverySessionToken: credentials.recoverySessionToken,
+    });
+    if (!response?.success || !Array.isArray(response.choices)) {
+      return Object.freeze({
+        success: false,
+        errorCode: 'RECOVERY_CHOICES_UNAVAILABLE',
+        choices: Object.freeze([]),
+      });
+    }
+    return Object.freeze({
+      success: true,
+      errorCode: null,
+      choices: response.choices,
+    });
+  };
+
+  const selectRecoveryChoice = async (selectedDraftId) => {
+    if (!canListRecoveryChoices()
+      || typeof selectedDraftId !== 'string'
+      || !SAFE_DRAFT_ID.test(selectedDraftId)) {
+      return Object.freeze({
+        success: false,
+        errorCode: 'RECOVERY_CHOICE_NOT_AUTHORIZED',
+      });
+    }
+    const response = await recoveryApiClient.selectProFormDraftRecoveryChoice({
+      recoverySessionToken: credentials.recoverySessionToken,
+      selectedDraftId,
+    });
+    if (!response?.success || !response.recoveryCompleted) {
+      return Object.freeze({
+        success: false,
+        errorCode: 'RECOVERY_CHOICE_NOT_COMPLETED',
+      });
+    }
+    const existingForSelectedDraft = credentials?.draftId === response.draft?.draftId
+      ? { ...credentials, recoveryCode: null }
+      : null;
+    const saved = await setCredentialBundle(createCredentialBundle({
+      existing: existingForSelectedDraft,
+      environment: runtimeConfig.environment,
+      browserNamespace,
+      draft: response.draft,
+      resumeToken: null,
+      recoverySessionToken: response.recoverySessionToken,
+      recoverySessionExpiresAt: response.recoverySessionExpiresAt,
+      recoveryCode: null,
+      recoveryCodeHint: response.draft?.recoveryCodeHint || null,
+      recoveryCodeVersion: response.draft?.recoveryCodeVersion || null,
+      authorizationMethod: 'email',
+      now: options.now,
+    }), { allowRecoveryCode: false });
+    state = Object.freeze({
+      ...state,
+      storageMode: saved.storageMode,
+      memoryOnly: saved.storageMode === 'memory_only',
+    });
+    const loaded = await loadAuthorized({
+      authorization: { recoverySessionToken: response.recoverySessionToken },
+      draftId: response.draft.draftId,
+      outcome: 'email_draft_recovered',
+    });
+    return Object.freeze({
+      ...loaded,
+      success: true,
+      selectionCompleted: true,
     });
   };
 
@@ -873,6 +958,11 @@ export const createProDraftBootstrapCoordinator = (options = {}) => {
       keepRecoveryCode: recoveryOptions.keepInBrowser !== false,
       captchaToken: recoveryOptions.captchaToken,
     })),
+    listRecoveryChoices: () => action(listRecoveryChoices),
+    selectRecoveryChoice: (selectedDraftId) => action(() => (
+      selectRecoveryChoice(selectedDraftId)
+    )),
+    canListRecoveryChoices,
     loadAuthorizedDraft: (input) => action(() => loadAuthorized(input)),
     createNewDraftAssociation: (input) => action(() => createNew(input)),
     getState: () => state,

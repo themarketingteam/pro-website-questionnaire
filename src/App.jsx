@@ -6,12 +6,13 @@ import { queryClientInstance } from '@/lib/query-client'
 import VisualEditAgent from '@/lib/VisualEditAgent'
 import NavigationTracker from '@/lib/NavigationTracker'
 import { pagesConfig } from './pages.config'
-import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import AdminSubmitIntake from './pages/AdminSubmitIntake';
 import ProFormDraftRecovery from './pages/ProFormDraftRecovery';
+import ProDraftRecovery from './pages/ProDraftRecovery';
 import QuestionnaireIntakeRecoveryPage from './pages/QuestionnaireIntakeRecovery';
 import DraftRecoveryPasswordGate from '@/components/admin/DraftRecoveryPasswordGate';
 import AppRuntimeShell from '@/components/common/AppRuntimeShell';
@@ -68,8 +69,10 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
   </Layout>
   : <Suspense fallback={<AppRouteLoader />}>{children}</Suspense>;
 
-const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, isAuthenticated, navigateToLogin } = useAuth();
+export const AuthenticatedApp = () => {
+  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const location = useLocation();
+  const isPublicRecoveryRoute = location.pathname === '/recover-draft';
 
   // Show loading spinner while checking app public settings or auth
   if (isLoadingPublicSettings || isLoadingAuth) {
@@ -81,7 +84,7 @@ const AuthenticatedApp = () => {
   }
 
   // Handle authentication errors
-  if (authError) {
+  if (authError && !isPublicRecoveryRoute) {
     if (authError.type === 'user_not_registered') {
       return <UserNotRegisteredError />;
     } else if (authError.type === 'auth_required') {
@@ -97,6 +100,11 @@ const AuthenticatedApp = () => {
       <Route path="/" element={
         <LayoutWrapper currentPageName={mainPageKey}>
           <MainPage />
+        </LayoutWrapper>
+      } />
+      <Route path="/recover-draft" element={
+        <LayoutWrapper currentPageName={"recover-draft"}>
+          <ProDraftRecovery />
         </LayoutWrapper>
       } />
       {Object.entries(Pages).map(([path, Page]) => (

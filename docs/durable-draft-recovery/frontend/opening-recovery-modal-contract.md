@@ -129,3 +129,14 @@ status or alert semantics.
 This is source and local-browser evidence. No staging site was deployed, no
 email was sent, no Base44 resource was changed, and no production behavior was
 enabled by this implementation.
+
+## Public recovery continuation
+
+The separate [public recovery page and panel contract](./public-recovery-page-and-panel-contract.md)
+reuses this modal's coordinator, credential-vault, generic-error, and
+conditional-CAPTCHA boundaries at `/recover-draft`. Unlike the mandatory
+opening gate, the public page accepts only an explicit email or recovery-code
+request and may expose the email-authorized older-draft list. The persistent
+V2 panel is rendered immediately before Question 1 with compact footer access;
+it is never rendered in the global header. Neither surface changes this
+modal's V2-disabled legacy behavior or activates ongoing server autosave.

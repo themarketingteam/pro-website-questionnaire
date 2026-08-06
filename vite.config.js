@@ -24,6 +24,10 @@ export default defineConfig({
           process.cwd(),
           'tests/e2e/fixtures/pro-draft-entry.html',
         ),
+        'pro-draft-recovery': resolve(
+          process.cwd(),
+          'tests/e2e/fixtures/pro-draft-recovery.html',
+        ),
       },
     },
   } : undefined,

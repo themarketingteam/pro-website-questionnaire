@@ -204,3 +204,17 @@ cleanup.
 Checklist items 5, 6, 7, 9, 13, 15, 17, 20, and the manual domain/account
 checks remain not ready. No readiness item is promoted and the overall decision
 remains **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
+
+### 2026-08-06 public recovery page and panel local evidence
+
+The account-free `/recover-draft` source route, authorized transient choice
+list, V2-only recovery panel directly before Question 1, compact footer access,
+masking helpers, and truthful save-state wording are implemented locally. The
+browser fixture is synthetic, read-only, and protected by the no-external-side-
+effect capture. It is not evidence that the staging site, live functions,
+CAPTCHA provider, storage policy, or accessibility profile is certified.
+
+No readiness item is promoted. Ordinary V2 server autosave was not migrated;
+no email, entity, function, secret, record, site, domain, connector, webhook,
+Base44 deployment, production action, or Git push occurred. The decision
+remains **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
