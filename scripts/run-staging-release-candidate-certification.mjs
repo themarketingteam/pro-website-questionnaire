@@ -122,6 +122,14 @@ export const runStagingReleaseCandidateCertification = async (
   const config = JSON.parse(await readFile(path.join(repositoryRoot, 'config/durable-draft-staging-release-candidate.json'), 'utf8'));
   state.manualEvidence = config.requiredManualEvidence;
   state.rollbackDrillStatus = config.requiredManualEvidence.find(({ id }) => id === 'rollback-drill')?.status || 'MISSING';
+  const manualEvidence = runner(process.execPath, [
+    'scripts/validate-manual-staging-evidence.mjs',
+    '--output', path.join(options.outputDir, 'manual-evidence-summary.json'),
+  ], options);
+  state.groups.push({
+    id: 'manual-staging-evidence',
+    status: manualEvidence.status === 0 ? 'passed' : 'blocked',
+  });
   const manifest = runner(process.execPath, [
     'scripts/build-staging-release-candidate-manifest.mjs',
     '--precheck', path.join(options.outputDir, 'precheck.json'),

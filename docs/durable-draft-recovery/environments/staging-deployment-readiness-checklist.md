@@ -1,5 +1,20 @@
 # Staging Deployment Readiness Checklist
 
+## 2026-08-06 accessibility/device/mail/PDF certification
+
+- [x] Add axe desktop/mobile-emulation coverage for twelve required UI states.
+- [x] Pass the local 24-test axe run with no serious, critical, or moderate findings.
+- [x] Add fail-closed manual evidence validation and sanitized evidence documents.
+- [x] Generate and visually render a safe synthetic PDF outside Git.
+- [ ] Correct and recertify the nonstandard single tall-page PDF pagination.
+- [ ] Configure and verify the approved staging URL without credentials.
+- [ ] Complete physical iOS/Android and required assistive-technology checks.
+- [ ] Complete Outlook/Gmail/Teams/iOS Mail/Android Gmail link checks.
+- [ ] Complete approved internal email-client rendering checks.
+
+No staging redeploy was attempted because no verified staging target was
+available. Production, domains, clients, and `main` remain untouched.
+
 ## 2026-08-06 staging release-candidate gate
 
 - [x] Add versioned staging RC configuration and accepted pending families.

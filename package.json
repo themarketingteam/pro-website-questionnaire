@@ -47,6 +47,8 @@
     "test:e2e:debug": "playwright test --debug",
     "test:e2e:install": "playwright install",
     "test:e2e:edge": "node scripts/run-e2e.mjs edge",
+    "test:e2e:accessibility": "playwright test tests/e2e/accessibility/staging-accessibility.spec.js --project=chromium-desktop --project=mobile-chromium",
+    "test:e2e:pdf-qa": "playwright test tests/e2e/pdf/synthetic-pdf-visual-qa.spec.js --project=chromium-desktop",
     "test:e2e:harness": "playwright test tests/e2e/harness/fixture-mechanics.spec.js",
     "test:e2e:pending-report": "node scripts/report-pending-draft-v2-tests.mjs",
     "test:e2e:pending-strict": "node scripts/report-pending-draft-v2-tests.mjs --fail-on-pending",
@@ -61,8 +63,10 @@
     "release:precheck-staging-rc": "node scripts/precheck-staging-release-candidate.mjs",
     "release:build-staging-rc-manifest": "node scripts/build-staging-release-candidate-manifest.mjs",
     "release:validate-feature-freeze": "node scripts/validate-release-candidate-feature-freeze.mjs",
+    "release:validate-manual-evidence": "node scripts/validate-manual-staging-evidence.mjs",
     "release:certify-staging-rc": "node scripts/run-staging-release-candidate-certification.mjs",
     "test:staging-rc": "vitest run --config src/vitest.config.js scripts/staging-release-candidate.test.js --reporter=dot --no-coverage",
+    "test:manual-staging-evidence": "vitest run --config src/vitest.config.js scripts/manual-staging-evidence.test.js --reporter=dot --no-coverage",
     "security:audit-dependencies": "node scripts/audit-durable-draft-dependencies.mjs",
     "security:scan-artifacts": "node scripts/scan-durable-draft-test-artifacts.mjs",
     "security:test": "node scripts/run-durable-draft-security-tests.mjs --mode local",
@@ -162,6 +166,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/js": "^9.19.0",
     "@playwright/test": "^1.62.1",
     "@types/node": "^22.13.5",

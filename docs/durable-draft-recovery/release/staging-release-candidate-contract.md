@@ -85,7 +85,17 @@ and cannot deploy or create a tag.
 
 ## Current manual evidence status
 
-Real-device/browser checks, mail-app link checks, and the rollback drill remain
+Real-device/browser checks, keyboard/screen-reader accessibility, mail-app link
+and email-client rendering checks, PDF visual QA, and the rollback drill remain
 pending by design. Prompt 4 will create the freeze ref and tag only after all
 automated and manual evidence is complete. No production state is changed by
 this contract.
+
+Prompt 2 adds a fail-closed manual evidence validator covering the accessibility
+checklist, device/mail-link manifest, email-client rendering matrix, and PDF QA
+report. Local Chromium desktop and Pixel 7 emulation passed 24/24 axe checks
+with no serious, critical, or moderate findings; this does not satisfy physical
+device or assistive-technology rows. No staging URL, approved test mailbox, or
+device-cloud credential was available, and the synthetic PDF exposed a
+nonstandard single tall-page pagination defect. The RC therefore remains
+blocked and no manual status is advanced.

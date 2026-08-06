@@ -1,5 +1,18 @@
 # Durable Draft Recovery Requirements Traceability Matrix
 
+## 2026-08-06 accessibility/device/mail/PDF evidence gate
+
+`DR-A11Y-001` now has a 12-state axe suite across desktop and mobile emulation;
+the local run passed 24/24 with zero serious, critical, or moderate findings.
+The [manual checklist](../testing/manual-accessibility-checklist.md),
+[device/mail-link manifest](../testing/device-and-mail-link-certification-manifest.md),
+[email-client matrix](../testing/staging-email-client-rendering.md), and
+[PDF QA report](../testing/staging-pdf-visual-qa.md) remain pending and are
+machine-validated. Physical device, mail-client, screen-reader, keyboard,
+staging URL, and approved-mailbox evidence is unavailable. Local PDF rendering
+also identified a one-page `612 x 5115.93 pt` pagination blocker. No staging or
+production requirement advances to certified.
+
 ## 2026-08-06 staging release-candidate gate source
 
 The [staging RC contract](./staging-release-candidate-contract.md), versioned

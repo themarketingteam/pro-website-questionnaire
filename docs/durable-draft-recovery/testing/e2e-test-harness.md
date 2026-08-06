@@ -1,5 +1,25 @@
 # Safe multi-browser E2E test harness
 
+## Accessibility and manual-evidence certification
+
+`npm run test:e2e:accessibility` runs axe against twelve opening, form, recovery,
+dialog, submitted, admin, CAPTCHA, and maintenance states in Chromium desktop
+and Pixel 7 emulation. Serious/critical findings fail immediately; safe summaries
+retain moderate finding IDs/counts without raw DOM or user data. The opening
+flow also requires a visible focus indicator.
+
+`npm run test:e2e:pdf-qa` exercises the existing questionnaire PDF generator
+with a deterministic synthetic snapshot. Setting
+`E2E_WRITE_PDF_QA_ARTIFACTS=true` writes only to the ignored
+`.durable-draft-artifacts/manual-staging/pdf-qa` directory for rendering and
+inspection. Never commit generated PDFs or screenshots.
+
+`npm run release:validate-manual-evidence` validates the four sanitized manual
+documents and fails on missing rows, tester/time/result omissions, another
+commit, production URLs, credential-bearing links, or incomplete evidence.
+Playwright device emulation is supplemental and must never be labeled as a real
+device result.
+
 - Status: local foundation implemented; staging execution awaits an explicit deployed staging URL
 - Date: 2026-08-06
 - Scope: read-only questionnaire shell, fixture mechanics, and synthetic recovery-bootstrap controller validation

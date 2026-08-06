@@ -80,6 +80,18 @@
       "status": "PENDING_FINAL_STAGING_MANUAL_CERTIFICATION"
     },
     {
+      "id": "manual-accessibility",
+      "status": "PENDING_FINAL_STAGING_MANUAL_CERTIFICATION"
+    },
+    {
+      "id": "email-client-rendering",
+      "status": "PENDING_FINAL_STAGING_MANUAL_CERTIFICATION"
+    },
+    {
+      "id": "pdf-visual-qa",
+      "status": "PENDING_FINAL_STAGING_MANUAL_CERTIFICATION"
+    },
+    {
       "id": "rollback-drill",
       "status": "PENDING_PROMPT_3"
     }

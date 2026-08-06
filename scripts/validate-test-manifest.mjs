@@ -98,6 +98,8 @@ const requiredFoundationFiles = [
   'scripts/validate-release-candidate-feature-freeze.mjs',
   'scripts/run-staging-release-candidate-certification.mjs',
   'scripts/staging-release-candidate.test.js',
+  'scripts/validate-manual-staging-evidence.mjs',
+  'scripts/manual-staging-evidence.test.js',
   'scripts/build-durable-draft-evidence-bundle.mjs',
   'scripts/cleanup-durable-draft-test-data.mjs',
   'scripts/scan-durable-draft-test-artifacts.mjs',
@@ -122,6 +124,13 @@ const requiredFoundationFiles = [
   'docs/durable-draft-recovery/testing/security-and-adversarial-test-contract.md',
   'docs/durable-draft-recovery/testing/load-capacity-and-chaos-test-contract.md',
   'docs/durable-draft-recovery/release/staging-release-candidate-contract.md',
+  'docs/durable-draft-recovery/testing/manual-accessibility-checklist.md',
+  'docs/durable-draft-recovery/testing/device-and-mail-link-certification-manifest.md',
+  'docs/durable-draft-recovery/testing/staging-email-client-rendering.md',
+  'docs/durable-draft-recovery/testing/staging-pdf-visual-qa.md',
+  'tests/e2e/accessibility/staging-accessibility.spec.js',
+  'tests/e2e/pdf/synthetic-pdf-visual-qa.spec.js',
+  'tests/e2e/helpers/accessibility.js',
 ];
 
 for (const file of requiredFoundationFiles) {
@@ -130,6 +139,15 @@ for (const file of requiredFoundationFiles) {
     `required CI foundation file is missing: ${file}`,
   );
 }
+
+const stagingRcOrchestrator = readFileSync(
+  path.join(repositoryRoot, 'scripts/run-staging-release-candidate-certification.mjs'),
+  'utf8',
+);
+requireCondition(
+  stagingRcOrchestrator.includes('scripts/validate-manual-staging-evidence.mjs'),
+  'staging RC orchestrator must block on authoritative manual evidence validation',
+);
 
 const nodeVersionPath = path.join(repositoryRoot, '.node-version');
 if (existsSync(nodeVersionPath)) {
@@ -276,6 +294,8 @@ const requiredScripts = [
   'test:e2e:debug',
   'test:e2e:install',
   'test:e2e:edge',
+  'test:e2e:accessibility',
+  'test:e2e:pdf-qa',
   'test:e2e:harness',
   'test:e2e:pending-report',
   'test:e2e:pending-strict',
@@ -290,8 +310,10 @@ const requiredScripts = [
   'release:precheck-staging-rc',
   'release:build-staging-rc-manifest',
   'release:validate-feature-freeze',
+  'release:validate-manual-evidence',
   'release:certify-staging-rc',
   'test:staging-rc',
+  'test:manual-staging-evidence',
   'security:audit-dependencies',
   'security:scan-artifacts',
   'security:test',

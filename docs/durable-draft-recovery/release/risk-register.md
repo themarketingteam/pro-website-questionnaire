@@ -1,5 +1,19 @@
 # Durable Draft Recovery Risk Register
 
+## 2026-08-06 final manual-certification risks
+
+- **Open:** real iOS/Android, VoiceOver, TalkBack, NVDA, keyboard-only, Outlook,
+  Gmail, Teams, iOS Mail, and Android Gmail evidence is unavailable.
+- **Open:** no approved staging URL or internal test mailbox was available, so
+  no safe test link was generated or sent and no email-client rendering claim
+  is made.
+- **Open:** the local synthetic PDF visually preserved content but rendered as
+  one nonstandard `612 x 5115.93 pt` raster page. Standard pagination and mobile
+  download usability remain release-blocking.
+- **Mitigation:** `release:validate-manual-evidence` rejects missing rows,
+  unnamed/stale results, production or credential-bearing URLs, and incomplete
+  email/PDF evidence. The staging RC cannot pass while these risks remain.
+
 ## 2026-08-06 comprehensive certification stop
 
 The `staging_security` coverage gate failed with 25 release blockers before any

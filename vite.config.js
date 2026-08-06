@@ -44,6 +44,18 @@ export default defineConfig({
           process.cwd(),
           'tests/e2e/fixtures/pro-draft-submission.html',
         ),
+        'pro-draft-admin': resolve(
+          process.cwd(),
+          'tests/e2e/fixtures/pro-draft-admin.html',
+        ),
+        'pro-draft-maintenance': resolve(
+          process.cwd(),
+          'tests/e2e/fixtures/pro-draft-maintenance.html',
+        ),
+        'pro-draft-pdf': resolve(
+          process.cwd(),
+          'tests/e2e/fixtures/pro-draft-pdf.html',
+        ),
       },
     },
   } : undefined,
