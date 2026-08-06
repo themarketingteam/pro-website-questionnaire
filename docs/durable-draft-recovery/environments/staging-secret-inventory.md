@@ -2,7 +2,7 @@
 
 - Status: **STAGING_CRYPTOGRAPHIC_SECRETS_CONFIGURED**
 - Inventory date: 2026-08-05
-- Inventory rows: **67 names**
+- Inventory rows: **77 names**
 - Current production Base44 secret names observed: **4**
 - Current staging Base44 secret names observed: **8** (six cryptographic secrets and two ordinary staging controls)
 
@@ -22,6 +22,16 @@ The four production names observed through the names-only Base44 secret command 
 | 6 | `EXPECTED_GIT_BRANCH` | Branch/tag assertion for deployment guard | Yes | Yes | Yes | No |
 | 7 | `VITE_APP_ENVIRONMENT` | Visible/runtime environment marker | Yes | Yes | Yes | No |
 | 8 | `STAGING_EMAIL_REDIRECT_TO` | Internal destination for every staging email | Later | No | Yes | No |
+| 8a | `PRO_DRAFT_EMAIL_MODE` | Backend SES mode: disabled, staging_redirect, or production | Later; keep `disabled` | Later; keep `disabled` until approved | Yes when activated | Safe `disabled` only |
+| 8b | `PRO_DRAFT_SES_FROM_EMAIL` | Approved SES sender email; must be noreply at the approved domain | Later | Later | Prefer No after identity approval | No; configure independently |
+| 8c | `PRO_DRAFT_SES_FROM_NAME` | Safe sender display name; defaults to MSP Success Websites | Optional | Optional | No | Yes; non-secret approved text only |
+| 8d | `PRO_DRAFT_AWS_REGION` | Preferred backend SES region | Later | Later | Prefer Yes | No; configure from approved account inventory |
+| 8e | `PRO_DRAFT_AWS_ACCESS_KEY_ID` | Preferred least-privilege SES access-key identifier | Later | Later | Yes | No |
+| 8f | `PRO_DRAFT_AWS_SECRET_ACCESS_KEY` | Preferred least-privilege SES secret | Later | Later | Yes | No |
+| 8g | `PRO_DRAFT_AWS_SESSION_TOKEN` | Optional temporary SES credential session token | Optional | Optional | Yes | No |
+| 8h | `PRO_DRAFT_SES_TIMEOUT_MS` | Bounded SES timeout; default 10000, clamped 2000–30000 | Optional | Optional | No | Yes; non-secret bounded configuration only |
+| 8i | `PRO_DRAFT_RECOVERY_BASE_URL` | HTTPS recovery-site base URL with no code/query/fragment | Later | Later | Yes | Only separately reviewed noncredential URL |
+| 8j | `AWS_SESSION_TOKEN` | Standard AWS compatibility alias for a temporary session token | Optional compatibility only | Optional compatibility only | Yes | No |
 | 9 | `AWS_REGION` | Future SES region | Later | Later | Prefer Yes | Prefer No |
 | 10 | `AWS_ACCESS_KEY_ID` | Future least-privilege SES access-key identifier | Later | Later | Yes | No |
 | 11 | `AWS_SECRET_ACCESS_KEY` | Future least-privilege SES secret | Later | Later | Yes | No |
@@ -178,3 +188,20 @@ credential. A future passing attempt must independently generate at least 48
 random bytes for staging, use a mode-`0600` file outside the repository, import
 without terminal echo, delete the file, and then record only the configured
 name. No production value may be copied or inferred.
+
+## 2026-08-06 SES transport source inventory
+
+The backend transport reserves the ten preferred configuration names in rows
+8–8i. Standard `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and
+`AWS_SESSION_TOKEN`, plus legacy-planned `SES_FROM_ADDRESS`, are compatibility
+aliases only; preferred names take precedence so operators do not duplicate
+secrets. No value was created, configured, queried, printed, or copied in this
+prompt. `SES_CONFIGURATION_SET` remains a future bounce/complaint event-routing
+control and is not read by the current source module.
+
+Sender verification, SES region, account sandbox/production status, IAM
+least-privilege policy, quotas, and bounce/complaint routing are **UNKNOWN**.
+The existing sanitized evidence still records staging external side effects as
+`disabled`; cloud state was not refreshed. Before any staging delivery, the
+real redirect must be configured outside Git and validated by presence/domain
+only. No real internal address belongs in this inventory.

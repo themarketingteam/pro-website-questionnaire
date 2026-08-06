@@ -650,6 +650,50 @@
       "description": "Number of backend recovery-code email delivery attempts.",
       "group": "recovery_email_delivery"
     },
+    "recovery_email_delivery_idempotency_hash": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "sensitive_hash", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves a purpose-keyed delivery deduplication hash without a raw idempotency key or recovery code.",
+      "publicProjectionRule": "omit",
+      "description": "Purpose-keyed hash used to deduplicate backend recovery-email delivery.",
+      "group": "recovery_email_delivery"
+    },
+    "recovery_email_delivery_purpose": {
+      "type": "string",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves only an allowlisted delivery purpose and never content or recipient context.",
+      "publicProjectionRule": "omit",
+      "description": "Safe bounded purpose code for the latest recovery-email delivery request.",
+      "group": "recovery_email_delivery"
+    },
+    "recovery_email_provider_message_id": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves a provider diagnostic identifier only under reviewed environment migration rules.",
+      "publicProjectionRule": "omit",
+      "description": "Backend-only provider message identifier for recovery-email diagnostics.",
+      "group": "recovery_email_delivery"
+    },
+    "recovery_email_last_request_id": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves an opaque delivery request correlation identifier without request content.",
+      "publicProjectionRule": "omit",
+      "description": "Opaque backend request identifier for the latest recovery-email delivery attempt.",
+      "group": "recovery_email_delivery"
+    },
     "recovery_email_last_sent_at": {
       "type": "string",
       "format": "date-time",
@@ -1469,7 +1513,7 @@
       "schemaFile": "base44/entities/ProFormDraft.jsonc",
       "baselineSha256": "134d638d3fd42f429022b694b1dc1ba8393341b8b133ff6eda22a3d12f06d1f6",
       "baselineExistingPropertiesSha256": "6b8993602c502ef8fdd119ed95ab10c4ddaafd7d16e531980888bad214873c5e",
-      "implementedSchemaSha256": "2775a9ba531b19769656203958a4f2ca411572ff0575834ea8017e0a4da73e4c",
+      "implementedSchemaSha256": "e247f8161a195a0bf69a91efbb050d0d9c2cbd946c3d884bcf8fe96ddff13e3e",
       "implementationStatus": "local_schema_implemented_not_pushed",
       "existingRequired": ["session_id"],
       "expectedRls": null,
@@ -1514,7 +1558,7 @@
         "bootstrap_idempotency_key_hash", "last_save_idempotency_key_hash", "last_save_request_id", "last_event_batch_idempotency_key_hash", "last_event_batch_request_id",
         "draft_generation", "previous_draft_id", "replacement_draft_id", "superseded_at", "superseded_reason", "status_version",
         "submitted_state_hash", "pdf_source_state_hash", "submitted_lock_version", "status_locked_at", "last_submission_error_code",
-        "recovery_email_delivery_status", "last_recovery_email_sent_at", "recovery_email_delivery_error_code", "recovery_email_delivery_attempt_count",
+        "recovery_email_delivery_status", "last_recovery_email_sent_at", "recovery_email_delivery_error_code", "recovery_email_delivery_attempt_count", "recovery_email_delivery_idempotency_hash", "recovery_email_delivery_purpose", "recovery_email_provider_message_id", "recovery_email_last_request_id",
         "retention_expires_at", "retention_hold", "retention_hold_reason", "retention_policy_version",
         "environment", "test_run_id", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version"
       ]

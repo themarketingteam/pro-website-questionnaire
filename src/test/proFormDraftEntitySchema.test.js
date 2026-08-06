@@ -74,6 +74,10 @@ const FIELD_CATEGORIES = {
     'last_recovery_email_sent_at',
     'recovery_email_delivery_error_code',
     'recovery_email_delivery_attempt_count',
+    'recovery_email_delivery_idempotency_hash',
+    'recovery_email_delivery_purpose',
+    'recovery_email_provider_message_id',
+    'recovery_email_last_request_id',
   ],
   retention: [
     'retention_expires_at',
@@ -103,6 +107,10 @@ const FORBIDDEN_RAW_FIELDS = [
   'resume_token',
   'recovery_session_token',
   'admin_grant',
+  'recovery_email_body',
+  'recovery_email_raw_code',
+  'aws_access_key',
+  'aws_secret_access_key',
 ];
 
 const schemaText = readFileSync(SCHEMA_PATH, 'utf8');
@@ -195,8 +203,8 @@ describe('ProFormDraft entity schema extension', () => {
     expect(Object.keys(draftPlan.existingFields)).toHaveLength(30);
   });
 
-  it('implements exactly the 60 optional protected fields with admin/backend FLS', () => {
-    expect(new Set(EXPECTED_NEW_FIELDS).size).toBe(60);
+  it('implements exactly the 64 optional protected fields with admin/backend FLS', () => {
+    expect(new Set(EXPECTED_NEW_FIELDS).size).toBe(64);
     expect([...draftPlan.proposedFields].sort()).toEqual([...EXPECTED_NEW_FIELDS].sort());
 
     for (const fieldName of EXPECTED_NEW_FIELDS) {

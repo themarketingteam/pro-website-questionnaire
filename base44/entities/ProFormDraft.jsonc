@@ -481,6 +481,38 @@
         "write": { "user_condition": { "role": "admin" } }
       }
     },
+    "recovery_email_delivery_idempotency_hash": {
+      "type": "string",
+      "description": "Purpose-keyed hash used to deduplicate backend recovery-email delivery without storing a raw idempotency key or recovery code",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "recovery_email_delivery_purpose": {
+      "type": "string",
+      "description": "Safe bounded purpose code for the latest recovery-email delivery request",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "recovery_email_provider_message_id": {
+      "type": "string",
+      "description": "Backend-only provider message identifier retained for delivery diagnostics without recipient, body, or recovery code",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "recovery_email_last_request_id": {
+      "type": "string",
+      "description": "Opaque backend request identifier for the latest recovery-email delivery attempt",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
     "retention_expires_at": {
       "type": "string",
       "format": "date-time",

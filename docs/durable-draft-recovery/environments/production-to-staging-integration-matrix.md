@@ -30,7 +30,7 @@ The names-only production secret check returned four names: `DRAFT_RECOVERY_PASS
 | `INT-011` | Base44 content-strategist agent | `generateAIContent`; `_shared/base44Agent`; `msp_content_strategist` | `BASE44_APP_ID`, `BASE44_SERVICE_ROLE_KEY` | Base44 agent/conversation API | Instruction, questionnaire context, draft content, and conversation messages |
 | `INT-012` | Base44 Core upload/storage | `FileUploadQuestion`, `ImageTaggingQuestion`, `MultiCertificationQuestion`, `MultiGuaranteeQuestion` | App-scoped Base44 runtime; no custom storage secret in source | Base44 managed file storage | Client-selected images, PDFs, Word/text files, filenames, and resulting URLs |
 | `INT-013` | Browser PDF generation/download | `PDFGenerator.jsx`; `pdf/*`; `useQuestionnairePdfDownload.js` | None currently; future `PDF_STAGING_DESTINATION` only if server storage is introduced | Client browser download; no current backend PDF destination | Submitted questionnaire snapshot, business name/domain, embedded images, and public branding assets |
-| `INT-014` | Dormant email capability and planned SES path | `src/api/integrations.js` exports `SendEmail`; ADR-001 plans SES; no active caller or SES function exists | Future `STAGING_EMAIL_REDIRECT_TO`, `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `SES_FROM_ADDRESS`, `SES_CONFIGURATION_SET` | No active production email path found; future Amazon SES/Base44 email integration | Future recovery code and associated unverified email; no current production recipient was found in source |
+| `INT-014` | Source-only SES transport and dormant Base44 email capability | Backend-only `proDraftEmailTransport`/`proDraftEmailTemplates`; `src/api/integrations.js` exports unused `SendEmail`; no active caller or deployed SES function | Preferred `PRO_DRAFT_EMAIL_MODE`, sender, AWS, timeout, recovery-base, and staging-redirect names; documented standard AWS/legacy sender aliases | No active production email path; future Amazon SES v2 delivery only after separate deployment/configuration | Future recovery code, safe business display name, and instructions only; no answers or current production recipient |
 | `INT-015` | Other dormant Base44 Core capabilities | `src/api/integrations.js` exports `SendSMS`, `GenerateImage`, and `ExtractDataFromUploadedFile`; no caller found | App-scoped Base44 runtime | Base44 Core integration layer | None currently; future data depends on the caller |
 | `INT-016` | Microsoft Clarity analytics | `index.html`; `src/lib/clarity.js`; questionnaire and PDF call sites | Current property identifier is source-configured; future `VITE_CLARITY_PROJECT_ID`; `ERROR_REPORTING_ENVIRONMENT` | Microsoft Clarity production property | Business domain, user ID/friendly label when present, page path, question IDs/types, answer metadata, validation/submit status, and PDF event metadata |
 | `INT-017` | Hotjar analytics | `src/components/HotjarTracking.jsx`; `src/Layout.jsx` | Current site identifier is source-configured; future `VITE_HOTJAR_SITE_ID`; `ERROR_REPORTING_ENVIRONMENT` | Hotjar production property | Browser/session behavior, page content/interaction, request metadata, and any data captured under the active Hotjar configuration |
@@ -59,7 +59,7 @@ The names-only production secret check returned four names: `DRAFT_RECOVERY_PASS
 | `INT-011` | External conversation write | Production Base44 agent/app | Separate staging agent/app or mock | Yes |
 | `INT-012` | Reversible external file write with durable URL | Production app storage | Isolated staging storage/mock, synthetic files | Yes |
 | `INT-013` | Local reversible browser file creation | No server delivery exists | Synthetic local download | No external replacement unless server delivery is introduced |
-| `INT-014` | Future irreversible email send | No active path | Disabled only | Yes before implementation; no SES work in this prompt |
+| `INT-014` | Future irreversible email send | Source transport exists but has no caller/deployment/configuration | `disabled`; later guarded `staging_redirect` only | Yes: source tests pass; cloud/account and live redirect certification remain |
 | `INT-015` | Dormant potentially irreversible integrations | No active caller | Disabled/no call | Yes if activated |
 | `INT-016` | Irreversible telemetry disclosure | Production Clarity property | Disabled or separate staging property | Yes |
 | `INT-017` | Irreversible telemetry/session disclosure | Production Hotjar property | Disabled or separate staging property | Yes |
@@ -86,7 +86,7 @@ The names-only production secret check returned four names: `DRAFT_RECOVERY_PASS
 | `INT-011` | Yes | Yes: conversation creation/external model processing | Separate staging agent/resource or mock | Staging app/agent assertion, synthetic prompt, timeout, and no-production-app tests | Agent is not deployed in staging; service-role isolation and prompt policy are not ready |
 | `INT-012` | Yes; uploaded files can be sensitive | Yes: stores files and returns durable URLs | Separate staging app storage or mock; synthetic uploads only | Storage namespace/app-ID assertion, content/size rules, cleanup, and production-URL denylist | Cleanup, retention, staging location proof, and upload policy are absent |
 | `INT-013` | Yes, but generated locally | Local file creation only | Local browser download using synthetic data; no server destination | PDF snapshot, asset failure, filename redaction, and no-upload/no-email test | Production external assets and staging banner/watermark review remain unresolved |
-| `INT-014` | Yes when implemented | Yes: sends email | **Disabled** until all recipients are redirected through `STAGING_EMAIL_REDIRECT_TO` and subjects start `[STAGING]` | Missing redirect suppresses send; entered address never becomes destination; prefix/allowlist/redaction tests | No redirect secret, SES inventory, sender, least-privilege IAM, bounce/complaint plan, or email implementation exists |
+| `INT-014` | Recovery address and code when later called | Yes: sends email | **Disabled**; later all staging destinations are server-rewritten through `STAGING_EMAIL_REDIRECT_TO` and subjects start `[STAGING]` | Injected source tests prove disabled makes no SES call, missing/invalid redirect fails closed, entered address never becomes an SES header, and prefix/injection/redaction rules hold | No redirect/AWS secret, verified sender, approved region, sandbox exit, least-privilege IAM, bounce/complaint plan, deployment, or live certification exists |
 | `INT-015` | Unknown if called | Potentially | Disabled; enable only with a separately reviewed staging resource | Assert exports have no staging call sites and unexpected invocation is blocked | No staging requirements or approved use case exists |
 | `INT-016` | Yes: domain/user/session context | Yes: telemetry disclosure | Disabled or separate staging property with synthetic identifiers and environment tag | Production property denylist and PII/tag allowlist tests | Identifier is hardcoded and no staging analytics configuration exists |
 | `INT-017` | Potentially | Yes: session/behavior disclosure | Disabled or separate staging property with privacy masking | Production site-ID denylist, masking, and no-client-data test | Site identifier is hardcoded and no staging privacy configuration exists |
@@ -100,7 +100,7 @@ The names-only production secret check returned four names: `DRAFT_RECOVERY_PASS
 
 | Category | Result | Required action |
 | --- | --- | --- |
-| Amazon SES, AWS credentials/region, S3, CloudFront | No implemented SES/AWS SDK call, AWS environment access, S3 bucket, or CloudFront URL found. SES is a future approved design only. | Keep email disabled. Complete account/region/sandbox/sender/IAM/quota/bounce/complaint inventory before implementation. |
+| Amazon SES, AWS credentials/region, S3, CloudFront | A backend-only, uncalled SES v2 source adapter now reads reserved server names and is fully injected in tests. No AWS account, credential, S3 bucket, CloudFront URL, deployment, or live call exists. | Keep email disabled. Complete account/region/sandbox/sender/IAM/quota/bounce/complaint inventory before configuration or deployment. |
 | CAPTCHA | No CAPTCHA SDK, key, widget, or backend verification found. | Reserve staging names, use separate keys, and keep public recovery blocked until abuse-control tests exist. |
 | Slack or Microsoft Teams | No direct integration found. | Keep disabled; inventory any future notification destination before authorization. |
 | Direct CRM integration | No direct Salesforce, HubSpot, or other CRM call found. Zapier's downstream actions are unknown. | Product/integration owner must inventory the production Zap workflow and create a separate staging sink. |
@@ -110,6 +110,16 @@ The names-only production secret check returned four names: `DRAFT_RECOVERY_PASS
 | Production email recipient | No active email caller or hardcoded recipient found. | Future staging mail must use the redirect policy below; do not infer a production recipient. |
 | Webhook signing secret | No separate webhook signature secret or verification found. Destination URLs are credential-bearing server configuration and no longer appear in source/public results/logs. | Reserve a signing-secret name only if the future staging endpoint supports verification; never log either destination. |
 | Dedicated external error reporter | No Sentry or comparable client found. | Keep `ERROR_REPORTING_ENVIRONMENT` reserved and require a separate staging project before adding one. |
+
+## 2026-08-06 SES source boundary
+
+The [SES transport and template contract](../email/amazon-ses-transport-and-template-contract.md)
+implements source-only environment routing, the fixed sender, a bounded SES v2
+adapter, safe result/diagnostics, and recovery/future-verification templates.
+It does not add a function or caller. `INT-014` therefore remains inactive and
+email remains disabled. Sender verification, region, SES account status, IAM,
+quotas, bounce/complaint handling, redirect ownership, and live routing remain
+release blockers. No other integration row is promoted by this change.
 
 ## Staging email policy
 

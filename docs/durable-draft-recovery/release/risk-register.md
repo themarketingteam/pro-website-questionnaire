@@ -226,3 +226,22 @@ remains explicitly accepted at its existing rating: email-only recovery is
 unverified and does not establish mailbox ownership. No secret, flag, schema,
 function, record, email, SES, Zapier, domain, staging site, production
 resource, or remote Git branch changed in this attempt.
+
+## 2026-08-06 SES transport and template source foundation
+
+The [SES transport and template contract](../email/amazon-ses-transport-and-template-contract.md)
+adds local, injected-test evidence for the `RISK-008` staging-recipient rewrite,
+`[STAGING]` subject prefix, fixed sender, mode/environment mismatch denial,
+bounded timeout, header/HTML injection rejection, safe provider result, no-code-
+in-link template, and frontend credential separation. Four optional protected
+delivery fields add idempotency/purpose/provider/request diagnostics without
+raw recipient, body, code, or AWS credential storage.
+
+No risk rating changes. `RISK-008` still requires live 100-message routing and
+event inspection. `RISK-009` remains fully blocking because sender/domain
+verification, region, SES sandbox/production status, quotas, least-privilege
+IAM, bounce/complaint handling, configuration-set routing, and AWS ownership
+are unknown. Email-only recovery remains unverified; future OTP/magic-link
+templates do not mitigate `RISK-001` and are not enabled. No AWS/Base44 secret,
+schema push, function deployment, email, record, production operation, or Git
+remote changed.

@@ -231,3 +231,22 @@ This attempt adds no staging evidence to `DR-ID-001`, `DR-ID-004`,
 `DR-REL-001`. Their source evidence remains unchanged; no requirement advances
 to environment certification. Production and `main` were untouched, and the
 feature branch was not pushed.
+
+### 2026-08-06 SES transport and template source implementation
+
+The [Amazon SES contract](../email/amazon-ses-transport-and-template-contract.md)
+and focused tests implement the local portions of `DR-EMAIL-001` and
+`DR-EMAIL-002`: fixed approved sender, default-off modes, strict staging
+recipient rewrite and subject prefix, production/upstream authorization,
+official SES v2 adapter, 2–30 second bounded timeout, safe internal result,
+header/HTML injection controls, accessible recovery templates, no code in URL,
+no answers/tracking/images, safe diagnostics, and frontend credential
+separation. The four added optional `ProFormDraft` fields support hashed
+idempotency and allowlisted backend diagnostics only.
+
+This is source evidence, not environment evidence. The source has no caller,
+function, schema push, credentials, or live send. Sender/domain verification,
+region, SES account status, IAM, quotas, bounce/complaint routing, live staging
+redirection, persistence orchestration, retry behavior, and monitoring remain
+pending. `DR-EMAIL-001`, `DR-EMAIL-002`, `DR-CLEAR-002`, `DR-OBS-001`, and
+`DR-REL-001` do not advance to staging certification.
