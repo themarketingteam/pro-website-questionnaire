@@ -102,7 +102,15 @@ export type AuthorizationErrorCode = typeof AUTHORIZATION_ERROR_CODES[
   keyof typeof AUTHORIZATION_ERROR_CODES
 ];
 export type DraftTokenEnvironment = 'local' | 'test' | 'staging' | 'production';
-export type AuthorizationMethod = 'email' | 'recovery_code' | 'signed_invitation';
+export type AuthorizationMethod =
+  | 'email'
+  | 'recovery_code'
+  | 'signed_invitation'
+  | 'email_otp'
+  | 'magic_link';
+export type RecoveryEmailVerificationStatus =
+  | 'verified_otp'
+  | 'verified_magic_link';
 export type AllowedInvitationAssociation = 'current_invitation' | 'new_draft';
 
 export type AuthorizationSecret = Readonly<{
@@ -148,6 +156,7 @@ export type RecoverySessionClaims = CommonStructuredClaims & Readonly<{
     | 'draft:list-associated'
   )[];
   recoveryEmailLookupHash?: string;
+  recoveryEmailVerificationStatus?: RecoveryEmailVerificationStatus;
   recoveryCodeVersion: number;
   recoverySessionVersion: number;
 }>;
@@ -225,6 +234,7 @@ export type RecoverySessionIssueInput = Readonly<{
   authorizationMethod: AuthorizationMethod;
   authorizedScopes: RecoverySessionClaims['authorizedScopes'];
   recoveryEmailLookupHash?: string;
+  recoveryEmailVerificationStatus?: RecoveryEmailVerificationStatus;
   recoveryCodeVersion: number;
   recoverySessionVersion: number;
   grantVersion: number;
@@ -303,6 +313,8 @@ const AUTHORIZATION_METHODS = new Set<AuthorizationMethod>([
   'email',
   'recovery_code',
   'signed_invitation',
+  'email_otp',
+  'magic_link',
 ]);
 const INVITATION_ASSOCIATIONS = new Set<AllowedInvitationAssociation>([
   'current_invitation',
@@ -496,6 +508,10 @@ function exactClaimKeys(
     && Object.hasOwn(claims, 'recoveryEmailLookupHash')) {
     typeKeys.push('recoveryEmailLookupHash');
   }
+  if (type === SIGNED_TOKEN_TYPES.RECOVERY_SESSION
+    && Object.hasOwn(claims, 'recoveryEmailVerificationStatus')) {
+    typeKeys.push('recoveryEmailVerificationStatus');
+  }
   const expected = [...COMMON_CLAIM_KEYS, ...typeKeys].sort();
   const actual = Object.keys(claims).sort();
   return expected.length === actual.length
@@ -678,8 +694,17 @@ function validateRecoverySessionShape(
       | 'draft:list-associated'))) {
     return authorizationError(AUTHORIZATION_ERROR_CODES.TOKEN_SCOPE_INVALID);
   }
-  if (value.authorizationMethod === 'email'
+  if (['email', 'email_otp', 'magic_link'].includes(String(value.authorizationMethod))
     && !Object.hasOwn(value, 'recoveryEmailLookupHash')) {
+    return authorizationError(AUTHORIZATION_ERROR_CODES.TOKEN_SCOPE_INVALID);
+  }
+  const verificationStatus = value.recoveryEmailVerificationStatus;
+  if ((value.authorizationMethod === 'email_otp'
+    && verificationStatus !== 'verified_otp')
+    || (value.authorizationMethod === 'magic_link'
+      && verificationStatus !== 'verified_magic_link')
+    || (!['email_otp', 'magic_link'].includes(String(value.authorizationMethod))
+      && Object.hasOwn(value, 'recoveryEmailVerificationStatus'))) {
     return authorizationError(AUTHORIZATION_ERROR_CODES.TOKEN_SCOPE_INVALID);
   }
   if (authorizedScopes.includes(SIGNED_TOKEN_SCOPES.DRAFT_LIST_ASSOCIATED)
@@ -959,6 +984,9 @@ export async function issueRecoverySessionToken(
     authorizedScopes: Object.freeze([...input.authorizedScopes]),
     ...(input.recoveryEmailLookupHash
       ? { recoveryEmailLookupHash: input.recoveryEmailLookupHash }
+      : {}),
+    ...(input.recoveryEmailVerificationStatus
+      ? { recoveryEmailVerificationStatus: input.recoveryEmailVerificationStatus }
       : {}),
     recoveryCodeVersion: input.recoveryCodeVersion,
     recoverySessionVersion: input.recoverySessionVersion,

@@ -39,6 +39,7 @@ runNode(
     'src/test/proFormDraftEntitySchema.test.js',
     'src/test/proFormMigrationEntitySchemas.test.js',
     'src/test/proFormRecoverySecurityEventSchema.test.js',
+    'src/test/proFormEmailVerificationAttemptSchema.test.js',
     '--reporter=dot',
     '--no-coverage',
   ],

@@ -2,7 +2,7 @@
 
 - Status: **STAGING_CRYPTOGRAPHIC_SECRETS_CONFIGURED**
 - Inventory date: 2026-08-05
-- Inventory rows: **79 names**
+- Inventory rows: **81 names**
 - Current production Base44 secret names observed: **4**
 - Current staging Base44 secret names observed: **8** (six cryptographic secrets and two ordinary staging controls)
 
@@ -48,6 +48,8 @@ The four production names observed through the names-only Base44 secret command 
 | 19a | `PRO_FORM_RECOVERY_SESSION_SECRET` | Recovery-session signing | Yes; configured independently 2026-08-05 | Later | Yes | No |
 | 19b | `PRO_FORM_ABUSE_HASH_SECRET` | Purpose-separated IP/device/email/code abuse-limit HMAC | Later; reserved, not configured | Later | Yes | No |
 | 19c | `PRO_FORM_RECOVERY_SESSION_TTL_SECONDS` | Positive recovery-session TTL; default 43200, maximum 604800 | Optional | Optional | No | Yes; non-secret bounded configuration only |
+| 19d | `PRO_FORM_EMAIL_OTP_SECRET` | Future six-digit OTP HMAC; independent, at least 32 bytes | Later; reserved and not configured | Later; reserved and not configured | Yes | No |
+| 19e | `PRO_FORM_MAGIC_LINK_SECRET` | Future opaque magic-link-token HMAC; independent, at least 32 bytes | Later; reserved and not configured | Later; reserved and not configured | Yes | No |
 | 20 | `CAPTCHA_SITE_KEY` | Future public staging CAPTCHA site key | Later | Later | Yes | No |
 | 21 | `CAPTCHA_SECRET_KEY` | Future backend CAPTCHA verification secret | Later | Later | Yes | No |
 | 20a | `PRO_DRAFT_CAPTCHA_PROVIDER` | Backend provider selector: disabled, turnstile, or staging_test | Later; start `disabled` | Later | Prefer Yes | Safe `disabled` only |

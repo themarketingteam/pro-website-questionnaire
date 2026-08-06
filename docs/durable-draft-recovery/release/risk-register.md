@@ -262,3 +262,23 @@ entity FLS, SES redirection, 100-message routing, sender/IAM/account readiness,
 bounce/complaint handling, and controller integration remain unproved.
 `RISK-009` remains blocking. No function/schema was deployed, no secret or
 record changed, no email/SES call occurred, and no Git remote changed.
+
+## 2026-08-06 disabled OTP and magic-link framework source
+
+The [future verification framework](../email/future-otp-and-magic-link-framework.md)
+reduces source-design uncertainty around later mailbox verification: separate
+secrets/domain separators, unbiased OTP generation, bounded attempts/expiry,
+256-bit magic tokens, HMAC-only records, one-time consumption, exact redirect
+allowlisting, and exact-draft verified recovery-session claims are covered by
+synthetic tests. The initial email association remains unverified until a
+future successful consumption; the same lookup hash avoids destructive draft
+migration.
+
+No risk rating changes and `RISK-001` remains knowingly accepted for the
+initial unverified email-recovery release. Future activation introduces or
+reactivates enumeration, mailbox compromise, OTP guessing, link forwarding,
+email-security scanner consumption, referrer/history/log leakage, redirect,
+replay/race, delivery, secret-rotation, and account-recovery risks. Those need
+separate threat/privacy review and live staging evidence. Both flags remain
+false; no schema/secret/function was pushed or configured, no email/value was
+sent, no UI/route was added, and no Git remote changed.

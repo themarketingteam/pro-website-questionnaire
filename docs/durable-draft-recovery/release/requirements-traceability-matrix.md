@@ -265,3 +265,19 @@ This remains source-only. Entity fields are not pushed, the function is not
 deployed, Clear All/Start New controllers are not connected, SES is not
 configured/called, and live CAS/FLS/routing evidence is absent. No requirement
 advances to staging certification.
+
+### 2026-08-06 disabled OTP and magic-link framework source
+
+The [future verification framework](../email/future-otp-and-magic-link-framework.md)
+adds local structural evidence for `DR-ID-004`, `DR-REC-001`, `DR-SEC-001`,
+`DR-SEC-002`, and `DR-RLS-001`: an admin-only attempt entity, same-email-lookup
+identity, separate purpose secrets, secure generation, HMAC-only persistence,
+expiry/lock/one-time consumption, open-redirect denial, verified method/status
+recovery-session claims, disabled-before-side-effect functions, and a client
+placeholder with both flags false and no storage/UI/routes.
+
+This does not certify a workflow or environment. The entity is not pushed,
+secrets are not configured, functions are not deployed, public validation and
+abuse controls are not connected, no email or URL exists, and neither flag is
+enabled. Initial unverified email recovery is unchanged. No requirement
+advances to staging, production-disabled, or production-enabled acceptance.

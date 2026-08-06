@@ -1506,6 +1506,54 @@
         "request_body", "answer_content", "recovery_session_token"
       ],
       "publicProjectionRule": "never expose entity rows; public functions return only allowlisted generic recovery envelopes"
+    },
+    "ProFormEmailVerificationAttempt": {
+      "schemaFile": "base44/entities/ProFormEmailVerificationAttempt.jsonc",
+      "implementationStatus": "local_schema_implemented_not_pushed",
+      "required": ["attempt_id", "environment"],
+      "entityRls": {
+        "create": {"user_condition": {"role": "admin"}},
+        "read": {"user_condition": {"role": "admin"}},
+        "update": {"user_condition": {"role": "admin"}},
+        "delete": {"user_condition": {"role": "admin"}}
+      },
+      "fields": {
+        "attempt_id": {"type": "string", "required": true, "classification": "audit_metadata"},
+        "environment": {"type": "string", "required": true, "classification": "migration_metadata"},
+        "verification_method": {"type": "string", "required": false, "enum": ["otp", "magic_link"], "classification": "audit_metadata"},
+        "recovery_email_lookup_hash": {"type": "string", "required": false, "classification": "sensitive_hash"},
+        "verification_token_hash": {"type": "string", "required": false, "classification": "sensitive_hash"},
+        "status": {"type": "string", "required": false, "enum": ["pending", "verified", "expired", "locked", "consumed", "cancelled"], "classification": "audit_metadata"},
+        "requested_at": {"type": "string", "format": "date-time", "required": false, "classification": "audit_metadata"},
+        "expires_at": {"type": "string", "format": "date-time", "required": false, "classification": "audit_metadata"},
+        "verified_at": {"type": "string", "format": "date-time", "required": false, "classification": "audit_metadata"},
+        "consumed_at": {"type": "string", "format": "date-time", "required": false, "classification": "audit_metadata"},
+        "attempt_count": {"type": "number", "required": false, "classification": "audit_metadata"},
+        "maximum_attempts": {"type": "number", "required": false, "classification": "audit_metadata"},
+        "request_id": {"type": "string", "required": false, "classification": "audit_metadata"},
+        "device_hash": {"type": "string", "required": false, "classification": "sensitive_hash"},
+        "ip_hash": {"type": "string", "required": false, "classification": "sensitive_hash"},
+        "redirect_path_hash": {"type": "string", "required": false, "classification": "sensitive_hash"},
+        "email_delivery_status": {"type": "string", "required": false, "classification": "audit_metadata"},
+        "email_provider_message_id": {"type": "string", "required": false, "classification": "admin_only"},
+        "test_run_id": {"type": "string", "required": false, "classification": "test_metadata"},
+        "source_app_id": {"type": "string", "required": false, "classification": "migration_metadata"},
+        "source_entity": {"type": "string", "required": false, "classification": "migration_metadata"},
+        "source_record_id": {"type": "string", "required": false, "classification": "migration_metadata"},
+        "source_created_date": {"type": "string", "format": "date-time", "required": false, "classification": "migration_metadata"},
+        "source_updated_date": {"type": "string", "format": "date-time", "required": false, "classification": "migration_metadata"},
+        "migration_batch_id": {"type": "string", "required": false, "classification": "migration_metadata"},
+        "migration_direction": {"type": "string", "required": false, "classification": "migration_metadata"},
+        "migrated_at": {"type": "string", "format": "date-time", "required": false, "classification": "migration_metadata"},
+        "source_content_hash": {"type": "string", "required": false, "classification": "sensitive_hash"},
+        "migration_version": {"type": "number", "required": false, "classification": "migration_metadata"}
+      },
+      "prohibitedFields": [
+        "email", "raw_email", "otp", "otp_code", "magic_link_token",
+        "raw_token", "ip_address", "device_id", "redirect_url",
+        "request_body", "recovery_session_token"
+      ],
+      "publicProjectionRule": "never expose attempt rows; future public functions return only generic state and separately authorized recovery sessions"
     }
   },
   "entities": {

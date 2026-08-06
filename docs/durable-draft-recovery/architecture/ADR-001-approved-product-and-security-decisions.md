@@ -256,6 +256,25 @@ A persistent signed grant obtained from one shared support/admin password has we
 11. Release controls must support disabled-first production deployment, separate global enablement, and an enduring kill switch.
 12. Later changes to verification, retention, cleanup, release activation, or data access require explicit policy and migration review under the supersession procedure.
 
+### 2026-08-06 disabled verification-framework implementation note
+
+The source now contains the additive, undeployed
+`ProFormEmailVerificationAttempt` entity, separate OTP/magic-link HMAC
+purposes, one-time lifecycle helpers, exact relative redirect allowlist,
+verified recovery-session handoff claims, four feature-disabled functions, and
+a storage-free client placeholder. OTP is six numeric digits with rejection
+sampling, a 10-minute default/15-minute maximum lifetime, five default
+attempts, and lockout. Magic tokens contain 256 bits of entropy and expire
+after 30 minutes. Neither raw value is persisted or logged.
+
+This implements structural compatibility only. `PRO_DRAFT_EMAIL_OTP_ENABLED`
+and `PRO_DRAFT_MAGIC_LINK_ENABLED` remain false; the attempt entity is not
+pushed; secrets are reserved but unconfigured; no URL, route, UI, email,
+deployment, or initial-email-recovery replacement is authorized. Successful
+future consumption preserves the existing recovery-email lookup identity and
+requires an exact selected draft, so no destructive association migration is
+needed. Activation remains subject to the supersession/security review below.
+
 ## Explicit non-goals (category N)
 
 1. No client account-registration system.

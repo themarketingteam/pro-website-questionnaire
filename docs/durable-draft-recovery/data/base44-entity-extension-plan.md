@@ -42,6 +42,22 @@ It is cataloged separately under `securityEntities` in the field manifest so
 the four legacy compatibility baselines remain immutable. The focused schema
 runner now includes its contract test. No schema was pushed.
 
+### Future email-verification attempt addition
+
+`base44/entities/ProFormEmailVerificationAttempt.jsonc` is an additive,
+optional admin-only entity for disabled future OTP and magic-link verification.
+Its 29 unique fields contain only opaque IDs, method/status/times/counters, the
+existing recovery-email lookup HMAC, a purpose-bound verification-value HMAC,
+optional device/IP HMACs, an allowlisted redirect-path hash, safe delivery
+diagnostics, test metadata, and common migration metadata. It contains no raw
+email, OTP, magic token, IP/device value, redirect URL, body, credential, or
+recovery session.
+
+The local schema and field-manifest entry are implemented but not pushed.
+Entity create/read/update/delete is admin-only, and sensitive hashes/provider
+IDs also declare admin-only field rules. Later activation requires live staging
+RLS/FLS and atomic one-time-consumption certification.
+
 ## Current compatibility baseline
 
 | Entity | Existing top-level fields | Existing required array | Repository RLS/FLS | Current compatibility callers |
@@ -262,7 +278,7 @@ The existing status enum, retry counters/errors, AI repair fields, `zapier_sent`
 
 `npm run test:entity-schemas`:
 
-- parses strict manifest JSON and all four JSONC schemas with `jsonc-parser`;
+- parses strict manifest JSON and all six JSONC schemas with `jsonc-parser`;
 - detects duplicate keys from the JSONC syntax tree;
 - verifies exact entity names, uppercase paths, top-level object shape, existing field types, required arrays, Intake enum/default, and RLS baselines;
 - requires every locally implemented field to exist and verifies it is optional, described, classified, nonsecret, and assigned exact admin/backend FLS;
@@ -270,7 +286,8 @@ The existing status enum, retry counters/errors, AI repair fields, `zapier_sent`
 - rejects raw code/token/grant field names;
 - freezes the exact 27 legacy missing-description exceptions and rejects new ones;
 - verifies each pre-extension baseline, the preserved existing-property hash, and each implemented local schema hash;
-- runs focused Vitest coverage for all four schemas plus six strict synthetic legacy/extended fixtures;
+- runs focused Vitest coverage for the four migration schemas, both optional
+  security/framework schemas, and six strict synthetic legacy/extended fixtures;
 - exits nonzero for every violation.
 
 ## Deferred implementation gates

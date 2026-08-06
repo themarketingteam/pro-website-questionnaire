@@ -1,0 +1,144 @@
+{
+  "name": "ProFormEmailVerificationAttempt",
+  "type": "object",
+  "properties": {
+    "attempt_id": {
+      "type": "string",
+      "description": "Opaque server-generated identity for one email-verification attempt."
+    },
+    "environment": {
+      "type": "string",
+      "description": "Trusted backend environment classification for this attempt."
+    },
+    "verification_method": {
+      "type": "string",
+      "enum": ["otp", "magic_link"],
+      "description": "Verification mechanism reserved for this attempt."
+    },
+    "recovery_email_lookup_hash": {
+      "type": "string",
+      "description": "Existing purpose-separated recovery-email lookup identity; never a raw email.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "verification_token_hash": {
+      "type": "string",
+      "description": "Purpose/version/attempt-bound HMAC of the OTP or magic-link token.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "verified", "expired", "locked", "consumed", "cancelled"],
+      "description": "Server-controlled lifecycle status for this one-time attempt."
+    },
+    "requested_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Authoritative server time when the attempt was created."
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Authoritative server time after which verification is denied."
+    },
+    "verified_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Authoritative server time when ownership verification succeeded."
+    },
+    "consumed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Authoritative server time when the one-time attempt was consumed."
+    },
+    "attempt_count": {
+      "type": "number",
+      "description": "Bounded count of submitted OTP verification values."
+    },
+    "maximum_attempts": {
+      "type": "number",
+      "description": "Maximum OTP submissions permitted before the attempt locks."
+    },
+    "request_id": {
+      "type": "string",
+      "description": "Opaque server request identifier for safe operational correlation."
+    },
+    "device_hash": {
+      "type": "string",
+      "description": "Purpose-separated device-context HMAC; never a raw device identifier.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "ip_hash": {
+      "type": "string",
+      "description": "Purpose-separated trusted network-context HMAC; never a raw address.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "redirect_path_hash": {
+      "type": "string",
+      "description": "Hash of an allowlisted relative redirect path; never an arbitrary URL.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "email_delivery_status": {
+      "type": "string",
+      "description": "Allowlisted future email-delivery status without recipient or provider body."
+    },
+    "email_provider_message_id": {
+      "type": "string",
+      "description": "Future provider message identifier available only to trusted administrators.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "test_run_id": {
+      "type": "string",
+      "description": "Synthetic nonproduction test-run identifier used for isolation and cleanup."
+    },
+    "source_app_id": {
+      "type": "string",
+      "description": "Internal Base44 application identifier of the source attempt."
+    },
+    "source_entity": {
+      "type": "string",
+      "description": "Source entity name used in deterministic migration identity."
+    },
+    "source_record_id": {
+      "type": "string",
+      "description": "Source record identifier used in deterministic migration identity."
+    },
+    "source_created_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation timestamp reported by the source platform."
+    },
+    "source_updated_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Update timestamp reported by the source platform."
+    },
+    "migration_batch_id": {
+      "type": "string",
+      "description": "Opaque identifier of the migration batch that wrote this representation."
+    },
+    "migration_direction": {
+      "type": "string",
+      "description": "Forward or reverse migration direction for this representation."
+    },
+    "migrated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Authoritative time when the migration runner wrote this representation."
+    },
+    "source_content_hash": {
+      "type": "string",
+      "description": "Stable hash of migration-relevant source content excluding bookkeeping."
+    },
+    "migration_version": {
+      "type": "number",
+      "description": "Version of the migration transform applied to this representation."
+    }
+  },
+  "required": ["attempt_id", "environment"],
+  "rls": {
+    "create": {"user_condition": {"role": "admin"}},
+    "read": {"user_condition": {"role": "admin"}},
+    "update": {"user_condition": {"role": "admin"}},
+    "delete": {"user_condition": {"role": "admin"}}
+  }
+}
