@@ -753,3 +753,8 @@ No risk is closed or lowered. The final gate found 96 RC-precheck failures, 82 s
 | Alert storm or duplicate delivery | Fingerprint cooldown abstraction and bounded safe messages | Durable shared cooldown store required for scaled production |
 | Alert transport silently fails | Delivery failure records a separate operational event | Independent monitoring path and staging failure injection required |
 | Operations dashboard exposes sensitive records | Function-only aggregate client, password-issued grant, bounded safe projections | Browser/security review and staging authorization evidence required |
+| Staff improvise unsafe recovery or inspect raw records | Scripted support workflows prohibit passwords, raw answers, full-code tickets, direct browser entities, and RLS bypass | Support training must pass all 12 staging scenarios |
+| Secret rotation invalidates recoverability or creates duplicates | Per-secret impact matrix, mandatory dual-key/version gate, staffed tests and rollback | Dual-key implementations and staging rotation rehearsals remain required |
+| Client banner is mistaken for a write freeze | Runbook requires protected server barriers, quiet windows, final delta, and class-by-class unfreeze | Granular backend write barriers do not yet exist and remain release blockers |
+| Domain rollback strands green writes | Manual domain checklist requires freeze, reverse delta, zero conflicts, blue compatibility, and owner approvals | Live reverse migration/domain rehearsal remains required |
+| Incident communications overstate verification or loss | Plain-language approved templates forbid identity and unconfirmed loss claims | Contact owners and communications approval must be assigned before release |

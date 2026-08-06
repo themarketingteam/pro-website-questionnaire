@@ -103,3 +103,15 @@ blocked and no manual status is advanced.
 Prompt 3 adds the fail-closed staging rollback precheck, local nine-entity reverse-migration interruption/resume drill, application rollback plan, and domain-transfer rehearsal checklist. The live classification is **STAGING_APPLICATION_ROLLBACK_DRILL_BLOCKED** because no prior RLS-certified compatible commit or complete staging target/backup/secret-set evidence exists. The current RC was not deployed, rolled back, or rolled forward; no staging or production resource changed.
 
 Prompt 4 ran the final gate at `a31c4574a9717ddb686156509ba50c5a34aa6e95`. The precheck failed 96 conditions; strict coverage failed 82; manual evidence had 44 pending rows; live browser/capacity/runtime/cleanup could not start; rollback, migration, RLS, dependency, and target gates blocked. The candidate is not frozen or certified, and no tag or remote push is permitted. See the [summary](./staging-release-candidate-summary.md).
+
+## Operational readiness addendum (2026-08-06)
+
+The incident model, production/support runbooks, per-secret rotation matrix,
+write-freeze procedure, communication templates, three stop/decision
+checklists, support-training manifest, and fail-closed validator now exist as
+local source. The manifest is explicitly `NOT CERTIFIED`; all 12 scenarios are
+`PENDING`. Named contacts, granular server write barriers, staging tabletop and
+support training, secret-rotation rehearsal, reverse delta, and manual domain
+rollback evidence remain release blockers. No candidate status advances from
+documentation alone, and no deployment, domain action, secret change, training
+certification, tag, or push occurred.

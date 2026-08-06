@@ -471,3 +471,16 @@ effects; two consecutive probe failures and every critical invariant to alert;
 staging delivery to reach only the approved internal redirect; cooldown to be
 durable across instances; alert-transport failure to be independently visible;
 and production scheduling to remain disabled until the authorized cutover.
+
+## Operational runbook and support acceptance
+
+Production promotion additionally requires all ten operational documents to
+pass `npm run operations:validate-runbooks`; incident, engineering, security,
+data, Base44, domain, support, and communications roles to be assigned; all 12
+support-training scenarios to pass in staging against the candidate build; a
+tabletop SEV-1/2/3 exercise; a protected server write-freeze rehearsal; secret
+rotation rehearsals for every active family, including dual-key recovery/email
+hash behavior; blue/green domain rollback and reverse-delta rehearsal; approved
+client templates; and evidence that no procedure exposes client content,
+credentials, raw app IDs, or unsupported commands. Documentation alone does
+not satisfy these gates.

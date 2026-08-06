@@ -506,6 +506,19 @@ cleanup were not entered.
 No checklist item is promoted. The decision remains
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
 
+## Operational runbook readiness
+
+- [x] Ten required incident/support/rotation/maintenance/communication/decision documents exist locally.
+- [x] The runbook validator and seven focused tests pass locally.
+- [x] Blue fallback and separate green candidate rules are documented.
+- [ ] Named operational contacts have not been assigned.
+- [ ] All 12 support-training scenarios remain `PENDING`.
+- [ ] Granular server write barriers and a live maintenance rehearsal are absent.
+- [ ] Secret rotations, incident tabletop, reverse delta, and manual domain rollback have not been rehearsed in staging.
+
+Local documentation does not promote readiness. The decision remains
+**STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
+
 ## 2026-08-06 release-test orchestration source checkpoint
 
 - [x] Ten explicit release phases and per-phase permissions are source-defined.

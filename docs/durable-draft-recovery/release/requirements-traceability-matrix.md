@@ -707,3 +707,4 @@ The [final gate summary](./staging-release-candidate-summary.md) is **NOT ISSUED
 | Synthetic health probe and cleanup | `runProDraftSyntheticProbe`, `proDraftSyntheticProbe` | `proDraftSyntheticProbe.test.js` | Local implemented; disabled/not scheduled |
 | Alert policy and safe delivery | `proDraftAlertPolicy`, `proDraftAlertDelivery` | `proDraftAlerting.test.js` | Local implemented; destinations unconfigured |
 | Password-gated operations dashboard | `/admin/draft-operations`, `proDraftHealthClient` | dashboard/client/admin authorization tests | Local implemented; not deployed |
+| Incident, support, maintenance, rotation, communication, and decision procedures | Operations runbook set and pending support-training manifest | `validate-durable-draft-operations-runbooks.test.js`; `operations:validate-runbooks` | Local documentation validated; training and staging exercises pending |
