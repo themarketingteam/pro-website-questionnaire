@@ -1,0 +1,1173 @@
+{
+  "manifestVersion": 1,
+  "status": "plan_only",
+  "manifestPath": "docs/durable-draft-recovery/data/pro-form-field-manifest.json",
+  "entityDirectory": "base44/entities",
+  "nonDeployable": true,
+  "classifications": [
+    "public_compatibility",
+    "admin_only",
+    "backend_only",
+    "sensitive_pii",
+    "sensitive_hash",
+    "migration_metadata",
+    "audit_metadata",
+    "retention_metadata",
+    "test_metadata",
+    "canonical_state",
+    "submission_lock"
+  ],
+  "fieldLevelRlsPolicies": {
+    "admin_backend_only": {
+      "read": {
+        "user_condition": {
+          "role": "admin"
+        }
+      },
+      "write": {
+        "user_condition": {
+          "role": "admin"
+        }
+      }
+    }
+  },
+  "groupPolicies": {
+    "common_migration": {
+      "canonicalStateSource": "Base44 platform metadata and the authorized migration runner, never a public client payload.",
+      "legacyFallback": "Absence means the record is local to its current app or predates migration metadata.",
+      "migrationBehavior": "Set by idempotent full, incremental, late-write reconciliation, or reverse migration; never copied from staging into green production.",
+      "adminProjectionBehavior": "Included only in an allowlisted migration or administrative projection.",
+      "retentionBehavior": "Retained through the complete forward/reverse migration, reconciliation, rollback, and audit window.",
+      "testRequirement": "Validate optionality, type consistency across all four entities, admin-only FLS, composite migration identity, staging exclusion, and idempotent reruns."
+    },
+    "canonical_state": {
+      "canonicalStateSource": "Strictly normalized canonical draft-state contract version 4.",
+      "legacyFallback": "Reconstruct from existing compatibility JSON fields without discarding the source record when reconstruction warns or fails.",
+      "migrationBehavior": "Migrate the validated canonical representation and retain existing compatibility fields during rollout.",
+      "adminProjectionBehavior": "Return only through a scoped backend/admin projection; never through unrestricted entity access.",
+      "retentionBehavior": "Retain with the draft lifecycle and any active support, incident, legal, or migration hold.",
+      "testRequirement": "Round-trip canonical state, reject secrets, preserve legacy compatibility fields, and prove hash/contract-version consistency."
+    },
+    "revision_hash": {
+      "canonicalStateSource": "Accepted canonical mutation and server-assigned revision metadata.",
+      "legacyFallback": "Use revision zero and no authoritative server save time; never infer authority from client timestamps.",
+      "migrationBehavior": "Preserve revisions and hashes; migration bookkeeping must not independently advance them.",
+      "adminProjectionBehavior": "Expose only safe revision/conflict metadata through scoped backend responses.",
+      "retentionBehavior": "Retain with canonical state for conflict, submission, migration, and audit integrity.",
+      "testRequirement": "Validate monotonic revisions, idempotent same-revision/same-hash behavior, stale rejection, and stable hash parity."
+    },
+    "identity_association": {
+      "canonicalStateSource": "Validated draft identity and recovery-email normalization contracts.",
+      "legacyFallback": "Map legacy user_email only through an explicit migration decision; otherwise leave the new association fields absent.",
+      "migrationBehavior": "Preserve source and verification state without upgrading unverified legacy data.",
+      "adminProjectionBehavior": "Raw/display/normalized email is allowlisted only where operationally required; hashes and normalized values remain internal.",
+      "retentionBehavior": "Retain with the draft subject to privacy, support-hold, and lifecycle retention policy.",
+      "testRequirement": "Validate normalization, provenance, explicit verification, changed-email behavior, PII-safe diagnostics, and FLS denial for anonymous callers."
+    },
+    "recovery_authorization": {
+      "canonicalStateSource": "Backend-issued recovery-code verifier metadata; raw codes are transient and excluded.",
+      "legacyFallback": "Legacy records remain readable but require an explicit backend migration/issuance path before code recovery is available.",
+      "migrationBehavior": "Copy only versioned verifier metadata and approved hint; never copy raw or normalized code input.",
+      "adminProjectionBehavior": "Verifier fields are never projected; an approved hint may appear only in an explicitly scoped support projection.",
+      "retentionBehavior": "Retain with the draft until rotation, deletion eligibility, or a verified migration supersedes the verifier.",
+      "testRequirement": "Reject raw code fields, enforce hash/version types and FLS, and prove ordinary reads never return verifier material."
+    },
+    "supersession": {
+      "canonicalStateSource": "Server-coordinated Clear All or Start New transaction.",
+      "legacyFallback": "Absence means no recorded supersession relationship; existing draft IDs remain valid.",
+      "migrationBehavior": "Remap draft relationships through the durable source/destination ID map in both directions.",
+      "adminProjectionBehavior": "Expose only safe scoped relationship/status fields; never expose a replacement recovery credential.",
+      "retentionBehavior": "Retain the full chain for at least the draft retention and rollback evidence window.",
+      "testRequirement": "Validate one replacement, bidirectional links, idempotency, terminal guards, relationship remapping, and late-write rejection."
+    },
+    "submission_lock": {
+      "canonicalStateSource": "Immutable force-saved submit-attempt and PDF source snapshot.",
+      "legacyFallback": "Use existing final submission linkage and compatibility payloads without inventing a snapshot hash.",
+      "migrationBehavior": "Preserve immutable snapshot/hash/linkage and never regenerate from a newer blank draft.",
+      "adminProjectionBehavior": "Snapshot content is scoped and sensitive; hashes remain backend/admin-only.",
+      "retentionBehavior": "Retain according to completed-submission policy and the one-year submitted-response guarantee.",
+      "testRequirement": "Prove terminal immutability, retry idempotency, snapshot/PDF hash binding, and submitted read-only recovery."
+    },
+    "recovery_email_delivery": {
+      "canonicalStateSource": "Backend SES delivery coordinator using safe outcomes only.",
+      "legacyFallback": "Absence means no durable delivery diagnostic exists.",
+      "migrationBehavior": "Preserve safe outcome/counter/timestamps; do not copy staging recipients or test delivery identifiers into green.",
+      "adminProjectionBehavior": "Expose safe status and error codes only; never recipient, raw code, provider credentials, or message body.",
+      "retentionBehavior": "Retain with the draft and incident/complaint evidence window.",
+      "testRequirement": "Exercise success/failure/retry, staging redirection, PII/secret redaction, and no rollback of a created replacement draft."
+    },
+    "retention": {
+      "canonicalStateSource": "Server lifecycle timestamps, approved retention class, and authorized support-hold operations.",
+      "legacyFallback": "Compute eligibility from existing server/platform dates under the documented one-year policy; absence never shortens retention.",
+      "migrationBehavior": "Preserve holds and anchors across forward/reverse migration and exclude held records from cleanup.",
+      "adminProjectionBehavior": "Admin/backend-only retention and hold details.",
+      "retentionBehavior": "Dry-run first; preserve relationship, submission, audit, and rollback integrity before any deletion.",
+      "testRequirement": "Validate server-time eligibility, one-year boundaries, hold exemptions, dry-run evidence, and relationship-safe cleanup."
+    },
+    "diagnostics": {
+      "canonicalStateSource": "Safe backend mutation, authorization, and conflict outcomes.",
+      "legacyFallback": "Absence means no structured diagnostic was recorded.",
+      "migrationBehavior": "Copy safe codes/IDs only and preserve source timestamps where applicable.",
+      "adminProjectionBehavior": "Allowlisted safe codes and opaque IDs only; no values, credentials, email, code, token, or grant.",
+      "retentionBehavior": "Retain for operational audit and incident windows without extending raw content retention.",
+      "testRequirement": "Scan diagnostics for PII/secrets and validate bounded safe-code formats."
+    },
+    "event_contract": {
+      "canonicalStateSource": "Accepted draft mutation or backend lifecycle/audit operation.",
+      "legacyFallback": "Existing session-linked events remain valid without draft ID, revisions, mutation IDs, or hashes.",
+      "migrationBehavior": "Remap draft relationship, preserve event identity/order, and deduplicate by the safe idempotency hash.",
+      "adminProjectionBehavior": "Admin/backend-only event metadata; existing value fields remain compatibility data pending later minimization.",
+      "retentionBehavior": "Retain at least as long as the associated draft and all active holds.",
+      "testRequirement": "Validate relationship remapping, event idempotency, revisions, mutation/tab linkage, safe hashing, and retention inheritance."
+    },
+    "submission_linkage": {
+      "canonicalStateSource": "Finalized draft and immutable submitted-state/PDF hashes.",
+      "legacyFallback": "Retain existing metadata/userdata unchanged; absence of linkage fields is valid for legacy submissions.",
+      "migrationBehavior": "Populate only when compatibility review finds a trustworthy source; remap source draft IDs in both directions.",
+      "adminProjectionBehavior": "Backend/admin-only linkage and integrity hashes; metadata/userdata projections remain unchanged.",
+      "retentionBehavior": "Follow completed-submission retention and rollback evidence requirements.",
+      "testRequirement": "Prove metadata/userdata byte-shape compatibility, optional linkage, hash equality, and relationship remapping."
+    },
+    "intake_linkage": {
+      "canonicalStateSource": "Fallback submission coordinator and source draft canonical hash.",
+      "legacyFallback": "Existing questionnaire_session_id and linked_submission_id remain authoritative compatibility links.",
+      "migrationBehavior": "Populate only when source mapping is trustworthy; remap source draft linkage without changing intake status/retry fields.",
+      "adminProjectionBehavior": "Backend/admin-only linkage and hash fields.",
+      "retentionBehavior": "Retain with intake retry/repair evidence and linked draft/submission integrity.",
+      "testRequirement": "Validate optional linkage, status-enum preservation, retry/repair compatibility, and bidirectional remapping."
+    },
+    "external_side_effect_diagnostics": {
+      "canonicalStateSource": "Environment-constrained external-side-effect policy and Zapier delivery result.",
+      "legacyFallback": "Existing zapier_sent remains valid; absent diagnostics mean the historical outcome is unknown.",
+      "migrationBehavior": "Preserve safe diagnostics but exclude staging destinations, test IDs, and staging-only delivery context from green.",
+      "adminProjectionBehavior": "Safe delivery mode/status/outcome only; no destination URL, secret, response body, or payload.",
+      "retentionBehavior": "Retain with intake retry/incident evidence.",
+      "testRequirement": "Validate disabled/staging/production routing, status bounds, safe outcomes, and absence of destinations or secrets."
+    }
+  },
+  "commonMigrationFields": [
+    "environment",
+    "test_run_id",
+    "source_app_id",
+    "source_entity",
+    "source_record_id",
+    "source_created_date",
+    "source_updated_date",
+    "migration_batch_id",
+    "migration_direction",
+    "migrated_at",
+    "source_content_hash",
+    "migration_version"
+  ],
+  "fieldDefinitions": {
+    "environment": {
+      "type": "string",
+      "classifications": ["backend_only", "migration_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Separates blue, staging, and green records and blocks staging/test records from production migration.",
+      "publicProjectionRule": "omit",
+      "description": "Environment classification assigned by trusted backend or migration code.",
+      "group": "common_migration"
+    },
+    "test_run_id": {
+      "type": "string",
+      "classifications": ["backend_only", "test_metadata", "migration_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Identifies synthetic test records so they can be excluded from green production.",
+      "publicProjectionRule": "omit",
+      "description": "Opaque synthetic test-run identifier; absent for ordinary production records.",
+      "group": "common_migration"
+    },
+    "source_app_id": {
+      "type": "string",
+      "classifications": ["backend_only", "migration_metadata", "sensitive_pii"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "First component of the logical migration identity.",
+      "publicProjectionRule": "omit",
+      "description": "Internal Base44 application identifier of the source record.",
+      "group": "common_migration"
+    },
+    "source_entity": {
+      "type": "string",
+      "classifications": ["backend_only", "migration_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Second component of the logical migration identity.",
+      "publicProjectionRule": "omit",
+      "description": "Source entity name used by the migration identity and integrity report.",
+      "group": "common_migration"
+    },
+    "source_record_id": {
+      "type": "string",
+      "classifications": ["backend_only", "migration_metadata", "sensitive_pii"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Third component of the logical migration identity and relationship map.",
+      "publicProjectionRule": "omit",
+      "description": "Immutable Base44 identifier of the source record.",
+      "group": "common_migration"
+    },
+    "source_created_date": {
+      "type": "string",
+      "format": "date-time",
+      "classifications": ["backend_only", "migration_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves authoritative source creation ordering for validation and selection.",
+      "publicProjectionRule": "omit",
+      "description": "Authoritative source platform creation timestamp.",
+      "group": "common_migration"
+    },
+    "source_updated_date": {
+      "type": "string",
+      "format": "date-time",
+      "classifications": ["backend_only", "migration_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Supports incremental checkpoints, overlap windows, and late-write detection.",
+      "publicProjectionRule": "omit",
+      "description": "Authoritative source platform update timestamp.",
+      "group": "common_migration"
+    },
+    "migration_batch_id": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "migration_metadata", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Correlates full, incremental, reconciliation, and reverse batches.",
+      "publicProjectionRule": "omit",
+      "description": "Opaque identifier of the migration or reconciliation batch.",
+      "group": "common_migration"
+    },
+    "migration_direction": {
+      "type": "string",
+      "classifications": ["backend_only", "migration_metadata", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Distinguishes blue-to-green, late-write reconciliation, and green-to-blue operations.",
+      "publicProjectionRule": "omit",
+      "description": "Controlled migration direction recorded by the migration runner.",
+      "group": "common_migration"
+    },
+    "migrated_at": {
+      "type": "string",
+      "format": "date-time",
+      "classifications": ["backend_only", "migration_metadata", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Records server migration time without replacing source ordering timestamps.",
+      "publicProjectionRule": "omit",
+      "description": "Server timestamp when the destination record was last reconciled.",
+      "group": "common_migration"
+    },
+    "source_content_hash": {
+      "type": "string",
+      "classifications": ["backend_only", "migration_metadata", "sensitive_hash"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Detects unchanged content, conflicts, corruption, and idempotent reruns.",
+      "publicProjectionRule": "omit",
+      "description": "Deterministic hash of normalized source content excluding migration bookkeeping.",
+      "group": "common_migration"
+    },
+    "migration_version": {
+      "type": "number",
+      "classifications": ["backend_only", "migration_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Identifies the migration contract and transformation version.",
+      "publicProjectionRule": "omit",
+      "description": "Positive migration contract version used for this record.",
+      "group": "common_migration"
+    },
+    "canonical_state_json": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_pii", "canonical_state"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Carries the validated server-authoritative draft state through forward and reverse migration.",
+      "publicProjectionRule": "authorized_draft_projection_only",
+      "description": "Deterministically serialized canonical questionnaire draft state.",
+      "group": "canonical_state"
+    },
+    "canonical_state_contract_version": {
+      "type": "number",
+      "classifications": ["backend_only", "canonical_state"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Selects the canonical parser and migration path.",
+      "publicProjectionRule": "omit",
+      "description": "Version of the canonical draft-state serialization contract.",
+      "group": "canonical_state"
+    },
+    "field_change_metadata_json": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_pii", "canonical_state", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves merge/conflict metadata with the canonical state.",
+      "publicProjectionRule": "omit",
+      "description": "Serialized per-field mutation metadata for conflict detection and merge decisions.",
+      "group": "canonical_state"
+    },
+    "client_revision": {
+      "type": "number",
+      "classifications": ["backend_only", "canonical_state", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the highest accepted coordinated client revision.",
+      "publicProjectionRule": "scoped_conflict_projection_only",
+      "description": "Highest accepted nonnegative coordinated client revision.",
+      "group": "revision_hash"
+    },
+    "server_revision": {
+      "type": "number",
+      "classifications": ["backend_only", "canonical_state", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the authoritative monotonic server mutation revision.",
+      "publicProjectionRule": "scoped_conflict_projection_only",
+      "description": "Authoritative nonnegative monotonic server revision.",
+      "group": "revision_hash"
+    },
+    "state_hash": {
+      "type": "string",
+      "classifications": ["backend_only", "canonical_state", "sensitive_hash"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Validates canonical state equality and conflict/idempotency behavior.",
+      "publicProjectionRule": "omit",
+      "description": "Stable cryptographic hash of the accepted canonical state projection.",
+      "group": "revision_hash"
+    },
+    "saved_at_server": {
+      "type": "string",
+      "format": "date-time",
+      "classifications": ["backend_only", "canonical_state", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves authoritative server acknowledgement time without trusting last_saved_at client time.",
+      "publicProjectionRule": "authorized_draft_projection_only",
+      "description": "Server timestamp for the latest acknowledged canonical draft save.",
+      "group": "revision_hash"
+    },
+    "recovery_email_display": {
+      "type": "string",
+      "format": "email",
+      "classifications": ["admin_only", "backend_only", "sensitive_pii"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves an explicitly accepted display form without using it for lookup.",
+      "publicProjectionRule": "authorized_identity_projection_only",
+      "description": "Trimmed display form of the associated recovery email.",
+      "group": "identity_association"
+    },
+    "recovery_email_normalized": {
+      "type": "string",
+      "format": "email",
+      "classifications": ["admin_only", "backend_only", "sensitive_pii"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Supports deterministic backend normalization and hash reconciliation.",
+      "publicProjectionRule": "omit",
+      "description": "Validated fully lowercased recovery email used before keyed lookup hashing.",
+      "group": "identity_association"
+    },
+    "recovery_email_lookup_hash": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "sensitive_hash"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Supports exact backend email association lookup and hash rotation.",
+      "publicProjectionRule": "omit",
+      "description": "Versioned keyed hash of the normalized recovery email.",
+      "group": "identity_association"
+    },
+    "recovery_email_lookup_hash_version": {
+      "type": "number",
+      "classifications": ["admin_only", "backend_only", "sensitive_hash"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Selects the keyed email lookup strategy during migration or rotation.",
+      "publicProjectionRule": "omit",
+      "description": "Version of the recovery email keyed-hash strategy.",
+      "group": "identity_association"
+    },
+    "email_source": {
+      "type": "string",
+      "enum": ["signed_invitation", "client_entered", "recovered_by_email", "recovered_by_code", "admin_corrected", "migrated_legacy", "anonymous"],
+      "classifications": ["admin_only", "backend_only", "sensitive_pii", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves association provenance without upgrading verification.",
+      "publicProjectionRule": "authorized_identity_projection_only",
+      "description": "Controlled provenance of the recovery email association or anonymous state.",
+      "group": "identity_association"
+    },
+    "verification_status": {
+      "type": "string",
+      "enum": ["unverified", "verified_signed_invitation", "verified_otp", "verified_magic_link"],
+      "classifications": ["admin_only", "backend_only", "sensitive_pii", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves explicit verification state without inferring verification for legacy records.",
+      "publicProjectionRule": "authorized_identity_projection_only",
+      "description": "Explicit recovery email verification state.",
+      "group": "identity_association"
+    },
+    "identity_context_version": {
+      "type": "number",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Selects identity association normalization and compatibility behavior.",
+      "publicProjectionRule": "omit",
+      "description": "Version of the normalized draft identity context contract.",
+      "group": "identity_association"
+    },
+    "recovery_code_hash": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "sensitive_hash"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Carries only the secure/keyed verifier for exact-code authorization.",
+      "publicProjectionRule": "omit",
+      "description": "Secure or keyed hash of the normalized high-entropy recovery code.",
+      "group": "recovery_authorization"
+    },
+    "recovery_code_hash_version": {
+      "type": "number",
+      "classifications": ["admin_only", "backend_only", "sensitive_hash"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Selects the verifier algorithm and pepper/key version.",
+      "publicProjectionRule": "omit",
+      "description": "Version of the recovery code hash or keyed-hash strategy.",
+      "group": "recovery_authorization"
+    },
+    "recovery_code_version": {
+      "type": "number",
+      "classifications": ["admin_only", "backend_only", "sensitive_hash", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves rotation/revocation ordering for the current verifier.",
+      "publicProjectionRule": "omit",
+      "description": "Monotonic recovery code rotation version for the draft.",
+      "group": "recovery_authorization"
+    },
+    "recovery_code_last_four_hint": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "sensitive_hash"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves only an explicitly approved support hint, never the code.",
+      "publicProjectionRule": "omit",
+      "description": "Optional approved final four-character support hint for the current recovery code.",
+      "group": "recovery_authorization"
+    },
+    "superseded_at": {
+      "type": "string",
+      "format": "date-time",
+      "classifications": ["backend_only", "audit_metadata", "retention_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves authoritative supersession ordering and retention anchor evidence.",
+      "publicProjectionRule": "authorized_draft_projection_only",
+      "description": "Server timestamp when the draft became cleared or otherwise superseded.",
+      "group": "supersession"
+    },
+    "superseded_reason": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_pii", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the controlled reason for the supersession relationship.",
+      "publicProjectionRule": "authorized_draft_projection_only",
+      "description": "Controlled reason the draft was superseded.",
+      "group": "supersession"
+    },
+    "replacement_draft_id": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_pii", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Maps the old draft to its destination-specific replacement ID.",
+      "publicProjectionRule": "authorized_old_draft_projection_only",
+      "description": "Identifier of the replacement draft created by a supersession transaction.",
+      "group": "supersession"
+    },
+    "previous_draft_id": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_pii", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Maps the replacement draft back to its source-specific predecessor ID.",
+      "publicProjectionRule": "omit",
+      "description": "Identifier of the draft replaced by this draft.",
+      "group": "supersession"
+    },
+    "generation_sequence": {
+      "type": "number",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves deterministic generation ordering within a supersession chain.",
+      "publicProjectionRule": "authorized_draft_projection_only",
+      "description": "Nonnegative generation number within a linked draft chain.",
+      "group": "supersession"
+    },
+    "clear_idempotency_key_hash": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_hash", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Prevents duplicate replacement creation during retries and migration replay.",
+      "publicProjectionRule": "omit",
+      "description": "Hash of the backend Clear All idempotency key.",
+      "group": "supersession"
+    },
+    "submission_snapshot_json": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_pii", "canonical_state", "submission_lock"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the immutable payload used for the final submission attempt.",
+      "publicProjectionRule": "authorized_submitted_projection_only",
+      "description": "Immutable canonical snapshot used for final submission.",
+      "group": "submission_lock"
+    },
+    "submission_snapshot_hash": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_hash", "submission_lock"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Validates immutable submit-attempt snapshot integrity.",
+      "publicProjectionRule": "omit",
+      "description": "Stable hash of the immutable final submission snapshot.",
+      "group": "submission_lock"
+    },
+    "submission_idempotency_key_hash": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_hash", "submission_lock"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Prevents duplicate final submission during retry and replay.",
+      "publicProjectionRule": "omit",
+      "description": "Hash of the backend final-submission idempotency key.",
+      "group": "submission_lock"
+    },
+    "pdf_source_snapshot_json": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_pii", "canonical_state", "submission_lock"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the immutable submitted source used for PDF regeneration.",
+      "publicProjectionRule": "authorized_pdf_projection_only",
+      "description": "Immutable submitted source snapshot used for PDF generation.",
+      "group": "submission_lock"
+    },
+    "pdf_source_state_hash": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_hash", "submission_lock"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Binds PDF regeneration to the exact submitted source state.",
+      "publicProjectionRule": "omit",
+      "description": "Stable hash of the immutable PDF source state.",
+      "group": "submission_lock"
+    },
+    "recovery_email_delivery_status": {
+      "type": "string",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves a safe delivery lifecycle state without recipient or code.",
+      "publicProjectionRule": "authorized_draft_projection_only",
+      "description": "Safe recovery-code email delivery lifecycle status.",
+      "group": "recovery_email_delivery"
+    },
+    "recovery_email_delivery_attempt_count": {
+      "type": "number",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves bounded delivery retry count.",
+      "publicProjectionRule": "omit",
+      "description": "Number of backend recovery-code email delivery attempts.",
+      "group": "recovery_email_delivery"
+    },
+    "recovery_email_last_sent_at": {
+      "type": "string",
+      "format": "date-time",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the most recent successful provider acceptance time.",
+      "publicProjectionRule": "omit",
+      "description": "Server timestamp of the latest accepted recovery-code email delivery.",
+      "group": "recovery_email_delivery"
+    },
+    "recovery_email_delivery_error_code": {
+      "type": "string",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves a bounded safe failure classification for support and retry.",
+      "publicProjectionRule": "authorized_draft_projection_only",
+      "description": "Safe bounded error code for the latest recovery email delivery failure.",
+      "group": "recovery_email_delivery"
+    },
+    "retention_class": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "retention_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves lifecycle-specific retention policy across environments.",
+      "publicProjectionRule": "omit",
+      "description": "Approved retention policy class for the record.",
+      "group": "retention"
+    },
+    "retention_anchor_at": {
+      "type": "string",
+      "format": "date-time",
+      "classifications": ["admin_only", "backend_only", "retention_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the server-time anchor used for cleanup eligibility.",
+      "publicProjectionRule": "omit",
+      "description": "Authoritative server-time anchor for retention calculation.",
+      "group": "retention"
+    },
+    "support_hold": {
+      "type": "boolean",
+      "classifications": ["admin_only", "backend_only", "retention_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Prevents automated cleanup while support, incident, legal, or migration work is active.",
+      "publicProjectionRule": "omit",
+      "description": "Whether an authorized hold currently exempts the record from cleanup.",
+      "group": "retention"
+    },
+    "support_hold_reason": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "sensitive_pii", "retention_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves an allowlisted hold reason for operational review.",
+      "publicProjectionRule": "omit",
+      "description": "Controlled sensitive reason for the current support or migration hold.",
+      "group": "retention"
+    },
+    "support_hold_set_at": {
+      "type": "string",
+      "format": "date-time",
+      "classifications": ["admin_only", "backend_only", "retention_metadata", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the server time the current hold began.",
+      "publicProjectionRule": "omit",
+      "description": "Server timestamp when the current support hold was set.",
+      "group": "retention"
+    },
+    "support_hold_released_at": {
+      "type": "string",
+      "format": "date-time",
+      "classifications": ["admin_only", "backend_only", "retention_metadata", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the server time the hold ended.",
+      "publicProjectionRule": "omit",
+      "description": "Server timestamp when the support hold was released.",
+      "group": "retention"
+    },
+    "cleanup_dry_run_batch_id": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "retention_metadata", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the dry-run evidence batch that evaluated cleanup eligibility.",
+      "publicProjectionRule": "omit",
+      "description": "Opaque identifier of the latest cleanup dry-run evaluation batch.",
+      "group": "retention"
+    },
+    "expired_at": {
+      "type": "string",
+      "format": "date-time",
+      "classifications": ["backend_only", "retention_metadata", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves authoritative expiration transition time.",
+      "publicProjectionRule": "authorized_draft_projection_only",
+      "description": "Server timestamp when the draft entered expired status.",
+      "group": "retention"
+    },
+    "deleted_at": {
+      "type": "string",
+      "format": "date-time",
+      "classifications": ["admin_only", "backend_only", "retention_metadata", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves optional soft-deletion time if a later policy authorizes that lifecycle.",
+      "publicProjectionRule": "omit",
+      "description": "Server timestamp of an optional authorized soft deletion.",
+      "group": "retention"
+    },
+    "last_mutation_id": {
+      "type": "string",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Correlates the latest accepted draft mutation without storing its values.",
+      "publicProjectionRule": "omit",
+      "description": "Opaque identifier of the latest accepted canonical mutation.",
+      "group": "diagnostics"
+    },
+    "last_authorization_method": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves a safe method classification for the latest authorized recovery operation.",
+      "publicProjectionRule": "omit",
+      "description": "Safe method code for the latest authorized draft recovery operation.",
+      "group": "diagnostics"
+    },
+    "last_authorization_outcome": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves a bounded internal outcome without exposing a public enumeration oracle.",
+      "publicProjectionRule": "omit",
+      "description": "Safe internal outcome code for the latest recovery authorization operation.",
+      "group": "diagnostics"
+    },
+    "last_conflict_code": {
+      "type": "string",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves a bounded latest conflict classification for diagnostics.",
+      "publicProjectionRule": "scoped_conflict_projection_only",
+      "description": "Safe bounded code for the latest revision or field conflict.",
+      "group": "diagnostics"
+    },
+    "draft_id": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_pii", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Provides a direct event-to-draft relationship remapped through the migration ID map.",
+      "publicProjectionRule": "omit",
+      "description": "Direct identifier of the draft associated with the event.",
+      "group": "event_contract"
+    },
+    "event_idempotency_key_hash": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_hash", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Deduplicates event retries and migration replays.",
+      "publicProjectionRule": "omit",
+      "description": "Hash of the backend event idempotency key.",
+      "group": "event_contract"
+    },
+    "base_server_revision": {
+      "type": "number",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the revision on which the event mutation was based.",
+      "publicProjectionRule": "omit",
+      "description": "Server revision used as the base for the event mutation.",
+      "group": "event_contract"
+    },
+    "mutation_id": {
+      "type": "string",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Correlates an event with its accepted canonical mutation.",
+      "publicProjectionRule": "omit",
+      "description": "Opaque canonical mutation identifier associated with the event.",
+      "group": "event_contract"
+    },
+    "source_tab_id": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_pii", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves safe per-tab mutation origin for conflict diagnosis.",
+      "publicProjectionRule": "omit",
+      "description": "Opaque per-tab identifier associated with the event mutation.",
+      "group": "event_contract"
+    },
+    "event_metadata_json": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_pii", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves validated safe event metadata without changing compatibility value fields.",
+      "publicProjectionRule": "omit",
+      "description": "Serialized allowlisted event metadata containing no raw credential or recovery secret.",
+      "group": "event_contract"
+    },
+    "safe_value_hash": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_hash", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Compares event value integrity without projecting the value.",
+      "publicProjectionRule": "omit",
+      "description": "Stable hash of the canonicalized event value when hashing is permitted.",
+      "group": "event_contract"
+    },
+    "canonical_state_hash": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_hash", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Links an event or intake to the corresponding canonical state integrity value.",
+      "publicProjectionRule": "omit",
+      "description": "Stable hash of the associated canonical questionnaire state.",
+      "group": "event_contract"
+    },
+    "questionnaire_session_id": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_pii", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Adds optional direct submission linkage without restructuring metadata or userdata.",
+      "publicProjectionRule": "omit",
+      "description": "Questionnaire session identifier linked to the final submission.",
+      "implementationGate": "Do not add until the existing runtime use of metadata.questionnaire_session_id has an approved single-write/backfill/projection rule that prevents divergent duplicate values.",
+      "group": "submission_linkage"
+    },
+    "source_draft_id": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_pii", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Links a submission or intake to its destination-specific source draft ID.",
+      "publicProjectionRule": "omit",
+      "description": "Identifier of the source draft associated with this record.",
+      "group": "submission_linkage"
+    },
+    "submitted_state_hash": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_hash", "submission_lock"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Binds the final submission record to the immutable submitted state.",
+      "publicProjectionRule": "omit",
+      "description": "Stable hash of the immutable canonical state used for submission.",
+      "group": "submission_linkage"
+    },
+    "external_side_effects_mode": {
+      "type": "string",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the safe environment-constrained side-effect mode while excluding staging-only context from green.",
+      "publicProjectionRule": "omit",
+      "description": "Safe external-side-effect policy mode applied to the intake attempt.",
+      "group": "external_side_effect_diagnostics"
+    },
+    "zapier_status": {
+      "type": "number",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves the bounded external HTTP status without response content.",
+      "publicProjectionRule": "omit",
+      "description": "External Zapier HTTP status when a request was attempted.",
+      "group": "external_side_effect_diagnostics"
+    },
+    "zapier_delivery_outcome": {
+      "type": "string",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves delivered, redirected, suppressed, or failed outcome without destination data.",
+      "publicProjectionRule": "omit",
+      "description": "Safe outcome classification for the Zapier delivery decision.",
+      "group": "external_side_effect_diagnostics"
+    },
+    "zapier_last_attempted_at": {
+      "type": "string",
+      "format": "date-time",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves authoritative delivery-attempt ordering for retry diagnostics.",
+      "publicProjectionRule": "omit",
+      "description": "Server timestamp of the latest Zapier delivery attempt.",
+      "group": "external_side_effect_diagnostics"
+    },
+    "zapier_failure_kind": {
+      "type": "string",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves a safe bounded failure kind for retry and incident review.",
+      "publicProjectionRule": "omit",
+      "description": "Safe bounded failure classification for the latest Zapier attempt.",
+      "group": "external_side_effect_diagnostics"
+    }
+  },
+  "entities": {
+    "ProFormDraft": {
+      "schemaFile": "base44/entities/ProFormDraft.jsonc",
+      "baselineSha256": "134d638d3fd42f429022b694b1dc1ba8393341b8b133ff6eda22a3d12f06d1f6",
+      "existingRequired": ["session_id"],
+      "expectedRls": null,
+      "legacyDescriptionExceptions": [],
+      "existingFields": {
+        "session_id": {"type": "string", "required": true},
+        "business_name": {"type": "string", "required": false},
+        "domain": {"type": "string", "required": false},
+        "user_id": {"type": "string", "required": false},
+        "user_name": {"type": "string", "required": false},
+        "user_email": {"type": "string", "required": false},
+        "status": {"type": "string", "required": false},
+        "current_question_id": {"type": "string", "required": false},
+        "last_changed_question_id": {"type": "string", "required": false},
+        "responses_json": {"type": "string", "required": false},
+        "validation_status_json": {"type": "string", "required": false},
+        "touched_questions_json": {"type": "string", "required": false},
+        "expanded_questions_json": {"type": "string", "required": false},
+        "metadata_json": {"type": "string", "required": false},
+        "userdata_json": {"type": "string", "required": false},
+        "mapped_payload_json": {"type": "string", "required": false},
+        "draft_metadata_json": {"type": "string", "required": false},
+        "save_error": {"type": "string", "required": false},
+        "submit_error": {"type": "string", "required": false},
+        "submit_attempted_at": {"type": "string", "required": false},
+        "submitted_at": {"type": "string", "required": false},
+        "last_changed_at": {"type": "string", "required": false},
+        "last_saved_at": {"type": "string", "required": false},
+        "final_submission_id": {"type": "string", "required": false},
+        "ai_repair_status": {"type": "string", "required": false},
+        "last_ai_repair_at": {"type": "string", "required": false},
+        "ai_repair_error_json": {"type": "string", "required": false},
+        "ai_repair_report_json": {"type": "string", "required": false},
+        "ai_repaired_payload_json": {"type": "string", "required": false},
+        "ai_repair_applied": {"type": "boolean", "required": false}
+      },
+      "proposedFields": [
+        "environment", "test_run_id", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version",
+        "canonical_state_json", "canonical_state_contract_version", "field_change_metadata_json", "client_revision", "server_revision", "state_hash", "saved_at_server",
+        "recovery_email_display", "recovery_email_normalized", "recovery_email_lookup_hash", "recovery_email_lookup_hash_version", "email_source", "verification_status", "identity_context_version",
+        "recovery_code_hash", "recovery_code_hash_version", "recovery_code_version", "recovery_code_last_four_hint",
+        "superseded_at", "superseded_reason", "replacement_draft_id", "previous_draft_id", "generation_sequence", "clear_idempotency_key_hash",
+        "submission_snapshot_json", "submission_snapshot_hash", "submission_idempotency_key_hash", "pdf_source_snapshot_json", "pdf_source_state_hash",
+        "recovery_email_delivery_status", "recovery_email_delivery_attempt_count", "recovery_email_last_sent_at", "recovery_email_delivery_error_code",
+        "retention_class", "retention_anchor_at", "support_hold", "support_hold_reason", "support_hold_set_at", "support_hold_released_at", "cleanup_dry_run_batch_id", "expired_at", "deleted_at",
+        "last_mutation_id", "last_authorization_method", "last_authorization_outcome", "last_conflict_code"
+      ]
+    },
+    "ProFormDraftEvent": {
+      "schemaFile": "base44/entities/ProFormDraftEvent.jsonc",
+      "baselineSha256": "4828654d5a77525438daf4c61855542a1302a51b3860a0a671425edc3085f5ae",
+      "existingRequired": ["session_id"],
+      "expectedRls": null,
+      "legacyDescriptionExceptions": [],
+      "existingFields": {
+        "session_id": {"type": "string", "required": true},
+        "event_type": {"type": "string", "required": false},
+        "question_id": {"type": "string", "required": false},
+        "question_type": {"type": "string", "required": false},
+        "value_json": {"type": "string", "required": false},
+        "value_summary": {"type": "string", "required": false},
+        "value_length": {"type": "number", "required": false},
+        "selected_option_count": {"type": "number", "required": false},
+        "business_name": {"type": "string", "required": false},
+        "domain": {"type": "string", "required": false},
+        "user_id": {"type": "string", "required": false},
+        "created_at_iso": {"type": "string", "required": false}
+      },
+      "proposedFields": [
+        "environment", "test_run_id", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version",
+        "draft_id", "event_idempotency_key_hash", "client_revision", "server_revision", "base_server_revision", "mutation_id", "source_tab_id", "event_metadata_json", "safe_value_hash", "canonical_state_hash", "retention_class", "retention_anchor_at", "support_hold"
+      ]
+    },
+    "ProFormSubmission": {
+      "schemaFile": "base44/entities/ProFormSubmission.jsonc",
+      "baselineSha256": "dd876a669dc103f69464b0a77ec6bf55995dd8c3656d9bb16311ee4145dea5f0",
+      "existingRequired": ["metadata", "userdata"],
+      "expectedRls": {
+        "create": {},
+        "read": {"$or": [{"created_by": "{{user.email}}"}, {"user_condition": {"role": "admin"}}]},
+        "update": {"$or": [{"created_by": "{{user.email}}"}, {"user_condition": {"role": "admin"}}]},
+        "delete": {"$or": [{"created_by": "{{user.email}}"}, {"user_condition": {"role": "admin"}}]},
+        "write": {}
+      },
+      "legacyDescriptionExceptions": [
+        "/properties/metadata",
+        "/properties/userdata",
+        "/properties/userdata/properties/additional_pages_list/properties/why_choose_us_page",
+        "/properties/userdata/properties/additional_pages_list/properties/meet_the_team_page",
+        "/properties/userdata/properties/geographic_areas/items/properties/geographic_area_meta"
+      ],
+      "existingFields": {
+        "metadata": {"type": "object", "required": true},
+        "userdata": {"type": "object", "required": true}
+      },
+      "proposedFields": [
+        "environment", "test_run_id", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version",
+        "questionnaire_session_id", "source_draft_id", "submitted_state_hash", "pdf_source_state_hash"
+      ]
+    },
+    "ProFormSubmissionIntake": {
+      "schemaFile": "base44/entities/ProFormSubmissionIntake.jsonc",
+      "baselineSha256": "3a97cde95ed2ac74158b6f2fe3d755f573c23860bd9b77695586e74db73b3328",
+      "existingRequired": ["questionnaire_session_id"],
+      "expectedRls": {
+        "read": {"user_condition": {"role": "admin"}},
+        "update": {"user_condition": {"role": "admin"}},
+        "delete": {"user_condition": {"role": "admin"}},
+        "write": {"user_condition": {"role": "admin"}}
+      },
+      "legacyDescriptionExceptions": [
+        "/properties/business_name",
+        "/properties/business_domain",
+        "/properties/user_email",
+        "/properties/user_id",
+        "/properties/status",
+        "/properties/intake_reason",
+        "/properties/primary_failure_kind",
+        "/properties/fallback_failure_kind",
+        "/properties/primary_error_json",
+        "/properties/fallback_error_json",
+        "/properties/retry_error_json",
+        "/properties/transformed_payload_json",
+        "/properties/raw_responses_json",
+        "/properties/diagnostics_json",
+        "/properties/source",
+        "/properties/created_at_client",
+        "/properties/created_at_server",
+        "/properties/last_retry_at",
+        "/properties/retry_count",
+        "/properties/linked_submission_id",
+        "/properties/zapier_sent",
+        "/properties/notes"
+      ],
+      "existingFields": {
+        "questionnaire_session_id": {"type": "string", "required": true},
+        "business_name": {"type": "string", "required": false},
+        "business_domain": {"type": "string", "required": false},
+        "user_email": {"type": "string", "required": false},
+        "user_id": {"type": "string", "required": false},
+        "status": {"type": "string", "required": false, "enum": ["submitted", "received_intake", "retry_pending", "retry_success", "retry_failed", "abandoned"], "default": "received_intake"},
+        "intake_reason": {"type": "string", "required": false},
+        "primary_failure_kind": {"type": "string", "required": false},
+        "fallback_failure_kind": {"type": "string", "required": false},
+        "primary_error_json": {"type": "string", "required": false},
+        "fallback_error_json": {"type": "string", "required": false},
+        "retry_error_json": {"type": "string", "required": false},
+        "transformed_payload_json": {"type": "string", "required": false},
+        "raw_responses_json": {"type": "string", "required": false},
+        "diagnostics_json": {"type": "string", "required": false},
+        "source": {"type": "string", "required": false},
+        "created_at_client": {"type": "string", "required": false},
+        "created_at_server": {"type": "string", "required": false},
+        "last_retry_at": {"type": "string", "required": false},
+        "retry_count": {"type": "number", "required": false},
+        "linked_submission_id": {"type": "string", "required": false},
+        "zapier_sent": {"type": "boolean", "required": false},
+        "notes": {"type": "string", "required": false},
+        "ai_repair_status": {"type": "string", "required": false},
+        "ai_repair_attempt_count": {"type": "number", "required": false},
+        "last_ai_repair_at": {"type": "string", "required": false},
+        "ai_repair_error_json": {"type": "string", "required": false},
+        "ai_repair_report_json": {"type": "string", "required": false},
+        "ai_repaired_payload_json": {"type": "string", "required": false},
+        "ai_repair_applied": {"type": "boolean", "required": false},
+        "ai_repair_retry_attempted": {"type": "boolean", "required": false},
+        "ai_repair_retry_result_json": {"type": "string", "required": false},
+        "ai_repair_source": {"type": "string", "required": false}
+      },
+      "proposedFields": [
+        "environment", "test_run_id", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version",
+        "source_draft_id", "canonical_state_hash", "external_side_effects_mode", "zapier_status", "zapier_delivery_outcome", "zapier_last_attempted_at", "zapier_failure_kind"
+      ]
+    }
+  }
+}

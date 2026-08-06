@@ -18,6 +18,7 @@
     "test:storage": "npm run test:manifest && vitest run --config src/vitest.config.js src/test/storage --reporter=dot --no-coverage && vitest run --config src/vitest.baseline-characterization.config.js src/test/baseline-characterization/storage-initialization.baseline-characterization.test.js src/test/baseline-characterization/storage-isolation.baseline-characterization.test.js --reporter=dot --no-coverage",
     "test:runtime-config": "npm run test:manifest && vitest run --config src/vitest.config.js src/test/proDraftRuntimeConfig.test.js src/test/proDraftBackendRuntimeConfig.test.js src/test/environmentIdentification.test.jsx src/test/proExternalSideEffects.test.js --reporter=dot --no-coverage",
     "test:identity-contract": "node scripts/validate-pro-draft-identity-contract.mjs",
+    "test:entity-schemas": "node scripts/validate-pro-form-entity-schemas.mjs",
     "test:ci": "npm run test:manifest && vitest run --config src/vitest.config.js --reporter=dot --no-coverage",
     "test:manifest": "node scripts/validate-test-manifest.mjs",
     "test:e2e": "playwright test",
