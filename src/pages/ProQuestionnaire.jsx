@@ -69,6 +69,7 @@ import { deriveQuestionnaireBrowserNamespace } from '@/lib/questionnaireBrowserN
 import { useQuestionnairePersistence } from '@/components/store/QuestionnairePersistenceContext';
 import ProDraftBootstrapGate from '@/components/pro-form/ProDraftBootstrapGate';
 import ProDraftRecoveryPanel from '@/components/pro-form/ProDraftRecoveryPanel';
+import ProDraftReplacementActions from '@/components/pro-form/ProDraftReplacementActions';
 import {
   frontendRuntimeConfig,
   isDurableDraftClientEnabled,
@@ -111,7 +112,6 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
   const [submittedBusinessName, setSubmittedBusinessName] = useState('');
   const [submittedDomain, setSubmittedDomain] = useState('');
   const [submittedFormData, setSubmittedFormData] = useState({});
-  const [showClearAllModal, setShowClearAllModal] = useState(false);
   const [showIncompleteList, setShowIncompleteList] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [validatingQuestions, setValidatingQuestions] = useState([]);
@@ -124,7 +124,6 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
   const draftSaveDelayMs = isTestMode ? 0 : 600;
   const draftTextEventDelayMs = isTestMode ? 0 : 1000;
   const expandLinkedQuestionDelayMs = isTestMode ? 0 : 500;
-  const clearAllReloadDelayMs = isTestMode ? 0 : 100;
   const hasFinalSubmittedRef = useRef(false);
   const lastChangedQuestionIdRef = useRef('');
   const [questionnaireSessionId, setQuestionnaireSessionId] = useState('');
@@ -1095,33 +1094,6 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     dispatch(setAllExpanded(collapsed));
   };
 
-  const clearAll = () => {
-    setShowClearAllModal(true);
-  };
-
-  const handleConfirmClearAll = () => {
-    dispatch(resetForm());
-    
-    // Collapse all questions
-    const collapsed = {};
-    QUESTIONS.forEach(q => {
-      collapsed[q.id] = false;
-      if (q.conditionalChildren) {
-        q.conditionalChildren.forEach(child => {
-          collapsed[child.id] = false;
-        });
-      }
-    });
-    dispatch(setAllExpanded(collapsed));
-
-    setShowClearAllModal(false);
-    toast.success('All responses cleared');
-
-    // Scroll to top and refresh
-    window.scrollTo(0, 0);
-    setTimeout(() => window.location.reload(), clearAllReloadDelayMs);
-  };
-
   const isQuestionComplete = (questionId) => {
     const question = getQuestionById(QUESTIONS, questionId);
     if (!question) return false;
@@ -2073,13 +2045,7 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
                 )}
               </button>
 
-              <button
-                type="button"
-                onClick={clearAll}
-                className="w-full sm:w-auto px-8 sm:px-12 py-4 bg-white text-[#4A5F8C] border-2 border-[#4A5F8C] hover:bg-[#F0F2F5] active:bg-[#E0E4EC] rounded transition-all uppercase text-sm font-bold tracking-wide min-h-[52px]"
-              >
-                Clear All
-              </button>
+              {!draftSync.isReadOnly && <ProDraftReplacementActions mode="clear_all" />}
             </div>
 
             {showIncompleteList && !isFormValid() && (
@@ -2157,30 +2123,6 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
         </Suspense>
       )}
 
-      {showClearAllModal && (
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold text-[#122947] mb-4">Clear All Responses?</h3>
-            <p className="text-[#566C75] mb-6">
-              Are you sure? You will have to start over again.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={handleConfirmClearAll}
-                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
-              >
-                Yes, Clear All
-              </button>
-              <button
-                onClick={() => setShowClearAllModal(false)}
-                className="flex-1 px-6 py-3 bg-[#C1C6C8] hover:bg-[#A9B3B7] text-white rounded-lg font-medium transition-colors"
-              >
-                No, Keep Form Info
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       </div>
       </ErrorBoundary>
       );
@@ -2192,7 +2134,10 @@ export default function ProQuestionnaire() {
   if (!durableDraftV2Enabled) return <ProQuestionnaireContent />;
 
   return (
-    <ProDraftBootstrapGate runtimeConfig={frontendRuntimeConfig}>
+    <ProDraftBootstrapGate
+      runtimeConfig={frontendRuntimeConfig}
+      readOnlyActions={<ProDraftReplacementActions mode="start_new" />}
+    >
       <ProQuestionnaireContent legacyPersistenceEnabled={false} />
     </ProDraftBootstrapGate>
   );

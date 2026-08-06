@@ -1,5 +1,21 @@
 # Durable Draft Recovery Risk Register
 
+## 2026-08-06 client replacement-control update
+
+| Risk | Control added | Residual / release gate |
+| --- | --- | --- |
+| Local-only Clear All lets an active server draft resurrect | Server-accepted revision followed by idempotent backend replacement; old data remains support-recoverable | Live staging transaction and recovery-selection certification pending |
+| Broad browser cleanup deletes another client | Exact draft namespace keys only; Client B retention tests; no storage-wide clear | Cross-browser staging storage inspection pending |
+| Old async save updates new Redux state | Manager lifecycle generation and draft tag reject late save/event completion after invalidation/disposal | Live throttled-network/multi-tab certification pending |
+| Replacement commits but email fails | New code remains visible; delivery status is explicit; creation is not rolled back | Live SES staging failure/redirect evidence pending |
+| Start New mutates submitted evidence | Submitted source is read-only, is not superseded, and its browser namespace is retained | Immutable submitted/PDF staging proof pending |
+| Raw replacement credentials leak | Controller memory only for display/handoff; credential vault for token; Redux/URL/history and diagnostics scans | Built-bundle/log/network staging scan pending |
+
+Local evidence passed 83/83 focused cases and 90/90 synthetic browser cases
+across the configured five-project matrix. These results reduce source-level
+uncertainty only; no risk rating is lowered without live Base44, SES, deployed
+browser, log/bundle, cleanup, and submitted-record immutability evidence.
+
 - Status: Active architecture risk register
 - Date: 2026-08-06
 - Owners: Isaac Hines; Engineering; Security; Operations

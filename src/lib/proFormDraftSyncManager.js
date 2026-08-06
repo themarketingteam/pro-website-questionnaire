@@ -426,6 +426,8 @@ export const createProFormDraftSyncManager = (options = {}) => {
   let pendingConflict = null;
   let supportRecoveryCopy = null;
   let conflictRoundCount = 0;
+  let lifecycleGeneration = 0;
+  let managerDraftId = null;
   const status = /** @type {any} */ ({
     state: DRAFT_SYNC_MANAGER_STATES.IDLE,
     active: false,
@@ -1018,6 +1020,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
   };
 
   async function runSave(runOptions = {}) {
+    const operationGeneration = lifecycleGeneration;
     if (preferRecoverySessionNext && runOptions.preferRecoverySession !== true) {
       runOptions = { ...runOptions, preferRecoverySession: true };
     }
@@ -1080,6 +1083,9 @@ export const createProFormDraftSyncManager = (options = {}) => {
           syncReason,
           requestedStatus: prepared.canonical.draftStatus,
         });
+        if (operationGeneration !== lifecycleGeneration || status.disposed || status.locked) {
+          return publicStatus(status);
+        }
         validateAcceptedResponse(response, prepared.canonical, prepared.stateHash);
         const savedAt = typeof response.draft?.lastSavedAt === 'string'
           && Number.isFinite(Date.parse(response.draft.lastSavedAt))
@@ -1313,6 +1319,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
     }
     if (!status.online || eventQueue.length === 0 || status.disposed) return publicStatus(status);
     eventPromise = (async () => {
+      const operationGeneration = lifecycleGeneration;
       const canonical = canonicalOrNull();
       if (!canonical?.draftId) {
         eventAutoFlushBlocked = true;
@@ -1341,6 +1348,9 @@ export const createProFormDraftSyncManager = (options = {}) => {
           sourceTabId: canonical.sourceTabId || sourceTabId,
           events: eventAttempt.events,
         });
+        if (operationGeneration !== lifecycleGeneration || status.disposed || status.locked) {
+          return publicStatus(status);
+        }
         const accepted = new Set(eventAttempt.eventIds);
         for (let index = eventQueue.length - 1; index >= 0; index -= 1) {
           if (accepted.has(eventQueue[index].eventId)) {
@@ -1602,6 +1612,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
   };
 
   const invalidateAfterSupersession = () => {
+    lifecycleGeneration += 1;
     clearNetworkTimers();
     attempt = null;
     networkBlockState = DRAFT_SYNC_MANAGER_STATES.SUPERSEDED;
@@ -1640,6 +1651,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
     if (status.active) return publicStatus(status);
     ensureSourceTab();
     const initial = canonicalOrNull();
+    managerDraftId = initial?.draftId || null;
     status.isReadOnly = readOnlyProvider() || initial?.draftStatus === 'submitted';
     status.locked = status.isReadOnly;
     status.state = status.isReadOnly && initial?.draftStatus === 'submitted'
@@ -1685,6 +1697,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
 
   const dispose = async () => {
     if (status.disposed) return publicStatus(status);
+    lifecycleGeneration += 1;
     await stop();
     listeners.clear();
     eventQueue.length = 0;
@@ -1724,6 +1737,10 @@ export const createProFormDraftSyncManager = (options = {}) => {
       clientRevision: supportRecoveryCopy?.clientRevision ?? null,
       containsTokens: false,
       authoritative: false,
+    }),
+    getDraftIdentity: () => Object.freeze({
+      draftId: managerDraftId,
+      lifecycleGeneration,
     }),
     getStatus: () => publicStatus(status),
     subscribeStatus(listener) {

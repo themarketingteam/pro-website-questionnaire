@@ -45,6 +45,24 @@ feature-branch push, production operation, or `main` change occurred.
 
 ## Planned implementation batches
 
+### 2026-08-06 Clear All and Start New client source evidence
+
+The [client replacement flow](../frontend/clear-all-and-start-new-client-flow.md),
+replacement API client/controller, accessible confirmation and code dialogs,
+draft-tagged sync invalidation, and 18-scenario synthetic browser suite add local
+implementation/test evidence for `DR-CLEAR-001`, `DR-NEW-001`, `DR-LOCAL-002`,
+`DR-SUBTERM-001`, `DR-LIFE-001`, `DR-REC-001`, and `DR-A11Y-001`. Clear All
+requires a locally flushed and server-accepted revision before committing the
+replacement; cleanup is exact-namespace only. Start New preserves the submitted
+record/cache/credential. Raw code/tokens remain outside Redux and URL/history.
+Focused validation passed 83/83, and the synthetic 18-scenario suite passed
+90/90 across the configured five desktop/mobile browser projects. The full
+normal suite remains blocked at 1,650/1,655 by five established unrelated
+assertions; repository lint/typecheck also retain their established debt. This
+is local source evidence only; staging and release certification remain pending.
+No deployment, email, final submission, feature-branch push, or production
+operation occurred.
+
 ### 2026-08-06 conflict merge and multi-tab source evidence
 
 The [conflict merge and multi-tab contract](../frontend/conflict-merge-and-multi-tab-contract.md),

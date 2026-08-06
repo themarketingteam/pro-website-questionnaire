@@ -22,9 +22,10 @@ describe('V2 handler-level persistence guard', () => {
     expect(page).toMatch(/legacyPersistenceEnabled[\s\S]+queueDraftSave/u);
   });
 
-  it('keeps Clear All and final submission paths isolated for the next batch', () => {
-    expect(page).toContain('const handleConfirmClearAll');
-    expect(page).toContain('window.location.reload()');
+  it('routes Clear All through the replacement flow without a reload', () => {
+    expect(page).toContain('<ProDraftReplacementActions mode="clear_all" />');
+    expect(page).not.toContain('const handleConfirmClearAll');
+    expect(page).not.toContain('window.location.reload()');
     expect(page).toContain('const handleConfirmSubmit');
   });
 });

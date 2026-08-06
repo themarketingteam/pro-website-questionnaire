@@ -1,5 +1,26 @@
 # Staging Deployment Readiness Checklist
 
+## 2026-08-06 Clear All / Start New source checkpoint
+
+- [x] Client methods call `clearAndReplaceProFormDraft` and `startNewProFormDraft` through `base44.functions.invoke` behind the durable-draft feature flag.
+- [x] Controller orders local flush, accepted server save, pause, idempotent commit, old-manager disposal, new vault/cache hydration, and new-manager start.
+- [x] Clear All exact-namespace cleanup and unrelated-client retention have synthetic unit coverage.
+- [x] Submitted Start New retains the submitted namespace/record and exposes a read-only Back state.
+- [x] Raw recovery code/token exclusion from Redux and history/URL is source-tested.
+- [x] Confirmation/code dialogs cover exact copy, accessibility, mobile layout, truthful delivery, and acknowledgement.
+- [x] The 18-case replacement Playwright spec is wired into the five-project browser matrix.
+- [x] Local dependency-complete five-project replacement matrix passed 90/90 (18 scenarios per project).
+- [ ] Exercise authorized staging replacement records and SES redirect/failure outcomes with cleanup.
+- [ ] Clear the repository-wide full-test, lint, and typecheck release blockers.
+- [ ] Obtain a separate deployment authorization; this prompt performed no deployment.
+
+Local validation also passed 83/83 focused tests and the production build. The
+full normal suite passed 1,650/1,655; its five established unrelated failures,
+repository lint (32 errors/16 warnings), and project-wide typecheck debt keep
+the release gate closed. This local matrix does not replace deployed staging
+browser, Base44 transaction, SES routing, cleanup, or production-isolation
+evidence.
+
 - Current status: **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**
 - Review date: 2026-08-05 (America/Chicago)
 - Deployment authorization: **DENIED**

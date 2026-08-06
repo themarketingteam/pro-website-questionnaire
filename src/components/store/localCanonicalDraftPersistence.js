@@ -80,7 +80,13 @@ export const createLocalCanonicalDraftPersistence = (options = {}) => {
   if (!options.store || typeof options.store.subscribe !== 'function') {
     throw new TypeError('LOCAL_CANONICAL_PERSISTENCE_STORE_REQUIRED');
   }
-  const existing = controllersByStore.get(options.store);
+  let controllers = controllersByStore.get(options.store);
+  if (!controllers) {
+    controllers = new Map();
+    controllersByStore.set(options.store, controllers);
+  }
+  const controllerKey = options.namespace || 'namespace-unset';
+  const existing = controllers.get(controllerKey);
   if (existing) return existing;
 
   const store = options.store;
@@ -277,7 +283,7 @@ export const createLocalCanonicalDraftPersistence = (options = {}) => {
     },
   });
 
-  controllersByStore.set(store, controller);
+  controllers.set(controllerKey, controller);
   return controller;
 };
 

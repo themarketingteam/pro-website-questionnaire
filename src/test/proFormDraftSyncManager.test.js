@@ -476,6 +476,27 @@ describe('authoritative Pro form draft sync manager', () => {
     expect(second.manager.getStatus().state).toBe(DRAFT_SYNC_MANAGER_STATES.SUPERSEDED);
   });
 
+  it('rejects a late save callback after supersession and tags the manager draft', async () => {
+    const pending = deferred();
+    let request;
+    const saveProFormDraft = vi.fn((input) => {
+      request = input;
+      return pending.promise;
+    });
+    const harness = createHarness({ saveProFormDraft });
+    harness.manager.start();
+    expect(harness.manager.getDraftIdentity()).toMatchObject({ draftId: DRAFT_ID });
+    mutate(harness, 'in flight before clear');
+    const savePromise = harness.manager.flush({ reason: 'manual_save' });
+    await vi.waitFor(() => expect(saveProFormDraft).toHaveBeenCalledOnce());
+    const dispatchSpy = vi.spyOn(harness.store, 'dispatch');
+    harness.manager.invalidateAfterSupersession();
+    pending.resolve(await acceptedResponse(request));
+    await savePromise;
+    expect(harness.manager.getStatus().state).toBe(DRAFT_SYNC_MANAGER_STATES.SUPERSEDED);
+    expect(dispatchSpy.mock.calls.map(([action]) => action.type)).not.toContain('form/setDraftServerSaved');
+  });
+
   it('keeps offline changes local and saves the newest state after reconnect stabilization', async () => {
     const harness = createHarness({ online: false });
     harness.manager.start();

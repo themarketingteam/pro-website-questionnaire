@@ -37,6 +37,7 @@ const EnabledProDraftBootstrapGate = ({
   captchaProvider = undefined,
   captchaSiteKey = undefined,
   onEntryReady = undefined,
+  readOnlyActions = null,
 }) => {
   const store = useStore();
   const persistence = useQuestionnairePersistence();
@@ -136,10 +137,17 @@ const EnabledProDraftBootstrapGate = ({
               : 'Questionnaire interaction is unavailable until draft recovery is complete.'}
           </p>
           {interactiveReady && bootstrap.readOnly && (
-            <fieldset disabled aria-disabled="true" className="min-w-0 border-0 p-0">
-              <legend className="sr-only">Submitted questionnaire read-only content</legend>
-              {submittedContent}
-            </fieldset>
+            <>
+              <fieldset disabled aria-disabled="true" className="min-w-0 border-0 p-0">
+                <legend className="sr-only">Submitted questionnaire read-only content</legend>
+                {submittedContent}
+              </fieldset>
+              {readOnlyActions && (
+                <aside aria-label="Submitted questionnaire actions" className="mx-auto w-full max-w-6xl px-4 pb-8 text-center">
+                  {readOnlyActions}
+                </aside>
+              )}
+            </>
           )}
           {interactiveReady && !bootstrap.readOnly && content}
           </section>

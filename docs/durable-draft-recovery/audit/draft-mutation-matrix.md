@@ -66,7 +66,7 @@ uncertified after the failed Prompt 4 staging attempt.
 | M016 | Mark question touched | `/ProQuestionnaire` | page / `TextareaQuestion` | change path or `onTouched` | `setTouchedQuestion` | Yes | No at touch time | No | Validation/UI only | No | No | Touch may be persisted after response or validation independently | Server recovery misses latest error-display state | Decide browser-only vs draft; if draft, couple with answer mutation | T-MUT-016 |
 | M017 | Validation-only update | `/ProQuestionnaire` | page | `updateValidationState` / `setValidationStatusIfChanged` | `setValidationStatus`; possible parent validation | Yes | No | Yes when changed | Gates submission | No | No | Child and derived parent statuses dispatch independently | Server snapshot can hold stale validation map | Version validation against response and persist as one result set | T-MUT-017 |
 | M018 | Reset one question | `/ProQuestionnaire` | `QuestionWrapper` | `resetQuestion` | `deleteResponse`, then `setValidationStatus('incomplete')` | Yes | No | No | Cleared from output | Cleared from output | No | Delete and status update separate; no server write | Reload/recovery can resurrect reset answer; auxiliary/primary cleanup is reducer-dependent | `resetQuestionAtomic(id)` plus immediate post-reducer draft and reset event | T-MUT-018 |
-| M019 | Confirm Clear All | `/ProQuestionnaire` | page clear modal | `handleConfirmClearAll` | `resetForm`, `setAllExpanded` | Partial: async persist, no purge, and `textValidationMeta` is not cleared | No | No | Responses cleared | Responses cleared | No | Forced reload can race redux-persist write; existing server draft remains active | Old browser/server answers can rehydrate or be recovered as current; stale text-validation metadata remains | Supersede old draft, create new session/draft generation, clear all answer metadata, purge/flush browser state before reload | T-MUT-019 |
+| M019 | Confirm Clear All (durable-draft V2) | `/ProQuestionnaire` | `ProDraftReplacementActions` -> replacement controller | local flush -> forced accepted server save -> pause -> idempotent backend replacement -> invalidate/dispose old manager -> exact namespace cleanup -> new canonical hydrate | `loadCanonicalDraftState` only after committed replacement | Yes, exact old namespace only after commit | Yes, expected-revision replacement | Backend emits replacement event; client does not duplicate it | New blank canonical state | New blank canonical state | No hard reload; lifecycle generation rejects late callbacks | Partial/recovery-required response reuses the same idempotency request and retains old local state until commit is identified | Credential/cache failure after a committed transaction requires safe recovery/support; live staging transaction remains uncertified | Live staging replacement, recovery-selection, SES-result, and browser-history certification | T-MUT-019, DR-REPLACE-001–018 |
 | M020 | Type in Google Places widget before selection | `/ProQuestionnaire` | `MultiGeographicQuestion` | browser-owned `PlaceAutocompleteElement` input | None | No | No | No | No | No | No | Web component owns unobserved text | Reload/close loses search text | Mirror safe query text into `uiDraftState`; never persist Google objects | T-MUT-020 |
 | M021 | Select Google place / add Q5 location | `/ProQuestionnaire` | `MultiGeographicQuestion` -> page | `handlePlaceSelect` -> `onAdd` | direct `setResponse('5')`, `setValidationStatus('5')` | Yes | No; only later unrelated save/submit | No | Yes | Yes | No | Direct dispatch bypasses `updateResponse`; selected ref can lag render | Server recovery misses new location; autosave indicator is misleading | Atomic Q5 action plus draft/event queue | T-MUT-021 |
 | M022 | Update an existing Q5 location | `/ProQuestionnaire` | `MultiGeographicQuestion` -> page | `onUpdate` closure | direct `setResponse('5')` | Yes | No | No | Yes | Yes | No | Direct dispatch; no validation refresh in handler | Server recovery keeps old location fields | Atomic Q5 update with validation, draft, event | T-MUT-022 |
@@ -126,10 +126,23 @@ uncertified after the failed Prompt 4 staging attempt.
 
 ## Confirmed mutation bypasses
 
+### 2026-08-06 replacement-flow correction
+
+The durable-draft V2 path now supersedes the legacy M019/T-ATOM-004 behavior:
+Clear All no longer resets Redux and reloads. It flushes the current canonical
+state, requires an accepted server revision, commits an idempotent replacement,
+invalidates/disposes the old manager, removes only exact old-namespace browser
+artifacts, loads the new empty canonical state, and displays the one-time code.
+The feature-disabled path cannot invoke the replacement client. Submitted
+questionnaires omit Clear All and provide Start New, which retains the submitted
+record/cache/credential and creates a separate editable namespace. Validation:
+`proDraftReplacementController.test.js`, `ProDraftReplacementDialogs.test.jsx`,
+`proFormDraftSyncManager.test.js`, and `clear-all-and-start-new.spec.js`.
+
 The following are current, code-confirmed gaps rather than hypothetical failures:
 
 1. Q5 `onAdd`, `onUpdate`, `onRemove`, and `onSetPrimary` dispatch Redux directly and never call `queueDraftSave` or `queueDraftEvent` (M021–M024, M028).
-2. `resetQuestion` and Clear All change Redux/browser state but do not save or supersede the server draft and do not emit mutation events (M018–M019).
+2. Remaining non-replacement reset paths require their own server lifecycle treatment; durable-draft V2 Clear All is covered by M019.
 3. Parent `no` schedules a response snapshot before conditional-child cleanup, so the scheduled snapshot can retain hidden child content (M011, M013).
 4. Validation-only, touch, collapse, and textarea validation metadata changes are not represented in a contemporaneous `ProFormDraft` snapshot (M003–M005, M015–M017).
 5. Numeric range input, manual location text, Google search text, image working tags/partial people, confirmation credentials, file bytes/progress/errors, and dormant AI working text remain component/browser-object state until an explicit commit (M020, M025, M027, M029–M034, M040, M042, M047, M051, M053–M058).
@@ -139,7 +152,7 @@ The following are current, code-confirmed gaps rather than hypothetical failures
 
 ## Redux action coverage
 
-Every action exported by `formSlice` was searched. Active paths are covered as follows: `setResponse` (M002, M006–M011, M021–M026 and editor/upload rows), `setValidationStatus` (M003–M005, M011, M017, M021–M023, M059, M073), `setTouchedQuestion` (M002, M006–M017, M073), `setExpandedQuestion`/`setAllExpanded` (M014–M015, M019), `setCredentials` (M071), `resetForm` (M019, M061, M074–M075), `deleteResponse` (M013, M018), `initializeExpandedQuestions` (M072), and `setTextareaDirtyMeta` (M004–M005). `setMultipleResponses`, `setMultipleValidationStatus`, and `loadInitialState` are exported but have no call site outside the slice; they are dormant reducer surface, not current user mutation paths.
+Every action exported by `formSlice` was searched. Active paths are covered as follows: `setResponse` (M002, M006–M011, M021–M026 and editor/upload rows), `setValidationStatus` (M003–M005, M011, M017, M021–M023, M059, M073), `setTouchedQuestion` (M002, M006–M017, M073), `setExpandedQuestion`/`setAllExpanded` (M014–M015), `setCredentials` (M071), `resetForm` (M061, M074–M075), `deleteResponse` (M013, M018), `initializeExpandedQuestions` (M072), `loadCanonicalDraftState` (M019), and `setTextareaDirtyMeta` (M004–M005). `setMultipleResponses`, `setMultipleValidationStatus`, and `loadInitialState` are exported but have no call site outside the slice; they are dormant reducer surface, not current user mutation paths.
 
 ## Atomicity audit
 
@@ -148,7 +161,7 @@ Every action exported by `formSlice` was searched. Active paths are covered as f
 | Parent answer + child cleanup | Parent `setResponse` -> queue snapshot/event -> validation function dispatches child delete/status/touch/expand resets | Draft can say parent `no` while retaining child response; no deletion event | Reducer action performs all cleanup; snapshot reads post-reducer revision | T-ATOM-001 |
 | Location removal + primary repair | `setResponse('5')` -> `setResponse('5_primary')` -> validation | New list with stale/out-of-range primary or new primary with old list | One Q5 reducer action derives list, primary and validation | T-ATOM-002 |
 | Reset + auxiliary deletion | `deleteResponse(id)` (also deletes `_other`/`_primary`) -> set validation incomplete; no save | Browser/server disagreement; reset can resurrect | One reset mutation plus immediate saved revision/event | T-ATOM-003 |
-| Clear All + supersession/new draft | `resetForm` -> collapse map -> forced reload; no persistor flush/purge or server status change | Old draft/session remains recoverable as active; reload race | Transactionally supersede generation and create/reset recovery head | T-ATOM-004 |
+| Clear All + supersession/new draft | Flush local -> accepted server revision -> idempotent backend commit -> invalidate/dispose -> exact old-namespace cleanup -> load new canonical state | No client-visible mixed draft state before committed response; late old-manager completions are generation-rejected | Backend replacement transaction is authoritative; live staging proof remains required | T-ATOM-004, DR-REPLACE-001–018 |
 | Final validation + submit-attempted snapshot | async validations update Redux; later submit shallow-copies responses, emits events, then best-effort saves attempted state | Attempt can pair answer revision with stale/incomplete validation map | Freeze/deep-normalize a revision, validate it, persist attempt receipt | T-ATOM-005 |
 | Upload success + URL/metadata attachment | Base44 upload finishes -> component array/object update -> Redux -> debounced draft | Orphan file, wrong index attachment, missing MIME/size/status/id | Durable upload record and stable item ID; atomic attach | T-ATOM-006 |
 | Business/domain edits + final snapshot | local modal state -> arguments to submit/PDF; draft identity remains prior parameters | Draft metadata, final entity and PDF can disagree; modal edits vanish | Commit confirmation credentials with response revision before attempt | T-ATOM-007 |

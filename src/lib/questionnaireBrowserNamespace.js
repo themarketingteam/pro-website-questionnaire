@@ -16,6 +16,8 @@ export const QUESTIONNAIRE_STORAGE_PURPOSES = Object.freeze([
   'legacy-session',
   'draft-cache',
   'draft-credentials',
+  'last-server-base',
+  'pending-events',
   'failure-backup',
   'migration-marker',
   'submitted-receipt',
@@ -180,6 +182,10 @@ export const hashNamespaceSeed = (seed) => {
     .join('');
 };
 
+/**
+ * @param {Record<string, unknown>} [identity]
+ * @param {{ anonymousLaunchId?: string }} [options]
+ */
 export const deriveQuestionnaireBrowserNamespace = (
   identity = readQuestionnaireIdentityFromUrl(),
   options,

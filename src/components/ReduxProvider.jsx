@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Provider } from 'react-redux';
 import { createResilientStorage } from '@/lib/resilientStorage';
 import { safeGetWindowLocationHref } from '@/lib/browserSafety';
@@ -454,9 +454,48 @@ export default function ReduxProvider({
     identity.context,
   ), [identity]);
   const [runtime, setRuntime] = useState(null);
+  const runtimeRef = useRef(null);
   const ordinaryLocalPersistenceEnabled = !isDurableDraftClientEnabled(
     frontendRuntimeConfig,
   );
+
+  const switchDraftRuntime = useCallback(async ({ namespace: nextNamespace }) => {
+    if (typeof nextNamespace !== 'string' || nextNamespace === runtimeRef.current?.namespace) {
+      return true;
+    }
+    const nextRuntime = await getOrCreateQuestionnaireRuntime({
+      namespace: nextNamespace,
+      identityContext: identity.context,
+      storageFactory,
+      storeFactory,
+      rehydrationTimeoutMs,
+      cacheTimeoutMs,
+      canonicalCacheAdapter,
+      startLocalPersistence: ordinaryLocalPersistenceEnabled,
+    });
+    await stopLocalCanonicalDraftPersistence(runtimeRef.current?.localPersistence);
+    runtimeRef.current = nextRuntime;
+    setRuntime(nextRuntime);
+    return true;
+  }, [
+    cacheTimeoutMs,
+    canonicalCacheAdapter,
+    identity.context,
+    ordinaryLocalPersistenceEnabled,
+    rehydrationTimeoutMs,
+    storageFactory,
+    storeFactory,
+  ]);
+
+  useEffect(() => {
+    const onPopState = (event) => {
+      const target = event.state;
+      if (!target?.namespace || target.superseded === true) return;
+      void switchDraftRuntime({ namespace: target.namespace });
+    };
+    globalThis.addEventListener?.('popstate', onPopState);
+    return () => globalThis.removeEventListener?.('popstate', onPopState);
+  }, [switchDraftRuntime]);
 
   useEffect(() => {
     let active = true;
@@ -520,6 +559,7 @@ export default function ReduxProvider({
         });
       }
       mountedRuntime = nextRuntime;
+      runtimeRef.current = nextRuntime;
       setRuntime(nextRuntime);
       try { onRuntimeReady?.(nextRuntime); } catch {}
     }).catch(async () => {
@@ -543,7 +583,10 @@ export default function ReduxProvider({
         identityContext: identity.context,
         startLocalPersistence: ordinaryLocalPersistenceEnabled,
       });
-      if (active) setRuntime(bootstrappedFallback);
+      if (active) {
+        runtimeRef.current = bootstrappedFallback;
+        setRuntime(bootstrappedFallback);
+      }
       else await bootstrappedFallback.dispose?.();
     });
 
@@ -583,6 +626,7 @@ export default function ReduxProvider({
     localPersistence: runtime.localPersistence,
     canonicalCacheAdapter: runtime.canonicalCacheAdapter,
     draftListenerRuntime: runtime.draftListenerRuntime,
+    switchDraftRuntime,
   };
 
   return (

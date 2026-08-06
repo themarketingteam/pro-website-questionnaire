@@ -17,6 +17,7 @@ import {
 } from '@/lib/proFormDraftSyncManager';
 import { frontendRuntimeConfig } from '@/lib/proDraftRuntimeConfig';
 import { createProDraftTabCoordinator } from '@/lib/proDraftTabCoordinator';
+import { createLocalCanonicalDraftPersistence } from '@/components/store/localCanonicalDraftPersistence';
 
 const EMPTY_STATUS = Object.freeze({
   state: 'idle',
@@ -56,6 +57,7 @@ const DEFAULT_CONTEXT = Object.freeze({
   markSubmitAttempted: NOOP_ASYNC,
   markSubmitFailed: NOOP_ASYNC,
   markSubmitted: NOOP_ASYNC,
+  replacementLifecycle: null,
   enabled: false,
 });
 
@@ -101,24 +103,42 @@ const EnabledProDraftSyncProvider = ({
   const store = useStore();
   const persistence = useQuestionnairePersistence();
   const draftContext = useSelector(selectDraftContext);
-  const draftKey = draftContext.draftId || draftContext.sessionId || 'draft-pending';
+  const activeNamespace = draftContext.namespace || persistence.namespace;
+  const draftKey = `${activeNamespace}:${draftContext.draftId || draftContext.sessionId || 'draft-pending'}`;
   const credentialVault = useMemo(() => (
     credentialVaultOverride || createProDraftCredentialVault({
       storage: persistence.storage,
       environment: runtimeConfig.environment,
-      browserNamespace: persistence.namespace,
+      browserNamespace: activeNamespace,
     })
   ), [
     credentialVaultOverride,
-    persistence.namespace,
+    activeNamespace,
     persistence.storage,
     runtimeConfig.environment,
   ]);
   const tabCoordinator = useMemo(() => (
     tabCoordinatorOverride || createProDraftTabCoordinator({
-      namespace: persistence.namespace,
+      namespace: activeNamespace,
     })
-  ), [persistence.namespace, tabCoordinatorOverride]);
+  ), [activeNamespace, tabCoordinatorOverride]);
+  const activeLocalPersistence = useMemo(() => (
+    activeNamespace === persistence.namespace
+      ? persistence.localPersistence
+      : createLocalCanonicalDraftPersistence({
+        store,
+        namespace: activeNamespace,
+        storage: persistence.storage,
+        cacheAdapter: persistence.canonicalCacheAdapter,
+      })
+  ), [
+    activeNamespace,
+    persistence.canonicalCacheAdapter,
+    persistence.localPersistence,
+    persistence.namespace,
+    persistence.storage,
+    store,
+  ]);
   const coordinatorConflictAdapter = useMemo(() => Object.freeze({
     handleConflict(details) {
       tabCoordinator.broadcast({
@@ -161,6 +181,7 @@ const EnabledProDraftSyncProvider = ({
     managerOptions,
     pendingServerSync,
     persistence,
+    activeLocalPersistence,
     runtimeConfig,
     store,
   });
@@ -175,6 +196,7 @@ const EnabledProDraftSyncProvider = ({
     managerOptions,
     pendingServerSync,
     persistence,
+    activeLocalPersistence,
     runtimeConfig,
     store,
   };
@@ -185,9 +207,9 @@ const EnabledProDraftSyncProvider = ({
       const inputs = stableInputs.current;
       return inputs.managerFactory({
         store: inputs.store,
-        namespace: inputs.persistence.namespace,
+        namespace: activeNamespace,
         storage: inputs.persistence.storage,
-        localPersistence: inputs.persistence.localPersistence,
+        localPersistence: inputs.activeLocalPersistence,
         canonicalCache: inputs.persistence.canonicalCacheAdapter,
         credentialVault: inputs.credentialVault,
         draftApiClient: inputs.draftApiClient,
@@ -201,7 +223,7 @@ const EnabledProDraftSyncProvider = ({
         ...inputs.managerOptions,
       });
     },
-  }), [draftKey, store]);
+  }), [activeNamespace, draftKey, store]);
   const [syncStatus, setSyncStatus] = useState(() => record.manager.getStatus());
 
   useEffect(() => {
@@ -247,6 +269,16 @@ const EnabledProDraftSyncProvider = ({
     markSubmitAttempted: record.manager.markSubmitAttempted,
     markSubmitFailed: record.manager.markSubmitFailed,
     markSubmitted: record.manager.markSubmitted,
+    replacementLifecycle: Object.freeze({
+      flush: record.manager.flush,
+      saveImmediately: record.manager.saveImmediately,
+      stop: record.manager.stop,
+      start: record.manager.start,
+      invalidateAfterSupersession: record.manager.invalidateAfterSupersession,
+      dispose: record.manager.dispose,
+      getStatus: record.manager.getStatus,
+      getDraftIdentity: record.manager.getDraftIdentity,
+    }),
     getSafeDiagnostics: () => getSafeDraftSyncDiagnostics(record.manager),
     enabled: true,
   }), [record.manager, syncStatus]);
