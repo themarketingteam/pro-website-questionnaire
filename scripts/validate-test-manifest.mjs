@@ -187,6 +187,7 @@ const requiredScripts = [
   'test:baseline-characterization',
   'test:storage',
   'test:runtime-config',
+  'test:identity-contract',
   'test:ci',
   'test:manifest',
   'test:e2e',
@@ -237,6 +238,11 @@ requireCondition(
 requireCondition(
   scripts['test:manifest'] === 'node scripts/validate-test-manifest.mjs',
   'test:manifest must execute scripts/validate-test-manifest.mjs',
+);
+requireCondition(
+  scripts['test:identity-contract']
+    === 'node scripts/validate-pro-draft-identity-contract.mjs',
+  'test:identity-contract must execute the cross-runtime drift validator',
 );
 requireCondition(
   scripts.check === 'node scripts/run-validation-sequence.mjs check',

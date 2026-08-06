@@ -1,0 +1,217 @@
+{
+  "contract": {
+    "recoveryCodeVersion": 1,
+    "alphabet": "23456789ABCDEFGHJKMNPQRSTUVWXYZ",
+    "length": 20,
+    "groupSize": 4,
+    "groupCount": 5,
+    "displayFormat": "XXXX-XXXX-XXXX-XXXX-XXXX",
+    "minimumEntropyBits": 96,
+    "lifecycleStatuses": [
+      "active",
+      "submit_attempted",
+      "submit_failed",
+      "submitted",
+      "cleared_superseded",
+      "expired",
+      "deleted"
+    ],
+    "emailRecoveryEligibleStatuses": [
+      "active",
+      "submit_attempted",
+      "submit_failed",
+      "submitted"
+    ],
+    "stableIdTieBreaker": "descending"
+  },
+  "recoveryCodeNormalization": [
+    {
+      "name": "normalized",
+      "input": "23456789ABCDEFGHJKMN",
+      "valid": true,
+      "normalizedCode": "23456789ABCDEFGHJKMN",
+      "errorCode": null
+    },
+    {
+      "name": "lowercase",
+      "input": "23456789abcdefghjkmn",
+      "valid": true,
+      "normalizedCode": "23456789ABCDEFGHJKMN",
+      "errorCode": null
+    },
+    {
+      "name": "spaces",
+      "input": "2345 6789 ABCD EFGH JKMN",
+      "valid": true,
+      "normalizedCode": "23456789ABCDEFGHJKMN",
+      "errorCode": null
+    },
+    {
+      "name": "hyphens",
+      "input": "2345-6789-ABCD-EFGH-JKMN",
+      "valid": true,
+      "normalizedCode": "23456789ABCDEFGHJKMN",
+      "errorCode": null
+    },
+    {
+      "name": "mixed separators",
+      "input": "2345 - 6789-ABCD EFGH - JKMN",
+      "valid": true,
+      "normalizedCode": "23456789ABCDEFGHJKMN",
+      "errorCode": null
+    },
+    {
+      "name": "ambiguous zero",
+      "input": "03456789ABCDEFGHJKMN",
+      "valid": false,
+      "normalizedCode": "",
+      "errorCode": "RECOVERY_CODE_INVALID_CHARACTER"
+    },
+    {
+      "name": "ambiguous uppercase i",
+      "input": "I3456789ABCDEFGHJKMN",
+      "valid": false,
+      "normalizedCode": "",
+      "errorCode": "RECOVERY_CODE_INVALID_CHARACTER"
+    },
+    {
+      "name": "arbitrary punctuation",
+      "input": "!3456789ABCDEFGHJKMN",
+      "valid": false,
+      "normalizedCode": "",
+      "errorCode": "RECOVERY_CODE_INVALID_CHARACTER"
+    },
+    {
+      "name": "insufficient length",
+      "input": "23456789ABCDEFGHJKM",
+      "valid": false,
+      "normalizedCode": "",
+      "errorCode": "RECOVERY_CODE_TOO_SHORT"
+    },
+    {
+      "name": "excess length",
+      "input": "23456789ABCDEFGHJKMNP",
+      "valid": false,
+      "normalizedCode": "",
+      "errorCode": "RECOVERY_CODE_TOO_LONG"
+    }
+  ],
+  "recoveryCodeFormatting": [
+    {
+      "normalizedCode": "23456789ABCDEFGHJKMN",
+      "formattedCode": "2345-6789-ABCD-EFGH-JKMN",
+      "hint": "JKMN"
+    }
+  ],
+  "deterministicEncoding": [
+    {
+      "name": "sequential accepted bytes",
+      "bytes": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+      "normalizedCode": "23456789ABCDEFGHJKMN"
+    },
+    {
+      "name": "rejection sampling skips upper tail",
+      "bytes": [248, 255, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19],
+      "normalizedCode": "23456789ABCDEFGHJKMN"
+    }
+  ],
+  "statusNormalization": [
+    { "input": "draft", "isValidLegacyDraft": false, "expected": "active" },
+    { "input": "", "isValidLegacyDraft": true, "expected": "active" },
+    { "input": null, "isValidLegacyDraft": true, "expected": "active" },
+    { "input": "submit_attempted", "isValidLegacyDraft": false, "expected": "submit_attempted" },
+    { "input": "submit_failed", "isValidLegacyDraft": false, "expected": "submit_failed" },
+    { "input": "submitted", "isValidLegacyDraft": false, "expected": "submitted" },
+    { "input": "future_status", "isValidLegacyDraft": false, "expected": "unknown" },
+    { "input": "", "isValidLegacyDraft": false, "expected": "unknown" }
+  ],
+  "eligibility": [
+    { "status": "active", "eligible": true },
+    { "status": "submit_attempted", "eligible": true },
+    { "status": "submit_failed", "eligible": true },
+    { "status": "submitted", "eligible": true },
+    { "status": "cleared_superseded", "eligible": false },
+    { "status": "expired", "eligible": false },
+    { "status": "deleted", "eligible": false },
+    { "status": "future_status", "eligible": false }
+  ],
+  "selections": [
+    {
+      "name": "newest created ignores newer update on older record",
+      "options": { "expectedEnvironment": "production" },
+      "records": [
+        { "id": "draft-older", "status": "active", "environment": "production", "created_date": "2026-01-01T00:00:00.000Z", "updated_date": "2026-08-01T00:00:00.000Z" },
+        { "id": "draft-newer", "status": "active", "environment": "production", "created_date": "2026-02-01T00:00:00.000Z", "updated_date": "2026-02-01T00:00:00.000Z" }
+      ],
+      "selectedId": "draft-newer",
+      "eligibleCount": 2,
+      "warnings": []
+    },
+    {
+      "name": "submitted newest wins over active older",
+      "options": { "expectedEnvironment": "production" },
+      "records": [
+        { "id": "draft-active-older", "status": "active", "environment": "production", "created_date": "2026-03-01T00:00:00.000Z" },
+        { "id": "draft-submitted-newest", "status": "submitted", "environment": "production", "created_date": "2026-04-01T00:00:00.000Z" }
+      ],
+      "selectedId": "draft-submitted-newest",
+      "eligibleCount": 2,
+      "warnings": []
+    },
+    {
+      "name": "superseded newest is excluded",
+      "options": { "expectedEnvironment": "production" },
+      "records": [
+        { "id": "draft-active-older", "status": "active", "environment": "production", "created_date": "2026-03-01T00:00:00.000Z" },
+        { "id": "draft-cleared-newest", "status": "cleared_superseded", "environment": "production", "created_date": "2026-05-01T00:00:00.000Z", "replacement_draft_id": "draft-active-older" }
+      ],
+      "selectedId": "draft-active-older",
+      "eligibleCount": 1,
+      "warnings": []
+    },
+    {
+      "name": "equal timestamps use descending stable id",
+      "options": {},
+      "records": [
+        { "id": "draft-a", "status": "active", "created_date": "2026-06-01T00:00:00.000Z", "created_at_server": "2026-06-01T00:00:01.000Z" },
+        { "id": "draft-z", "status": "active", "created_date": "2026-06-01T00:00:00.000Z", "created_at_server": "2026-06-01T00:00:01.000Z" }
+      ],
+      "selectedId": "draft-z",
+      "eligibleCount": 2,
+      "warnings": []
+    },
+    {
+      "name": "malformed timestamp excluded when valid record exists",
+      "options": {},
+      "records": [
+        { "id": "draft-malformed", "status": "active", "created_date": "not-a-date", "created_at_server": "also-not-a-date" },
+        { "id": "draft-valid", "status": "active", "created_date": "2026-01-01T00:00:00.000Z" }
+      ],
+      "selectedId": "draft-valid",
+      "eligibleCount": 1,
+      "warnings": ["INVALID_CREATION_TIMESTAMP_EXCLUDED"]
+    },
+    {
+      "name": "environment mismatch excluded",
+      "options": { "expectedEnvironment": "production" },
+      "records": [
+        { "id": "draft-production", "status": "active", "environment": "production", "created_date": "2026-01-01T00:00:00.000Z" },
+        { "id": "draft-staging", "status": "active", "environment": "staging", "created_date": "2026-07-01T00:00:00.000Z" }
+      ],
+      "selectedId": "draft-production",
+      "eligibleCount": 1,
+      "warnings": []
+    },
+    {
+      "name": "all malformed timestamps use deterministic id fallback",
+      "options": {},
+      "records": [
+        { "id": "draft-a", "status": "active", "created_date": "invalid-a" },
+        { "id": "draft-z", "status": "submitted", "created_at_server": "invalid-z" }
+      ],
+      "selectedId": "draft-z",
+      "eligibleCount": 2,
+      "warnings": ["ALL_CREATION_TIMESTAMPS_INVALID_ID_FALLBACK"]
+    }
+  ]
+}
