@@ -484,3 +484,12 @@ hash behavior; blue/green domain rollback and reverse-delta rehearsal; approved
 client templates; and evidence that no procedure exposes client content,
 credentials, raw app IDs, or unsupported commands. Documentation alone does
 not satisfy these gates.
+
+## 2026-08-06 operational-readiness gate result
+
+The operational-readiness attempt is **OPERATIONAL_READINESS_BLOCKED** because
+the full normal suite failed three assertions before staging target
+verification. Focused operational tests do not satisfy the live acceptance
+criteria. Secrets, deployments, live telemetry/health/probe/alert evidence,
+browser coverage, drills, support training, and cleanup verification remain
+absent. Production acceptance remains `BLOCKED`.

@@ -758,3 +758,12 @@ No risk is closed or lowered. The final gate found 96 RC-precheck failures, 82 s
 | Client banner is mistaken for a write freeze | Runbook requires protected server barriers, quiet windows, final delta, and class-by-class unfreeze | Granular backend write barriers do not yet exist and remain release blockers |
 | Domain rollback strands green writes | Manual domain checklist requires freeze, reverse delta, zero conflicts, blue compatibility, and owner approvals | Live reverse migration/domain rehearsal remains required |
 | Incident communications overstate verification or loss | Plain-language approved templates forbid identity and unconfirmed loss claims | Contact owners and communications approval must be assigned before release |
+
+## 2026-08-06 operational-readiness hard stop
+
+The full normal suite failed three questionnaire/repair assertions after the
+focused operational gates passed. No operational risk is lowered or closed.
+Live telemetry leakage, RLS, probe cleanup, alert redirection/deduplication,
+dashboard authorization, incident response timing, support readiness, and
+zero-record cleanup remain unproved. The hard stop prevented all staging and
+production mutations.

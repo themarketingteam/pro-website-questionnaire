@@ -708,3 +708,14 @@ The [final gate summary](./staging-release-candidate-summary.md) is **NOT ISSUED
 | Alert policy and safe delivery | `proDraftAlertPolicy`, `proDraftAlertDelivery` | `proDraftAlerting.test.js` | Local implemented; destinations unconfigured |
 | Password-gated operations dashboard | `/admin/draft-operations`, `proDraftHealthClient` | dashboard/client/admin authorization tests | Local implemented; not deployed |
 | Incident, support, maintenance, rotation, communication, and decision procedures | Operations runbook set and pending support-training manifest | `validate-durable-draft-operations-runbooks.test.js`; `operations:validate-runbooks` | Local documentation validated; training and staging exercises pending |
+
+## 2026-08-06 staging operational-readiness attempt
+
+The [operational-readiness report](../operations/staging-operational-readiness-certification.md)
+is **OPERATIONAL_READINESS_BLOCKED** at commit
+`bc4144c3e29154440cad0c65c44cb754a0444f93`. Focused telemetry,
+health/probe/alert/dashboard, runbook, and direct-access boundaries passed, but
+the full normal suite failed 3 of 2,188 tests. No requirement advances to live
+staging evidence. Target verification, secrets, deployments, synthetic events,
+health/probe/alert matrices, browser checks, drills, training, and live cleanup
+were not entered.

@@ -546,6 +546,26 @@ No readiness item is promoted by source tooling alone. The decision remains
 These local controls do not promote readiness. The decision remains
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
 
+## 2026-08-06 operational-readiness certification attempt
+
+- [x] Focused operational telemetry tests passed: 18 of 18.
+- [x] Focused health, probe, alert, dashboard, and admin-request tests passed:
+  30 of 30.
+- [x] Runbook and direct-access/service-role validators passed.
+- [ ] Full normal validation failed: 3 of 2,188 tests failed.
+- [ ] Target guard, secret configuration, schemas, functions, and site were not
+  entered after the hard stop.
+- [ ] Telemetry, health, probe, alert/inbox, dashboard/browser, and incident
+  drill matrices have no live staging evidence.
+- [ ] Support training remains `SUPPORT_TRAINING_BLOCKED`; all 12 rows are
+  `PENDING`.
+- [x] No staging or production records, alerts, emails, deployments, domains,
+  schedules, or external side effects were created by the attempt.
+
+The [report](../operations/staging-operational-readiness-certification.md) is
+**OPERATIONAL_READINESS_BLOCKED**. The decision remains
+**STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
+
 ## 2026-08-06 bidirectional migration utility certification attempt
 
 The [migration utility report](../migration/staging-migration-utility-certification.md)

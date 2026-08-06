@@ -32,6 +32,17 @@
     "cleanup": "BLOCKED_TARGET_UNAVAILABLE",
     "runtimeCommitVerification": "BLOCKED_TARGET_UNAVAILABLE"
   },
+  "supplementalGateInputs": {
+    "operationalReadiness": {
+      "attemptedCommit": "bc4144c3e29154440cad0c65c44cb754a0444f93",
+      "classification": "OPERATIONAL_READINESS_BLOCKED",
+      "sourceValidation": "FAILED_3_OF_2188",
+      "stagingTargetGuard": "NOT_RUN_FAIL_CLOSED",
+      "deployment": "NOT_RUN",
+      "supportTraining": "SUPPORT_TRAINING_BLOCKED",
+      "cleanup": "NOT_REQUIRED_NO_RECORDS_CREATED"
+    }
+  },
   "checksums": {
     "coverageReportSha256": "047bd63eb299059d8c00adc4f8e24a00d24cd1d4d98347bc9abc0ded98f2cc8d",
     "manualEvidenceReportSha256": "f29a8c7d1af7ced260eb67898ee8a3e20adbe2c03ffb7d4b17b2287e93d611a3",
