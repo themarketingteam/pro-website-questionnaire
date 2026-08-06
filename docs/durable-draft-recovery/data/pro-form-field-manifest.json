@@ -1416,6 +1416,54 @@
       "group": "retention"
     }
   },
+  "securityEntities": {
+    "ProFormRecoverySecurityEvent": {
+      "schemaFile": "base44/entities/ProFormRecoverySecurityEvent.jsonc",
+      "implementationStatus": "local_schema_implemented_not_pushed",
+      "required": ["request_id", "environment"],
+      "entityRls": {
+        "create": {"user_condition": {"role": "admin"}},
+        "read": {"user_condition": {"role": "admin"}},
+        "update": {"user_condition": {"role": "admin"}},
+        "delete": {"user_condition": {"role": "admin"}}
+      },
+      "fields": {
+        "request_id": {"type": "string", "required": true, "classification": "audit_metadata"},
+        "environment": {"type": "string", "required": true, "classification": "migration_metadata"},
+        "attempt_type": {"type": "string", "required": false, "classification": "audit_metadata"},
+        "outcome": {"type": "string", "required": false, "classification": "audit_metadata"},
+        "subject_hash": {"type": "string", "required": false, "classification": "sensitive_hash"},
+        "ip_hash": {"type": "string", "required": false, "classification": "sensitive_hash"},
+        "device_hash": {"type": "string", "required": false, "classification": "sensitive_hash"},
+        "recovery_email_lookup_hash": {"type": "string", "required": false, "classification": "sensitive_hash"},
+        "draft_id": {"type": "string", "required": false, "classification": "admin_only"},
+        "captcha_required": {"type": "boolean", "required": false, "default": false, "classification": "audit_metadata"},
+        "captcha_verified": {"type": "boolean", "required": false, "default": false, "classification": "audit_metadata"},
+        "failure_count_window": {"type": "number", "required": false, "classification": "audit_metadata"},
+        "attempt_count_window": {"type": "number", "required": false, "classification": "audit_metadata"},
+        "lockout_until": {"type": "string", "format": "date-time", "required": false, "classification": "audit_metadata"},
+        "window_started_at": {"type": "string", "format": "date-time", "required": false, "classification": "audit_metadata"},
+        "created_at_server": {"type": "string", "format": "date-time", "required": false, "classification": "audit_metadata"},
+        "policy_version": {"type": "number", "required": false, "classification": "audit_metadata"},
+        "test_run_id": {"type": "string", "required": false, "classification": "test_metadata"},
+        "source_app_id": {"type": "string", "required": false, "classification": "migration_metadata"},
+        "source_entity": {"type": "string", "required": false, "classification": "migration_metadata"},
+        "source_record_id": {"type": "string", "required": false, "classification": "migration_metadata"},
+        "source_created_date": {"type": "string", "format": "date-time", "required": false, "classification": "migration_metadata"},
+        "source_updated_date": {"type": "string", "format": "date-time", "required": false, "classification": "migration_metadata"},
+        "migration_batch_id": {"type": "string", "required": false, "classification": "migration_metadata"},
+        "migration_direction": {"type": "string", "required": false, "classification": "migration_metadata"},
+        "migrated_at": {"type": "string", "format": "date-time", "required": false, "classification": "migration_metadata"},
+        "source_content_hash": {"type": "string", "required": false, "classification": "sensitive_hash"},
+        "migration_version": {"type": "number", "required": false, "classification": "migration_metadata"}
+      },
+      "prohibitedFields": [
+        "email", "ip_address", "device_id", "recovery_code", "captcha_token",
+        "request_body", "answer_content", "recovery_session_token"
+      ],
+      "publicProjectionRule": "never expose entity rows; public functions return only allowlisted generic recovery envelopes"
+    }
+  },
   "entities": {
     "ProFormDraft": {
       "schemaFile": "base44/entities/ProFormDraft.jsonc",

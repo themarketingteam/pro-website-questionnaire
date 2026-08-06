@@ -143,6 +143,22 @@ the normal suite passed 1,155/1,160 tests. Consequently `DR-SAVE-001`,
 environment evidence or certified status. No schema, function, flag, secret,
 data, or frontend deployment operation occurred.
 
+### 2026-08-05 public recovery abuse-control foundation
+
+The feature branch now contains an admin-only recovery security-event schema,
+purpose-separated abuse HMAC contract, bounded IP/subject/global policy,
+conditional CAPTCHA escalation, temporary lockout, generic public failure
+envelope, server-only CAPTCHA abstraction, and a resilient 128-bit random
+device-ID helper. Focused source tests cover the schema/RLS/raw-field boundary,
+hash separation, thresholds, delays, lockout, trusted-header parsing, event
+allowlisting, CAPTCHA modes/timeout/bindings, diagnostics, and storage fallback.
+
+This is implementation evidence for the abuse-control portions of `DR-REC-001`,
+`DR-REC-002`, `DR-SEC-001`, and `DR-SEC-002`; none advances to environment
+certification. No public recovery endpoint, secret configuration, schema push,
+function deployment, release flag, production access, or browser recovery UI
+exists. See [public recovery abuse-control contract](../security/public-recovery-abuse-control-contract.md).
+
 ## Coverage summary
 
 ### 2026-08-05 entity-extension staging evidence

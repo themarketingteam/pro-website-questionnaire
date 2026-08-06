@@ -142,6 +142,23 @@ No staging schema, secret, runtime flag, function, data, cleanup, or site state
 changed. Production and `main` were untouched, and the feature branch was not
 pushed.
 
+### 2026-08-05 public recovery abuse-control source foundation
+
+The [public recovery abuse-control contract](../security/public-recovery-abuse-control-contract.md)
+now has local source and focused-test evidence for separate abuse hashing,
+admin-only security events, IP/subject/global limits, conditional CAPTCHA,
+temporary lockout, generic enumeration-resistant failures, random device
+correlation, and server-side Turnstile verification. This reduces design
+uncertainty for `RISK-020`, `RISK-021`, `RISK-026`, and the knowingly accepted
+`RISK-001`, but does not lower likelihood or severity.
+
+Residual blockers remain: Base44 trusted-proxy semantics, live RLS/FLS and
+service-role event persistence, atomic/cross-instance limit behavior, CAPTCHA
+credentials/hostname, retention/cleanup, monitoring/alerts, public endpoint
+authorization, the 10k abuse corpus, and deployment certification. No secret
+was configured, no schema/function was pushed, and public email/code recovery
+remains disabled and absent. Production and `main` were untouched.
+
 ## Knowingly accepted risks
 
 ### RISK-001: Public email-only recovery

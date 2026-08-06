@@ -1,6 +1,6 @@
 # Base44 Pro Form entity extension and compatibility plan
 
-- Status: all four Pro Form entity extensions implemented locally; no entity schema pushed
+- Status: four Pro Form extensions plus recovery security-event schema implemented locally; no entity schema pushed
 - Date: 2026-08-05
 - Planning baseline: `50c7379c1cfc30e2d242e917b0abe951e3f75584`
 - Prompt 2 implementation baseline: `8b5aac603bb9c568b7bdc726423852c4e146582a`
@@ -24,6 +24,23 @@ The four existing uppercase schema files remain the authoritative repository con
 They are not renamed. The local foundation now has 60 optional protected properties on `ProFormDraft`: the original 55 extensions plus five authoritative-API idempotency fields. Prompt 3 added 25 to `ProFormDraftEvent`, 16 to `ProFormSubmission`, and 18 to `ProFormSubmissionIntake`. The schemas retain every existing field, required array, nested submission object, enum/default, and entity-level RLS. Current public compatibility payloads remain valid, while every new field is restricted to admin read/write.
 
 The manifest is deliberately stored under `docs/durable-draft-recovery/data`, outside `base44/entities`. It is strict JSON but is not a Base44 entity resource and cannot be included by an entity-directory push. No types are generated because these local schema changes are not pushed or deployed.
+
+### Recovery security-event addition
+
+`base44/entities/ProFormRecoverySecurityEvent.jsonc` is a new endpoint-free,
+admin-only security-event schema. Its required fields are only `request_id` and
+`environment`; its attempt/outcome values, purpose-separated abuse hashes,
+CAPTCHA booleans, bounded window counts, temporary lockout timestamps, policy
+version, test marker, and common migration metadata are allowlisted explicitly.
+Entity create/read/update/delete require role `admin`, which includes reviewed
+Base44 service-role operations. Recovery-email lookup and draft linkage also
+carry explicit admin field security.
+
+The entity has no raw email, network address, random device ID, recovery code,
+CAPTCHA token, request body, answer content, or recovery-session token field.
+It is cataloged separately under `securityEntities` in the field manifest so
+the four legacy compatibility baselines remain immutable. The focused schema
+runner now includes its contract test. No schema was pushed.
 
 ## Current compatibility baseline
 

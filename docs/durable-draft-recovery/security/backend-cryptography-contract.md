@@ -62,6 +62,28 @@ Purpose helpers require a runtime object containing the expected secret name and
 
 Operators must provision three independently generated values. Merely using different environment-variable names or domain separators does not make reused secret material acceptable. Raw SHA-256 is forbidden for low-entropy email or recovery-code lookup. SHA-256 remains appropriate for state hashes, nonsecret fingerprints, and opaque high-entropy token storage, although this contract uses purpose-separated HMAC for resume tokens.
 
+### Public-recovery abuse hashing
+
+Future public recovery rate limits reserve `PRO_FORM_ABUSE_HASH_SECRET`. It must
+contain at least 32 random bytes and must be generated independently from the
+recovery-email lookup, recovery-code, resume-token, draft-link, recovery-session,
+admin-grant, and idempotency secrets. It is not configured by this source-only
+batch.
+
+The recovery security policy uses HMAC-SHA-256 with four noninterchangeable
+domains:
+
+| Abuse subject | Domain separator |
+| --- | --- |
+| Trusted normalized network address or stable unknown bucket | `pro-draft:abuse:ip:v1:` |
+| Random client device ID | `pro-draft:abuse:device:v1:` |
+| Already-normalized recovery email | `pro-draft:abuse:email-subject:v1:` |
+| Normalized recovery-code subject | `pro-draft:abuse:code-subject:v1:` |
+
+These hashes are rate-limit correlation keys, not authorization credentials.
+The raw inputs and full hashes are absent from public responses and diagnostics;
+raw inputs are never written to the recovery security-event entity.
+
 ## Timing-safe comparison
 
 `timingSafeEqualBytes` traverses the maximum input length, folds all byte differences, and returns false for unequal lengths. Equal-length values do not exit early. Empty arrays compare equal. `timingSafeEqualStrings` UTF-8 encodes each string and delegates to the byte comparison; it performs no email or recovery-code normalization, so callers must normalize before comparison.

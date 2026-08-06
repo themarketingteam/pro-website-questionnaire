@@ -38,6 +38,7 @@ runNode(
     'src/vitest.config.js',
     'src/test/proFormDraftEntitySchema.test.js',
     'src/test/proFormMigrationEntitySchemas.test.js',
+    'src/test/proFormRecoverySecurityEventSchema.test.js',
     '--reporter=dot',
     '--no-coverage',
   ],

@@ -2,7 +2,7 @@
 
 - Status: **STAGING_CRYPTOGRAPHIC_SECRETS_CONFIGURED**
 - Inventory date: 2026-08-05
-- Inventory rows: **51 names**
+- Inventory rows: **66 names**
 - Current production Base44 secret names observed: **4**
 - Current staging Base44 secret names observed: **8** (six cryptographic secrets and two ordinary staging controls)
 
@@ -34,8 +34,15 @@ The four production names observed through the names-only Base44 secret command 
 | 18 | `PRO_FORM_EMAIL_LOOKUP_SECRET` | Normalized-email lookup hashing | Yes; configured independently 2026-08-05 | Later | Yes | No |
 | 19 | `PRO_FORM_ADMIN_GRANT_SECRET` | Independently rotatable admin-grant signing | Yes; configured independently 2026-08-05 | Later | Yes | No |
 | 19a | `PRO_FORM_RECOVERY_SESSION_SECRET` | Recovery-session signing | Yes; configured independently 2026-08-05 | Later | Yes | No |
+| 19b | `PRO_FORM_ABUSE_HASH_SECRET` | Purpose-separated IP/device/email/code abuse-limit HMAC | Later; reserved, not configured | Later | Yes | No |
 | 20 | `CAPTCHA_SITE_KEY` | Future public staging CAPTCHA site key | Later | Later | Yes | No |
 | 21 | `CAPTCHA_SECRET_KEY` | Future backend CAPTCHA verification secret | Later | Later | Yes | No |
+| 20a | `PRO_DRAFT_CAPTCHA_PROVIDER` | Backend provider selector: disabled, turnstile, or staging_test | Later; start `disabled` | Later | Prefer Yes | Safe `disabled` only |
+| 20b | `PRO_DRAFT_CAPTCHA_SECRET_KEY` | Backend Turnstile verification secret | Later | Later | Yes | No |
+| 20c | `PRO_DRAFT_CAPTCHA_VERIFY_URL` | Optional HTTPS server-side verification endpoint | Optional | Optional | Prefer Yes | Only reviewed noncredential URL |
+| 20d | `PRO_DRAFT_CAPTCHA_EXPECTED_HOSTNAME` | Exact expected provider hostname binding | Later | Later | Yes | No |
+| 20e | `PRO_DRAFT_CAPTCHA_TEST_MODE_ENABLED` | Explicit staging/test-only synthetic CAPTCHA control | Later (`false` until test) | Yes (`false`) | Yes | Safe `false` only |
+| 20f | `VITE_PRO_DRAFT_CAPTCHA_SITE_KEY` | Public environment-specific CAPTCHA site key | Later | Later | Yes | No |
 | 22 | `PRO_ZAPIER_WEBHOOK_URL` | Production-only Zapier submission destination | No | Yes only with production mode | Yes | No |
 | 23 | `STAGING_ZAPIER_WEBHOOK_URL` | Separately owned staging redirect destination | Later; omit while mode is `disabled` | No | Yes | No |
 | 24 | `PRO_ZAPIER_TIMEOUT_MS` | Bounded Zapier request timeout in milliseconds | Optional; safe default is 8000 | Optional; safe default is 8000 | No | Yes; non-secret bounded configuration only |
@@ -65,6 +72,14 @@ The four production names observed through the names-only Base44 secret command 
 | 48 | `PRO_DRAFT_EXTERNAL_SIDE_EFFECTS_MODE` | Environment-constrained external-side-effect routing | Yes (`disabled`) | Yes (`disabled` until approved activation) | Yes when side effects are enabled | Yes, only the safe value `disabled` |
 | 49 | `PRO_DRAFT_DIAGNOSTICS_ENABLED` | Safe backend configuration diagnostics gate | Yes (`false` initially) | Yes (`false`) | No initially | Yes, only the safe value `false` |
 | 50 | `PRO_DRAFT_BUILD_SHA` | Safe backend build identifier/fingerprint | Yes | Yes | Prefer Yes | Yes only for the same immutable build |
+| 50a | `PRO_DRAFT_RECOVERY_IP_ATTEMPTS_PER_15_MIN` | Positive bounded IP-bucket attempt threshold; default 10 | Optional | Optional | No | Yes; non-secret policy only |
+| 50b | `PRO_DRAFT_RECOVERY_SUBJECT_ATTEMPTS_PER_15_MIN` | Positive bounded subject threshold; default 5 | Optional | Optional | No | Yes; non-secret policy only |
+| 50c | `PRO_DRAFT_RECOVERY_FAILURES_BEFORE_CAPTCHA` | Positive CAPTCHA escalation threshold; default 3 | Optional | Optional | Prefer Yes for testing | Yes; non-secret policy only |
+| 50d | `PRO_DRAFT_RECOVERY_FAILURES_BEFORE_LOCKOUT` | Positive temporary-lockout threshold; default 10 | Optional | Optional | Prefer Yes for testing | Yes; non-secret policy only |
+| 50e | `PRO_DRAFT_RECOVERY_LOCKOUT_SECONDS` | Positive bounded lockout duration; default 1800 | Optional | Optional | Prefer Yes for testing | Yes; non-secret policy only |
+| 50f | `PRO_DRAFT_RECOVERY_GLOBAL_ATTEMPTS_PER_MIN` | Positive bounded environment circuit breaker; default 300 | Optional | Optional | Prefer Yes for load profile | Yes; non-secret policy only |
+| 50g | `PRO_DRAFT_RECOVERY_MIN_RESPONSE_MS` | Positive bounded generic-response floor; default 400 | Optional | Optional | No | Yes; non-secret policy only |
+| 50h | `PRO_DRAFT_RECOVERY_MAX_JITTER_MS` | Positive bounded Web Crypto jitter; default 200 | Optional | Optional | No | Yes; non-secret policy only |
 
 `ALLOW_PRODUCTION_DEPLOY=false` is a non-sensitive safe default, not authorization. All app IDs remain outside Git even though identifiers are not access credentials.
 
@@ -102,8 +117,8 @@ Both destination values must use HTTPS outside an explicitly injected local test
 | --- | --- | --- | --- |
 | Deployment target variables (1-7) | Revalidate at every invocation; rotate/update when an app, branch, or release changes | Release owner | Run `verify:base44-target`; compare only SHA-256 app-ID fingerprints and safe PASS/failure codes |
 | Staging email/SES (8-13) | Rotate credentials on personnel/policy incident and at the organization standard; revalidate sender/config after change | Messaging owner + Security | Names-only secret listing; send only synthetic mail after redirect tests; record recipient class/domain hash, never address/value |
-| Recovery/token secrets (14-19) | Independently version and rotate; rotation must revoke or version old grants/tokens | Application owner + Security | Names-only listing plus backend challenge tests with synthetic invalid/valid fixtures; never log raw password/token/code |
-| CAPTCHA (20-21) | Separate environment keys; rotate on disclosure/abuse/provider recommendation | Security + Application owner | Provider dashboard key fingerprint/last-four under restricted review; automated staging verification with synthetic provider response |
+| Recovery/token/abuse secrets (14-19b) | Independently version and rotate; rotation must revoke/version affected grants, tokens, or abuse hashes | Application owner + Security | Names-only listing plus backend challenge tests with synthetic invalid/valid fixtures; never log raw password/token/code/network/device input |
+| CAPTCHA (20-21, 20a-20f) | Separate environment keys; rotate on disclosure/abuse/provider recommendation | Security + Application owner | Provider dashboard key fingerprint/last-four under restricted review; automated staging verification with synthetic provider response |
 | Webhook (22-25) | Rotate destination/secret on exposure, destination change, or incident; timeout changes require bounded validation | Integration owner + Security | Names-only listing; destination class and one-way fingerprint in restricted evidence; synthetic sink receipt only |
 | AI (26) | Separate key/project; rotate on disclosure, owner change, or provider policy | AI service owner + Security | Names-only listing; synthetic minimal completion and project/budget metadata reviewed outside Git |
 | Base44 platform identity (27-30) | App-scoped/platform-managed; rotate service role on compromise; never manually copy | Base44 workspace owner | Deployment guard fingerprint, names-only configuration inspection, and app-scoped read-only checks |
@@ -121,6 +136,7 @@ Both destination values must use HTTPS outside an explicitly injected local test
 - `VITE_*` values are exposed to the browser. They must never contain a private credential.
 - A missing redirect, webhook, AI, CAPTCHA, or environment declaration must suppress the related side effect; it must not select production.
 - Backend runtime names 42-50 require reviewed staging values before any later deployment, except optional bounded timeout configuration. The staging redirect URL remains absent and unnecessary while mode is `disabled`. This inventory does not set any value.
+- The abuse secret, CAPTCHA variables, public site key, and recovery-policy variables added in rows 19b, 20a-20f, and 50a-50h are reserved only. This prompt configured none of them.
 
 ## 2026-08-05 staging cryptographic configuration evidence
 
