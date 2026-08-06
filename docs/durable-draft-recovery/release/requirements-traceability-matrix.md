@@ -215,3 +215,19 @@ This adds local schema-contract evidence only. It does not satisfy `DR-RLS-001`,
 ## Evidence-boundary statement
 
 The linked modules, tests, workflows, and harness files are source controls, not environment or release certification. Public code/email recovery source now exists, but it was not deployed or enabled and no UI was added. This attempt performed only the required identity authentication check; it performed no staging or production Base44 mutation, deployment, application creation, data read/write, email delivery, SES call, production test, domain movement, or release enablement.
+
+### 2026-08-06 public recovery staging certification attempt
+
+The [public recovery services report](../security/staging-public-recovery-services-certification.md)
+is **PUBLIC_RECOVERY_SERVICES_BLOCKED**. Focused recovery suites passed 214/214
+and entity-schema suites passed 22/22, but the ordered normal suite failed 5 of
+1,260 tests. The hard stop prevented the staging checkout update, target guard,
+abuse secret and policy configuration, security-entity push, four function
+deployments, synthetic data, live recovery/choice/abuse/RLS matrices, cleanup,
+and deployed frontend regression.
+
+This attempt adds no staging evidence to `DR-ID-001`, `DR-ID-004`,
+`DR-ID-005`, `DR-REC-001`, `DR-REC-002`, `DR-SEC-001`, `DR-SEC-002`, or
+`DR-REL-001`. Their source evidence remains unchanged; no requirement advances
+to environment certification. Production and `main` were untouched, and the
+feature branch was not pushed.

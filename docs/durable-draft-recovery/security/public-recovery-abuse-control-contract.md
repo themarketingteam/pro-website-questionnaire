@@ -176,3 +176,18 @@ Production remains disabled until all of the following pass:
 4. Monitoring/alerts and safe retention/cleanup are operational.
 5. Public email recovery receives separate release approval; recovery-code
    recovery receives its own authorization/UI/service certification.
+
+## 2026-08-06 staging certification attempt
+
+The [staging public recovery services report](staging-public-recovery-services-certification.md)
+is **PUBLIC_RECOVERY_SERVICES_BLOCKED**. Source-focused recovery tests passed
+214/214 and entity-schema tests passed 22/22, but five normal-suite failures
+triggered the mandatory hard stop. Consequently this attempt supplied no live
+evidence for abuse hashing, event RLS, trusted network context, per-IP,
+per-subject or global limits, CAPTCHA escalation, lockout, retry timing,
+minimum response time, generic failure equivalence, or safe event contents.
+
+No abuse secret or staging-test CAPTCHA setting was configured, and no public
+recovery function or security entity was deployed. The source contract and
+future production gates remain unchanged. Email recovery remains explicitly
+unverified; no email, SES request, Zapier request, or final submission ran.

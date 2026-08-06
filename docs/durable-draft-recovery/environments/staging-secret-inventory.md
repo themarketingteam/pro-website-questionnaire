@@ -163,3 +163,18 @@ The attempt stopped at the source gate before any secret operation. No
 queried, and the prior names-only inventory was not changed. Its required
 staging presence and production absence remain to be proved during a future
 authorized attempt. No temporary environment file was created.
+
+## 2026-08-06 public recovery services attempt
+
+The attempt stopped at the normal source-test gate before entering the staging
+checkout. `PRO_FORM_ABUSE_HASH_SECRET` was not generated, written, imported,
+printed, or queried. No temporary owner-only environment file was created, and
+none required deletion. The eleven staging recovery-policy values, including
+`staging_test` CAPTCHA mode, were not configured or changed. Existing names-
+only staging and production inventories were not refreshed or mutated.
+
+The required abuse secret remains a name-only planned item, not a configured
+credential. A future passing attempt must independently generate at least 48
+random bytes for staging, use a mode-`0600` file outside the repository, import
+without terminal echo, delete the file, and then record only the configured
+name. No production value may be copied or inferred.

@@ -210,3 +210,19 @@ Isaac Hines knowingly accepts the residual theft/replay risk of a password-issue
 ## Current scope statement
 
 This register distinguishes primitive environment evidence from workflow/release certification. This batch configured staging-only secrets and deployed one non-public administrative self-check to the staging app. It changed no entity/schema, production Base44 resource, production secret, production data, SES setting, email delivery, domain, public recovery endpoint, or release flag. Durable draft V2 remains disabled.
+
+## 2026-08-06 public recovery staging certification attempt
+
+The [public recovery services certification](../security/staging-public-recovery-services-certification.md)
+is **PUBLIC_RECOVERY_SERVICES_BLOCKED**. Although the focused recovery and
+entity-schema suites passed, five normal-suite failures stopped the attempt
+before any staging operation. Live service-role/RLS behavior, distributed
+limits, trusted network headers, CAPTCHA escalation, lockout, timing, generic
+failure equivalence, event confidentiality, choice authorization, newest-
+created selection, cleanup, and deployed frontend isolation remain unproved.
+
+No risk is downgraded, closed, or newly accepted. In particular, `RISK-001`
+remains explicitly accepted at its existing rating: email-only recovery is
+unverified and does not establish mailbox ownership. No secret, flag, schema,
+function, record, email, SES, Zapier, domain, staging site, production
+resource, or remote Git branch changed in this attempt.

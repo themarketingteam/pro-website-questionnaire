@@ -162,3 +162,17 @@ guard, secret/flag configuration, schema push, function deployment, live API or
 concurrency checks, fixture creation/cleanup, and deployed frontend regression.
 No readiness item is promoted by this attempt, and the decision remains
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
+
+### 2026-08-06 public recovery services attempt
+
+The [public recovery services report](../security/staging-public-recovery-services-certification.md)
+is **PUBLIC_RECOVERY_SERVICES_BLOCKED**. The source gate passed 214/214 focused
+recovery tests and 22/22 entity-schema tests, then failed 5 of 1,260 normal
+tests. In compliance with the hard stop, the separate staging checkout was not
+updated, its app fingerprint was not freshly collected, and its target guard
+was not run. No abuse secret or recovery policy was configured; no entity,
+function, fixture, live API, cleanup, frontend, or side-effect check ran.
+
+No readiness item is promoted. Frontend public recovery remains disabled in
+source, its deployed value was not rechecked, and the overall decision remains
+**STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
