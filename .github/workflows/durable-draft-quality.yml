@@ -232,6 +232,60 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  security-adversarial:
+    name: Security adversarial gates
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up approved Node
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run deterministic security unit and integration suites
+        env:
+          SECURITY_PROPERTY_SEED: '20260806'
+          SECURITY_PROPERTY_RUNS: '100'
+        run: npm run security:test
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run local browser credential-leakage suite
+        env:
+          E2E_ALLOW_PRODUCTION: 'false'
+          E2E_ALLOW_WRITES: 'false'
+          E2E_TEST_RUN_ID: security-${{ github.run_id }}-${{ github.run_attempt }}-browser
+        run: npm run security:test:browser -- --project=chromium-desktop
+
+      - name: Scan test artifacts without printing detected values
+        if: always()
+        run: npm run security:scan-artifacts
+
+      - name: Classify dependency vulnerabilities without auto-fix
+        if: always()
+        run: npm run security:audit-dependencies
+
+      - name: Upload sanitized security summaries
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: durable-draft-security-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .durable-draft-artifacts/security/
+            test-results/
+            playwright-report/
+          if-no-files-found: warn
+          retention-days: 14
+
   pending-requirements-report:
     name: Pending requirements report
     runs-on: ubuntu-latest
@@ -285,6 +339,7 @@ jobs:
       - unit-quality
       - build
       - e2e-harness
+      - security-adversarial
       - pending-requirements-report
     runs-on: ubuntu-latest
     steps:
@@ -295,7 +350,7 @@ jobs:
 
       - name: Write safe job summary
         env:
-          CI_SUMMARY_ARTIFACTS: durable-draft-unit-quality-${{ github.run_id }}-${{ github.run_attempt }},durable-draft-build-manifest-${{ github.run_id }}-${{ github.run_attempt }},durable-draft-e2e-harness-${{ github.run_id }}-${{ github.run_attempt }},durable-draft-pending-requirements-${{ github.run_id }}-${{ github.run_attempt }}
+          CI_SUMMARY_ARTIFACTS: durable-draft-unit-quality-${{ github.run_id }}-${{ github.run_attempt }},durable-draft-build-manifest-${{ github.run_id }}-${{ github.run_attempt }},durable-draft-e2e-harness-${{ github.run_id }}-${{ github.run_attempt }},durable-draft-security-${{ github.run_id }}-${{ github.run_attempt }},durable-draft-pending-requirements-${{ github.run_id }}-${{ github.run_attempt }}
           CI_SUMMARY_BASELINE_STATUS: ${{ needs['source-safety'].outputs.baseline_status }}
           CI_SUMMARY_BUILD_RESULT: ${{ needs.build.result }}
           CI_SUMMARY_COMMIT_SHA: ${{ github.sha }}

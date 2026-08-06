@@ -1,5 +1,27 @@
 # Durable Draft Recovery Risk Register
 
+## 2026-08-06 comprehensive adversarial security controls
+
+| Risk | Control added | Residual / release gate |
+|---|---|---|
+| Recovery, token, or admin-grant bypass | Deterministic enumeration/timing/binding/replay/revocation/purpose/browser suites | Live staging authorization and abuse evidence remains required |
+| Parser or injection ambiguity corrupts authoritative state | Bounded property tests; method/type/size/UTF-8 controls; duplicate JSON keys rejected | Provider edge request smuggling remains outside the repository boundary |
+| Direct entity or premature service role bypass | RLS catalog plus source/order validators in `security:test` | Deployed staging RLS denial and authorized-function success pending |
+| Staging test harms a client or SES reputation | Production denial, isolated `example.test` subjects, 20-attempt ceiling, mock-only email | No live email is authorized by this batch |
+| Migration replay/substitution corrupts data | Signature/route/sequence/hash/lease/conflict adversarial cases | Live bidirectional staging rehearsal pending |
+| Credentials leak into browser/evidence | Local Playwright inspection and redacting nonzero scanner | Exact deployed staging bundle/log scan pending |
+| Vulnerable exposed runtime dependency | Full plus production audit classifier; no auto-fix/major upgrade | Current audit must be dispositioned before release |
+
+These controls add source-level detection and hard gates; they do not lower a
+risk rating without deployed staging evidence. No production target, email
+transport, deployment, or cloud data was contacted by this prompt.
+
+Observed dependency classification is release-blocking: critical production-
+graph findings affect `jspdf` and the currently runtime-classified `vitest`,
+while high direct findings affect `lodash` and `react-router-dom`. The tool also
+records four dev-only packages for review. No automatic fix, dependency major
+upgrade, or finding waiver was performed.
+
 ## 2026-08-06 final local RLS pre-deployment safeguards
 
 | Risk | Control added | Residual / release gate |

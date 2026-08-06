@@ -1,5 +1,18 @@
 # GitHub Actions and branch protection
 
+## Adversarial security job
+
+`durable-draft-quality.yml` includes a blocking `security-adversarial` job. It
+installs the lockfile graph, runs seeded unit/integration suites, executes the
+read-only local Chromium leakage spec, scans artifacts with redacted findings,
+and classifies full plus production-only dependency audits without applying
+fixes. The quality summary depends on this job and uploads sanitized summaries
+for 14 days.
+
+The job sets production/writes false, has no Base44 deploy command, SES
+credential, or staging URL. Live staging security is a separate explicit
+`security:test:staging` invocation governed by the [security contract](security-and-adversarial-test-contract.md).
+
 - Status: workflow source implemented; repository protection remains a manual GitHub administration task
 - Date: 2026-08-05
 - Node runtime: `22.23.1` from the repository `.node-version`

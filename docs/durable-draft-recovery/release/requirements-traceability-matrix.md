@@ -1,5 +1,11 @@
 # Durable Draft Recovery Requirements Traceability Matrix
 
+## 2026-08-06 adversarial security gate
+
+| Requirement | Source controls | Automated evidence | Release status |
+|---|---|---|---|
+| `DR-SEC-ADV-001` Comprehensive security, integrity, and leakage testing | Production-denying target guard; bounded seeded generators; duplicate-key rejecting parser; RLS/service-role contract; SES/migration/state suites; redacting artifact/dependency scanners | `npm run security:test`; `npm run security:test:browser -- --project=chromium-desktop`; `npm run security:scan-artifacts`; `npm run security:audit-dependencies`; [security contract](../testing/security-and-adversarial-test-contract.md) | Source/local evidence only. Live RLS and isolated rate-limit proof remain staging-pending; every security failure blocks release. |
+
 ## 2026-08-06 Prompt 3 local RLS safeguard evidence
 
 | Requirement | Source evidence | Test evidence | Status |

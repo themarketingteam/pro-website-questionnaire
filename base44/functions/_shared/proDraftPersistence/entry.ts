@@ -1025,6 +1025,46 @@ function boundedByteLimit(value: unknown, maximum: number): number {
   return value as number;
 }
 
+function hasDuplicateJsonObjectKeys(text: string): boolean {
+  const stack: Array<{ type: 'array' } | { type: 'object'; keys: Set<string>; expectKey: boolean }> = [];
+  let index = 0;
+  while (index < text.length) {
+    const character = text[index];
+    if (/\s/u.test(character)) {
+      index += 1;
+      continue;
+    }
+    if (character === '"') {
+      const start = index;
+      index += 1;
+      while (index < text.length) {
+        if (text[index] === '\\') index += 2;
+        else if (text[index] === '"') {
+          index += 1;
+          break;
+        } else index += 1;
+      }
+      const context = stack.at(-1);
+      if (context?.type === 'object' && context.expectKey) {
+        const key = JSON.parse(text.slice(start, index)) as string;
+        if (context.keys.has(key)) return true;
+        context.keys.add(key);
+        context.expectKey = false;
+      }
+      continue;
+    }
+    if (character === '{') stack.push({ type: 'object', keys: new Set(), expectKey: true });
+    else if (character === '[') stack.push({ type: 'array' });
+    else if (character === '}' || character === ']') stack.pop();
+    else if (character === ',') {
+      const context = stack.at(-1);
+      if (context?.type === 'object') context.expectKey = true;
+    }
+    index += 1;
+  }
+  return false;
+}
+
 export async function readBoundedJsonBody(
   request: Request,
   options: BoundedJsonBodyOptions = {},
@@ -1112,7 +1152,11 @@ export async function readBoundedJsonBody(
     return persistenceError(PERSISTENCE_ERROR_CODES.JSON_MALFORMED);
   }
   try {
-    return JSON.parse(text);
+    const parsed = JSON.parse(text);
+    if (hasDuplicateJsonObjectKeys(text)) {
+      return persistenceError(PERSISTENCE_ERROR_CODES.JSON_MALFORMED);
+    }
+    return parsed;
   } catch {
     return persistenceError(PERSISTENCE_ERROR_CODES.JSON_MALFORMED);
   }

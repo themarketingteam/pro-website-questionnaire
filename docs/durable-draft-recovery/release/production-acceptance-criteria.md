@@ -1,5 +1,20 @@
 # Durable Draft Recovery Production Acceptance Criteria
 
+## Adversarial security acceptance
+
+Production enablement additionally requires `DR-SEC-ADV-001` evidence from the
+exact release candidate. Deterministic property, security unit/integration,
+local browser leakage, staging RLS/recovery/rate-limit, dependency audit, and
+sanitized artifact gates must pass. Any boundary failure blocks release and may
+not be waived as flaky.
+
+Evidence must show a non-production target, unique isolated staging subjects,
+bounded attempts, no client recipient, no SES send during local testing, no raw
+email/code/grant/token/answer in reports, and no deployment command. Critical
+production dependency findings and unmitigated high direct exposed runtime
+findings block acceptance. Request smuggling needs a future provider-controlled
+proxy test and is not claimed here.
+
 - Status: Release-blocking contract
 - Date: 2026-08-05
 - Owners: Isaac Hines; Engineering; QA; Security; Operations

@@ -86,9 +86,25 @@ const requiredFoundationFiles = [
   'tests/factories/proDraftSyntheticDataFactory.js',
   'scripts/validate-release-test-coverage.mjs',
   'scripts/lib/normalize-test-results.mjs',
+  'scripts/lib/security-output-safety.mjs',
   'scripts/run-durable-draft-release-tests.mjs',
   'scripts/build-durable-draft-evidence-bundle.mjs',
   'scripts/cleanup-durable-draft-test-data.mjs',
+  'scripts/scan-durable-draft-test-artifacts.mjs',
+  'scripts/audit-durable-draft-dependencies.mjs',
+  'scripts/run-durable-draft-security-tests.mjs',
+  'tests/security/vitest.config.js',
+  'tests/security/vitest.staging.config.js',
+  'tests/security/helpers/propertyTest.js',
+  'tests/security/helpers/targetSafety.js',
+  'tests/security/fixtures/adversarialFixtures.js',
+  'tests/security/unit/property-based.test.js',
+  'tests/security/unit/public-recovery-token-and-request.test.js',
+  'tests/security/unit/security-tools.test.js',
+  'tests/security/integration/state-rls-email-and-migration.test.js',
+  'tests/security/staging/staging-safety-contract.test.js',
+  'tests/e2e/security/draft-credential-leakage.spec.js',
+  'docs/durable-draft-recovery/testing/security-and-adversarial-test-contract.md',
 ];
 
 for (const file of requiredFoundationFiles) {
@@ -117,6 +133,7 @@ if (existsSync(qualityWorkflowPath)) {
     'unit-quality',
     'build',
     'e2e-harness',
+    'security-adversarial',
     'pending-requirements-report',
   ]) {
     requireCondition(
@@ -132,6 +149,10 @@ if (existsSync(qualityWorkflowPath)) {
     'npm run test:e2e:harness',
     'npm run test:base44-target',
     'npm run test:manifest',
+    'npm run security:test',
+    'npm run security:test:browser',
+    'npm run security:scan-artifacts',
+    'npm run security:audit-dependencies',
   ]) {
     requireCondition(
       qualityWorkflow.includes(command),
@@ -216,6 +237,11 @@ const requiredScripts = [
   'release:validate-coverage',
   'release:build-evidence',
   'release:cleanup-test-data',
+  'security:audit-dependencies',
+  'security:scan-artifacts',
+  'security:test',
+  'security:test:browser',
+  'security:test:staging',
   'check',
 ];
 
@@ -295,6 +321,10 @@ requireCondition(
   'fake-indexeddb must be a root development dependency for storage tests',
 );
 requireCondition(
+  typeof packageJson.devDependencies?.['fast-check'] === 'string',
+  'fast-check must be a root development dependency for bounded property tests',
+);
+requireCondition(
   scripts['test:storage']?.includes('src/test/storage'),
   'test:storage must execute the resilient storage test directory',
 );
@@ -315,6 +345,12 @@ const requiredDirectories = [
   'tests/e2e/harness',
   'tests/e2e/helpers',
   'tests/e2e/smoke',
+  'tests/e2e/security',
+  'tests/security/unit',
+  'tests/security/integration',
+  'tests/security/staging',
+  'tests/security/fixtures',
+  'tests/security/helpers',
 ];
 
 for (const directory of requiredDirectories) {
@@ -398,9 +434,13 @@ const characterizationFiles = testLikeFiles.filter((file) =>
 const playwrightFiles = testLikeFiles.filter((file) =>
   file.startsWith('tests/e2e/') && /\.spec\.js$/.test(file),
 );
+const securityFiles = testLikeFiles.filter((file) =>
+  file.startsWith('tests/security/') && /\.test\.js$/.test(file),
+);
 const normalTestFiles = testLikeFiles.filter((file) =>
   !characterizationFiles.includes(file)
   && !playwrightFiles.includes(file)
+  && !securityFiles.includes(file)
   && /\.test\.(?:js|jsx)$/.test(file),
 );
 
@@ -408,11 +448,12 @@ for (const file of testLikeFiles) {
   const isCharacterization = characterizationFiles.includes(file)
     && file.startsWith('src/test/baseline-characterization/');
   const isPlaywright = playwrightFiles.includes(file);
+  const isSecurity = securityFiles.includes(file);
   const isNormal = normalTestFiles.includes(file)
     && (file.startsWith('src/') || file.startsWith('scripts/'));
 
   requireCondition(
-    isCharacterization || isPlaywright || isNormal,
+    isCharacterization || isPlaywright || isSecurity || isNormal,
     `test file violates repository naming/location conventions: ${file}`,
   );
 }
@@ -423,6 +464,7 @@ requireCondition(
   'no baseline characterization test files found',
 );
 requireCondition(playwrightFiles.length > 0, 'no Playwright smoke specs found');
+requireCondition(securityFiles.length > 0, 'no adversarial security tests found');
 
 if (failures.length > 0) {
   for (const failure of failures) console.error(`FAIL ${failure}`);
@@ -432,4 +474,5 @@ if (failures.length > 0) {
 console.log(`normal_test_files=${normalTestFiles.length}`);
 console.log(`characterization_test_files=${characterizationFiles.length}`);
 console.log(`playwright_spec_files=${playwrightFiles.length}`);
+console.log(`security_test_files=${securityFiles.length}`);
 console.log('status=PASS');
