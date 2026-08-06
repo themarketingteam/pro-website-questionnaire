@@ -575,3 +575,18 @@ No migration or retention risk is closed or lowered without real-data dry-run,
 execution idempotency, checkpoint, secret-backed email hashing, staging
 rehearsal, cleanup, and reverse-migration proof. No Base44 or Git remote
 operation occurred.
+
+## 2026-08-06 resumable migration execution risk evidence
+
+The local checkpoint/repository/apply-token implementation reduces design
+uncertainty for interrupted batches, stale dry-run records, repeat apply,
+cross-environment authorization, duplicate deletion, and unsafe rollback.
+Exact report/record fingerprints, anchored cursors, maximum counts, dual admin
+and migration scopes, no-delete APIs, submitted guards, and manual-review
+outcomes fail closed.
+
+`RISK-010`, `RISK-011`, `RISK-016`, `RISK-019`, and `RISK-025` remain open at
+their existing release classification. The apply secret is not configured;
+there is no staging RLS proof, real-data dry run, retention/cleanup, reverse
+migration, or production rollback rehearsal. No Base44 or Git remote operation
+occurred.

@@ -30,6 +30,7 @@
     "test:sensitive-service-role": "node scripts/validate-sensitive-function-service-role.mjs",
     "precheck:rls": "node scripts/precheck-draft-rls-deployment.mjs",
     "migration:analyze-legacy": "node scripts/analyze-pro-form-legacy-data.mjs",
+    "test:migration-execution": "npm run test:manifest && vitest run --config src/vitest.config.js src/test/proDraftLegacyMigration.test.js scripts/analyze-pro-form-legacy-data.test.js src/test/proDraftMigrationAuthorization.test.js src/test/proDraftMigrationExecution.test.js src/test/proFormMigrationCheckpointSchema.test.js src/test/proDraftAdminRequest.test.js src/test/proDraftFunctionAuthorizationOrderContract.test.js --reporter=dot --no-coverage",
     "test:save-concurrency": "npm run test:manifest && vitest run --config src/vitest.config.js src/test/saveProFormDraft.test.js src/test/proDraftRepository.test.js src/test/proDraftSaveEvents.integration.test.js --reporter=dot --no-coverage",
     "test:ci": "npm run test:manifest && vitest run --config src/vitest.config.js --reporter=dot --no-coverage",
     "test:manifest": "node scripts/validate-test-manifest.mjs",

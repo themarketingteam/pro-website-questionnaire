@@ -528,3 +528,19 @@ safe diagnostics, and strict manual-review gates.
 This is dry-run source evidence only. No exported real dataset, Base44 record,
 lookup secret, execution function, checkpoint, retention policy, staging run,
 or production migration exists. No requirement advances to staging acceptance.
+
+## 2026-08-06 resumable legacy migration execution source evidence
+
+The [execution/checkpoint contract](../migration/legacy-migration-execution-and-checkpoint-contract.md),
+admin-only checkpoint entity, bounded repository, separate two-hour apply
+authorization, and four local function entry points add source evidence for
+`DR-MIG-001`, `DR-ID-001`, and `DR-OBS-001`. Focused tests cover dry-run-first
+sequencing, 50/200 pagination, cursor/fingerprint drift, checkpoint resume,
+idempotency, explicit duplicate lineage, submitted guards, redacted audits,
+and limited no-delete rollback.
+
+This is local evidence only. The apply secret is deliberately unconfigured;
+no Base44 operation occurred and no real data or cloud resource was accessed
+or changed. Live staging RLS, dry-run review, interruption replay, count
+reconciliation, retention, and reverse migration remain open. No requirement
+advances to staging acceptance.

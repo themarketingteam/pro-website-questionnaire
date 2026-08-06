@@ -1,0 +1,15 @@
+export {
+  MIGRATION_REPOSITORY_DEFAULT_PAGE_SIZE,
+  MIGRATION_REPOSITORY_MAX_PAGE_SIZE,
+  MigrationRepositoryError,
+  applyDraftUpgradePatch,
+  applyEventUpgradePatch,
+  createMigrationRepository,
+  getOrCreateCheckpoint,
+  getMigrationRecordFingerprint,
+  getSafeMigrationRepositoryDiagnostics,
+  listLegacyDraftBatch,
+  listLegacyEventBatch,
+  markDuplicateCandidate,
+  updateCheckpoint,
+} from './repository.js';

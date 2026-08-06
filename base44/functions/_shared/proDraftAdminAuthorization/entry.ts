@@ -55,6 +55,10 @@ export const ADMIN_AUTH_ATTEMPT_TYPES = Object.freeze([
   'admin_event_list',
   'admin_retry_submission',
   'admin_repair_submission',
+  'admin_migration_analyze',
+  'admin_migration_apply',
+  'admin_migration_duplicate_resolution',
+  'admin_migration_rollback',
 ] as const);
 
 export const ADMIN_AUTH_OUTCOMES = Object.freeze([

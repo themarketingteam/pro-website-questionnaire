@@ -353,3 +353,16 @@ The engine never overwrites nonempty current fields, created dates, submitted
 locks, final submission IDs, or raw event values. It proposes no patch when
 answer mapping, future version, recovery association, or duplicate evidence is
 ambiguous. No Base44 record was read or changed.
+
+## Resumable migration checkpoint addition
+
+`ProFormMigrationCheckpoint` is a local-only, admin-only operational entity.
+Its four required identity fields are `migration_name`, `environment`,
+`migration_version`, and `batch_id`. Optional phase/cursor/count/fingerprint
+fields support dry-run-first analysis and resumable bounded apply work. Only
+one-way apply-token and admin-grant-token-ID hashes may be stored; raw grants,
+tokens, record payloads, answers, and email values are prohibited.
+
+The entity is cataloged under `securityEntities` so the frozen four-entity
+compatibility manifest and their common-field validator remain unchanged. No
+schema push or type generation is authorized by this addition.

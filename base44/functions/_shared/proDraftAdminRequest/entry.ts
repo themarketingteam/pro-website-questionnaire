@@ -28,6 +28,10 @@ export const ADMIN_API_OPERATION_NAMES = Object.freeze({
   GET_INTAKE: 'get_intake',
   RETRY_SUBMISSION: 'retry_submission',
   REPAIR_SUBMISSION: 'repair_submission',
+  ANALYZE_MIGRATION: 'analyze_migration',
+  APPLY_MIGRATION: 'apply_migration',
+  RESOLVE_MIGRATION_DUPLICATE: 'resolve_migration_duplicate',
+  ROLLBACK_MIGRATION: 'rollback_migration',
 } as const);
 
 export const ADMIN_API_ERROR_CODES = Object.freeze({
@@ -96,6 +100,10 @@ const ATTEMPT_TYPES: Readonly<Record<AdminApiOperationName, AdminAuthAttemptType
   get_intake: 'admin_draft_detail',
   retry_submission: 'admin_retry_submission',
   repair_submission: 'admin_repair_submission',
+  analyze_migration: 'admin_migration_analyze',
+  apply_migration: 'admin_migration_apply',
+  resolve_migration_duplicate: 'admin_migration_duplicate_resolution',
+  rollback_migration: 'admin_migration_rollback',
 };
 
 function fail(code: AdminApiErrorCode, status = 400): never {

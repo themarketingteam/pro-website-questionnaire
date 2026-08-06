@@ -2,7 +2,7 @@
 
 - Status: **STAGING_CRYPTOGRAPHIC_SECRETS_CONFIGURED**
 - Inventory date: 2026-08-05
-- Inventory rows: **90 names**
+- Inventory rows: **91 names**
 - Current production Base44 secret names observed: **4**
 - Current staging Base44 secret names observed: **8** (six cryptographic secrets and two ordinary staging controls)
 
@@ -50,6 +50,7 @@ The four production names observed through the names-only Base44 secret command 
 | 19c | `PRO_FORM_RECOVERY_SESSION_TTL_SECONDS` | Positive recovery-session TTL; default 43200, maximum 604800 | Optional | Optional | No | Yes; non-secret bounded configuration only |
 | 19d | `PRO_FORM_EMAIL_OTP_SECRET` | Future six-digit OTP HMAC; independent, at least 32 bytes | Later; reserved and not configured | Later; reserved and not configured | Yes | No |
 | 19e | `PRO_FORM_MAGIC_LINK_SECRET` | Future opaque magic-link-token HMAC; independent, at least 32 bytes | Later; reserved and not configured | Later; reserved and not configured | Yes | No |
+| 19f | `PRO_FORM_MIGRATION_APPLY_SECRET` | Independent HMAC key for two-hour one-time admin migration apply and rollback authorization | Later; reserved, not configured | Later; reserved, not configured | Yes | No |
 | 20 | `CAPTCHA_SITE_KEY` | Future public staging CAPTCHA site key | Later | Later | Yes | No |
 | 21 | `CAPTCHA_SECRET_KEY` | Future backend CAPTCHA verification secret | Later | Later | Yes | No |
 | 20a | `PRO_DRAFT_CAPTCHA_PROVIDER` | Backend provider selector: disabled, turnstile, or staging_test | Later; start `disabled` | Later | Prefer Yes | Safe `disabled` only |
@@ -166,6 +167,14 @@ Both destination values must use HTTPS outside an explicitly injected local test
 ## 2026-08-06 password-only admin authorization source inventory
 
 The eleven exact admin authorization names are reserved by the backend contract. The nine version/rate/lockout/timing names added in rows 50i-50q are ordinary bounded configuration, not secrets. `DRAFT_RECOVERY_PASSWORD` and `PRO_FORM_ADMIN_GRANT_SECRET` remain private and environment-specific. No Base44 secret/configuration operation, schema push, function deployment, or production change occurred. Before staging use, operators must configure the password independently, retain or deliberately rotate the already independent grant secret, explicitly review all three version values, and validate only presence/version behavior without printing values.
+
+## 2026-08-06 migration apply authorization source inventory
+
+`PRO_FORM_MIGRATION_APPLY_SECRET` is reserved as an independent minimum
+32-byte HMAC key. It is not the admin grant secret and must differ by
+environment. This source increment did not generate, configure, query, print,
+or copy a value. Until a later staging-only configuration prompt supplies it,
+dry-run analysis cannot issue an apply token and apply/rollback fail closed.
 
 ## 2026-08-05 staging cryptographic configuration evidence
 

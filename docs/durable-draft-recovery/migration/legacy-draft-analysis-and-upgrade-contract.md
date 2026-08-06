@@ -147,10 +147,12 @@ email, current/future states, active duplicates, submitted/active partition
 conflict, an ambiguous hash group, and linked/unlinked/ambiguous events. All
 values are synthetic.
 
-Manual review is a durable result, not an analysis error to suppress. The next
-prompt may add an authorized execution function, server-secret lookup hashing,
-idempotent writes, checkpoints, and audit events. It must first consume a saved
-dry-run report and must not silently override any manual-review decision.
+Manual review is a durable result, not an analysis error to suppress. Follow-on
+Prompt 2 implements the local authorized execution/checkpoint source contract,
+which must consume a completed dry run and cannot silently override any
+manual-review decision. The analyzer remains runtime-neutral and dry-run-only; see
+[legacy migration execution and checkpoint](./legacy-migration-execution-and-checkpoint-contract.md).
+Neither increment has been deployed or run against Base44 data.
 
 No Base44 record, schema, function, secret, application, or deployment was
 accessed or changed by this implementation.
