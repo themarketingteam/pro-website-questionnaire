@@ -5,6 +5,25 @@
 - Owners: Isaac Hines; Engineering; Security; Operations
 - Sources: [ADR-001](../architecture/ADR-001-approved-product-and-security-decisions.md), [ADR-002](../architecture/ADR-002-blue-green-base44-cutover-and-data-continuity.md), [ADR-003](../architecture/ADR-003-draft-identity-recovery-and-lifecycle-contract.md), [identity normalization contract](../architecture/draft-identity-and-email-normalization-contract.md), [current system audit](../audit/current-system-audit-report.md), [current defect register](../audit/current-defect-register.md)
 
+## 2026-08-06 conflict and multi-tab control update
+
+- Concurrent non-overlapping edits are mitigated by three-way field merge with
+  the last acknowledged base and server-authoritative revision.
+- Ambiguous same-field, delete/set, reset/set, and credential changes remain
+  visible and paused until explicit choice; no last-writer timestamp shortcut
+  is used.
+- Cross-tab leakage is mitigated by a hashed namespace and a strict message
+  allowlist. Tests assert no answer, identity, credential, or token field is
+  emitted through either transport.
+- Broadcast/storage loss remains an accepted degraded-mode risk: the UI reports
+  no coordination, while backend optimistic concurrency still prevents stale
+  overwrite.
+- Automatic merge storms are bounded to three rounds. Exceeding the ceiling
+  requires reload/support and retains the local recovery copy.
+- Residual risk: deployed Base44 concurrency, real browser lifecycle behavior,
+  and production-scale conflict telemetry are not certified by local synthetic
+  evidence. Release status remains blocked pending staging evidence.
+
 ## Rating and treatment rules
 
 Likelihood is `Low`, `Medium`, or `High` before planned controls. Severity is `Moderate`, `High`, or `Critical`. **Accepted (known residual)** means the named owner knowingly accepts the residual risk for the initial release; controls reduce likelihood or impact but do not remove acceptance. **Mitigated (pending proof)** means release remains blocked until the mapped acceptance evidence proves the mitigation.
@@ -23,12 +42,12 @@ also prevents Strict Mode from constructing concurrent V2 managers, while an
 explicit feature branch preserves the legacy writer only when V2 is disabled.
 
 These controls reduce source-level implementation uncertainty but do not lower
-any likelihood or severity. Multi-tab merge belongs to the next conflict
-batch; every component has not yet migrated to the canonical mutation factory;
-and staging concurrency, lifecycle, browser-close, authorization, and deployed
-log evidence is absent. The full normal test, lint, and typecheck gates are not
-green, so all mapped risks remain **Mitigated (pending proof)** and deployment
-authorization remains denied.
+any likelihood or severity. Multi-tab merge is implemented by the later update
+above, but every component has not yet migrated to the canonical mutation
+factory; staging concurrency, lifecycle, browser-close, authorization, and
+deployed log evidence is absent. The full normal test, lint, and typecheck gates
+are not green, so all mapped risks remain **Mitigated (pending proof)** and
+deployment authorization remains denied.
 
 ## Register
 

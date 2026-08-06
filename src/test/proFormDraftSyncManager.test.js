@@ -87,6 +87,7 @@ const createHarness = (options = {}) => {
     },
   ));
   const saveProFormDraft = options.saveProFormDraft || vi.fn(acceptedResponse);
+  const loadProFormDraft = options.loadProFormDraft;
   const appendProFormDraftEvents = options.appendProFormDraftEvents
     || vi.fn(async () => ({ success: true, acceptedCount: 1 }));
   const localStatus = {
@@ -130,7 +131,10 @@ const createHarness = (options = {}) => {
     storage: { getMode: () => options.storageMode || 'indexeddb' },
     localPersistence,
     credentialVault,
-    draftApiClient: { saveProFormDraft },
+    draftApiClient: {
+      saveProFormDraft,
+      ...(loadProFormDraft ? { loadProFormDraft } : {}),
+    },
     eventApiClient: { appendProFormDraftEvents },
     bootstrapReadyProvider: () => options.bootstrapReady !== false,
     readOnlyProvider: () => options.readOnly === true,
@@ -142,6 +146,7 @@ const createHarness = (options = {}) => {
     random: () => 0.5,
     retryJitterRatio: 0,
     logger,
+    loadProFormDraft,
     ...(options.managerOptions || {}),
   });
   managers.push(manager);
@@ -357,6 +362,93 @@ describe('authoritative Pro form draft sync manager', () => {
     expect(conflictAdapter.handleConflict).toHaveBeenCalledOnce();
     await vi.runAllTimersAsync();
     expect(saveProFormDraft).toHaveBeenCalledOnce();
+  });
+
+  it('loads server state and auto-merges nonoverlapping edits after a 409', async () => {
+    const saveProFormDraft = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('stale'), {
+        code: 'REVISION_CONFLICT', status: 409, mergeRequired: true,
+        conflict: { draftId: DRAFT_ID, serverRevision: 1, status: 'active' },
+      }))
+      .mockImplementation(acceptedResponse);
+    const loadProFormDraft = vi.fn(async () => ({
+      success: true,
+      draft: { canonicalState: canonicalState({
+        serverRevision: 1, clientRevision: 1, responses: { q2: 'server answer' },
+      }) },
+    }));
+    const harness = createHarness({ saveProFormDraft, loadProFormDraft });
+    harness.manager.start();
+    mutate(harness, 'local answer', 'q1');
+    await vi.advanceTimersByTimeAsync(650);
+    await vi.waitFor(() => expect(saveProFormDraft).toHaveBeenCalledTimes(2));
+    expect(loadProFormDraft).toHaveBeenCalledOnce();
+    expect(saveProFormDraft).toHaveBeenCalledTimes(2);
+    expect(saveProFormDraft.mock.calls[1][0].canonicalState.responses).toEqual({
+      q1: 'local answer', q2: 'server answer',
+    });
+    expect(saveProFormDraft.mock.calls[1][0].canonicalState.clientRevision).toBe(2);
+  });
+
+  it('pauses autosave for same-field conflicts and resumes after a user choice', async () => {
+    const saveProFormDraft = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('stale'), {
+        code: 'REVISION_CONFLICT', status: 409, mergeRequired: true,
+        conflict: { draftId: DRAFT_ID, serverRevision: 1, status: 'active' },
+      }))
+      .mockImplementation(acceptedResponse);
+    const loadProFormDraft = vi.fn(async () => ({
+      success: true,
+      draft: { canonicalState: canonicalState({
+        serverRevision: 1, clientRevision: 1, responses: { q1: 'server answer' },
+      }) },
+    }));
+    const harness = createHarness({ saveProFormDraft, loadProFormDraft });
+    harness.manager.start();
+    mutate(harness, 'local answer', 'q1');
+    await vi.advanceTimersByTimeAsync(650);
+    await harness.manager.flush({ reason: 'autosave' });
+    expect(harness.manager.getStatus()).toMatchObject({ hasConflict: true, conflictCount: 1 });
+    const conflict = harness.manager.getPendingConflict().conflicts[0];
+    harness.manager.scheduleSave('autosave');
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(saveProFormDraft).toHaveBeenCalledOnce();
+    await harness.manager.resolveConflictChoices({ [conflict.conflictId]: 'keep_local' });
+    expect(saveProFormDraft).toHaveBeenCalledTimes(2);
+    expect(saveProFormDraft.mock.calls[1][0].canonicalState.responses.q1).toBe('local answer');
+    expect(harness.manager.getStatus().hasConflict).toBe(false);
+  });
+
+  it('stops automatic conflict merging after three rounds', async () => {
+    let loadCount = 0;
+    const saveProFormDraft = vi.fn(async () => {
+      throw Object.assign(new Error('stale'), {
+        code: 'REVISION_CONFLICT', status: 409, mergeRequired: true,
+        conflict: { draftId: DRAFT_ID, serverRevision: loadCount + 1, status: 'active' },
+      });
+    });
+    const loadProFormDraft = vi.fn(async () => {
+      loadCount += 1;
+      return {
+        success: true,
+        draft: { canonicalState: canonicalState({
+          serverRevision: loadCount,
+          clientRevision: loadCount,
+          responses: Object.fromEntries(
+            Array.from({ length: loadCount }, (_, index) => [`server${index}`, `v${index}`]),
+          ),
+        }) },
+      };
+    });
+    const harness = createHarness({ saveProFormDraft, loadProFormDraft });
+    harness.manager.start();
+    mutate(harness, 'local answer', 'local');
+    await vi.advanceTimersByTimeAsync(650);
+    await vi.waitFor(() => expect(saveProFormDraft).toHaveBeenCalledTimes(4));
+    expect(harness.manager.getStatus()).toMatchObject({
+      hasConflict: true,
+      errorCode: DRAFT_SYNC_ERROR_CODES.MAX_CONFLICT_ROUNDS_EXCEEDED,
+    });
   });
 
   it('locks submitted and superseded drafts against stale ordinary saves', async () => {

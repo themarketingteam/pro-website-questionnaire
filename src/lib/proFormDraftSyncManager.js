@@ -3,10 +3,17 @@ import {
   proDraftApiClient,
 } from '@/lib/proDraftApiClient';
 import {
+  cloneCanonicalDraftState,
   hashCanonicalDraftState,
   normalizeCanonicalDraftState,
   serializeCanonicalDraftState,
 } from '@/lib/questionnaireDraftState';
+import {
+  DRAFT_MERGE_RESULTS,
+  applyConflictChoices as applyDraftConflictChoices,
+  getSafeMergeDiagnostics,
+  mergeCanonicalDraftStates,
+} from '@/lib/proDraftConflictMerge';
 import { saveCanonicalDraftCache } from '@/lib/questionnaireCanonicalDraftCache';
 import {
   selectCanonicalDraftState,
@@ -15,6 +22,7 @@ import {
 } from '@/components/store/draftSelectors';
 import {
   patchDraftContext,
+  loadCanonicalDraftState,
   setDraftLocalSaved,
   setDraftLocalSaving,
   setDraftOfflineLocalOnly,
@@ -61,6 +69,7 @@ export const DRAFT_SYNC_ERROR_CODES = Object.freeze({
   EVENT_FAILED: 'DRAFT_SYNC_EVENT_FAILED',
   LOCAL_CACHE_FAILED: 'DRAFT_SYNC_LOCAL_CACHE_FAILED',
   MAX_RETRIES_EXCEEDED: 'DRAFT_SYNC_MAX_RETRIES_EXCEEDED',
+  MAX_CONFLICT_ROUNDS_EXCEEDED: 'DRAFT_SYNC_MAX_CONFLICT_ROUNDS_EXCEEDED',
   PERMANENT_FAILURE: 'DRAFT_SYNC_PERMANENT_FAILURE',
   READ_ONLY: 'DRAFT_SYNC_READ_ONLY',
   RESPONSE_INVALID: 'DRAFT_SYNC_RESPONSE_INVALID',
@@ -77,12 +86,16 @@ export const DEFAULT_DRAFT_SYNC_MAX_RETRIES = 8;
 export const DEFAULT_DRAFT_SYNC_RECONNECT_DELAY_MS = 250;
 export const DEFAULT_DRAFT_SYNC_EVENT_BATCH_SIZE = 50;
 export const DEFAULT_DRAFT_SYNC_EVENT_QUEUE_LIMIT = 500;
+export const DEFAULT_DRAFT_SYNC_MAX_CONFLICT_ROUNDS = 3;
 
 const SAFE_CODE = /^[A-Z0-9_.:-]{1,160}$/u;
 const SAFE_ID = /^[A-Za-z0-9_.:-]{1,256}$/u;
 const HASH = /^[a-f0-9]{64}$/u;
 const SECRET_KEY = /(?:authorization|recovery.?code|resume.?token|recovery.?session|password|secret|private.?key|access.?token)/iu;
 const TERMINAL_CODES = new Set(['DRAFT_SUPERSEDED', 'DRAFT_EXPIRED', 'DRAFT_DELETED']);
+const TERMINAL_SERVER_STATUSES = new Set([
+  'submitted', 'cleared_superseded', 'expired', 'deleted',
+]);
 const CONFLICT_CODES = new Set([
   'REVISION_CONFLICT',
   'IDEMPOTENCY_CONFLICT',
@@ -108,6 +121,9 @@ const noopLogger = Object.freeze({ debug: noOp, info: noOp, warn: noOp, error: n
 const noopConflictAdapter = Object.freeze({
   handleConflict: noOp,
   broadcastAcceptedRevision: noOp,
+  broadcastLocalRevision: noOp,
+  broadcastSaveInProgress: noOp,
+  broadcastTerminalStatus: noOp,
 });
 
 const isPlainObject = (value) => {
@@ -246,6 +262,8 @@ const publicStatus = (status) => Object.freeze({
   confirmedServerRevision: status.confirmedServerRevision,
   isReadOnly: status.isReadOnly,
   hasConflict: status.hasConflict,
+  conflictCount: status.conflictCount,
+  conflictRoundCount: status.conflictRoundCount,
   locked: status.locked,
   disposed: status.disposed,
   eventQueueSize: status.eventQueueSize,
@@ -349,6 +367,12 @@ export const createProFormDraftSyncManager = (options = {}) => {
     0,
     32,
   );
+  const maxConflictRounds = boundedInteger(
+    options.maxConflictRounds,
+    DEFAULT_DRAFT_SYNC_MAX_CONFLICT_ROUNDS,
+    1,
+    10,
+  );
   const retryJitterRatio = Number.isFinite(options.retryJitterRatio)
     ? Math.min(0.5, Math.max(0, options.retryJitterRatio)) : 0.2;
   const reconnectDelayMs = boundedInteger(
@@ -398,6 +422,10 @@ export const createProFormDraftSyncManager = (options = {}) => {
   let sourceTabId = typeof options.sourceTabId === 'string' && SAFE_ID.test(options.sourceTabId)
     ? options.sourceTabId : null;
   let networkBlockState = null;
+  let lastAcceptedBaseState = null;
+  let pendingConflict = null;
+  let supportRecoveryCopy = null;
+  let conflictRoundCount = 0;
   const status = /** @type {any} */ ({
     state: DRAFT_SYNC_MANAGER_STATES.IDLE,
     active: false,
@@ -413,6 +441,8 @@ export const createProFormDraftSyncManager = (options = {}) => {
     confirmedServerRevision: null,
     isReadOnly: false,
     hasConflict: false,
+    conflictCount: 0,
+    conflictRoundCount: 0,
     locked: false,
     disposed: false,
     eventQueueSize: 0,
@@ -594,6 +624,167 @@ export const createProFormDraftSyncManager = (options = {}) => {
     return { bundle: loaded.bundle, authorization };
   };
 
+  const hydrateMergedCanonicalState = async (candidate, restoredFrom = 'merged') => {
+    const normalized = normalizeCanonicalDraftState({
+      ...candidate,
+      clientRevision: Math.min(
+        Number.MAX_SAFE_INTEGER,
+        Math.max(
+          candidate.clientRevision,
+          canonicalOrNull()?.clientRevision || 0,
+        ) + 1,
+      ),
+      sourceTabId,
+      savedAtClient: null,
+      savedAtServer: candidate.savedAtServer || null,
+    });
+    const stateHash = await hashCanonicalDraftState(normalized, {
+      ...(Object.hasOwn(options, 'crypto') ? { crypto: options.crypto } : {}),
+      ...(options.TextEncoder ? { TextEncoder: options.TextEncoder } : {}),
+    });
+    dispatch(loadCanonicalDraftState(normalized, {
+      source: restoredFrom,
+      completedAt: nowIso(clock),
+      namespace: options.namespace,
+      lastStateHash: stateHash,
+      storageMode: safeStorageMode(options.storage, localPersistence),
+    }));
+    lastObservedRevision = normalized.clientRevision;
+    lastObservedSignature = contentSignature(normalized);
+    return normalized;
+  };
+
+  const exposePendingConflict = (errorCode, mergeResult) => {
+    pendingConflict = { errorCode, mergeResult };
+    networkBlockState = DRAFT_SYNC_MANAGER_STATES.CONFLICT;
+    updateStatus({
+      state: DRAFT_SYNC_MANAGER_STATES.CONFLICT,
+      hasConflict: true,
+      conflictCount: mergeResult.conflicts.length,
+      conflictRoundCount,
+      pending: false,
+      errorCode: DRAFT_SYNC_ERROR_CODES.CONFLICT,
+    });
+    try {
+      conflictAdapter.handleConflict?.(Object.freeze({
+        errorCode,
+        conflicts: mergeResult.conflicts,
+        diagnostics: getSafeMergeDiagnostics(mergeResult),
+      }));
+    } catch {}
+    return publicStatus(status);
+  };
+
+  const processRevisionConflict = async (error, runOptions = {}) => {
+    clearNetworkTimers();
+    conflictRoundCount += 1;
+    if (conflictRoundCount > maxConflictRounds) {
+      networkBlockState = DRAFT_SYNC_MANAGER_STATES.CONFLICT;
+      pendingConflict = null;
+      return updateStatus({
+        state: DRAFT_SYNC_MANAGER_STATES.CONFLICT,
+        hasConflict: true,
+        conflictCount: 0,
+        conflictRoundCount,
+        pending: false,
+        errorCode: DRAFT_SYNC_ERROR_CODES.MAX_CONFLICT_ROUNDS_EXCEEDED,
+      });
+    }
+    const local = runOptions.preparedCanonical || canonicalOrNull();
+    if (!local) return exposePendingConflict(error.code, {
+      conflicts: [], adoptedLocalPaths: [], adoptedServerPaths: [], warnings: [],
+      result: DRAFT_MERGE_RESULTS.INVALID,
+    });
+    supportRecoveryCopy = cloneCanonicalDraftState(local);
+    const terminalStatus = error?.conflict?.status;
+    if (TERMINAL_SERVER_STATUSES.has(terminalStatus)) {
+      networkBlockState = terminalStatus === 'submitted'
+        ? DRAFT_SYNC_MANAGER_STATES.SUBMITTED
+        : DRAFT_SYNC_MANAGER_STATES.SUPERSEDED;
+      try {
+        conflictAdapter.broadcastTerminalStatus?.(Object.freeze({
+          status: terminalStatus,
+          clientRevision: local.clientRevision,
+          serverRevision: error?.conflict?.serverRevision,
+        }));
+      } catch {}
+      return updateStatus({
+        state: networkBlockState,
+        locked: true,
+        isReadOnly: terminalStatus === 'submitted',
+        pending: false,
+        errorCode: terminalStatus === 'submitted'
+          ? DRAFT_SYNC_ERROR_CODES.SUBMITTED : DRAFT_SYNC_ERROR_CODES.SUPERSEDED,
+      });
+    }
+    if (typeof draftApiClient.loadProFormDraft !== 'function') {
+      return exposePendingConflict(error.code, {
+        conflicts: [], adoptedLocalPaths: [], adoptedServerPaths: [], warnings: [],
+        result: DRAFT_MERGE_RESULTS.USER_CHOICE_REQUIRED,
+      });
+    }
+    let credentials;
+    let loaded;
+    try {
+      credentials = await loadCredentials(runOptions.preferRecoverySession === true);
+      if (!credentials) throw new Error('AUTHORIZATION_REQUIRED');
+      loaded = await draftApiClient.loadProFormDraft({
+        apiVersion: 1,
+        authorization: credentials.authorization,
+        requestedDraftId: local.draftId,
+        includeCanonicalState: true,
+        upgradeLegacyOnLoad: false,
+        clientContext: { environment: options.environment || 'unknown' },
+      });
+    } catch {
+      return exposePendingConflict(error.code, {
+        conflicts: [], adoptedLocalPaths: [], adoptedServerPaths: [], warnings: [],
+        result: DRAFT_MERGE_RESULTS.USER_CHOICE_REQUIRED,
+      });
+    }
+    const server = loaded?.draft?.canonicalState;
+    const mergeResult = await mergeCanonicalDraftStates({
+      localState: local,
+      serverState: server,
+      baseState: lastAcceptedBaseState,
+    });
+    if (mergeResult.result === DRAFT_MERGE_RESULTS.USER_CHOICE_REQUIRED) {
+      return exposePendingConflict(error.code, mergeResult);
+    }
+    if ([DRAFT_MERGE_RESULTS.INVALID, DRAFT_MERGE_RESULTS.INCOMPATIBLE]
+      .includes(mergeResult.result) || !mergeResult.mergedState) {
+      return exposePendingConflict(error.code, mergeResult);
+    }
+    if (TERMINAL_SERVER_STATUSES.has(mergeResult.mergedState.draftStatus)) {
+      await hydrateMergedCanonicalState(mergeResult.mergedState, 'server');
+      networkBlockState = mergeResult.mergedState.draftStatus === 'submitted'
+        ? DRAFT_SYNC_MANAGER_STATES.SUBMITTED : DRAFT_SYNC_MANAGER_STATES.SUPERSEDED;
+      return updateStatus({
+        state: networkBlockState,
+        locked: true,
+        isReadOnly: mergeResult.mergedState.draftStatus === 'submitted',
+        pending: false,
+      });
+    }
+    await hydrateMergedCanonicalState(mergeResult.mergedState);
+    pendingConflict = null;
+    attempt = null;
+    networkBlockState = null;
+    updateStatus({
+      state: DRAFT_SYNC_MANAGER_STATES.RETRYING,
+      hasConflict: false,
+      conflictCount: 0,
+      conflictRoundCount,
+      pending: true,
+      errorCode: null,
+    });
+    debounceTimer = setTimer(() => {
+      debounceTimer = null;
+      void runSave({ reason: 'conflict_merge', force: true, conflictMerge: true });
+    }, 0);
+    return publicStatus(status);
+  };
+
   const retryDelay = (retryCount, retryAfterSeconds = 0) => {
     const exponential = Math.min(retryMaxMs, retryBaseMs * (2 ** Math.max(0, retryCount - 1)));
     const jitter = exponential * retryJitterRatio * ((Math.min(1, Math.max(0, random()))) * 2 - 1);
@@ -753,8 +944,17 @@ export const createProFormDraftSyncManager = (options = {}) => {
     const code = safeCode(error?.code, DRAFT_SYNC_ERROR_CODES.PERMANENT_FAILURE);
     if (TERMINAL_CODES.has(code)) {
       clearNetworkTimers();
+      const local = runOptions.preparedCanonical || canonicalOrNull();
+      supportRecoveryCopy = local ? cloneCanonicalDraftState(local) : supportRecoveryCopy;
       attempt = null;
       networkBlockState = DRAFT_SYNC_MANAGER_STATES.SUPERSEDED;
+      try {
+        conflictAdapter.broadcastTerminalStatus?.(Object.freeze({
+          status: 'cleared_superseded',
+          clientRevision: local?.clientRevision,
+          serverRevision: error?.conflict?.serverRevision,
+        }));
+      } catch {}
       return updateStatus({
         state: DRAFT_SYNC_MANAGER_STATES.SUPERSEDED,
         locked: true,
@@ -763,21 +963,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
       });
     }
     if (CONFLICT_CODES.has(code) || error?.mergeRequired === true) {
-      clearNetworkTimers();
-      networkBlockState = DRAFT_SYNC_MANAGER_STATES.CONFLICT;
-      updateStatus({
-        state: DRAFT_SYNC_MANAGER_STATES.CONFLICT,
-        hasConflict: true,
-        pending: false,
-        errorCode: DRAFT_SYNC_ERROR_CODES.CONFLICT,
-      });
-      try {
-        conflictAdapter.handleConflict?.(Object.freeze({
-          errorCode: code,
-          conflict: error?.conflict || null,
-        }));
-      } catch {}
-      return publicStatus(status);
+      return processRevisionConflict(error, runOptions);
     }
     if ((AUTHORIZATION_CODES.has(code) || error?.status === 401 || error?.status === 403)
       && !authorizationFallbackAttempted && runOptions.preferRecoverySession !== true) {
@@ -876,6 +1062,13 @@ export const createProFormDraftSyncManager = (options = {}) => {
           pending: false,
           errorCode: null,
         });
+        try {
+          conflictAdapter.broadcastSaveInProgress?.(Object.freeze({
+            clientRevision: prepared.canonical.clientRevision,
+            serverRevision: prepared.canonical.serverRevision,
+            stateHash: prepared.stateHash,
+          }));
+        } catch {}
         const syncReason = SUBMIT_REASONS[prepared.canonical.draftStatus]
           || (reason === 'manual_save' ? 'manual_save' : 'autosave');
         const response = await draftApiClient.saveProFormDraft({
@@ -899,6 +1092,13 @@ export const createProFormDraftSyncManager = (options = {}) => {
         }));
         dispatch(setDraftStateHash(response.stateHash));
         lastAcceptedSignature = prepared.signature;
+        lastAcceptedBaseState = normalizeCanonicalDraftState({
+          ...prepared.canonical,
+          serverRevision: response.acceptedServerRevision,
+          savedAtServer: savedAt,
+        });
+        pendingConflict = null;
+        conflictRoundCount = 0;
         attempt = null;
         networkBlockState = prepared.canonical.draftStatus === 'submitted'
           ? DRAFT_SYNC_MANAGER_STATES.SUBMITTED
@@ -914,6 +1114,9 @@ export const createProFormDraftSyncManager = (options = {}) => {
           lastServerSavedAt: savedAt,
           confirmedClientRevision: response.acceptedClientRevision,
           confirmedServerRevision: response.acceptedServerRevision,
+          hasConflict: false,
+          conflictCount: 0,
+          conflictRoundCount: 0,
         });
         try {
           conflictAdapter.broadcastAcceptedRevision?.(Object.freeze({
@@ -941,7 +1144,10 @@ export const createProFormDraftSyncManager = (options = {}) => {
           retryable: error?.retryable === true,
           status: Number.isFinite(error?.status) ? error.status : null,
         });
-        return handleSaveError(error, runOptions);
+        return handleSaveError(error, {
+          ...runOptions,
+          ...(prepared?.canonical ? { preparedCanonical: prepared.canonical } : {}),
+        });
       }
     })().finally(() => {
       status.inFlight = false;
@@ -1035,6 +1241,13 @@ export const createProFormDraftSyncManager = (options = {}) => {
       }));
     }
     lastObservedRevision = Math.max(lastObservedRevision, clientRevision);
+    try {
+      conflictAdapter.broadcastLocalRevision?.(Object.freeze({
+        clientRevision,
+        serverRevision: canonical.serverRevision,
+        mutationId: canonical.lastMutation?.mutationId || undefined,
+      }));
+    } catch {}
     const reason = canonical.lastMutation?.reason === 'restore'
       ? 'restore'
       : canonical.lastMutation?.reason === 'clear_all'
@@ -1156,6 +1369,61 @@ export const createProFormDraftSyncManager = (options = {}) => {
     });
     return eventPromise;
   }
+
+  const getPendingConflict = () => {
+    if (!pendingConflict?.mergeResult) return null;
+    return Object.freeze({
+      errorCode: pendingConflict.errorCode,
+      conflicts: pendingConflict.mergeResult.conflicts,
+      diagnostics: getSafeMergeDiagnostics(pendingConflict.mergeResult),
+    });
+  };
+
+  const resolveConflictChoices = async (choices) => {
+    if (!pendingConflict?.mergeResult) return publicStatus(status);
+    const applied = await applyDraftConflictChoices(pendingConflict.mergeResult, choices);
+    if (applied.result !== DRAFT_MERGE_RESULTS.MERGED || !applied.mergedState) {
+      return updateStatus({
+        state: DRAFT_SYNC_MANAGER_STATES.CONFLICT,
+        hasConflict: true,
+        errorCode: DRAFT_SYNC_ERROR_CODES.CONFLICT,
+      });
+    }
+    await hydrateMergedCanonicalState(applied.mergedState);
+    pendingConflict = null;
+    attempt = null;
+    networkBlockState = null;
+    updateStatus({
+      state: DRAFT_SYNC_MANAGER_STATES.RETRYING,
+      hasConflict: false,
+      conflictCount: 0,
+      pending: true,
+      errorCode: null,
+    });
+    return saveImmediately('conflict_choice', { force: true, conflictMerge: true });
+  };
+
+  const handleTabMessage = (message) => {
+    if (!message || message.sourceTabId === sourceTabId) return publicStatus(status);
+    if (message.type === 'server_revision_accepted'
+      && Number.isSafeInteger(message.serverRevision)
+      && message.serverRevision > (canonicalOrNull()?.serverRevision || 0)
+      && !status.locked && !status.hasConflict) {
+      status.pending = true;
+      clearTimer(debounceTimer);
+      debounceTimer = setTimer(() => {
+        debounceTimer = null;
+        void runSave({ reason: 'tab_revision_accepted', force: true });
+      }, 0);
+    }
+    if (message.type === 'draft_submitted') {
+      supportRecoveryCopy = canonicalOrNull();
+      networkBlockState = DRAFT_SYNC_MANAGER_STATES.SUBMITTED;
+      updateStatus({ state: DRAFT_SYNC_MANAGER_STATES.SUBMITTED, locked: true, isReadOnly: true });
+    }
+    if (message.type === 'draft_superseded') invalidateAfterSupersession();
+    return publicStatus(status);
+  };
 
   const saveImmediately = (reason = 'manual_save', saveOptions = {}) => {
     if ((status.hasConflict || status.locked
@@ -1303,6 +1571,13 @@ export const createProFormDraftSyncManager = (options = {}) => {
       lastObservedSignature = contentSignature(current);
     }
     await saveImmediately('submitted', { force: true, allowSubmitted: true });
+    try {
+      conflictAdapter.broadcastTerminalStatus?.(Object.freeze({
+        status: 'submitted',
+        clientRevision: current?.clientRevision,
+        serverRevision: current?.serverRevision,
+      }));
+    } catch {}
     return updateStatus({
       state: DRAFT_SYNC_MANAGER_STATES.SUBMITTED,
       locked: true,
@@ -1316,6 +1591,9 @@ export const createProFormDraftSyncManager = (options = {}) => {
     clearNetworkTimers();
     attempt = null;
     networkBlockState = DRAFT_SYNC_MANAGER_STATES.SUPERSEDED;
+    try {
+      conflictAdapter.broadcastTerminalStatus?.(Object.freeze({ status: 'cleared_superseded' }));
+    } catch {}
     return updateStatus({
       state: DRAFT_SYNC_MANAGER_STATES.SUPERSEDED,
       locked: true,
@@ -1361,6 +1639,8 @@ export const createProFormDraftSyncManager = (options = {}) => {
     if (initial) {
       lastObservedSignature = contentSignature(initial);
       lastObservedRevision = initial.clientRevision;
+      const bootstrapSource = selectDraftBootstrapStatus(store.getState()).source;
+      if (bootstrapSource === 'server') lastAcceptedBaseState = cloneCanonicalDraftState(initial);
     }
     if (localPersistence) {
       startLocalCanonicalDraftPersistence(localPersistence, {
@@ -1420,6 +1700,16 @@ export const createProFormDraftSyncManager = (options = {}) => {
     markSubmitFailed,
     markSubmitted,
     invalidateAfterSupersession,
+    getPendingConflict,
+    resolveConflictChoices,
+    handleTabMessage,
+    getSupportRecoveryDiagnostics: () => Object.freeze({
+      present: Boolean(supportRecoveryCopy),
+      status: supportRecoveryCopy?.draftStatus || null,
+      clientRevision: supportRecoveryCopy?.clientRevision ?? null,
+      containsTokens: false,
+      authoritative: false,
+    }),
     getStatus: () => publicStatus(status),
     subscribeStatus(listener) {
       if (typeof listener !== 'function') return noOp;

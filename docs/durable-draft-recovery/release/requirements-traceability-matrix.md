@@ -35,6 +35,19 @@ feature-branch push, production operation, or `main` change occurred.
 
 ## Planned implementation batches
 
+### 2026-08-06 conflict merge and multi-tab source evidence
+
+The [conflict merge and multi-tab contract](../frontend/conflict-merge-and-multi-tab-contract.md),
+pure merge engine, safe tab coordinator, bounded 409 reconciliation loop, and
+accessible conflict dialog add local implementation evidence for
+`DR-CONCUR-001`, `DR-REV-001`, `DR-SAVE-001`, `DR-LIFE-001`, `DR-SEC-001`, and
+`DR-A11Y-001`. Focused coverage passes 59/59, and the synthetic desktop
+Chromium/Firefox/WebKit matrix passes 18/18. Ambiguous same-field edits require
+choice; submitted/superseded server state wins; channel envelopes contain no
+answers, credentials, email, domain, recovery codes, or tokens. This is local
+source evidence only. Staging certification and release gates remain pending,
+and no deployment or push occurred.
+
 | Batch | Scope |
 | --- | --- |
 | `B01` | Safe boot, browser capability detection, local persistence, and namespace isolation. |
@@ -187,7 +200,7 @@ This overlay records baseline and feature-branch evidence. A historical characte
 | `DR-ADMIN-002` | Existing baseline is noncompliant; browser directly lists/updates draft data. | [DRAFT-014](../audit/current-defect-register.md#draft-014--draft-data-crosses-a-direct-browser-entity-boundary) | — | Planned |
 | `DR-RLS-001` | Repository draft schemas declare no RLS; actual cloud enforcement is unverified. | [DRAFT-014](../audit/current-defect-register.md#draft-014--draft-data-crosses-a-direct-browser-entity-boundary) | — | Planned |
 | `DR-BROWSER-001` | The production-denied quality workflow runs Chromium fixture mechanics automatically; a manual staging workflow defines desktop/mobile and optional real-Edge matrices. Historical local evidence includes 70/70 active browser-local cache executions across five projects. The 2026-08-06 canonical-state attempt stopped at the failing normal suite, so no deployed browser, storage, isolation, migration, reset, console, or network matrix ran. Server/concurrency/offline/security scenarios also remain pending. | [Blocked canonical-state staging attempt](../testing/staging-canonical-state-redux-certification.md); [earlier blocked browser-storage attempt](../testing/staging-browser-storage-certification.md); [quality workflow](../../../.github/workflows/durable-draft-quality.yml); [manual staging E2E workflow](../../../.github/workflows/durable-draft-staging-e2e.yml); [E2E harness](../testing/e2e-test-harness.md); [browser fixture guide](../testing/browser-failure-fixtures.md) | `[HARNESS]` mechanics; `E2E-SMOKE-SHELL-001`; local active `DR-BOOT-001`/`002`; local active `DR-LOCAL-001`–`004`; local active `DR-LOCAL-002`; pending server-linked V2 specs | Partially implemented; staging certification blocked before deploy |
-| `DR-CONCUR-001` | Multi-tab/context and deterministic network-ordering fixtures exist, with three requirement-linked pending specs. Merge/conflict/stale/idempotency implementation and runtime proof remain absent. | [Browser fixture guide](../testing/browser-failure-fixtures.md); [DRAFT-015](../audit/current-defect-register.md#draft-015--draft-upsert-and-mutation-ordering-are-non-atomic) | 3 pending `DR-CONCUR-001` E2E scenarios | Planned |
+| `DR-CONCUR-001` | Three-way field merge, same-field choices, terminal server authority, hashed tab coordination, storage fallback, and server-CAS safety are implemented. | [Conflict merge and multi-tab contract](../frontend/conflict-merge-and-multi-tab-contract.md); [DRAFT-015](../audit/current-defect-register.md#draft-015--draft-upsert-and-mutation-ordering-are-non-atomic) | 59 focused tests; 18/18 desktop Chromium/Firefox/WebKit scenarios | Implemented — staging certification pending |
 | `DR-OFFLINE-001` | Offline/reconnect and lifecycle fixture mechanics pass, with two requirement-linked pending specs. No offline/online outbox or reconciliation implementation exists. | [Browser fixture guide](../testing/browser-failure-fixtures.md); [DRAFT-006](../audit/current-defect-register.md#draft-006--lifecycle-persistence-relies-only-on-beforeunload) | `BC-LIFE-001`; 2 pending `DR-OFFLINE-001` E2E scenarios | Planned |
 | `DR-OBS-001` | Existing analytics/logging does not provide the required acknowledged-revision and recovery telemetry evidence. | [Audit report](../audit/current-system-audit-report.md) | — | Planned |
 | `DR-REL-001` | Non-deploying quality and manual staging-E2E workflow sources exist. Candidate `9ca8e64` passed 18/18 focused schema tests but failed 5 of 780 normal tests, correctly stopping before staging checkout update, guard, deployment, and feature-branch push. GitHub branch protection remains administrator-unverified; staging/green certification and disabled deployment have not occurred. | [Blocked entity-schema staging attempt](../data/staging-entity-schema-certification.md); [GitHub Actions controls](../testing/github-actions-and-branch-protection.md); [staging readiness checklist](../environments/staging-deployment-readiness-checklist.md); [implementation dependency map](../audit/implementation-dependency-map.md) | `npm run test:entity-schemas` pass; `npm test` fail; later release checks not run under hard-stop rule | Blocked before staging deployment |

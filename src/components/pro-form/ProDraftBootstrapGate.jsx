@@ -14,6 +14,8 @@ import {
 import { useQuestionnairePersistence } from '@/components/store/QuestionnairePersistenceContext';
 import ProDraftEntryModal from './ProDraftEntryModal';
 import { ProDraftSyncProvider } from '@/contexts/ProDraftSyncContext';
+import { ProDraftConflictProvider } from '@/contexts/ProDraftConflictContext';
+import ProDraftConflictDialog from './ProDraftConflictDialog';
 
 const PREPARING_PHASES = new Set([
   'idle',
@@ -92,11 +94,12 @@ const EnabledProDraftBootstrapGate = ({
         runtimeConfig={runtimeConfig}
         pendingServerSync={bootstrap.pendingServerSync}
       >
-        <section
-          aria-busy={!interactiveReady}
-          data-testid="pro-draft-bootstrap-gate"
-          data-bootstrap-phase={bootstrap.phase}
-        >
+        <ProDraftConflictProvider>
+          <section
+            aria-busy={!interactiveReady}
+            data-testid="pro-draft-bootstrap-gate"
+            data-bootstrap-phase={bootstrap.phase}
+          >
           {preparing && (
             <div
               role="status"
@@ -139,7 +142,9 @@ const EnabledProDraftBootstrapGate = ({
             </fieldset>
           )}
           {interactiveReady && !bootstrap.readOnly && content}
-        </section>
+          </section>
+          <ProDraftConflictDialog />
+        </ProDraftConflictProvider>
       </ProDraftSyncProvider>
     </ProDraftCredentialProvider>
   );

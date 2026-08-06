@@ -46,7 +46,7 @@ All runtime-sensitive dependencies are injected or protected by adapters:
 | Draft and event API clients | Call `saveProFormDraft` and `appendProFormDraftEvents` through the approved client. |
 | Clock, timers, random/ID generator | Injectable for deterministic testing. |
 | Online, visibility, lifecycle | Protected providers/adapters; no unguarded browser-global assumption. |
-| Conflict adapter | Receives safe conflict metadata now; merge behavior belongs to the next conflict prompt. |
+| Conflict/coordination adapter | Receives safe conflict projections and emits allowlisted revision/lifecycle messages; no canonical values or tokens. |
 | Logger | Receives only safe state, count, code, revision, delay, and boolean fields. |
 
 ## State machine
@@ -102,9 +102,11 @@ revision separately; server revision changes only from an accepted backend
 response. Idempotent backend success follows the same acceptance path.
 
 Serialization or local-cache failure stops the network request and retains the
-previous good cache and server snapshot. A conflict retains current Redux
-state, pauses ordinary saves, records only bounded conflict metadata, and calls
-the conflict adapter once without a retry loop.
+previous good cache and server snapshot. On conflict the manager authorizes and
+loads current server state, performs the documented three-way field merge, and
+retries at most three rounds. Genuine same-field ambiguity pauses ordinary
+saves until explicit choices are applied. See
+[Draft conflict merge and multi-tab contract](./conflict-merge-and-multi-tab-contract.md).
 
 ## Offline, retry, and authorization behavior
 
@@ -181,8 +183,7 @@ mode, safe facade, and identity-change disposal. API-client, canonical-cache,
 local-persistence, Redux, status UI, save/event integration, and feature-mode
 tests provide adjacent evidence.
 
-This prompt establishes authoritative observation of every Redux mutation; it
-does not migrate every individual component to the canonical mutation factory.
-That complete component-mutation migration and interactive conflict merge are
-explicitly pending later prompts. Local source evidence is not staging or
-production certification.
+This implementation does not yet migrate every individual component to the
+canonical mutation factory. Interactive conflict merge and multi-tab safety are
+now implemented; complete component mutation capture remains a later prompt.
+Local source evidence is not staging or production certification.

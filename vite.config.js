@@ -28,6 +28,10 @@ export default defineConfig({
           process.cwd(),
           'tests/e2e/fixtures/pro-draft-recovery.html',
         ),
+        'pro-draft-conflict': resolve(
+          process.cwd(),
+          'tests/e2e/fixtures/pro-draft-conflict.html',
+        ),
       },
     },
   } : undefined,

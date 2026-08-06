@@ -16,6 +16,7 @@ import {
   getSafeDraftSyncDiagnostics,
 } from '@/lib/proFormDraftSyncManager';
 import { frontendRuntimeConfig } from '@/lib/proDraftRuntimeConfig';
+import { createProDraftTabCoordinator } from '@/lib/proDraftTabCoordinator';
 
 const EMPTY_STATUS = Object.freeze({
   state: 'idle',
@@ -49,6 +50,8 @@ const DEFAULT_CONTEXT = Object.freeze({
   lastServerSavedAt: null,
   isReadOnly: false,
   hasConflict: false,
+  pendingConflict: null,
+  resolveConflictChoices: NOOP_ASYNC,
   retryNow: NOOP_ASYNC,
   markSubmitAttempted: NOOP_ASYNC,
   markSubmitFailed: NOOP_ASYNC,
@@ -91,6 +94,7 @@ const EnabledProDraftSyncProvider = ({
   eventApiClient = draftApiClient,
   credentialVault: credentialVaultOverride = undefined,
   conflictAdapter = undefined,
+  tabCoordinator: tabCoordinatorOverride = undefined,
   lifecycleAdapter = undefined,
   managerOptions = {},
 }) => {
@@ -110,12 +114,49 @@ const EnabledProDraftSyncProvider = ({
     persistence.storage,
     runtimeConfig.environment,
   ]);
+  const tabCoordinator = useMemo(() => (
+    tabCoordinatorOverride || createProDraftTabCoordinator({
+      namespace: persistence.namespace,
+    })
+  ), [persistence.namespace, tabCoordinatorOverride]);
+  const coordinatorConflictAdapter = useMemo(() => Object.freeze({
+    handleConflict(details) {
+      tabCoordinator.broadcast({
+        type: 'conflict_detected',
+        status: 'conflict',
+        serverRevision: details?.conflicts?.[0]?.serverMetadata?.serverRevision,
+      });
+    },
+    broadcastAcceptedRevision(details) {
+      tabCoordinator.broadcast({
+        type: 'server_revision_accepted',
+        status: 'saved',
+        clientRevision: details?.clientRevision,
+        serverRevision: details?.serverRevision,
+        stateHash: details?.stateHash,
+      });
+    },
+    broadcastLocalRevision(details) {
+      tabCoordinator.broadcast({ type: 'local_revision_changed', ...details, status: 'active' });
+    },
+    broadcastSaveInProgress(details) {
+      tabCoordinator.broadcast({ type: 'save_in_progress', ...details, status: 'saving' });
+    },
+    broadcastTerminalStatus(details) {
+      tabCoordinator.broadcast({
+        type: details?.status === 'submitted' ? 'draft_submitted' : 'draft_superseded',
+        ...details,
+        status: details?.status === 'submitted' ? 'submitted' : 'superseded',
+      });
+    },
+  }), [tabCoordinator]);
   const stableInputs = useRef({
     managerFactory,
     draftApiClient,
     eventApiClient,
     credentialVault,
-    conflictAdapter,
+    conflictAdapter: conflictAdapter || coordinatorConflictAdapter,
+    tabCoordinator,
     lifecycleAdapter,
     managerOptions,
     pendingServerSync,
@@ -128,7 +169,8 @@ const EnabledProDraftSyncProvider = ({
     draftApiClient,
     eventApiClient,
     credentialVault,
-    conflictAdapter,
+    conflictAdapter: conflictAdapter || coordinatorConflictAdapter,
+    tabCoordinator,
     lifecycleAdapter,
     managerOptions,
     pendingServerSync,
@@ -153,6 +195,7 @@ const EnabledProDraftSyncProvider = ({
         environment: inputs.runtimeConfig.environment,
         scheduleInitialSave: inputs.pendingServerSync,
         ...(inputs.conflictAdapter ? { conflictAdapter: inputs.conflictAdapter } : {}),
+        sourceTabId: inputs.tabCoordinator.getSourceTabId(),
         ...(inputs.lifecycleAdapter ? { lifecycleAdapter: inputs.lifecycleAdapter } : {}),
         ...inputs.managerOptions,
       });
@@ -161,6 +204,8 @@ const EnabledProDraftSyncProvider = ({
   const [syncStatus, setSyncStatus] = useState(() => record.manager.getStatus());
 
   useEffect(() => {
+    tabCoordinator.start();
+    const unsubscribeTabs = tabCoordinator.subscribe(record.manager.handleTabMessage);
     record.mounts += 1;
     if (record.disposeTimer !== null) {
       clearTimeout(record.disposeTimer);
@@ -170,6 +215,8 @@ const EnabledProDraftSyncProvider = ({
     setSyncStatus(record.manager.start());
     return () => {
       unsubscribe();
+      unsubscribeTabs();
+      tabCoordinator.stop();
       record.mounts -= 1;
       record.disposeTimer = setTimeout(() => {
         record.disposeTimer = null;
@@ -180,7 +227,7 @@ const EnabledProDraftSyncProvider = ({
         if (records?.size === 0) recordsByStore.delete(store);
       }, 0);
     };
-  }, [draftKey, record, store]);
+  }, [draftKey, record, store, tabCoordinator]);
 
   const value = useMemo(() => Object.freeze({
     scheduleSave: record.manager.scheduleSave,
@@ -190,6 +237,8 @@ const EnabledProDraftSyncProvider = ({
     lastServerSavedAt: syncStatus.lastServerSavedAt,
     isReadOnly: syncStatus.isReadOnly,
     hasConflict: syncStatus.hasConflict,
+    pendingConflict: record.manager.getPendingConflict?.() || null,
+    resolveConflictChoices: record.manager.resolveConflictChoices || NOOP_ASYNC,
     retryNow: () => record.manager.saveImmediately('manual_save', { force: true }),
     markSubmitAttempted: record.manager.markSubmitAttempted,
     markSubmitFailed: record.manager.markSubmitFailed,

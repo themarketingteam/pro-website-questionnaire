@@ -62,7 +62,7 @@ lint and typecheck retain their documented baseline debt. Overall status stays
 
 All validation runs from the repository root. `npm run test:manifest` enforces the normal, characterization, and Playwright naming boundaries and currently reports 51 normal files, 5 characterization files, and 6 Playwright specs. `.github/workflows/durable-draft-quality.yml` runs source safety, all authoritative quality gates, a disabled-V2 build, Chromium harness mechanics, and the non-strict pending report for `main` pull requests and feature-branch pushes. `.github/workflows/durable-draft-staging-e2e.yml` is manual-only and reads the separate staging URL exclusively from `PRO_DRAFT_STAGING_URL`. Neither workflow deploys. Branch protection guidance and remaining manual administration are recorded in [GitHub Actions and branch protection](../testing/github-actions-and-branch-protection.md).
 
-`npm run check` remains the staging and production wrapper gate: it executes lint, typecheck, `test:ci`, and build and reports all four outcomes. Characterization tests are run separately with `npm run test:baseline-characterization`; they preserve known-defect evidence and cannot certify a release. `npm run test:e2e:pending-strict` is required before release but deliberately remains outside foundation CI until the later implementation gate; it currently fails on 8 pending server/concurrency/offline/security scenarios across 4 requirement IDs.
+`npm run check` remains the staging and production wrapper gate: it executes lint, typecheck, `test:ci`, and build and reports all four outcomes. Characterization tests are run separately with `npm run test:baseline-characterization`; they preserve known-defect evidence and cannot certify a release. `npm run test:e2e:pending-strict` is required before release but deliberately remains outside foundation CI until the later implementation gate; it currently fails on 5 pending server/offline/security scenarios across 3 requirement IDs. The three concurrency fixmes were replaced by the 18-case active desktop matrix.
 
 Historical local evidence includes 27/27 passing characterization tests, 207/207 focused canonical-cache/Redux tests, and 70/70 active browser-local cache/isolation executions across all five projects. In the latest entity-extension attempt, the schema validator and focused fixtures passed 18/18, but `npm test` failed 5 of 780 normal tests. The attempt stopped at that command; canonical, identity, submission/PDF, intake/repair, lint, typecheck, build, target guard, inventory, entity push, generated types, CRUD/FLS, and browser smoke were not run. Deployment authorization stays denied.
 
@@ -179,6 +179,19 @@ deployed, email was not sent, no entity/function/secret/record was changed, and
 the overall decision remains **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
 
 ## Decision
+
+### 2026-08-06 conflict merge and multi-tab local evidence
+
+Field-level conflict merge, a hashed/allowlisted tab coordinator, the bounded
+409 reconciliation loop, and accessible choice dialog are implemented locally.
+Focused tests pass 59/59 and the synthetic desktop browser matrix passes 18/18
+across Chromium, Firefox, and WebKit, including BroadcastChannel-disabled
+conflict protection and terminal submission. No deployment target, remote
+resource, record, secret, domain, integration, or email path was touched.
+
+This does not promote a readiness item: live Base44 optimistic-concurrency and
+deployed-browser certification are still missing. The decision remains
+**STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
 
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**
 
