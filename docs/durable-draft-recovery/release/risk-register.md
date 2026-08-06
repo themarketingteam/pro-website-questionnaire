@@ -3,7 +3,7 @@
 - Status: Active architecture risk register
 - Date: 2026-08-06
 - Owners: Isaac Hines; Engineering; Security; Operations
-- Sources: [ADR-001](../architecture/ADR-001-approved-product-and-security-decisions.md), [ADR-002](../architecture/ADR-002-blue-green-base44-cutover-and-data-continuity.md), [ADR-003](../architecture/ADR-003-draft-identity-recovery-and-lifecycle-contract.md), [current system audit](../audit/current-system-audit-report.md), [current defect register](../audit/current-defect-register.md)
+- Sources: [ADR-001](../architecture/ADR-001-approved-product-and-security-decisions.md), [ADR-002](../architecture/ADR-002-blue-green-base44-cutover-and-data-continuity.md), [ADR-003](../architecture/ADR-003-draft-identity-recovery-and-lifecycle-contract.md), [identity normalization contract](../architecture/draft-identity-and-email-normalization-contract.md), [current system audit](../audit/current-system-audit-report.md), [current defect register](../audit/current-defect-register.md)
 
 ## Rating and treatment rules
 
@@ -50,11 +50,11 @@ Any detection meeting a rollback trigger is an operational trigger, not permissi
 
 ## Current audit evidence overlay
 
-The register's likelihood/severity columns describe the risk before planned controls. The overlay below records the **current** evidence assessment as of 2026-08-06. “Path absent” means a planned feature risk is not currently active; its accepted/mitigated treatment above remains unchanged for the future release. The latest [canonical-state staging attempt](../testing/staging-canonical-state-redux-certification.md) is `CANONICAL_STATE_FOUNDATION_BLOCKED`: local focused suites passed inside the aggregate run, but 5 of 611 normal tests failed and stopped all deployment and deployed-risk proof.
+The register's likelihood/severity columns describe the risk before planned controls. The overlay below records the **current** evidence assessment as of 2026-08-06. “Path absent” means a planned feature risk is not currently active; its accepted/mitigated treatment above remains unchanged for the future release. The new [identity normalization contract](../architecture/draft-identity-and-email-normalization-contract.md) supplies local input/provenance/diagnostic controls only; public recovery, backend authorization, keyed lookup hashing, schemas, UI, and deployment remain absent.
 
 | Risk ID | Current likelihood | Current severity | Current audit evidence/classification |
 | --- | --- | --- | --- |
-| `RISK-001` | Low (path absent) | Critical | Future accepted email-only recovery risk; no current public email recovery path. Acceptance remains unchanged. |
+| `RISK-001` | Low (path absent) | Critical | The client contract explicitly preserves `unverified` for client-entered and future email-recovery associations and never describes normalization as ownership proof. The accepted privacy risk remains unchanged because no public recovery path or backend abuse control was implemented. |
 | `RISK-002` | Medium | Critical | Current password grant flow exists; future indefinite-grant acceptance remains unchanged. See [admin audit](../audit/current-system-audit-report.md#admin-recovery-summary). |
 | `RISK-003` | Medium | High | Confirmed storage exceptions can fail module import. [DRAFT-001](../audit/current-defect-register.md#draft-001--unsafe-module-evaluation-storage-access). |
 | `RISK-004` | High | High | Continuous canonical browser capture and deterministic same-browser rehydration are implemented/tested locally, but no server acknowledgement, durable outbox, reconnect proof, or deployed storage matrix exists. The latest release gate blocked staging. [DRAFT-005](../audit/current-defect-register.md#draft-005--local-backups-are-write-only), [DRAFT-006](../audit/current-defect-register.md#draft-006--lifecycle-persistence-relies-only-on-beforeunload). |
@@ -63,7 +63,7 @@ The register's likelihood/severity columns describe the risk before planned cont
 | `RISK-007` | High | Critical | Clear All retains old identity/draft; delayed-save protection absent. `BC-CLEAR-001/002`; [DRAFT-010](../audit/current-defect-register.md#draft-010--clear-all-races-browser-persistence-and-leaves-the-old-server-draft-active). |
 | `RISK-008` | Low (path absent) | Critical | Future staging SES risk; current audit found no active email path and performed no email operation. |
 | `RISK-009` | Medium (unverified) | High | Future SES readiness risk; no production SES inventory was authorized or performed. |
-| `RISK-010` | Medium (migration absent) | Critical | Future migration risk; no migration utility or production-data movement exists in this audit. |
+| `RISK-010` | Medium (migration absent) | Critical | The runtime-neutral normalization contract can be reused later, but no migration adapter, keyed lookup-hash backfill, utility, or production-data movement exists. |
 | `RISK-011` | Medium (migration absent) | Critical | Future checkpoint/delta risk; dependency remains before cutover. |
 | `RISK-012` | Medium | High | Current file descriptors/ownership need explicit inventory; raw in-flight state is not recoverable. [DRAFT-018](../audit/current-defect-register.md#draft-018--rawin-flight-file-selection-cannot-be-restored). |
 | `RISK-013` | Medium (cutover absent) | High | Future domain-transfer risk; no domain operation was performed. |
@@ -73,13 +73,13 @@ The register's likelihood/severity columns describe the risk before planned cont
 | `RISK-017` | High (cutover absent) | Critical | Future late-write risk; current clients have no revision/write-freeze guard. |
 | `RISK-018` | Low (default-off controls implemented) | Critical | Frontend/backend flags and kill switches are implemented fail closed. The failed source gate correctly prevented deployment, but no candidate staging configuration or deployed-marker proof exists. |
 | `RISK-019` | Medium (green absent) | Critical | Future environment-contamination risk; ADR requires clean green, never staging promotion. |
-| `RISK-020` | Medium (path absent) | Critical | Future code-recovery risk; no public recovery-code path currently exists. |
-| `RISK-021` | Low (path absent) | High | Future email-enumeration risk; no public email recovery endpoint currently exists. |
+| `RISK-020` | Medium (path absent) | Critical | Future code-recovery risk; the identity context explicitly rejects recovery-code/token fields and no code generator, hash, or public recovery-code path exists. |
+| `RISK-021` | Low (path absent) | High | Deterministic email validation and PII-free client diagnostics are implemented locally, but no keyed backend HMAC, generic response, rate limit, timing defense, or public email-recovery endpoint exists. |
 | `RISK-022` | Medium | Critical | Current password gate exists; comprehensive brute-force and fleet-revocation proof remains absent. |
 | `RISK-023` | Medium | Critical | Current submitted PDF source is in-memory and not identity-addressable after reload. [Audit report](../audit/current-system-audit-report.md#submission-and-pdf-behavior). |
 | `RISK-024` | Medium | Critical | Submission callers retain legacy-success compatibility and now distinguish delivered/redirected/suppressed/failed outcomes; remote fallback and end-to-end staging equivalence remain unverified. [Audit report](../audit/current-system-audit-report.md#unconfirmed-and-partially-confirmed-risks). |
 | `RISK-025` | Medium (cleanup absent) | Critical | Future cleanup risk; no retention cleanup was implemented or run. |
-| `RISK-026` | High | Critical | Hashed client-scoped Redux, canonical-cache, backup, and session keys are implemented/tested locally, mitigating the confirmed local leak on the feature branch. The deployed isolation matrix and server authorization boundary remain uncertified because the staging attempt stopped before deployment. [DRAFT-017](../audit/current-defect-register.md#draft-017--shared-browser-state-can-leak-across-clients). |
+| `RISK-026` | High | Critical | Hashed client-scoped keys remain locally tested; identity diagnostics now exclude synthetic email/domain/business/user/invitation values and the contract reiterates that namespace hashes cannot authorize access. The deployed isolation matrix and server authorization boundary remain uncertified. [DRAFT-017](../audit/current-defect-register.md#draft-017--shared-browser-state-can-leak-across-clients). |
 | `RISK-027` | High | Critical | The new canonical cache supplies tested same-browser reload continuity, but the older failure-backup record and acknowledged server drafts still lack authorized public recovery. Cross-device/server restore and the deployed migration matrix remain absent. [DRAFT-004](../audit/current-defect-register.md#draft-004--server-drafts-are-never-restored-into-the-public-form), [DRAFT-005](../audit/current-defect-register.md#draft-005--local-backups-are-write-only). |
 | `RISK-028` | Medium (policy unverified) | Critical | Seven direct calls and absent repository RLS declarations confirmed; exploitability not claimed. [DRAFT-014](../audit/current-defect-register.md#draft-014--draft-data-crosses-a-direct-browser-entity-boundary). |
 | `RISK-029` | High | Critical | Post-reducer local capture now covers canonical mutations and hidden-child cleanup locally, but the current Base44 save timer remains render-coupled/non-atomic and the normal suite still exposes geography/normalization defects. No deployed mutation, reset, or save-compatibility matrix ran. [DRAFT-019](../audit/current-defect-register.md#draft-019--state-driven-effect-cleanup-can-cancel-the-queued-server-save). |
@@ -99,4 +99,4 @@ Isaac Hines knowingly accepts the residual theft/replay risk of a password-issue
 
 ## Documentation-only statement
 
-This register distinguishes local implementation evidence from environment certification. Nothing in this update certifies staging or production, and it changes no source, test, package script, schema, Base44 app/cloud resource, production data, SES setting, email delivery, domain, or release flag.
+This register distinguishes local identity-contract evidence from environment or recovery certification. The batch changes only local source, tests, and documentation; it changes no package script, entity/schema, Base44 app/cloud resource, production data, SES setting, email delivery, domain, or release flag.
