@@ -4,6 +4,29 @@ Audit date: 2026-08-05
 
 Scope: every `useState`, `useRef`, or `useReducer` declaration under `src/components/pro-form`, plus the page-level state that assembles, saves, submits, or retains questionnaire answers.
 
+## 2026-08-06 mutation-capture implementation overlay
+
+The inventory below remains the historical pre-migration audit. Prompt 3 now
+migrates the recoverable entries as follows; each row is **Implemented** and
+**Tested** locally. Staging certification remains pending.
+
+| State | New Redux scope | Canonical path / server field | Test ID | Status |
+| --- | --- | --- | --- | --- |
+| Numeric range incomplete bounds | `question:<id>:numeric-range` | `uiDraftState.<scope>` | `UT-MUT-NUMERIC`; `BT-MUT-PARTIAL` | Implemented; Tested |
+| Manual geography text/visibility | `question:<id>:manual-geographic` | `uiDraftState.<scope>` | `BT-MUT-PARTIAL`; `BT-MUT-Q5` | Implemented; Tested |
+| Working image tags | `question:<id>:image-tags` | `uiDraftState.<scope>`; committed tags remain `responses.<id>.tags` | `UT-MUT-FILE`; `BT-MUT-FILE` | Implemented; Tested |
+| Partial person editor | `question:<id>:person-editor` | `uiDraftState.<scope>` | `BT-MUT-PARTIAL` | Implemented; Tested |
+| Confirmation business/domain | `confirmationDraft` | `uiDraftState.confirmationDraft` | `UT-MUT-CONFIRM`; `BT-MUT-PARTIAL` | Implemented; Tested |
+| Certification editor position/upload | `question:<id>:certification-editor` | `uiDraftState.<scope>`; item fields remain controlled in `responses.<id>` | `UT-MUT-UPLOAD` | Implemented; Tested |
+| Guarantee editor position/upload | `question:<id>:guarantee-editor` | `uiDraftState.<scope>`; item fields remain controlled in `responses.<id>` | `UT-MUT-UPLOAD` | Implemented; Tested |
+| AI client instruction/draft/questions | caller-provided question scope | `uiDraftState.<scope>` | `UT-MUT-AI-CONTRACT` | Implemented; Tested by contract/static coverage |
+| Generic/image/certification/guarantee upload lifecycle | question editor scope | safe upload descriptor in `uiDraftState`; successful URL/metadata in `responses` | `UT-MUT-FILE`; `BT-MUT-FILE` | Implemented; Tested |
+
+Raw `File`, `Blob`, `FileList`, DOM image nodes, Google Place objects, provider
+responses, and tokens remain transient. The earlier statement below that
+`uploadingFile` enters guarantee answers is superseded: upload-in-progress is
+now scoped UI metadata and the answer receives only a completed safe descriptor.
+
 ## Counts and notation
 
 - 15 files under `src/components/pro-form` use one or more audited hooks.

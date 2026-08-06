@@ -1,8 +1,20 @@
 import React, { useState } from 'react';
 import { Upload, X, Image, FileText, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import useScopedUiDraftState, { buildQuestionUiDraftScope } from './useScopedUiDraftState';
 
-export default function FileUploadQuestion({ value, onChange, accept = ".jpg,.jpeg,.png" }) {
+export default function FileUploadQuestion({
+  value,
+  onChange,
+  accept = ".jpg,.jpeg,.png",
+  questionId,
+  draftCaptureEnabled = false,
+}) {
+  const uploadDraft = useScopedUiDraftState({
+    scopeKey: buildQuestionUiDraftScope(questionId, 'file-upload'),
+    kind: 'file-upload',
+    enabled: draftCaptureEnabled,
+  });
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -12,16 +24,35 @@ export default function FileUploadQuestion({ value, onChange, accept = ".jpg,.jp
 
     setIsUploading(true);
     setError(null);
+    const uploadEntry = {
+      originalFileName: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+      uploadStatus: 'uploading',
+      uploadedUrl: null,
+      base44FileId: null,
+      errorCode: null,
+    };
+    uploadDraft.setData(uploadEntry);
 
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       onChange({
         url: file_url,
         name: file.name,
-        type: file.type
+        type: file.type,
+        ...uploadEntry,
+        uploadStatus: 'uploaded',
+        uploadedUrl: file_url,
       });
+      uploadDraft.clear();
     } catch (err) {
       setError('Failed to upload file. Please try again.');
+      uploadDraft.setData({
+        ...uploadEntry,
+        uploadStatus: 'failed',
+        errorCode: 'UPLOAD_FAILED',
+      });
       console.error('Upload error:', err);
     } finally {
       setIsUploading(false);
@@ -30,6 +61,7 @@ export default function FileUploadQuestion({ value, onChange, accept = ".jpg,.jp
 
   const handleRemove = () => {
     onChange(null);
+    uploadDraft.clear();
   };
 
   if (value?.url) {
@@ -96,6 +128,11 @@ export default function FileUploadQuestion({ value, onChange, accept = ".jpg,.jp
           </>
         )}
       </label>
+      {isUploading && (
+        <p className="mt-2 text-sm text-amber-700" role="status">
+          This upload must finish before you close the browser.
+        </p>
+      )}
       
       {error && (
         <p className="mt-2 text-sm text-red-600">{error}</p>

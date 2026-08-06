@@ -30,6 +30,7 @@ import {
   removeCanonicalDraftCache,
   saveCanonicalDraftCache,
 } from '@/lib/questionnaireCanonicalDraftCache';
+import { createProDraftListenerRuntime } from './proDraftListenerMiddleware';
 
 export const QUESTIONNAIRE_PERSIST_VERSION = 4;
 export const DEFAULT_REHYDRATION_TIMEOUT_MS = 2_000;
@@ -140,13 +141,14 @@ export const createQuestionnaireStore = ({
     debug: false,
   };
   const persistedFormReducer = persistReducer(persistConfig, formReducer);
+  const draftListenerRuntime = createProDraftListenerRuntime();
   const questionnaireStore = configureStore({
     reducer: { form: persistedFormReducer },
     middleware: (getDefaultMiddleware) => getDefaultMiddleware({
       serializableCheck: {
         ignoredActions: [FLUSH, REHYDRATE, PAUSE, PERSIST, PURGE, REGISTER],
       },
-    }),
+    }).prepend(draftListenerRuntime.middleware),
   });
 
   const localPersistence = enableLocalPersistence
@@ -178,12 +180,14 @@ export const createQuestionnaireStore = ({
     persistor: questionnairePersistor,
     storage,
     canonicalCacheAdapter,
+    draftListenerRuntime,
     localPersistence,
     ready,
     dispose: async ({ flush = false } = {}) => {
       if (localPersistence) {
         await stopLocalCanonicalDraftPersistence(localPersistence, { flush });
       }
+      draftListenerRuntime.dispose();
       questionnairePersistor.pause();
     },
     getDiagnostics: () => Object.freeze({
@@ -192,6 +196,7 @@ export const createQuestionnaireStore = ({
       rehydrationTimedOut: rehydration.timedOut,
       storageMode: storage.getMode?.() || 'unknown',
       durable: Boolean(storage.getDiagnostics?.().durable),
+      draftListener: draftListenerRuntime.getDiagnostics(),
     }),
   });
 };

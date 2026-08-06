@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { MapPin, X, Plus, Star } from "lucide-react";
+import useScopedUiDraftState, { buildQuestionUiDraftScope } from './useScopedUiDraftState';
 
 const PLACE_FIELDS = ["id", "displayName", "formattedAddress", "location", "addressComponents"];
 
@@ -11,8 +12,15 @@ export default function MultiGeographicQuestion({
   onRemove,
   onSetPrimary,
   maxLocations = 5,
-  externalDisabled = false
+  externalDisabled = false,
+  questionId,
+  draftCaptureEnabled = false,
 }) {
+  const uiDraft = useScopedUiDraftState({
+    scopeKey: buildQuestionUiDraftScope(questionId, 'manual-geographic'),
+    kind: 'manual-geographic',
+    enabled: draftCaptureEnabled,
+  });
   const autocompleteRef = useRef(null);
   const autocompleteContainerRef = useRef(null);
   const selectedLocationsRef = useRef(selectedLocations);
@@ -21,8 +29,19 @@ export default function MultiGeographicQuestion({
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [manualInput, setManualInput] = useState("");
-  const [showManualEntry, setShowManualEntry] = useState(false);
+  const [manualInput, setManualInput] = useState(() => uiDraft.data.manualInput || "");
+  const [showManualEntry, setShowManualEntry] = useState(
+    () => uiDraft.data.showManualEntry === true,
+  );
+
+  const persistManualDraft = (nextInput, nextVisible, validationCode = null) => {
+    uiDraft.setData({
+      manualInput: nextInput,
+      showManualEntry: nextVisible,
+      pendingSelection: null,
+      validationCode,
+    });
+  };
 
   // Keep selectedLocationsRef in sync
   useEffect(() => {
@@ -180,6 +199,7 @@ export default function MultiGeographicQuestion({
     )) {
       alert("This location has already been added.");
       setManualInput("");
+      persistManualDraft('', showManualEntry, 'DUPLICATE_LOCATION');
       return;
     }
 
@@ -199,6 +219,7 @@ export default function MultiGeographicQuestion({
     onAdd(meta);
     setManualInput("");
     setShowManualEntry(false);
+    uiDraft.clear();
   };
 
   const handleRetry = () => {
@@ -400,7 +421,11 @@ export default function MultiGeographicQuestion({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowManualEntry(!showManualEntry)}
+                  onClick={() => {
+                    const next = !showManualEntry;
+                    setShowManualEntry(next);
+                    persistManualDraft(manualInput, next);
+                  }}
                   className="text-sm text-blue-600 hover:text-blue-700 underline"
                 >
                   {showManualEntry ? 'Hide manual entry' : 'Can\'t find your location? Add manually'}
@@ -460,7 +485,10 @@ export default function MultiGeographicQuestion({
                   type="text"
                   placeholder="Enter location manually (e.g., Nashville, TN)"
                   value={manualInput}
-                  onChange={(e) => setManualInput(e.target.value)}
+                  onChange={(e) => {
+                    setManualInput(e.target.value);
+                    persistManualDraft(e.target.value, true);
+                  }}
                   onKeyPress={(e) => e.key === 'Enter' && handleManualAdd()}
                   className="flex-1 p-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />

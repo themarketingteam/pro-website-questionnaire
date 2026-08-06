@@ -6,6 +6,25 @@ Audited branch: `feature/durable-draft-recovery`
 
 Scope: current public `/ProQuestionnaire` implementation and its submission/PDF helpers. This is an observation of current behavior, not a target design.
 
+## 2026-08-06 implementation overlay
+
+The exhaustive inventory below records the pre-migration behavior. The V2
+replacement is now centralized by post-reducer listener middleware and is
+specified in the [complete mutation capture contract](../frontend/complete-mutation-capture-contract.md).
+
+| Category | New canonical behavior | Test ID | Status |
+| --- | --- | --- | --- |
+| Response, validation, touched, expanded, text metadata | One synchronous burst becomes one logical capture; manager reads final store | `UT-LISTENER-POST`; `UT-LISTENER-REV` | Implemented; Tested |
+| Q5 add/update/remove/primary | Atomic `applyFormMutation`, including primary repair/validation/touched | `UT-MUT-Q5`; `BT-MUT-Q5` | Implemented; Tested |
+| Conditional parent/child | Parent set plus all child/auxiliary/UI deletions in one revision | `UT-MUT-COND`; `BT-MUT-Q5` | Implemented; Tested |
+| Reset Question | Scoped `resetQuestionState`, immediate summarized event, no reload | `UT-MUT-RESET`; `BT-MUT-Q5` | Implemented; Tested |
+| Incomplete editors | Versioned `uiDraftState` scopes listed in the component audit | `UT-MUT-NUMERIC`; `BT-MUT-PARTIAL` | Implemented; Tested |
+| Uploads | Raw browser object excluded; safe lifecycle/URL metadata captured | `UT-MUT-FILE`; `BT-MUT-FILE` | Implemented; Tested |
+| Events | Immediate structural events; bounded text/UI debounce; no raw values | `UT-EVENT-MAP` | Implemented; Tested |
+| V2 handler persistence | Listener/backend manager only; legacy calls remain behind feature-mode guard | `UT-V2-HANDLER-GUARD` | Implemented; Tested |
+
+Clear All and final submission rows remain intentionally unchanged for Prompt 4.
+
 ## Reading the matrix
 
 - **Browser** means the `redux-persist` state stored under `persist:pro-questionnaire-root`, or an explicitly named local backup. A local React state change alone is **No**.

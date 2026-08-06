@@ -18,18 +18,30 @@ export default function ConfirmModal({
   onCancel,
   isSubmitting = false,
   initialBusinessName = '', 
-  initialDomain = '' 
+  initialDomain = '',
+  confirmationDraft = null,
+  onConfirmationDraftChange = undefined,
+  onConfirmationDraftClear = undefined,
 }) {
+  const restoredConfirmationDraft = /** @type {any} */ (confirmationDraft || {});
   const getSafeRecoveryMessage = (recoveryCode = 'unknown-session') => (
     `We saved your progress, but final submission could not complete. Please try submitting again. If it still does not work, send this recovery code to support so we can recover your questionnaire: ${recoveryCode}`
   );
-  const [businessName, setBusinessName] = useState(initialBusinessName);
-  const [domain, setDomain] = useState(initialDomain);
+  const [businessName, setBusinessName] = useState(
+    () => restoredConfirmationDraft.businessName ?? initialBusinessName,
+  );
+  const [domain, setDomain] = useState(() => restoredConfirmationDraft.domain ?? initialDomain);
   const [submitError, setSubmitError] = useState('');
   const submitAttemptRef = useRef(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const businessNameRef = useRef(null);
   const domainRef = useRef(null);
+  const persistConfirmationDraft = (patch) => onConfirmationDraftChange?.({
+    businessName,
+    domain,
+    validationCodes: [],
+    ...patch,
+  });
 
   const validatePdfDownload = useCallback(
     () =>
@@ -68,6 +80,9 @@ export default function ConfirmModal({
     const errors = validate();
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
+      persistConfirmationDraft({
+        validationCodes: Object.keys(errors).map((field) => `${field.toUpperCase()}_REQUIRED`),
+      });
       if (errors.businessName) businessNameRef.current?.focus();
       else if (errors.domain) domainRef.current?.focus();
       return;
@@ -79,6 +94,7 @@ export default function ConfirmModal({
 
     try {
       await onConfirm(businessName, cleanDomainForSubmission(domain));
+      onConfirmationDraftClear?.();
     } catch (err) {
       const recoveryCode = err?.recoveryCode || 'unknown-session';
       setSubmitError(err?.userMessage || getSafeRecoveryMessage(recoveryCode));
@@ -175,7 +191,11 @@ export default function ConfirmModal({
                 ref={businessNameRef}
                 type="text"
                 value={businessName}
-                onChange={(e) => { setBusinessName(e.target.value); setFieldErrors(prev => ({ ...prev, businessName: '' })); }}
+                onChange={(e) => {
+                  setBusinessName(e.target.value);
+                  persistConfirmationDraft({ businessName: e.target.value });
+                  setFieldErrors(prev => ({ ...prev, businessName: '' }));
+                }}
                 placeholder="Enter your business name"
                 autoComplete="organization"
                 disabled={isSubmitting}
@@ -197,7 +217,11 @@ export default function ConfirmModal({
                 ref={domainRef}
                 type="text"
                 value={domain}
-                onChange={(e) => { setDomain(e.target.value); setFieldErrors(prev => ({ ...prev, domain: '' })); }}
+                onChange={(e) => {
+                  setDomain(e.target.value);
+                  persistConfirmationDraft({ domain: e.target.value });
+                  setFieldErrors(prev => ({ ...prev, domain: '' }));
+                }}
                 placeholder="example.com or https://example.com"
                 autoComplete="url"
                 disabled={isSubmitting}

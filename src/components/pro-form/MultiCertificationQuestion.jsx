@@ -2,21 +2,40 @@ import React, { useState } from 'react';
 import { Plus, X, Upload, FileText, Image, Check, Edit, ChevronDown, ChevronUp } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
+import useScopedUiDraftState, { buildQuestionUiDraftScope } from './useScopedUiDraftState';
 
-export default function MultiCertificationQuestion({ value = [], onChange, max = 10 }) {
+export default function MultiCertificationQuestion({
+  value = [],
+  onChange,
+  max = 10,
+  questionId,
+  draftCaptureEnabled = false,
+}) {
+  const editorDraft = useScopedUiDraftState({
+    scopeKey: buildQuestionUiDraftScope(questionId, 'certification-editor'),
+    kind: 'certification-editor',
+    enabled: draftCaptureEnabled,
+  });
   const [uploading, setUploading] = useState({});
-  const [expandedIndex, setExpandedIndex] = useState(null);
+  const [expandedIndex, setExpandedIndex] = useState(
+    () => editorDraft.data.editingIndex ?? null,
+  );
+  const setEditingIndex = (index, extra = {}) => {
+    setExpandedIndex(index);
+    if (index === null) editorDraft.clear();
+    else editorDraft.setData({ editingIndex: index, validationCodes: [], ...extra });
+  };
 
   const addNewItem = () => {
     if (value.length >= max) return;
     const newItem = { name: '', type: '', image: null, files: [], saved: false };
     onChange([...value, newItem]);
-    setExpandedIndex(value.length);
+    setEditingIndex(value.length);
   };
 
   const removeItem = (index) => {
     onChange(value.filter((_, i) => i !== index));
-    if (expandedIndex === index) setExpandedIndex(null);
+    if (expandedIndex === index) setEditingIndex(null);
   };
 
   const updateItem = (index, field, fieldValue) => {
@@ -28,32 +47,63 @@ export default function MultiCertificationQuestion({ value = [], onChange, max =
   const saveItem = (index) => {
     if (!isItemComplete(value[index])) {
       toast.error('Please complete required fields');
+      editorDraft.setData({ editingIndex: index, validationCodes: ['REQUIRED_FIELDS_MISSING'] });
       return;
     }
     const updated = [...value];
     updated[index] = { ...updated[index], saved: true };
     onChange(updated);
-    setExpandedIndex(null);
+    setEditingIndex(null);
     toast.success('Item saved');
   };
 
   const handleFileUpload = async (index, field, file) => {
     const uploadKey = `${index}-${field}`;
     setUploading(prev => ({ ...prev, [uploadKey]: true }));
+    const uploadEntry = {
+      originalFileName: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+      uploadStatus: 'uploading',
+      uploadedUrl: null,
+      base44FileId: null,
+      errorCode: null,
+    };
+    editorDraft.setData({ editingIndex: index, validationCodes: [], upload: uploadEntry });
 
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       
       if (field === 'image') {
-        updateItem(index, 'image', { url: file_url, name: file.name });
+        updateItem(index, 'image', {
+          url: file_url,
+          name: file.name,
+          type: file.type,
+          ...uploadEntry,
+          uploadStatus: 'uploaded',
+          uploadedUrl: file_url,
+        });
       } else {
         // Add to files array
         const currentFiles = value[index].files || [];
-        updateItem(index, 'files', [...currentFiles, { url: file_url, name: file.name }]);
+        updateItem(index, 'files', [...currentFiles, {
+          url: file_url,
+          name: file.name,
+          type: file.type,
+          ...uploadEntry,
+          uploadStatus: 'uploaded',
+          uploadedUrl: file_url,
+        }]);
       }
+      editorDraft.setData({ editingIndex: index, validationCodes: [] });
       
       toast.success('File uploaded successfully');
     } catch (error) {
+      editorDraft.setData({
+        editingIndex: index,
+        validationCodes: ['UPLOAD_FAILED'],
+        upload: { ...uploadEntry, uploadStatus: 'failed', errorCode: 'UPLOAD_FAILED' },
+      });
       console.error('Upload failed:', error);
       toast.error('Failed to upload file');
     } finally {
@@ -94,7 +144,7 @@ export default function MultiCertificationQuestion({ value = [], onChange, max =
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setExpandedIndex(index)}
+                    onClick={() => setEditingIndex(index)}
                     className="px-4 py-2 bg-white border border-green-300 hover:bg-green-100 rounded-lg flex items-center gap-2 text-green-800 transition-colors"
                   >
                     <Edit className="w-4 h-4" />
@@ -126,7 +176,7 @@ export default function MultiCertificationQuestion({ value = [], onChange, max =
                     </button>
                     <button
                       type="button"
-                      onClick={() => setExpandedIndex(null)}
+                      onClick={() => setEditingIndex(null)}
                       className="p-1 hover:bg-slate-100 rounded transition-colors text-slate-600"
                     >
                       <ChevronUp className="w-4 h-4" />
@@ -310,6 +360,12 @@ export default function MultiCertificationQuestion({ value = [], onChange, max =
           <Plus className="w-5 h-5" />
           Add {value.length > 0 ? 'Another' : 'New'} Item ({value.length}/{max})
         </button>
+      )}
+
+      {Object.values(uploading).some(Boolean) && (
+        <p className="text-sm text-amber-700" role="status">
+          This upload must finish before you close the browser.
+        </p>
       )}
 
       {value.length === 0 && (

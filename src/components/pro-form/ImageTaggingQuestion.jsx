@@ -2,15 +2,52 @@ import React, { useState, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Upload, X, Plus, User, Check } from 'lucide-react';
 import { toast } from 'sonner';
+import useScopedUiDraftState, { buildQuestionUiDraftScope } from './useScopedUiDraftState';
 
-export default function ImageTaggingQuestion({ value, onChange }) {
+export default function ImageTaggingQuestion({
+  value,
+  onChange,
+  questionId,
+  draftCaptureEnabled = false,
+}) {
+  const imageDraft = useScopedUiDraftState({
+    scopeKey: buildQuestionUiDraftScope(questionId, 'image-tags'),
+    kind: 'image-tags',
+    enabled: draftCaptureEnabled,
+  });
+  const personDraft = useScopedUiDraftState({
+    scopeKey: buildQuestionUiDraftScope(questionId, 'person-editor'),
+    kind: 'person-editor',
+    enabled: draftCaptureEnabled,
+  });
   const [isUploading, setIsUploading] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [tags, setTags] = useState(value?.tags || []);
-  const [editingTag, setEditingTag] = useState(null);
-  const [tempPerson, setTempPerson] = useState({ name: '', position: '', bio: '' });
+  const [tags, setTags] = useState(() => imageDraft.data.workingTags || value?.tags || []);
+  const [editingTag, setEditingTag] = useState(
+    () => personDraft.data.editingTagIndex ?? imageDraft.data.editingTagIndex ?? null,
+  );
+  const [tempPerson, setTempPerson] = useState(
+    () => personDraft.data.tempPerson || { name: '', position: '', bio: '' },
+  );
   const imageRef = useRef(null);
   const fileInputRef = useRef(null);
+  const persistTags = (nextTags, nextEditing = editingTag, upload = imageDraft.data.upload) => {
+    imageDraft.setData({
+      workingTags: nextTags,
+      editingTagIndex: nextEditing,
+      editorStep: nextEditing === null ? 'tagging' : 'person_details',
+      validationCodes: [],
+      ...(upload ? { upload } : {}),
+    });
+  };
+  const persistPerson = (nextPerson, nextEditing = editingTag, validationCodes = []) => {
+    personDraft.setData({
+      tempPerson: nextPerson,
+      editingTagIndex: nextEditing,
+      editorStep: nextEditing === null ? 'idle' : 'person_details',
+      validationCodes,
+    });
+  };
 
   const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
@@ -23,18 +60,37 @@ export default function ImageTaggingQuestion({ value, onChange }) {
     }
 
     setIsUploading(true);
+    const upload = {
+      originalFileName: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+      uploadStatus: 'uploading',
+      uploadedUrl: null,
+      base44FileId: null,
+      errorCode: null,
+    };
+    persistTags(tags, editingTag, upload);
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       onChange({
         url: file_url,
         name: file.name,
         type: file.type,
+        originalFileName: file.name,
+        mimeType: file.type,
+        sizeBytes: file.size,
+        uploadStatus: 'uploaded',
+        uploadedUrl: file_url,
+        base44FileId: null,
+        errorCode: null,
         tags: []
       });
       setTags([]);
+      persistTags([], null, { ...upload, uploadStatus: 'uploaded', uploadedUrl: file_url });
       setShowModal(true);
       toast.success('Image uploaded');
     } catch (error) {
+      persistTags(tags, editingTag, { ...upload, uploadStatus: 'failed', errorCode: 'UPLOAD_FAILED' });
       toast.error('Upload failed');
     } finally {
       setIsUploading(false);
@@ -53,11 +109,14 @@ export default function ImageTaggingQuestion({ value, onChange }) {
     setTags(newTags);
     setEditingTag(newTags.length - 1);
     setTempPerson({ name: '', position: '', bio: '' });
+    persistTags(newTags, newTags.length - 1);
+    persistPerson({ name: '', position: '', bio: '' }, newTags.length - 1);
   };
 
   const handleSavePerson = () => {
     if (!tempPerson.name.trim()) {
       toast.error('Name is required');
+      persistPerson(tempPerson, editingTag, ['PERSON_NAME_REQUIRED']);
       return;
     }
 
@@ -77,15 +136,19 @@ export default function ImageTaggingQuestion({ value, onChange }) {
     onChange({ ...value, tags: updatedTags });
     setEditingTag(null);
     setTempPerson({ name: '', position: '', bio: '' });
+    persistTags(updatedTags, null);
+    personDraft.clear();
   };
 
   const handleDeleteTag = (index) => {
     const updatedTags = tags.filter((_, i) => i !== index);
     setTags(updatedTags);
     onChange({ ...value, tags: updatedTags });
+    persistTags(updatedTags, editingTag === index ? null : editingTag);
     if (editingTag === index) {
       setEditingTag(null);
       setTempPerson({ name: '', position: '', bio: '' });
+      personDraft.clear();
     }
   };
 
@@ -94,6 +157,8 @@ export default function ImageTaggingQuestion({ value, onChange }) {
     setTags([]);
     setShowModal(false);
     setEditingTag(null);
+    imageDraft.clear();
+    personDraft.clear();
   };
 
   const handleDoneTagging = () => {
@@ -135,6 +200,11 @@ export default function ImageTaggingQuestion({ value, onChange }) {
             )}
           </div>
         </button>
+        {isUploading && (
+          <p className="text-sm text-amber-700" role="status">
+            This upload must finish before you close the browser.
+          </p>
+        )}
       </div>
     );
   }
@@ -259,7 +329,11 @@ export default function ImageTaggingQuestion({ value, onChange }) {
                         <input
                           type="text"
                           value={tempPerson.name}
-                          onChange={(e) => setTempPerson({ ...tempPerson, name: e.target.value })}
+                          onChange={(e) => {
+                            const next = { ...tempPerson, name: e.target.value };
+                            setTempPerson(next);
+                            persistPerson(next);
+                          }}
                           placeholder="John Smith"
                           className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
@@ -272,7 +346,11 @@ export default function ImageTaggingQuestion({ value, onChange }) {
                         <input
                           type="text"
                           value={tempPerson.position}
-                          onChange={(e) => setTempPerson({ ...tempPerson, position: e.target.value })}
+                          onChange={(e) => {
+                            const next = { ...tempPerson, position: e.target.value };
+                            setTempPerson(next);
+                            persistPerson(next);
+                          }}
                           placeholder="CEO / Lead Engineer"
                           className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
@@ -284,7 +362,11 @@ export default function ImageTaggingQuestion({ value, onChange }) {
                         </label>
                         <textarea
                           value={tempPerson.bio}
-                          onChange={(e) => setTempPerson({ ...tempPerson, bio: e.target.value })}
+                          onChange={(e) => {
+                            const next = { ...tempPerson, bio: e.target.value };
+                            setTempPerson(next);
+                            persistPerson(next);
+                          }}
                           placeholder="Brief description..."
                           rows={3}
                           className="w-full p-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"

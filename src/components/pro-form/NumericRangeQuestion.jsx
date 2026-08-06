@@ -1,20 +1,45 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Lock, AlertCircle } from 'lucide-react';
+import useScopedUiDraftState, { buildQuestionUiDraftScope } from './useScopedUiDraftState';
 
 export default function NumericRangeQuestion({
   minValue = 1,
   maxValue = 50,
   onChange,
-  value
+  value,
+  questionId,
+  draftCaptureEnabled = false,
 }) {
-  const [smallest, setSmallest] = useState(minValue);
-  const [largest, setLargest] = useState(maxValue);
-  const [smallestInput, setSmallestInput] = useState(minValue.toString());
-  const [largestInput, setLargestInput] = useState(maxValue.toString());
-  const [isLocked, setIsLocked] = useState(false);
-  const [validationError, setValidationError] = useState('');
+  const uiDraft = useScopedUiDraftState({
+    scopeKey: buildQuestionUiDraftScope(questionId, 'numeric-range'),
+    kind: 'numeric-range',
+    enabled: draftCaptureEnabled,
+  });
+  const [smallest, setSmallest] = useState(() => uiDraft.data.smallestParsed ?? minValue);
+  const [largest, setLargest] = useState(() => uiDraft.data.largestParsed ?? maxValue);
+  const [smallestInput, setSmallestInput] = useState(
+    () => uiDraft.data.smallestInput ?? minValue.toString(),
+  );
+  const [largestInput, setLargestInput] = useState(
+    () => uiDraft.data.largestInput ?? maxValue.toString(),
+  );
+  const [isLocked, setIsLocked] = useState(() => uiDraft.data.editing === false);
+  const [validationError, setValidationError] = useState(
+    () => uiDraft.data.validationMessageCode === 'RANGE_ORDER_INVALID'
+      ? 'The largest company size must be greater than or equal to the smallest company size.'
+      : '',
+  );
   const smallestTimerRef = useRef(null);
   const largestTimerRef = useRef(null);
+  const persistEditing = (patch) => uiDraft.setData({
+    smallestInput,
+    largestInput,
+    smallestParsed: smallest,
+    largestParsed: largest,
+    editing: true,
+    validationMessageCode: validationError ? 'RANGE_ORDER_INVALID' : null,
+    ...patch,
+  });
 
   // Initialize from saved value
   useEffect(() => {
@@ -36,7 +61,7 @@ export default function NumericRangeQuestion({
         }
         setIsLocked(true);
       }
-    } else if (!value) {
+    } else if (!value && !uiDraft.entry) {
       // Reset to defaults when value is cleared
       setSmallest(minValue);
       setLargest(maxValue);
@@ -45,7 +70,7 @@ export default function NumericRangeQuestion({
       setIsLocked(false);
       setValidationError('');
     }
-  }, [value, minValue, maxValue]);
+  }, [value, minValue, maxValue, uiDraft.entry]);
 
   // Cleanup timers on unmount
   useEffect(() => {
@@ -61,6 +86,7 @@ export default function NumericRangeQuestion({
     setIsLocked(false);
     setValidationError('');
     onChange(''); // Clear the saved value when user starts editing
+    persistEditing({ smallestInput: value, validationMessageCode: null });
 
     // Clear any existing timer
     if (smallestTimerRef.current) {
@@ -79,6 +105,7 @@ export default function NumericRangeQuestion({
       if (!isNaN(parsed)) {
         const clamped = Math.max(1, parsed);
         setSmallest(clamped);
+        persistEditing({ smallestInput: value, smallestParsed: clamped, validationMessageCode: null });
       }
     }
   };
@@ -89,6 +116,7 @@ export default function NumericRangeQuestion({
     setIsLocked(false);
     setValidationError('');
     onChange(''); // Clear the saved value when user starts editing
+    persistEditing({ largestInput: value, validationMessageCode: null });
 
     // Clear any existing timer
     if (largestTimerRef.current) {
@@ -108,8 +136,10 @@ export default function NumericRangeQuestion({
         const clamped = Math.max(1, parsed);
         if (clamped > 5000) {
           setLargest(5001);
+          persistEditing({ largestInput: value, largestParsed: 5001, validationMessageCode: null });
         } else {
           setLargest(clamped);
+          persistEditing({ largestInput: value, largestParsed: clamped, validationMessageCode: null });
         }
       }
     }
@@ -119,6 +149,7 @@ export default function NumericRangeQuestion({
     // Validate that largest is not smaller than smallest
     if (largest <= 5000 && largest < smallest) {
       setValidationError('The largest company size must be greater than or equal to the smallest company size.');
+      persistEditing({ validationMessageCode: 'RANGE_ORDER_INVALID' });
       return;
     }
     
@@ -127,6 +158,7 @@ export default function NumericRangeQuestion({
     const formattedValue = `${smallest}-${largestDisplay} employees`;
     onChange(formattedValue);
     setIsLocked(true);
+    uiDraft.clear();
   };
 
   const largestDisplay = largest > 5000 ? "5000+" : largest;
@@ -135,10 +167,11 @@ export default function NumericRangeQuestion({
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <div className="flex-1">
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label htmlFor={`numeric-smallest-${questionId}`} className="block text-sm font-medium text-slate-700 mb-2">
             Smallest company size
           </label>
           <input
+            id={`numeric-smallest-${questionId}`}
             type="text"
             min="1"
             value={smallestInput}
@@ -150,10 +183,11 @@ export default function NumericRangeQuestion({
         <span className="text-2xl text-slate-400 mt-7">—</span>
         
         <div className="flex-1">
-          <label className="block text-sm font-medium text-slate-700 mb-2">
+          <label htmlFor={`numeric-largest-${questionId}`} className="block text-sm font-medium text-slate-700 mb-2">
             Largest company size
           </label>
           <input
+            id={`numeric-largest-${questionId}`}
             type="text"
             placeholder="5000+"
             value={largest > 5000 ? '' : largestInput}

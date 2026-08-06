@@ -1211,7 +1211,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
     return publicStatus(status);
   };
 
-  const observeStore = () => {
+  const observeStore = (captureMetadata = null) => {
     if (internalDispatch || !status.active || status.disposed) return;
     const canonical = canonicalOrNull();
     if (!canonical) {
@@ -1248,12 +1248,26 @@ export const createProFormDraftSyncManager = (options = {}) => {
         mutationId: canonical.lastMutation?.mutationId || undefined,
       }));
     } catch {}
-    const reason = canonical.lastMutation?.reason === 'restore'
-      ? 'restore'
-      : canonical.lastMutation?.reason === 'clear_all'
-        ? 'clear_all'
-        : 'autosave';
-    scheduleSave(reason, { clientRevision });
+    const reason = typeof captureMetadata?.reason === 'string'
+      ? captureMetadata.reason
+      : canonical.lastMutation?.reason === 'restore'
+        ? 'restore'
+        : canonical.lastMutation?.reason === 'clear_all'
+          ? 'clear_all'
+          : 'autosave';
+    scheduleSave(reason, {
+      clientRevision,
+      ...(canonical.lastMutation?.mutationId
+        ? { mutationId: canonical.lastMutation.mutationId }
+        : {}),
+      ...(captureMetadata?.questionId ? { questionId: captureMetadata.questionId } : {}),
+    });
+  };
+
+  const capturePostReducerMutation = (mutation) => {
+    if (!mutation || mutation.hydration === true) return publicStatus(status);
+    observeStore(mutation);
+    return publicStatus(status);
   };
 
   const scheduleEventFlush = () => {
@@ -1647,7 +1661,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
         scheduleInitial: options.scheduleInitialLocalSave !== false,
       });
     }
-    unsubscribeStore = store.subscribe(observeStore);
+    if (options.observeStoreChanges !== false) unsubscribeStore = store.subscribe(observeStore);
     registerLifecycle();
     notify();
     if (options.scheduleInitialSave === true && !status.isReadOnly) {
@@ -1688,6 +1702,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
     start,
     stop,
     scheduleSave,
+    capturePostReducerMutation,
     saveImmediately,
     flush,
     queueEvent,

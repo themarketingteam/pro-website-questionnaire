@@ -582,6 +582,7 @@ export default function ReduxProvider({
     ),
     localPersistence: runtime.localPersistence,
     canonicalCacheAdapter: runtime.canonicalCacheAdapter,
+    draftListenerRuntime: runtime.draftListenerRuntime,
   };
 
   return (

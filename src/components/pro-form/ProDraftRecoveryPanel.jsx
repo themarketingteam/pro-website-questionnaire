@@ -18,6 +18,18 @@ const storageLabel = (mode) => ({
   unavailable: 'Persistent browser storage unavailable',
 }[mode] || 'Browser storage status unavailable');
 
+const syncLabel = (state) => ({
+  local_saving: 'Saving in this browser',
+  local_saved: 'Saved in this browser',
+  server_saving: 'Saving securely',
+  server_saved: 'Saved securely',
+  offline_local_only: 'Offline — browser copy is waiting to sync',
+  retrying: 'Secure sync is retrying',
+  conflict: 'Changes from another tab require review',
+  error: 'Secure save has not been confirmed',
+  superseded: 'This draft was replaced',
+}[state] || null);
+
 export default function ProDraftRecoveryPanel({ variant = 'primary' }) {
   const form = useSelector((state) => (/** @type {any} */ (state))?.form || {});
   const persistence = useQuestionnairePersistence();
@@ -84,6 +96,9 @@ export default function ProDraftRecoveryPanel({ variant = 'primary' }) {
         <dl className="grid gap-2 text-sm text-slate-700 sm:grid-cols-2">
           {maskedEmail && <div><dt className="font-medium">Recovery email</dt><dd>{maskedEmail}</dd></div>}
           <div><dt className="font-medium">Draft status</dt><dd>{formatSafeDraftStatus(draftStatus, { readOnly })}</dd></div>
+          {syncLabel(sync.state) && (
+            <div><dt className="font-medium">Sync status</dt><dd>{syncLabel(sync.state)}</dd></div>
+          )}
           <div><dt className="font-medium">Browser storage</dt><dd>{storageLabel(mode)}</dd></div>
           {formatSafeSavedTime(sync.lastLocalSavedAt) && (
             <div><dt className="font-medium">Last browser save</dt><dd>{formatSafeSavedTime(sync.lastLocalSavedAt)}</dd></div>

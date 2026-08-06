@@ -12,20 +12,36 @@ export default function AIContentModal({
   onClose, 
   currentValue, 
   questionContext,
-  onInject 
+  onInject,
+  recoverableState = null,
+  onRecoverableStateChange = undefined,
+  onClearRecoverableState = undefined,
 }) {
-  const [userInstruction, setUserInstruction] = useState('');
-  const [draftContent, setDraftContent] = useState('');
+  const [userInstruction, setUserInstruction] = useState(
+    () => recoverableState?.userInstruction || '',
+  );
+  const [draftContent, setDraftContent] = useState(
+    () => recoverableState?.draftContent || '',
+  );
   const [isGenerating, setIsGenerating] = useState(false);
   const [isCheckingGrammar, setIsCheckingGrammar] = useState(false);
-  const [aiQuestions, setAiQuestions] = useState('');
+  const [aiQuestions, setAiQuestions] = useState(() => recoverableState?.aiQuestions || '');
+
+  const persistRecoverable = (patch) => onRecoverableStateChange?.({
+    userInstruction,
+    draftContent,
+    aiQuestions,
+    status: 'editing',
+    ...patch,
+  });
 
   useEffect(() => {
     if (open) {
-      setDraftContent(currentValue || '');
-      setUserInstruction('');
+      setDraftContent(recoverableState?.draftContent ?? currentValue ?? '');
+      setUserInstruction(recoverableState?.userInstruction || '');
+      setAiQuestions(recoverableState?.aiQuestions || '');
     }
-  }, [open, currentValue]);
+  }, [open, currentValue, recoverableState]);
 
   const isQuestionResponse = (text) => {
     const hasMultipleQuestions = (text.match(/\?/g) || []).length >= 2;
@@ -118,16 +134,19 @@ export default function AIContentModal({
         const questions = fullText.replace('Need More Information: ', '');
         setAiQuestions(questions);
         setDraftContent('');
+        persistRecoverable({ draftContent: '', aiQuestions: questions, status: 'needs_information' });
       } 
       else if (fullText.startsWith('Response: ')) {
         const cleanText = fullText.replace('Response: ', '');
         setDraftContent(cleanText);
         setAiQuestions('');
+        persistRecoverable({ draftContent: cleanText, aiQuestions: '', status: 'generated' });
       } 
       else {
         // Fallback
         setDraftContent(fullText);
         setAiQuestions('');
+        persistRecoverable({ draftContent: fullText, aiQuestions: '', status: 'generated' });
       }
       
       setUserInstruction('');
@@ -166,6 +185,7 @@ export default function AIContentModal({
           if (lastMessage?.role === 'assistant') {
             const content = lastMessage.content || '';
             setDraftContent(content);
+            persistRecoverable({ draftContent: content, status: 'generated' });
             
             if (lastMessage.streaming === false) {
               clearTimeout(timeout);
@@ -192,6 +212,7 @@ export default function AIContentModal({
 
   const handleInject = () => {
     onInject(draftContent);
+    onClearRecoverableState?.();
     onClose();
   };
 
@@ -227,7 +248,10 @@ export default function AIContentModal({
             <Input
               placeholder="e.g., 'Make this more professional' or 'Focus on our speed'"
               value={userInstruction}
-              onChange={(e) => setUserInstruction(e.target.value)}
+              onChange={(e) => {
+                setUserInstruction(e.target.value);
+                persistRecoverable({ userInstruction: e.target.value });
+              }}
               className="w-full"
             />
           </div>
@@ -255,7 +279,10 @@ export default function AIContentModal({
             </label>
             <Textarea
               value={draftContent}
-              onChange={(e) => setDraftContent(e.target.value)}
+              onChange={(e) => {
+                setDraftContent(e.target.value);
+                persistRecoverable({ draftContent: e.target.value });
+              }}
               rows={12}
               className="w-full text-sm"
             />

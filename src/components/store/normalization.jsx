@@ -304,7 +304,11 @@ export function normalizePersistedStateV3(state) {
     delete next.touchedQuestions[childId];
     delete next.expandedQuestions[childId];
     delete next.textValidationMeta[childId];
-    delete next.uiDraftState[`question:${childId}`];
+    for (const scope of Object.keys(next.uiDraftState)) {
+      if (scope === `question:${childId}` || scope.startsWith(`question:${childId}:`)) {
+        delete next.uiDraftState[scope];
+      }
+    }
     for (const fieldPath of Object.keys(next.fieldChangeMetadata)) {
       if (
         fieldPath === `responses.${childId}`

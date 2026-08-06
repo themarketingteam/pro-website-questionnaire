@@ -598,6 +598,40 @@ const normalizeQuestionResetPayload = (value) => {
   };
 };
 
+const normalizePostReducerMutationPayload = (value) => {
+  if (!isPlainObject(value) || !Array.isArray(value.changes)) fail('$');
+  if (value.changes.length > 2_000) fail('$.changes');
+  if (!MUTATION_REASON_SET.has(value.reason)) fail('$.reason');
+  if (typeof value.mutationType !== 'string' || !value.mutationType.trim()) {
+    fail('$.mutationType');
+  }
+  const mutation = normalizeCanonicalDraftState({
+    ...createEmptyCanonicalDraftState(),
+    lastMutation: {
+      mutationId: value.mutationId,
+      mutationType: value.mutationType,
+      reason: value.reason,
+      changedAtClient: value.occurredAtClient,
+      sourceTabId: null,
+    },
+  }).lastMutation;
+  if (!mutation) fail('$.mutationId');
+  return {
+    ...mutation,
+    questionId: value.questionId === null || value.questionId === undefined
+      ? null
+      : normalizeKey(value.questionId, '$.questionId'),
+    changes: value.changes.map((entry, index) => {
+      if (!isPlainObject(entry)) fail(`$.changes[${index}]`);
+      if (!['set', 'delete'].includes(entry.operation)) fail(`$.changes[${index}].operation`);
+      return {
+        fieldPath: normalizeKey(entry.fieldPath, `$.changes[${index}].fieldPath`),
+        operation: entry.operation,
+      };
+    }),
+  };
+};
+
 const normalizeResetPayload = (value = {}) => {
   if (!isPlainObject(value)) fail('$');
   const defaults = {
@@ -1505,6 +1539,44 @@ const formSlice = createSlice(/** @type {any} */ ({
       ensureDraftFoundation(state);
       state.fieldChangeMetadata = {};
     },
+    recordPostReducerMutation: {
+      prepare: (payload) => ({ payload: normalizePostReducerMutationPayload(payload) }),
+      reducer: (state, action) => {
+        ensureDraftFoundation(state);
+        if (shouldIgnoreBecauseSubmitted(state)) return;
+        const prepared = attempt(() => normalizePostReducerMutationPayload(action.payload));
+        if (!prepared.valid || state.draftContext.clientRevision >= Number.MAX_SAFE_INTEGER) return;
+        const payload = prepared.value;
+        const clientRevision = state.draftContext.clientRevision + 1;
+        const metadata = {
+          mutationId: payload.mutationId,
+          changedAtClient: payload.changedAtClient,
+          sourceTabId: state.draftContext.sourceTabId,
+          baseServerRevision: state.draftContext.serverRevision,
+        };
+        for (const item of payload.changes) {
+          applyFieldMetadata(state, item.fieldPath, item.operation, metadata, clientRevision);
+        }
+        state.draftContext.clientRevision = clientRevision;
+        state.lastMutation = {
+          mutationId: payload.mutationId,
+          mutationType: payload.mutationType,
+          reason: payload.reason,
+          changedAtClient: payload.changedAtClient,
+          sourceTabId: state.draftContext.sourceTabId,
+        };
+        if (payload.questionId) {
+          state.lastChangedQuestionId = payload.questionId;
+          applyFieldMetadata(
+            state,
+            'lastChangedQuestionId',
+            'set',
+            metadata,
+            clientRevision,
+          );
+        }
+      },
+    },
     resetQuestionnaireState: {
       prepare: (payload = {}) => ({ payload: normalizeResetPayload(payload) }),
       reducer: (state, action) => resetQuestionnaire(state, action.payload),
@@ -1657,6 +1729,7 @@ export const {
   setMultipleFieldChangeMetadata,
   deleteFieldChangeMetadata,
   clearFieldChangeMetadata,
+  recordPostReducerMutation,
   resetQuestionnaireState,
   resetQuestionState,
 } = formSlice.actions;

@@ -194,6 +194,7 @@ const EnabledProDraftSyncProvider = ({
         eventApiClient: inputs.eventApiClient,
         environment: inputs.runtimeConfig.environment,
         scheduleInitialSave: inputs.pendingServerSync,
+        observeStoreChanges: false,
         ...(inputs.conflictAdapter ? { conflictAdapter: inputs.conflictAdapter } : {}),
         sourceTabId: inputs.tabCoordinator.getSourceTabId(),
         ...(inputs.lifecycleAdapter ? { lifecycleAdapter: inputs.lifecycleAdapter } : {}),
@@ -212,9 +213,12 @@ const EnabledProDraftSyncProvider = ({
       record.disposeTimer = null;
     }
     const unsubscribe = record.manager.subscribeStatus(setSyncStatus);
+    const detachListener = persistence.draftListenerRuntime?.attachManager?.(record.manager)
+      || (() => {});
     setSyncStatus(record.manager.start());
     return () => {
       unsubscribe();
+      detachListener();
       unsubscribeTabs();
       tabCoordinator.stop();
       record.mounts -= 1;
@@ -227,7 +231,7 @@ const EnabledProDraftSyncProvider = ({
         if (records?.size === 0) recordsByStore.delete(store);
       }, 0);
     };
-  }, [draftKey, record, store, tabCoordinator]);
+  }, [draftKey, persistence.draftListenerRuntime, record, store, tabCoordinator]);
 
   const value = useMemo(() => Object.freeze({
     scheduleSave: record.manager.scheduleSave,

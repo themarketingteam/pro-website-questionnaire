@@ -21,6 +21,7 @@ export const useQuestionnairePersistence = () => {
       }),
       localPersistence: null,
       canonicalCacheAdapter: null,
+      draftListenerRuntime: null,
     };
   }
   return context;

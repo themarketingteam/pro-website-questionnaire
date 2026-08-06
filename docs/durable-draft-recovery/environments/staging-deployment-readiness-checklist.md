@@ -8,6 +8,20 @@
 
 This checklist is fail-closed. `READY` means current evidence exists; `NOT_READY` blocks deployment. `MANUAL_VERIFICATION_REQUIRED` also blocks deployment until dated evidence is captured immediately before the authorized deployment.
 
+## 2026-08-06 complete mutation-capture local evidence
+
+Post-reducer listener scheduling, atomic Q5/conditional/reset mutations,
+recoverable editor scopes, safe upload metadata, bounded event mapping, and
+truthful sync status are implemented locally. Focused new tests passed 25/25
+and the synthetic Playwright suite passed 20/20 across five desktop/mobile
+projects. Existing focused sync/store/PDF regression passed 82/82.
+
+This evidence is synthetic and local. It does not certify live Base44 writes,
+real upload interruption, staging authorization, Clear All replacement, or
+final-submission locking. Overall status remains
+**STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT** and deployment authorization
+remains **DENIED**. No Base44 deployment occurred.
+
 ## 2026-08-06 client sync-manager local evidence
 
 The V2 authoritative client sync manager and bootstrap-gated React ownership

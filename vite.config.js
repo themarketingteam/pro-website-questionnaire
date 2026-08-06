@@ -32,6 +32,10 @@ export default defineConfig({
           process.cwd(),
           'tests/e2e/fixtures/pro-draft-conflict.html',
         ),
+        'pro-draft-mutations': resolve(
+          process.cwd(),
+          'tests/e2e/fixtures/pro-draft-mutations.html',
+        ),
       },
     },
   } : undefined,

@@ -6,10 +6,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { base44 } from '@/api/base44Client';
 import { Plus, X, Check, Upload, Loader2, ChevronDown, ChevronUp, File, Edit } from 'lucide-react';
 import { toast } from 'sonner';
+import useScopedUiDraftState, { buildQuestionUiDraftScope } from './useScopedUiDraftState';
 
-export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
+export default function MultiGuaranteeQuestion({
+  value,
+  onChange,
+  max = 10,
+  questionId,
+  draftCaptureEnabled = false,
+}) {
   const items = Array.isArray(value) ? value : [];
-  const [expandedIndex, setExpandedIndex] = useState(null);
+  const editorDraft = useScopedUiDraftState({
+    scopeKey: buildQuestionUiDraftScope(questionId, 'guarantee-editor'),
+    kind: 'guarantee-editor',
+    enabled: draftCaptureEnabled,
+  });
+  const [expandedIndex, setExpandedIndex] = useState(
+    () => editorDraft.data.editingIndex ?? null,
+  );
+  const [uploadingIndex, setUploadingIndex] = useState(null);
+  const setEditingIndex = (index, extra = {}) => {
+    setExpandedIndex(index);
+    if (index === null) editorDraft.clear();
+    else editorDraft.setData({ editingIndex: index, validationCodes: [], ...extra });
+  };
 
   const handleAddItem = () => {
     if (items.length >= max) {
@@ -24,14 +44,14 @@ export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
       saved: false
     };
     onChange([...items, newItem]);
-    setExpandedIndex(items.length);
+    setEditingIndex(items.length);
   };
 
   const handleRemoveItem = (index) => {
     const updated = items.filter((_, i) => i !== index);
     onChange(updated);
     if (expandedIndex === index) {
-      setExpandedIndex(null);
+      setEditingIndex(null);
     }
   };
 
@@ -47,21 +67,24 @@ export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
     // Validation
     if (!item.name?.trim()) {
       toast.error('Name is required');
+      editorDraft.setData({ editingIndex: index, validationCodes: ['NAME_REQUIRED'] });
       return;
     }
     if (!item.type) {
       toast.error('Type is required');
+      editorDraft.setData({ editingIndex: index, validationCodes: ['TYPE_REQUIRED'] });
       return;
     }
     if (!item.file && !item.description?.trim()) {
       toast.error('Please provide either a supporting file or a description');
+      editorDraft.setData({ editingIndex: index, validationCodes: ['CONTENT_REQUIRED'] });
       return;
     }
 
     const updated = [...items];
     updated[index] = { ...updated[index], saved: true };
     onChange(updated);
-    setExpandedIndex(null);
+    setEditingIndex(null);
     toast.success('Item saved');
   };
 
@@ -81,9 +104,17 @@ export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
       return;
     }
 
-    const updated = [...items];
-    updated[index] = { ...updated[index], uploadingFile: true };
-    onChange(updated);
+    setUploadingIndex(index);
+    const uploadEntry = {
+      originalFileName: file.name,
+      mimeType: file.type,
+      sizeBytes: file.size,
+      uploadStatus: 'uploading',
+      uploadedUrl: null,
+      base44FileId: null,
+      errorCode: null,
+    };
+    editorDraft.setData({ editingIndex: index, validationCodes: [], upload: uploadEntry });
 
     try {
       const result = await base44.integrations.Core.UploadFile({ file });
@@ -93,24 +124,31 @@ export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
         file: {
           url: result.file_url,
           name: file.name,
-          type: file.type
+          type: file.type,
+          ...uploadEntry,
+          uploadStatus: 'uploaded',
+          uploadedUrl: result.file_url,
         },
-        uploadingFile: false,
         saved: false
       };
       onChange(updated);
+      editorDraft.setData({ editingIndex: index, validationCodes: [] });
       toast.success('File uploaded');
     } catch (error) {
       console.error('Upload error:', error);
-      const updated = [...items];
-      updated[index] = { ...updated[index], uploadingFile: false };
-      onChange(updated);
+      editorDraft.setData({
+        editingIndex: index,
+        validationCodes: ['UPLOAD_FAILED'],
+        upload: { ...uploadEntry, uploadStatus: 'failed', errorCode: 'UPLOAD_FAILED' },
+      });
       toast.error('Failed to upload file');
+    } finally {
+      setUploadingIndex(null);
     }
   };
 
   const toggleExpand = (index) => {
-    setExpandedIndex(expandedIndex === index ? null : index);
+    setEditingIndex(expandedIndex === index ? null : index);
   };
 
   const isItemComplete = (item) => {
@@ -272,17 +310,17 @@ export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
                           const file = e.target.files?.[0];
                           if (file) handleFileUpload(index, file);
                         }}
-                        disabled={item.uploadingFile}
+                        disabled={uploadingIndex === index}
                       />
                       <label
                         htmlFor={`file-${index}`}
                         className={`flex flex-col items-center justify-center py-4 border-2 border-dashed rounded cursor-pointer transition-colors ${
-                          item.uploadingFile
+                          uploadingIndex === index
                             ? 'border-slate-300 bg-slate-50 cursor-not-allowed'
                             : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
                         }`}
                       >
-                        {item.uploadingFile ? (
+                        {uploadingIndex === index ? (
                           <>
                             <Loader2 className="w-6 h-6 text-slate-600 animate-spin mb-2" />
                             <span className="text-sm text-slate-600">Uploading...</span>
@@ -352,6 +390,12 @@ export default function MultiGuaranteeQuestion({ value, onChange, max = 10 }) {
           <Plus className="w-5 h-5" />
           Add {items.length > 0 ? 'Another' : 'New'} Item ({items.length}/{max})
         </button>
+      )}
+
+      {uploadingIndex !== null && (
+        <p className="text-sm text-amber-700" role="status">
+          This upload must finish before you close the browser.
+        </p>
       )}
 
       {items.length === 0 && (

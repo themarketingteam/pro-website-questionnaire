@@ -5,6 +5,21 @@
 - Owners: Isaac Hines; Engineering; Security; Operations
 - Sources: [ADR-001](../architecture/ADR-001-approved-product-and-security-decisions.md), [ADR-002](../architecture/ADR-002-blue-green-base44-cutover-and-data-continuity.md), [ADR-003](../architecture/ADR-003-draft-identity-recovery-and-lifecycle-contract.md), [identity normalization contract](../architecture/draft-identity-and-email-normalization-contract.md), [current system audit](../audit/current-system-audit-report.md), [current defect register](../audit/current-defect-register.md)
 
+## 2026-08-06 complete mutation-capture update
+
+- V2 server scheduling now occurs after reducers and reads the complete current
+  canonical store at save preparation, reducing `RISK-005` and `RISK-029`
+  source-level stale/partial-snapshot exposure.
+- Q5 primary repair, conditional child deletion, and Reset Question are atomic
+  local mutations with safe summarized events.
+- Incomplete editor values use versioned `uiDraftState`; raw `File`, `Blob`,
+  `FileList`, Google, DOM, and token-bearing objects remain excluded.
+- Text/UI events are bounded by debounce while structural events are immediate;
+  the snapshot remains authoritative.
+- Residual risk is unchanged: live Base44 round trips, real interrupted uploads,
+  staging lifecycle behavior, and the next-batch Clear All/submission
+  transactions are uncertified. Deployment authorization remains denied.
+
 ## 2026-08-06 conflict and multi-tab control update
 
 - Concurrent non-overlapping edits are mitigated by three-way field merge with
