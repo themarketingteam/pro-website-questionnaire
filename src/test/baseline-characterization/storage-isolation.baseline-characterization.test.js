@@ -68,7 +68,7 @@ describe('baseline characterization: scoped browser-storage isolation', () => {
     expect(clientBSession).not.toBe(clientASession);
   });
 
-  it('[BC-LOCAL-003][DR-LOCAL-001][DR-LOCAL-002] persists responses but omits credentials', async () => {
+  it('[BC-LOCAL-003][DR-LOCAL-001][DR-LOCAL-002] persists approved credentials only inside the scoped root', async () => {
     const runtime = await loadConfiguredStore(namespaceFor('synthetic-client-a'));
 
     runtime.store.dispatch(actions.setCredentials({
@@ -84,9 +84,14 @@ describe('baseline characterization: scoped browser-storage isolation', () => {
 
     const persistedRoot = JSON.parse(await storage.getItem(runtime.persistenceKey));
     const persistedResponses = JSON.parse(persistedRoot.responses);
+    const persistedCredentials = JSON.parse(persistedRoot.credentials);
 
     expect(persistedResponses['6']).toBe('Synthetic persisted response');
-    expect(persistedRoot).not.toHaveProperty('credentials');
+    expect(persistedCredentials).toEqual({
+      businessName: 'Synthetic Client A',
+      domain: 'client-a.invalid',
+      userEmail: 'client-a@example.invalid',
+    });
   });
 
   it('[BC-LOCAL-004][DR-LOCAL-002] does not hydrate Client A state into Client B', async () => {

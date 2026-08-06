@@ -7,13 +7,282 @@ import {
   deriveQuestionnaireBrowserNamespace,
   readQuestionnaireIdentityFromUrl,
 } from '@/lib/questionnaireBrowserNamespace';
-import { createQuestionnaireStore } from './store/store';
-import { resetForm } from './store/formSlice';
+import {
+  compareCanonicalDraftFreshness,
+  createEmptyCanonicalDraftState,
+  hashCanonicalDraftState,
+} from '@/lib/questionnaireDraftState';
+import {
+  inspectCanonicalDraftCache,
+  loadCanonicalDraftCache,
+  removeCanonicalDraftCache,
+} from '@/lib/questionnaireCanonicalDraftCache';
+import {
+  createQuestionnaireStore,
+  defaultCanonicalDraftCacheAdapter,
+} from './store/store';
+import {
+  loadCanonicalDraftState,
+  loadInitialState,
+  patchDraftContext,
+  resetForm,
+  setDraftBootstrapLoading,
+  setDraftBootstrapReady,
+} from './store/formSlice';
+import { normalizePersistedQuestionnaireState } from './store/normalization';
+import { selectCanonicalDraftState } from './store/draftSelectors';
+import {
+  getLocalCanonicalPersistenceStatus,
+  startLocalCanonicalDraftPersistence,
+  stopLocalCanonicalDraftPersistence,
+} from './store/localCanonicalDraftPersistence';
 import { QuestionnairePersistenceProvider } from './store/QuestionnairePersistenceContext';
 
 const questionnaireRuntimeCache = new Map();
 
 const defaultStorageFactory = (_namespace) => createResilientStorage();
+
+const isSemanticallyEmptyValue = (value) => {
+  if (value === null || value === undefined || value === '' || value === false) return true;
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === 'object') return Object.keys(value).length === 0;
+  return false;
+};
+
+const isSemanticallyEmptyMap = (value) => (
+  Object.values(value || {}).every(isSemanticallyEmptyValue)
+);
+
+const resolveCacheOperation = (adapter, names, fallback) => {
+  for (const name of names) {
+    if (typeof adapter?.[name] === 'function') return adapter[name].bind(adapter);
+  }
+  return fallback;
+};
+
+export const isCanonicalQuestionnaireDraftEmpty = (state) => {
+  try {
+    const empty = createEmptyCanonicalDraftState();
+    return (
+      state.draftId === null
+      && state.sessionId === null
+      && state.draftStatus === empty.draftStatus
+      && state.clientRevision === 0
+      && state.serverRevision === 0
+      && isSemanticallyEmptyMap(state.responses)
+      && isSemanticallyEmptyMap(state.validationStatus)
+      && isSemanticallyEmptyMap(state.touchedQuestions)
+      && isSemanticallyEmptyMap(state.expandedQuestions)
+      && isSemanticallyEmptyMap(state.textValidationMeta)
+      && isSemanticallyEmptyMap(state.credentials)
+      && isSemanticallyEmptyMap(state.uiDraftState)
+      && isSemanticallyEmptyMap(state.fieldChangeMetadata)
+      && state.currentQuestionId === null
+      && state.lastChangedQuestionId === null
+      && state.lastMutation === null
+      && state.submission.finalSubmissionId === null
+      && state.submission.submittedAt === null
+    );
+  } catch {
+    return false;
+  }
+};
+
+/** @param {any} [options] @returns {Promise<any>} */
+export const selectLocalQuestionnaireBootstrapSource = async (options = {}) => {
+  const {
+    reduxState,
+    cacheState,
+    cachePresent,
+    cacheValid,
+    hashOptions = {},
+  } = options;
+  if (!cachePresent || !cacheValid || !cacheState) {
+    return Object.freeze({
+      source: 'redux',
+      reason: cachePresent ? 'cache_invalid' : 'cache_missing',
+      suppressInitialWrite: Boolean(cachePresent),
+    });
+  }
+  const reduxEmpty = isCanonicalQuestionnaireDraftEmpty(reduxState);
+  const cacheEmpty = isCanonicalQuestionnaireDraftEmpty(cacheState);
+  if (reduxEmpty && !cacheEmpty) {
+    return Object.freeze({ source: 'cache', reason: 'redux_empty', suppressInitialWrite: true });
+  }
+  if (!reduxEmpty && cacheEmpty) {
+    return Object.freeze({ source: 'redux', reason: 'cache_empty', suppressInitialWrite: false });
+  }
+
+  const [reduxHash, cacheHash] = await Promise.all([
+    hashCanonicalDraftState(reduxState, hashOptions),
+    hashCanonicalDraftState(cacheState, hashOptions),
+  ]);
+  if (reduxHash === cacheHash) {
+    return Object.freeze({
+      source: 'redux',
+      reason: 'equivalent_hash',
+      suppressInitialWrite: true,
+      initialHash: reduxHash,
+    });
+  }
+
+  const freshness = await compareCanonicalDraftFreshness(
+    reduxState,
+    cacheState,
+    hashOptions,
+  );
+  if (freshness.result === 'b_newer') {
+    return Object.freeze({
+      source: 'cache',
+      reason: freshness.reason,
+      suppressInitialWrite: true,
+      initialHash: cacheHash,
+    });
+  }
+  if (freshness.result === 'a_newer') {
+    return Object.freeze({
+      source: 'redux',
+      reason: freshness.reason,
+      suppressInitialWrite: false,
+    });
+  }
+  return Object.freeze({
+    source: 'redux',
+    reason: freshness.reason,
+    suppressInitialWrite: true,
+    initialHash: reduxHash,
+  });
+};
+
+export const bootstrapQuestionnaireStoreRuntime = async (runtime, options = {}) => {
+  const now = options.now || Date.now;
+  const completedAt = () => new Date(now()).toISOString();
+  const cacheAdapter = options.canonicalCacheAdapter
+    || runtime.canonicalCacheAdapter
+    || defaultCanonicalDraftCacheAdapter;
+  const cacheOptions = {
+    namespace: runtime.namespace,
+    storage: runtime.storage,
+    timeoutMs: options.cacheTimeoutMs,
+    ...(Object.hasOwn(options, 'crypto') ? { crypto: options.crypto } : {}),
+    ...(options.TextEncoder ? { TextEncoder: options.TextEncoder } : {}),
+  };
+  runtime.store.dispatch(setDraftBootstrapLoading({
+    source: 'browser',
+    startedAt: completedAt(),
+    beginNew: true,
+  }));
+
+  const normalized = normalizePersistedQuestionnaireState(runtime.store.getState()?.form);
+  runtime.store.dispatch(loadInitialState(normalized));
+  runtime.store.dispatch(patchDraftContext({ namespace: runtime.namespace }));
+
+  const inspect = resolveCacheOperation(
+    cacheAdapter,
+    ['inspectCanonicalDraftCache', 'inspect'],
+    inspectCanonicalDraftCache,
+  );
+  const load = resolveCacheOperation(
+    cacheAdapter,
+    ['loadCanonicalDraftCache', 'load'],
+    loadCanonicalDraftCache,
+  );
+  let inspection;
+  try {
+    inspection = await inspect(cacheOptions);
+  } catch {
+    inspection = {
+      present: true,
+      valid: false,
+      errorCode: 'CANONICAL_CACHE_INSPECTION_FAILED',
+    };
+  }
+  let cacheResult;
+  if (inspection?.present && inspection?.valid) {
+    try {
+      cacheResult = await load(cacheOptions);
+    } catch {
+      cacheResult = {
+        ok: false,
+        present: true,
+        state: null,
+        envelope: null,
+        errorCode: 'CANONICAL_CACHE_READ_FAILED',
+      };
+    }
+  } else {
+    cacheResult = {
+      ok: false,
+      present: inspection?.present === true,
+      state: null,
+      envelope: null,
+      errorCode: inspection?.errorCode || null,
+    };
+  }
+
+  let reduxResult = selectCanonicalDraftState(runtime.store.getState());
+  if (!reduxResult.ok) {
+    runtime.store.dispatch(resetForm());
+    runtime.store.dispatch(patchDraftContext({ namespace: runtime.namespace }));
+    reduxResult = selectCanonicalDraftState(runtime.store.getState());
+  }
+  const decision = /** @type {any} */ (await selectLocalQuestionnaireBootstrapSource({
+    reduxState: reduxResult.state,
+    cacheState: cacheResult.state,
+    cachePresent: inspection?.present === true,
+    cacheValid: cacheResult.ok === true && cacheResult.present === true,
+    hashOptions: {
+      ...(Object.hasOwn(options, 'crypto') ? { crypto: options.crypto } : {}),
+      ...(options.TextEncoder ? { TextEncoder: options.TextEncoder } : {}),
+    },
+  }));
+
+  if (decision.source === 'cache') {
+    const state = {
+      ...cacheResult.state,
+      savedAtClient: cacheResult.envelope?.savedAtClient
+        || cacheResult.state.savedAtClient,
+    };
+    runtime.store.dispatch(loadCanonicalDraftState(state, {
+      source: 'browser',
+      completedAt: completedAt(),
+      namespace: runtime.namespace,
+      lastStateHash: cacheResult.envelope?.canonicalStateHash || decision.initialHash || null,
+      storageMode: cacheResult.envelope?.storageMode || runtime.storage.getMode?.() || 'unknown',
+    }));
+  } else {
+    runtime.store.dispatch(setDraftBootstrapReady({
+      source: 'browser',
+      completedAt: completedAt(),
+    }));
+  }
+
+  let initialHash = decision.initialHash;
+  if (decision.suppressInitialWrite && !initialHash) {
+    const selected = selectCanonicalDraftState(runtime.store.getState());
+    if (selected.ok) {
+      initialHash = await hashCanonicalDraftState(selected.state, {
+        ...(Object.hasOwn(options, 'crypto') ? { crypto: options.crypto } : {}),
+        ...(options.TextEncoder ? { TextEncoder: options.TextEncoder } : {}),
+      });
+    }
+  }
+  if (runtime.localPersistence) {
+    startLocalCanonicalDraftPersistence(runtime.localPersistence, {
+      initialHash,
+      scheduleInitial: true,
+    });
+  }
+  return Object.freeze({
+    ...runtime,
+    bootstrapDiagnostics: Object.freeze({
+      source: decision.source,
+      reason: decision.reason,
+      cachePresent: inspection?.present === true,
+      cacheValid: cacheResult.ok === true && cacheResult.present === true,
+    }),
+  });
+};
 
 /**
  * @param {{
@@ -21,6 +290,8 @@ const defaultStorageFactory = (_namespace) => createResilientStorage();
  *   storageFactory?: (namespace?: string) => any,
  *   storeFactory?: (options?: any) => any,
  *   rehydrationTimeoutMs?: number,
+ *   canonicalCacheAdapter?: any,
+ *   cacheTimeoutMs?: number,
  * }} [options]
  */
 export const createQuestionnaireStoreRuntime = async ({
@@ -28,12 +299,24 @@ export const createQuestionnaireStoreRuntime = async ({
   storageFactory = defaultStorageFactory,
   storeFactory = createQuestionnaireStore,
   rehydrationTimeoutMs,
+  canonicalCacheAdapter = defaultCanonicalDraftCacheAdapter,
+  cacheTimeoutMs,
 } = {}) => {
   const storage = storageFactory(namespace);
   try { await storage.probe?.(); } catch {}
-  const runtime = storeFactory({ namespace, storage, rehydrationTimeoutMs });
+  const runtime = storeFactory({
+    namespace,
+    storage,
+    rehydrationTimeoutMs,
+    canonicalCacheAdapter,
+    enableLocalPersistence: true,
+    startLocalPersistence: false,
+  });
   await runtime.ready;
-  return runtime;
+  return bootstrapQuestionnaireStoreRuntime(runtime, {
+    canonicalCacheAdapter,
+    cacheTimeoutMs,
+  });
 };
 
 /** @param {{ namespace?: string, [key: string]: any }} options */
@@ -49,7 +332,7 @@ const getOrCreateQuestionnaireRuntime = ({ namespace, ...options }) => {
 
 export const resetQuestionnaireStoreRuntimeCacheForTests = () => {
   for (const runtimePromise of questionnaireRuntimeCache.values()) {
-    Promise.resolve(runtimePromise).then((runtime) => runtime.persistor.pause()).catch(() => {});
+    Promise.resolve(runtimePromise).then((runtime) => runtime.dispose?.()).catch(() => {});
   }
   questionnaireRuntimeCache.clear();
 };
@@ -77,6 +360,8 @@ const StoreBootstrapLoader = () => (
  *   storageFactory?: (namespace?: string) => any,
  *   storeFactory?: (options?: any) => any,
  *   rehydrationTimeoutMs?: number,
+ *   cacheTimeoutMs?: number,
+ *   canonicalCacheAdapter?: any,
  *   onRuntimeReady?: (runtime: any) => void,
  *   useRuntimeCache?: boolean,
  * }} props
@@ -87,6 +372,8 @@ export default function ReduxProvider({
   storageFactory = defaultStorageFactory,
   storeFactory = createQuestionnaireStore,
   rehydrationTimeoutMs,
+  cacheTimeoutMs,
+  canonicalCacheAdapter = defaultCanonicalDraftCacheAdapter,
   onRuntimeReady,
   useRuntimeCache = true,
 }) {
@@ -100,6 +387,7 @@ export default function ReduxProvider({
 
   useEffect(() => {
     let active = true;
+    let mountedRuntime = null;
     setRuntime(null);
 
     const options = {
@@ -107,6 +395,8 @@ export default function ReduxProvider({
       storageFactory,
       storeFactory,
       rehydrationTimeoutMs,
+      cacheTimeoutMs,
+      canonicalCacheAdapter,
     };
     const runtimePromise = useRuntimeCache
       ? getOrCreateQuestionnaireRuntime(options)
@@ -122,13 +412,32 @@ export default function ReduxProvider({
       }
 
       if (shouldReset) {
+        await stopLocalCanonicalDraftPersistence(nextRuntime.localPersistence);
         try { await nextRuntime.persistor.purge(); } catch {}
+        const remove = resolveCacheOperation(
+          nextRuntime.canonicalCacheAdapter || canonicalCacheAdapter,
+          ['removeCanonicalDraftCache', 'remove'],
+          removeCanonicalDraftCache,
+        );
+        try { await remove({ namespace, storage: nextRuntime.storage }); } catch {}
         nextRuntime.store.dispatch(resetForm());
+        nextRuntime.store.dispatch(patchDraftContext({ namespace }));
         try { await nextRuntime.persistor.flush(); } catch {}
+        startLocalCanonicalDraftPersistence(nextRuntime.localPersistence, {
+          scheduleInitial: true,
+        });
         safeRemoveSearchParameter('resetFormState');
       }
 
-      if (!active) return;
+      if (!active) {
+        await stopLocalCanonicalDraftPersistence(nextRuntime.localPersistence);
+        if (!useRuntimeCache) await nextRuntime.dispose?.();
+        return;
+      }
+      startLocalCanonicalDraftPersistence(nextRuntime.localPersistence, {
+        scheduleInitial: false,
+      });
+      mountedRuntime = nextRuntime;
       setRuntime(nextRuntime);
       try { onRuntimeReady?.(nextRuntime); } catch {}
     }).catch(async () => {
@@ -142,13 +451,27 @@ export default function ReduxProvider({
         namespace,
         storage: fallbackStorage,
         rehydrationTimeoutMs,
+        canonicalCacheAdapter,
+        startLocalPersistence: false,
       });
       await fallbackRuntime.ready;
-      if (active) setRuntime(fallbackRuntime);
+      const bootstrappedFallback = await bootstrapQuestionnaireStoreRuntime(fallbackRuntime, {
+        canonicalCacheAdapter,
+        cacheTimeoutMs,
+      });
+      if (active) setRuntime(bootstrappedFallback);
+      else await bootstrappedFallback.dispose?.();
     });
 
-    return () => { active = false; };
+    return () => {
+      active = false;
+      if (mountedRuntime) {
+        void stopLocalCanonicalDraftPersistence(mountedRuntime.localPersistence);
+      }
+    };
   }, [
+    cacheTimeoutMs,
+    canonicalCacheAdapter,
     namespace,
     onRuntimeReady,
     rehydrationTimeoutMs,
@@ -168,6 +491,9 @@ export default function ReduxProvider({
     durable: diagnostics.durable,
     rehydrationStatus: diagnostics.rehydrationStatus,
     getStorageDiagnostics: runtime.getDiagnostics,
+    getLocalPersistenceStatus: () => getLocalCanonicalPersistenceStatus(
+      runtime.localPersistence,
+    ),
   };
 
   return (

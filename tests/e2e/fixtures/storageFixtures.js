@@ -200,3 +200,180 @@ export const getStorageCapabilityDiagnostics = async (page) => page.evaluate(() 
     sessionStorage: probeStorage('sessionStorage'),
   };
 });
+
+const CACHE_DATABASE_NAME = 'pro_questionnaire_browser_cache';
+const CACHE_OBJECT_STORE_NAME = 'key_value';
+
+const evaluateCanonicalCache = async (page, operation) => page.evaluate(async ({
+  databaseName,
+  objectStoreName,
+  selectedOperation,
+}) => {
+  const parseLocalRecord = (raw) => {
+    if (typeof raw !== 'string') return null;
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed?.value === 'string' && Number.isFinite(parsed.updatedAt)) {
+        return parsed;
+      }
+    } catch {}
+    return { value: raw, updatedAt: 0, schemaVersion: 0 };
+  };
+  const openDatabase = () => new Promise((resolve) => {
+    if (!window.indexedDB) {
+      resolve(null);
+      return;
+    }
+    let request;
+    try { request = window.indexedDB.open(databaseName); } catch {
+      resolve(null);
+      return;
+    }
+    request.onerror = () => resolve(null);
+    request.onsuccess = () => resolve(request.result);
+  });
+  const readIndexedRecords = async () => {
+    const database = await openDatabase();
+    if (!database || !database.objectStoreNames.contains(objectStoreName)) {
+      database?.close();
+      return [];
+    }
+    return new Promise((resolve) => {
+      let transaction;
+      try { transaction = database.transaction(objectStoreName, 'readonly'); } catch {
+        database.close();
+        resolve([]);
+        return;
+      }
+      const request = transaction.objectStore(objectStoreName).getAll();
+      request.onerror = () => resolve([]);
+      request.onsuccess = () => resolve(request.result || []);
+      transaction.oncomplete = () => database.close();
+      transaction.onabort = () => {
+        database.close();
+        resolve([]);
+      };
+    });
+  };
+  const localRecords = [];
+  try {
+    for (let index = 0; index < window.localStorage.length; index += 1) {
+      const key = window.localStorage.key(index);
+      if (!key?.endsWith(':draft-cache')) continue;
+      const record = parseLocalRecord(window.localStorage.getItem(key));
+      if (record) localRecords.push({ key, ...record, layer: 'localstorage' });
+    }
+  } catch {}
+  const indexedRecords = (await readIndexedRecords())
+    .filter((record) => record?.key?.endsWith(':draft-cache'))
+    .map((record) => ({ ...record, layer: 'indexeddb' }));
+  const records = [...localRecords, ...indexedRecords]
+    .sort((left, right) => (right.updatedAt || 0) - (left.updatedAt || 0));
+
+  if (selectedOperation === 'read') {
+    const selected = records[0] || null;
+    if (!selected) return null;
+    try {
+      const envelope = JSON.parse(selected.value);
+      return {
+        envelope,
+        key: selected.key,
+        layer: selected.layer,
+        state: JSON.parse(envelope.canonicalStateJson),
+      };
+    } catch {
+      return { envelope: null, key: selected.key, layer: selected.layer, state: null };
+    }
+  }
+
+  if (selectedOperation === 'malform') {
+    const timestamp = Date.now() + 10_000;
+    let changed = false;
+    try {
+      for (const record of localRecords) {
+        const raw = window.localStorage.getItem(record.key);
+        const parsed = parseLocalRecord(raw);
+        window.localStorage.setItem(record.key, JSON.stringify({
+          ...parsed,
+          updatedAt: timestamp,
+          value: '{malformed-canonical-cache',
+        }));
+        changed = true;
+      }
+    } catch {}
+    const database = await openDatabase();
+    if (database?.objectStoreNames.contains(objectStoreName)) {
+      await new Promise((resolve) => {
+        let transaction;
+        try { transaction = database.transaction(objectStoreName, 'readwrite'); } catch {
+          database.close();
+          resolve();
+          return;
+        }
+        const store = transaction.objectStore(objectStoreName);
+        const request = store.openCursor();
+        request.onsuccess = () => {
+          const cursor = request.result;
+          if (!cursor) return;
+          if (cursor.value?.key?.endsWith(':draft-cache')) {
+            cursor.update({
+              ...cursor.value,
+              updatedAt: timestamp,
+              value: '{malformed-canonical-cache',
+            });
+            changed = true;
+          }
+          cursor.continue();
+        };
+        transaction.oncomplete = () => {
+          database.close();
+          resolve();
+        };
+        transaction.onabort = () => {
+          database.close();
+          resolve();
+        };
+      });
+    } else {
+      database?.close();
+    }
+    return changed;
+  }
+  return null;
+}, {
+  databaseName: CACHE_DATABASE_NAME,
+  objectStoreName: CACHE_OBJECT_STORE_NAME,
+  selectedOperation: operation,
+});
+
+export const readCanonicalDraftCache = (page) => evaluateCanonicalCache(page, 'read');
+
+export const replaceCanonicalDraftCacheWithMalformed = (page) => (
+  evaluateCanonicalCache(page, 'malform')
+);
+
+export const installRuntimePersistentWriteFailure = async (page) => page.evaluate(() => {
+  if (window.IDBDatabase?.prototype) {
+    Object.defineProperty(window.IDBDatabase.prototype, 'transaction', {
+      configurable: true,
+      value() {
+        throw new DOMException('Synthetic runtime IndexedDB write failure', 'InvalidStateError');
+      },
+    });
+  }
+  if (window.Storage?.prototype) {
+    Object.defineProperty(window.Storage.prototype, 'setItem', {
+      configurable: true,
+      value() {
+        throw new DOMException('Synthetic runtime storage quota', 'QuotaExceededError');
+      },
+    });
+    Object.defineProperty(window.Storage.prototype, 'removeItem', {
+      configurable: true,
+      value() {
+        throw new DOMException('Synthetic runtime storage denial', 'SecurityError');
+      },
+    });
+  }
+  return true;
+});

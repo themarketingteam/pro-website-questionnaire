@@ -97,10 +97,9 @@ describe('E2E fixture definitions', () => {
 describe('pending draft V2 report', () => {
   it('counts every requirement-linked pending scenario', () => {
     const report = scanPendingDraftV2Tests();
-    expect(report.pendingCount).toBe(9);
+    expect(report.pendingCount).toBe(8);
     expect(report.requirementIds).toEqual([
       'DR-CONCUR-001',
-      'DR-LOCAL-001',
       'DR-OFFLINE-001',
       'DR-SAVE-001',
       'DR-SEC-001',
@@ -110,7 +109,7 @@ describe('pending draft V2 report', () => {
 
   it('produces a text summary without questionnaire payloads', () => {
     const text = formatPendingDraftV2Text(scanPendingDraftV2Tests());
-    expect(text).toContain('pending_draft_v2_tests=9');
+    expect(text).toContain('pending_draft_v2_tests=8');
     expect(text).toContain('DR-CONCUR-001');
     expect(text).not.toContain('questionValues');
   });

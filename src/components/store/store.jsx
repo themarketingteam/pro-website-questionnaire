@@ -12,6 +12,11 @@ import {
 import formReducer from './formSlice';
 import { normalizePersistedQuestionnaireState } from './normalization';
 import {
+  createLocalCanonicalDraftPersistence,
+  startLocalCanonicalDraftPersistence,
+  stopLocalCanonicalDraftPersistence,
+} from './localCanonicalDraftPersistence';
+import {
   createResilientStorage,
   defaultResilientStorage,
 } from '@/lib/resilientStorage';
@@ -19,8 +24,14 @@ import {
   buildQuestionnaireStorageKey,
   deriveQuestionnaireBrowserNamespace,
 } from '@/lib/questionnaireBrowserNamespace';
+import {
+  inspectCanonicalDraftCache,
+  loadCanonicalDraftCache,
+  removeCanonicalDraftCache,
+  saveCanonicalDraftCache,
+} from '@/lib/questionnaireCanonicalDraftCache';
 
-export const QUESTIONNAIRE_PERSIST_VERSION = 3;
+export const QUESTIONNAIRE_PERSIST_VERSION = 4;
 export const DEFAULT_REHYDRATION_TIMEOUT_MS = 2_000;
 export const PERSISTED_FORM_FIELDS = Object.freeze([
   'responses',
@@ -28,7 +39,22 @@ export const PERSISTED_FORM_FIELDS = Object.freeze([
   'touchedQuestions',
   'expandedQuestions',
   'textValidationMeta',
+  'credentials',
+  'uiDraftState',
+  'fieldChangeMetadata',
+  'draftContext',
+  'currentQuestionId',
+  'lastChangedQuestionId',
+  'lastMutation',
+  'submittedReceipt',
 ]);
+
+export const defaultCanonicalDraftCacheAdapter = Object.freeze({
+  inspectCanonicalDraftCache,
+  loadCanonicalDraftCache,
+  removeCanonicalDraftCache,
+  saveCanonicalDraftCache,
+});
 
 const normalizeTimeout = (value) => (
   Number.isFinite(value) && value >= 0
@@ -67,11 +93,23 @@ const createBoundedRehydrationStorage = ({ storage, timeoutMs, state }) => ({
   },
 });
 
-/** @param {{ namespace?: string, storage?: any, rehydrationTimeoutMs?: number }} [options] */
+/** @param {{
+ *   namespace?: string,
+ *   storage?: any,
+ *   rehydrationTimeoutMs?: number,
+ *   canonicalCacheAdapter?: any,
+ *   enableLocalPersistence?: boolean,
+ *   startLocalPersistence?: boolean,
+ *   localPersistenceOptions?: any,
+ * }} [options] */
 export const createQuestionnaireStore = ({
   namespace,
   storage = defaultResilientStorage,
   rehydrationTimeoutMs = DEFAULT_REHYDRATION_TIMEOUT_MS,
+  canonicalCacheAdapter = defaultCanonicalDraftCacheAdapter,
+  enableLocalPersistence = true,
+  startLocalPersistence = true,
+  localPersistenceOptions = {},
 } = {}) => {
   const persistenceKey = buildQuestionnaireStorageKey({
     namespace,
@@ -111,11 +149,24 @@ export const createQuestionnaireStore = ({
     }),
   });
 
+  const localPersistence = enableLocalPersistence
+    ? createLocalCanonicalDraftPersistence({
+      store: questionnaireStore,
+      namespace,
+      storage,
+      cacheAdapter: canonicalCacheAdapter,
+      ...localPersistenceOptions,
+    })
+    : null;
+
   let resolveReady;
   const ready = new Promise((resolve) => { resolveReady = resolve; });
   const questionnairePersistor = persistStore(questionnaireStore, null, () => {
     if (!rehydration.timedOut && rehydration.status !== 'storage_failed') {
       rehydration.status = 'rehydrated';
+    }
+    if (startLocalPersistence && localPersistence) {
+      startLocalCanonicalDraftPersistence(localPersistence);
     }
     resolveReady();
   });
@@ -126,7 +177,15 @@ export const createQuestionnaireStore = ({
     store: questionnaireStore,
     persistor: questionnairePersistor,
     storage,
+    canonicalCacheAdapter,
+    localPersistence,
     ready,
+    dispose: async ({ flush = false } = {}) => {
+      if (localPersistence) {
+        await stopLocalCanonicalDraftPersistence(localPersistence, { flush });
+      }
+      questionnairePersistor.pause();
+    },
     getDiagnostics: () => Object.freeze({
       namespace,
       rehydrationStatus: rehydration.status,
@@ -137,17 +196,23 @@ export const createQuestionnaireStore = ({
   });
 };
 
-/** @param {{ namespace?: string, storage?: any }} [options] */
+/** @param {{ namespace?: string, storage?: any, canonicalCacheAdapter?: any }} [options] */
 export const clearQuestionnairePersistedState = async ({
   namespace,
   storage = defaultResilientStorage,
+  canonicalCacheAdapter = defaultCanonicalDraftCacheAdapter,
 } = {}) => {
   const persistenceKey = buildQuestionnaireStorageKey({
     namespace,
     purpose: 'redux-state',
   });
   try {
-    await storage.removeItem(persistenceKey);
+    await Promise.all([
+      storage.removeItem(persistenceKey),
+      (canonicalCacheAdapter.removeCanonicalDraftCache
+        || canonicalCacheAdapter.remove
+        || removeCanonicalDraftCache)({ namespace, storage }),
+    ]);
     return true;
   } catch {
     return false;
@@ -162,6 +227,7 @@ const compatibilityNamespace = deriveQuestionnaireBrowserNamespace({
 const compatibilityRuntime = createQuestionnaireStore({
   namespace: compatibilityNamespace,
   storage: createResilientStorage({ indexedDB: null, localStorage: null, sessionStorage: null }),
+  enableLocalPersistence: false,
 });
 
 export const store = compatibilityRuntime.store;

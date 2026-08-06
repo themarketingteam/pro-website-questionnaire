@@ -4,7 +4,7 @@
 - Minimum supported canonical version: `2`
 - Module: `src/lib/questionnaireDraftState.js`
 - Form type: `pro-questionnaire`
-- Status: pure foundation implemented; not connected to Redux, current Base44 saving, recovery, submission, or PDF runtime
+- Status: connected to Redux and the namespaced browser-local cache; not connected to canonical Base44 saving, authorized server recovery, submission locking, or PDF regeneration
 
 ## Purpose and version boundary
 
@@ -12,7 +12,7 @@ Version 4 is the first complete canonical envelope shared by future browser pers
 
 The version is intentionally independent of:
 
-- Redux Persist version 3;
+- Redux Persist version 4;
 - browser-storage key version 4;
 - Base44 entity schemas;
 - function/API revisions.
@@ -157,7 +157,7 @@ The module exports:
 - `buildCanonicalFieldPath`
 - `normalizeFieldChangeMetadata`
 
-All functions are framework-independent and require no Redux, React, Base44 client, storage API, or network access.
+All functions in this module remain framework-independent and require no Redux, React, Base44 client, storage API, or network access. Browser integration is defined separately in [Local canonical draft cache](./local-canonical-draft-cache.md).
 
 ## Serialization and rejected values
 
@@ -308,4 +308,4 @@ Future Base44 APIs should validate strict-server canonical v4 input, assign serv
 
 Future blue-to-green migration should parse each historical column independently, emit safe warnings, validate/hash the reconstructed v4 state, compare record counts and lifecycle fields, and write only through the reviewed idempotent migration protocol. A failed reconstruction must retain the source record and evidence; it must never overwrite the last validated destination state.
 
-This prompt adds only the pure contract, tests, and documentation. It changes no questionnaire UI, reducer, persistence wiring, current Base44 draft saving, entity schema, submission path, or PDF path, and performs no cloud action.
+The contract is now consumed by Redux hydration and the browser-local cache. Current Base44 draft saving, entity schemas, submission, and PDF paths are unchanged, and no cloud action or deployment is part of this integration.

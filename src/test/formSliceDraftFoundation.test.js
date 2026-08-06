@@ -132,14 +132,22 @@ describe('canonical Redux draft foundation', () => {
   });
 
   it('keeps legacy loadInitialState compatible while excluding unknown and token fields', () => {
-    const state = reducer(undefined, loadInitialState({
+    const action = loadInitialState({
       responses: { '6': 'Synthetic' },
       credentials: { businessName: 'Synthetic', harmlessUnknown: 'ignored' },
       arbitraryReduxField: 'ignored',
-    }));
+    });
+    const state = reducer(undefined, action);
     expect(state.responses['6']).toBe('Synthetic');
     expect(state.credentials).toEqual({ businessName: 'Synthetic' });
     expect(state.arbitraryReduxField).toBeUndefined();
+    expect(action.meta.safeDiagnostics).toEqual({
+      acceptedFieldCount: 2,
+      canonicalInput: false,
+      rejectedFieldCount: 1,
+      validInputShape: true,
+    });
+    expect(JSON.stringify(action.meta.safeDiagnostics)).not.toContain('arbitraryReduxField');
     expect(() => loadInitialState({
       responses: {},
       credentials: { resumeToken: 'blocked' },

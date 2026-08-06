@@ -1,5 +1,11 @@
 import { QUESTIONS } from '@/components/pro-form/questionData';
 import { getAllQuestionIds, getQuestionById } from '@/components/pro-form/questionUtils';
+import {
+  DRAFT_STATE_SOURCE_TYPES,
+  PRO_FORM_DRAFT_SCHEMA_VERSION,
+  createEmptyCanonicalDraftState,
+  normalizeCanonicalDraftState,
+} from '@/lib/questionnaireDraftState';
 
 function uniqArray(arr) {
   return Array.from(new Set(arr || []));
@@ -11,6 +17,25 @@ export const createEmptyPersistedQuestionnaireState = () => ({
   touchedQuestions: {},
   expandedQuestions: {},
   textValidationMeta: {},
+  credentials: {},
+  uiDraftState: {},
+  fieldChangeMetadata: {},
+  draftContext: {
+    draftId: null,
+    sessionId: null,
+    draftStatus: 'active',
+    schemaVersion: PRO_FORM_DRAFT_SCHEMA_VERSION,
+    clientRevision: 0,
+    serverRevision: 0,
+    sourceTabId: null,
+    namespace: null,
+    restoredFrom: null,
+    lastStateHash: null,
+  },
+  currentQuestionId: null,
+  lastChangedQuestionId: null,
+  lastMutation: null,
+  submittedReceipt: null,
 });
 
 const isPlainRecord = (value) => {
@@ -45,10 +70,9 @@ export function normalizePersistedState(state) {
   const __isDev = (() => {
     try {
       // Prefer Vite env flag; also allow URL opt-in for manual checks
-      const byEnv = typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.DEV;
       const byUrl = typeof window !== 'undefined' && /(?:redux-data|norm-debug)=true/.test(window.location.search || '');
-      return !!(byEnv || byUrl);
-    } catch (_) { return false; }
+      return Boolean(byUrl);
+    } catch { return false; }
   })();
   const __shallowEqual = (a, b) => {
     try { return JSON.stringify(a) === JSON.stringify(b); } catch { return a === b; }
@@ -266,6 +290,8 @@ export function normalizePersistedStateV3(state) {
     touchedQuestions: { ...(base.touchedQuestions || {}) },
     expandedQuestions: { ...(base.expandedQuestions || {}) },
     textValidationMeta: { ...(base.textValidationMeta || {}) },
+    uiDraftState: { ...(base.uiDraftState || {}) },
+    fieldChangeMetadata: { ...(base.fieldChangeMetadata || {}) },
   };
 
   const clearHiddenChild = (childId) => {
@@ -276,6 +302,18 @@ export function normalizePersistedStateV3(state) {
     delete next.touchedQuestions[childId];
     delete next.expandedQuestions[childId];
     delete next.textValidationMeta[childId];
+    delete next.uiDraftState[`question:${childId}`];
+    for (const fieldPath of Object.keys(next.fieldChangeMetadata)) {
+      if (
+        fieldPath === `responses.${childId}`
+        || fieldPath === `responses.${childId}_other`
+        || fieldPath === `responses.${childId}_primary`
+        || fieldPath.endsWith(`Questions.${childId}`)
+        || fieldPath === `textValidationMeta.${childId}`
+      ) delete next.fieldChangeMetadata[fieldPath];
+    }
+    if (next.currentQuestionId === childId) next.currentQuestionId = null;
+    if (next.lastChangedQuestionId === childId) next.lastChangedQuestionId = null;
   };
 
   // Generic rule set
@@ -325,20 +363,19 @@ export function normalizePersistedStateV3(state) {
 }
 
 // Redux Persist passes its complete persisted form payload to this boundary.
-// Only the approved browser fields are admitted; credentials and unknown keys
-// are intentionally excluded. Any malformed slice or normalization failure
-// returns an empty, usable form state without logging answer data.
+// Every recoverable category is normalized as one form before Redux sees it.
+// Unknown fields and volatile bootstrap/sync state are intentionally excluded.
 export function normalizePersistedQuestionnaireState(state) {
   if (!isPlainRecord(state)) return createEmptyPersistedQuestionnaireState();
 
-  const approvedFields = [
+  const requiredMapFields = [
     'responses',
     'validationStatus',
     'touchedQuestions',
     'expandedQuestions',
     'textValidationMeta',
   ];
-  if (approvedFields.some((field) => (
+  if (requiredMapFields.some((field) => (
     state[field] !== undefined && !isPlainRecord(state[field])
   ))) {
     return createEmptyPersistedQuestionnaireState();
@@ -350,25 +387,104 @@ export function normalizePersistedQuestionnaireState(state) {
     touchedQuestions: isPlainRecord(state.touchedQuestions) ? state.touchedQuestions : {},
     expandedQuestions: isPlainRecord(state.expandedQuestions) ? state.expandedQuestions : {},
     textValidationMeta: isPlainRecord(state.textValidationMeta) ? state.textValidationMeta : {},
+    credentials: isPlainRecord(state.credentials) ? state.credentials : {},
+    uiDraftState: isPlainRecord(state.uiDraftState) ? state.uiDraftState : {},
+    fieldChangeMetadata: isPlainRecord(state.fieldChangeMetadata)
+      ? state.fieldChangeMetadata
+      : {},
+    draftContext: isPlainRecord(state.draftContext) ? state.draftContext : {},
+    currentQuestionId: state.currentQuestionId ?? null,
+    lastChangedQuestionId: state.lastChangedQuestionId ?? null,
+    lastMutation: isPlainRecord(state.lastMutation) ? state.lastMutation : null,
+    submittedReceipt: isPlainRecord(state.submittedReceipt) ? state.submittedReceipt : null,
   };
 
   try {
     const normalized = normalizePersistedStateV3(approvedState);
     if (!isPlainRecord(normalized)) return createEmptyPersistedQuestionnaireState();
+    const context = normalized.draftContext || {};
+    const receipt = normalized.submittedReceipt;
+    const canonical = normalizeCanonicalDraftState({
+      ...createEmptyCanonicalDraftState(),
+      schemaVersion: context.schemaVersion ?? PRO_FORM_DRAFT_SCHEMA_VERSION,
+      draftId: context.draftId ?? null,
+      sessionId: context.sessionId ?? null,
+      draftStatus: context.draftStatus || 'active',
+      clientRevision: context.clientRevision ?? 0,
+      serverRevision: context.serverRevision ?? 0,
+      sourceTabId: context.sourceTabId ?? null,
+      responses: normalized.responses || {},
+      validationStatus: normalized.validationStatus || {},
+      touchedQuestions: normalized.touchedQuestions || {},
+      expandedQuestions: normalized.expandedQuestions || {},
+      textValidationMeta: normalized.textValidationMeta || {},
+      credentials: normalized.credentials || {},
+      uiDraftState: normalized.uiDraftState || {},
+      fieldChangeMetadata: normalized.fieldChangeMetadata || {},
+      currentQuestionId: normalized.currentQuestionId ?? null,
+      lastChangedQuestionId: normalized.lastChangedQuestionId ?? null,
+      lastMutation: normalized.lastMutation ?? null,
+      submission: {
+        finalSubmissionId: receipt?.finalSubmissionId ?? null,
+        submittedAt: receipt?.submittedAt ?? null,
+        submittedStateHash: null,
+        pdfSourceStateHash: null,
+        lastSubmissionErrorCode: null,
+      },
+      compatibility: {
+        sourceType: state?._persist?.version === 4
+          ? DRAFT_STATE_SOURCE_TYPES.REDUX_PERSIST_V4
+          : DRAFT_STATE_SOURCE_TYPES.REDUX_PERSIST_V3,
+        sourceVersion: Number.isSafeInteger(state?._persist?.version)
+          ? state._persist.version
+          : 3,
+        migratedAtClient: null,
+        migrationWarnings: [],
+      },
+    });
+    const namespace = /^ns_[a-f\d]{32}$/.test(String(context.namespace || ''))
+      ? context.namespace
+      : null;
+    const restoredFrom = ['none', 'browser', 'server', 'merged', 'legacy', 'submitted_receipt']
+      .includes(context.restoredFrom)
+      ? context.restoredFrom
+      : null;
+    const lastStateHash = /^[a-f0-9]{64}$/.test(String(context.lastStateHash || ''))
+      ? context.lastStateHash
+      : null;
     return {
-      responses: isPlainRecord(normalized.responses) ? normalized.responses : {},
-      validationStatus: isPlainRecord(normalized.validationStatus)
-        ? normalized.validationStatus
-        : {},
-      touchedQuestions: isPlainRecord(normalized.touchedQuestions)
-        ? normalized.touchedQuestions
-        : {},
-      expandedQuestions: isPlainRecord(normalized.expandedQuestions)
-        ? normalized.expandedQuestions
-        : {},
-      textValidationMeta: isPlainRecord(normalized.textValidationMeta)
-        ? normalized.textValidationMeta
-        : {},
+      responses: canonical.responses,
+      validationStatus: canonical.validationStatus,
+      touchedQuestions: canonical.touchedQuestions,
+      expandedQuestions: canonical.expandedQuestions,
+      textValidationMeta: canonical.textValidationMeta,
+      credentials: canonical.credentials,
+      uiDraftState: canonical.uiDraftState,
+      fieldChangeMetadata: canonical.fieldChangeMetadata,
+      draftContext: {
+        draftId: canonical.draftId,
+        sessionId: canonical.sessionId,
+        draftStatus: canonical.draftStatus,
+        schemaVersion: canonical.schemaVersion,
+        clientRevision: canonical.clientRevision,
+        serverRevision: canonical.serverRevision,
+        sourceTabId: canonical.sourceTabId,
+        namespace,
+        restoredFrom,
+        lastStateHash,
+      },
+      currentQuestionId: canonical.currentQuestionId,
+      lastChangedQuestionId: canonical.lastChangedQuestionId,
+      lastMutation: canonical.lastMutation,
+      submittedReceipt: (
+        canonical.draftStatus === 'submitted'
+        || canonical.submission.finalSubmissionId
+        || canonical.submission.submittedAt
+      ) ? {
+          finalSubmissionId: canonical.submission.finalSubmissionId,
+          submittedAt: canonical.submission.submittedAt,
+          pdfAvailable: receipt?.pdfAvailable === true,
+        } : null,
     };
   } catch {
     return createEmptyPersistedQuestionnaireState();

@@ -29,6 +29,7 @@ export const DRAFT_STATE_SOURCE_TYPES = Object.freeze({
   LOAD_INITIAL_STATE: 'load_initial_state',
   REDUX_PERSIST_V2: 'redux_persist_v2',
   REDUX_PERSIST_V3: 'redux_persist_v3',
+  REDUX_PERSIST_V4: 'redux_persist_v4',
   UNKNOWN: 'unknown',
 });
 

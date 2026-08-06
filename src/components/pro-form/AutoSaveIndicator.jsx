@@ -5,13 +5,15 @@ export default function AutoSaveIndicator({
   show,
   storageMode = 'unknown',
   getStorageDiagnostics,
+  getLocalPersistenceStatus,
   serverConfirmed = false,
 }) {
   const [visible, setVisible] = useState(false);
   const [fading, setFading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [localSaveFailed, setLocalSaveFailed] = useState(false);
   const [resolvedStorageMode, setResolvedStorageMode] = useState(storageMode);
-  const savedDelayMs = 0;
+  const savedDelayMs = 200;
   const fadeDelayMs = 3000;
   const hideDelayMs = 3500;
 
@@ -21,14 +23,32 @@ export default function AutoSaveIndicator({
     setVisible(true);
     setFading(false);
     setSaved(false);
+    setLocalSaveFailed(false);
     setResolvedStorageMode(storageMode);
 
-    const savedTimer = setTimeout(() => {
+    let savedTimer;
+    let attempts = 0;
+    const resolveSavedState = () => {
       let nextMode = storageMode;
+      let localStatus = null;
+      try { localStatus = getLocalPersistenceStatus?.() || null; } catch {}
+      if (
+        localStatus
+        && !localStatus.lastErrorCode
+        && (localStatus.dirty || localStatus.inFlight || !localStatus.lastSavedAt)
+        && attempts < 20
+      ) {
+        attempts += 1;
+        savedTimer = setTimeout(resolveSavedState, 50);
+        return;
+      }
+      if (localStatus?.storageMode) nextMode = localStatus.storageMode;
+      setLocalSaveFailed(Boolean(localStatus?.lastErrorCode));
       try { nextMode = getStorageDiagnostics?.().storageMode || nextMode; } catch {}
       setResolvedStorageMode(nextMode);
       setSaved(true);
-    }, savedDelayMs);
+    };
+    savedTimer = setTimeout(resolveSavedState, savedDelayMs);
 
     const fadeTimer = setTimeout(() => {
       setFading(true);
@@ -43,7 +63,15 @@ export default function AutoSaveIndicator({
       clearTimeout(fadeTimer);
       clearTimeout(hideTimer);
     };
-  }, [show, storageMode, getStorageDiagnostics, savedDelayMs, fadeDelayMs, hideDelayMs]);
+  }, [
+    show,
+    storageMode,
+    getStorageDiagnostics,
+    getLocalPersistenceStatus,
+    savedDelayMs,
+    fadeDelayMs,
+    hideDelayMs,
+  ]);
 
   if (!visible) return null;
 
@@ -61,11 +89,13 @@ export default function AutoSaveIndicator({
         <p className="text-xs text-slate-500">
           {!saved
             ? 'Saving your progress in this browser…'
-            : serverConfirmed
-              ? 'Progress confirmed by the server.'
-              : resolvedStorageMode === 'indexeddb' || resolvedStorageMode === 'localstorage'
-                ? 'Progress saved in this browser.'
-                : 'Progress is available for this page only.'}
+            : localSaveFailed
+              ? 'Browser save could not be confirmed.'
+              : serverConfirmed
+                ? 'Progress confirmed by the server.'
+                : resolvedStorageMode === 'indexeddb' || resolvedStorageMode === 'localstorage'
+                  ? 'Progress saved in this browser.'
+                  : 'Progress is available for this page only.'}
         </p>
       </div>
     </div>

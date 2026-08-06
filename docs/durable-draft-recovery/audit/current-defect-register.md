@@ -108,7 +108,9 @@ The 2026-08-06 staging-certification attempt reconfirmed the local browser found
 - **Permanent implementation batch:** B01/B03 — local journal plus authorized reconciliation.
 - **Feature-branch remediation (2026-08-05):** Failure backups now use the exact version 4 client namespace and resilient storage, contain only approved serializable form state plus safe metadata, and have an exact-namespace safe reader. The reader is a foundation API only: page bootstrap does not automatically hydrate a backup or server draft.
 - **Remediation evidence:** `src/test/draftFailureBackup.test.js`; `BC-LOCAL-005`; `BC-LIFE-001`.
-- **Remediation status:** Scoped write/read foundation is implemented on `feature/durable-draft-recovery`; deterministic reconciliation, expiry, automatic authorized restore, and environment certification remain pending.
+- **Canonical-cache remediation (2026-08-05):** A separate versioned canonical browser cache now continuously stores the complete post-reducer form and is automatically considered after Redux Persist rehydration. This supplies same-browser reload continuity without treating the older failure-backup record as authoritative or deleting it.
+- **Canonical-cache evidence:** `src/test/questionnaireCanonicalDraftCache.test.js`; `src/test/localCanonicalDraftPersistence.test.js`; `src/test/questionnaireLocalBootstrap.test.js`; active `DR-LOCAL-001`, `DR-LOCAL-003`, and `DR-LOCAL-004` Playwright scenarios.
+- **Remediation status:** Same-browser canonical reload is implemented locally. Failure-backup reconciliation/expiry, authorized server recovery, cross-device restore, and environment certification remain pending.
 - **Release blocking:** Yes
 
 ## DRAFT-006 — Lifecycle persistence relies only on beforeunload
@@ -125,6 +127,8 @@ The 2026-08-06 staging-certification attempt reconfirmed the local browser found
 - **Reproduction/evidence:** `BC-LIFE-001`; `M066`, `M068`, `M070` in the [mutation matrix](./draft-mutation-matrix.md).
 - **Current workaround:** Pause after edits and avoid closing/offline transitions; not enforceable.
 - **Permanent implementation batch:** B01/B02/B06 — journal, mutation outbox, browser acceptance.
+- **Feature-branch remediation (2026-08-05):** The canonical browser cache subscribes to complete Redux state after reducers and writes continuously with a 100 ms debounce/500 ms maximum wait. It does not rely on `beforeunload`; unload remains only a best-effort legacy failure-backup supplement.
+- **Remediation status:** Ordinary browser-local edits are continuously cached. Explicit pagehide/visibility flush, server outbox/reconnect reconciliation, abrupt-process-loss certification, and environment certification remain pending.
 - **Release blocking:** Yes
 
 ## DRAFT-007 — Server snapshots can mix response and stale UI maps
@@ -339,6 +343,9 @@ The 2026-08-06 staging-certification attempt reconfirmed the local browser found
 - **Reproduction/evidence:** `BC-COND-001` (zero draft calls, one event call); limitation documented in the characterization manifest.
 - **Current workaround:** Make an unrelated qualifying edit after cleanup and wait; no acknowledgement proves the correct snapshot won.
 - **Permanent implementation batch:** B02 — render-independent durable mutation outbox and revisioned save.
+- **Feature-branch remediation (2026-08-05):** A store-level post-reducer canonical subscriber now captures the complete local state independently of component effect cleanup, including conditional-child deletion across response, validation, touched, expanded, text, UI-draft, metadata, and question-pointer categories.
+- **Remediation evidence:** `src/test/localCanonicalDraftPersistence.test.js`; whole-form/hidden-child cases in `src/test/questionnaireStore.test.jsx`.
+- **Remediation status:** The browser-local loss mode is mitigated. The existing Base44 server timer remains render-coupled and non-atomic, so server acknowledgement, revision/CAS, and reconciliation are still release-blocking.
 - **Release blocking:** Yes
 
 ## Register controls

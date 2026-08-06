@@ -2,9 +2,11 @@
 
 ## Scope
 
-This contract defines the Redux foundation for canonical questionnaire draft recovery. It extends the existing `form` slice without migrating every questionnaire component and without adding storage middleware, server synchronization, Base44 APIs, entity changes, or deployment behavior.
+This contract defines the Redux foundation for canonical questionnaire draft recovery. It extends the existing `form` slice and now connects its complete canonical selector to browser-local persistence. It does not migrate every questionnaire component and does not add server synchronization, Base44 APIs, entity changes, Draft V2 enablement, or deployment behavior.
 
 The authoritative portable state remains canonical draft schema version 4 in `src/lib/questionnaireDraftState.js`. Redux includes runtime lifecycle diagnostics around that portable state, but selectors exclude those diagnostics when constructing a canonical snapshot.
+
+Redux Persist is version `4`. It persists every recoverable form category in the same hashed browser namespace while excluding volatile `draftBootstrapStatus` and `draftSyncStatus`. Version 2/3 records receive explicit safe defaults and whole-form hidden-child cleanup.
 
 ## Extended form state
 
@@ -237,7 +239,13 @@ No reset action creates or updates a server record.
 }
 ```
 
-On success, `state` is a valid normalized schema-v4 canonical state. On invalid untrusted preload data, `state` is null and diagnostics contain no values. The selector is memoized, does not mutate Redux, does not hash synchronously, and excludes Redux-only lifecycle diagnostics, namespace values, last-state hash, recovery material, and unknown fields.
+On success, `state` is a valid normalized schema-v4 canonical state. On invalid untrusted preload data, `state` is null and diagnostics contain no values. The selector is memoized, does not mutate Redux, does not hash synchronously, and excludes Redux-only lifecycle diagnostics (including local/server save timestamps and sync error codes), namespace values, last-state hash, recovery material, and unknown fields.
+
+## Browser-local persistence and bootstrap
+
+`localCanonicalDraftPersistence.js` subscribes after reducers, coalesces synchronous actions, debounces for 100 ms, enforces a 500 ms maximum wait, skips unchanged hashes, and exposes explicit `start`, `stop`, `flush`, and safe status APIs. One controller/subscription exists per store. Cache success dispatches local status only and never changes revisions or reports server acknowledgement.
+
+`ReduxProvider` waits for Redux Persist, normalizes the whole form, inspects/loads the versioned canonical cache, applies deterministic freshness selection, hydrates the winner, marks bootstrap ready, and only then starts the subscriber. Empty bootstrap state cannot overwrite a selected cache. Malformed/incompatible/diverged cache content is preserved during bootstrap. See [Local canonical draft cache](./local-canonical-draft-cache.md).
 
 `selectSafeDraftDiagnostics` returns only counts, presence flags, schema/status/revisions, byte size, lifecycle state names, storage mode, retry count, and read-only status.
 
@@ -273,7 +281,7 @@ Later batches will:
 
 1. Move answer-bearing component-local editor state into scoped `uiDraftState` entries.
 2. Replace related multi-dispatch component sequences with `applyFormMutation`.
-3. Add browser persistence and server synchronization around canonical selector output.
+3. Browser persistence is complete; add future server synchronization around canonical selector output.
 4. Wire Clear All and submission lifecycle to backend transactions.
 
-This foundation does not perform those integrations and therefore does not change current questionnaire UI behavior or submission payloads.
+The remaining component/server integrations are future work. Browser-local persistence does not change submission payloads or add a server authority claim.

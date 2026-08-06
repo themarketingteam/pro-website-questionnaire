@@ -21,6 +21,7 @@ import {
   selectUiDraftState,
   selectUiDraftStateScope,
 } from '@/components/store/draftSelectors';
+import { hashCanonicalDraftState } from '@/lib/questionnaireDraftState';
 
 const uiEntry = {
   kind: 'synthetic-editor',
@@ -99,7 +100,7 @@ describe('draft selectors', () => {
       draftId: 'draft-1',
       sessionId: 'session-1',
       responses: { '6': 'Synthetic response' },
-      savedAtClient: '2026-08-05T12:00:00.000Z',
+      savedAtClient: null,
       uiDraftState: { 'question:6': uiEntry },
     });
     expect(root).toEqual(before);
@@ -169,6 +170,22 @@ describe('draft selectors', () => {
   it('memoizes canonical results for an unchanged form reference', () => {
     const root = buildRootState();
     expect(selectCanonicalDraftState(root)).toBe(selectCanonicalDraftState(root));
+  });
+
+  it('keeps volatile sync transitions out of the canonical hash input', async () => {
+    const root = buildRootState();
+    const before = selectCanonicalDraftState(root);
+    const changed = {
+      form: reducer(root.form, setDraftLocalSaved({
+        storageMode: 'memory_only',
+        lastLocalSavedAt: '2026-08-05T14:00:00.000Z',
+        confirmedClientRevision: 2,
+      })),
+    };
+    const after = selectCanonicalDraftState(changed);
+    expect(after.state.savedAtClient).toBeNull();
+    expect(await hashCanonicalDraftState(after.state))
+      .toBe(await hashCanonicalDraftState(before.state));
   });
 
   it('refuses prototype keys in scoped UI selection', () => {

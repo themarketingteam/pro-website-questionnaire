@@ -80,7 +80,38 @@ const LEGACY_FORM_FIELDS = new Set([
   'expandedQuestions',
   'credentials',
   'textValidationMeta',
+  'uiDraftState',
+  'fieldChangeMetadata',
+  'draftContext',
+  'currentQuestionId',
+  'lastChangedQuestionId',
+  'lastMutation',
+  'submittedReceipt',
 ]);
+
+export const getSafeLoadInitialStateDiagnostics = (value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return Object.freeze({
+      acceptedFieldCount: 0,
+      canonicalInput: false,
+      rejectedFieldCount: 0,
+      validInputShape: false,
+    });
+  }
+  const canonicalInput = Object.hasOwn(value, 'schemaVersion')
+    || Object.hasOwn(value, 'formType');
+  const fields = Object.keys(value);
+  return Object.freeze({
+    acceptedFieldCount: canonicalInput
+      ? fields.length
+      : fields.filter((key) => LEGACY_FORM_FIELDS.has(key)).length,
+    canonicalInput,
+    rejectedFieldCount: canonicalInput
+      ? 0
+      : fields.filter((key) => !LEGACY_FORM_FIELDS.has(key)).length,
+    validInputShape: true,
+  });
+};
 
 const isPlainObject = (value) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -390,6 +421,43 @@ const normalizeFieldMetadataPayload = (value) => {
 
 const normalizeLegacyStatePayload = (value) => {
   if (!isPlainObject(value)) fail('$');
+  if (Object.hasOwn(value, 'schemaVersion') || Object.hasOwn(value, 'formType')) {
+    const canonical = normalizeCanonicalDraftState(migrateCanonicalDraftState(value));
+    return {
+      responses: canonical.responses,
+      validationStatus: canonical.validationStatus,
+      touchedQuestions: canonical.touchedQuestions,
+      expandedQuestions: canonical.expandedQuestions,
+      credentials: canonical.credentials,
+      textValidationMeta: canonical.textValidationMeta,
+      uiDraftState: canonical.uiDraftState,
+      fieldChangeMetadata: canonical.fieldChangeMetadata,
+      draftContext: {
+        draftId: canonical.draftId,
+        sessionId: canonical.sessionId,
+        draftStatus: canonical.draftStatus,
+        schemaVersion: canonical.schemaVersion,
+        clientRevision: canonical.clientRevision,
+        serverRevision: canonical.serverRevision,
+        sourceTabId: canonical.sourceTabId,
+        namespace: null,
+        restoredFrom: null,
+        lastStateHash: null,
+      },
+      currentQuestionId: canonical.currentQuestionId,
+      lastChangedQuestionId: canonical.lastChangedQuestionId,
+      lastMutation: canonical.lastMutation,
+      submittedReceipt: (
+        canonical.draftStatus === 'submitted'
+        || canonical.submission.finalSubmissionId
+        || canonical.submission.submittedAt
+      ) ? {
+          finalSubmissionId: canonical.submission.finalSubmissionId,
+          submittedAt: canonical.submission.submittedAt,
+          pdfAvailable: Boolean(canonical.submission.pdfSourceStateHash),
+        } : null,
+    };
+  }
   const output = {};
   for (const key of Object.keys(value)) {
     if (!LEGACY_FORM_FIELDS.has(key)) continue;
@@ -401,6 +469,21 @@ const normalizeLegacyStatePayload = (value) => {
       output[key] = normalizeBooleanMap(value[key], `$.${key}`);
     } else if (key === 'credentials') {
       output[key] = normalizeCredentials(value[key]);
+    } else if (key === 'uiDraftState') {
+      output[key] = normalizeUiDraftMap(value[key]);
+    } else if (key === 'fieldChangeMetadata') {
+      output[key] = normalizeFieldMetadataMap(value[key]);
+    } else if (key === 'draftContext') {
+      output[key] = normalizeDraftContextPayload(value[key]);
+    } else if (key === 'currentQuestionId' || key === 'lastChangedQuestionId') {
+      output[key] = normalizeNullableString(value[key], `$.${key}`);
+    } else if (key === 'lastMutation') {
+      output[key] = normalizeCanonicalDraftState({
+        ...createEmptyCanonicalDraftState(),
+        lastMutation: value[key],
+      }).lastMutation;
+    } else if (key === 'submittedReceipt') {
+      output[key] = value[key] === null ? null : normalizeSubmittedReceipt(value[key]);
     }
   }
   return output;
@@ -796,7 +879,10 @@ const formSlice = createSlice(/** @type {any} */ ({
       },
     },
     loadInitialState: {
-      prepare: (payload) => ({ payload: normalizeLegacyStatePayload(payload) }),
+      prepare: (payload) => ({
+        payload: normalizeLegacyStatePayload(payload),
+        meta: { safeDiagnostics: getSafeLoadInitialStateDiagnostics(payload) },
+      }),
       reducer: (state, action) => {
         if (shouldIgnoreBecauseSubmitted(state)) return;
         const prepared = attempt(() => normalizeLegacyStatePayload(action.payload));

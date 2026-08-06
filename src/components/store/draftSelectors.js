@@ -72,7 +72,6 @@ export const selectCanonicalDraftState = createSelector(
   (form) => {
     try {
       const context = form.draftContext || EMPTY_OBJECT;
-      const sync = form.draftSyncStatus || EMPTY_OBJECT;
       const receipt = form.submittedReceipt;
       const state = normalizeCanonicalDraftState({
         ...createEmptyCanonicalDraftState(),
@@ -82,8 +81,11 @@ export const selectCanonicalDraftState = createSelector(
         draftStatus: context.draftStatus || 'active',
         clientRevision: context.clientRevision ?? 0,
         serverRevision: context.serverRevision ?? 0,
-        savedAtClient: sync.lastLocalSavedAt ?? null,
-        savedAtServer: sync.lastServerSavedAt ?? null,
+        // Cache-envelope timestamps and Redux sync indicators are operational
+        // metadata. Keeping them out of this projection prevents save-status
+        // actions from scheduling another canonical write.
+        savedAtClient: null,
+        savedAtServer: null,
         sourceTabId: context.sourceTabId ?? null,
         responses: form.responses || {},
         validationStatus: form.validationStatus || {},
@@ -101,7 +103,7 @@ export const selectCanonicalDraftState = createSelector(
           submittedAt: receipt?.submittedAt ?? null,
           submittedStateHash: null,
           pdfSourceStateHash: null,
-          lastSubmissionErrorCode: sync.errorCode ?? null,
+          lastSubmissionErrorCode: null,
         },
         compatibility: {
           sourceType: DRAFT_STATE_SOURCE_TYPES.CANONICAL,

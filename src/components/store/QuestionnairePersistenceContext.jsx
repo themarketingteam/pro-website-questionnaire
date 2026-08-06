@@ -13,6 +13,12 @@ export const useQuestionnairePersistence = () => {
       storageMode: 'unknown',
       durable: false,
       rehydrationStatus: 'unavailable',
+      getStorageDiagnostics: () => ({ storageMode: 'unknown', durable: false }),
+      getLocalPersistenceStatus: () => ({
+        active: false,
+        storageMode: 'unknown',
+        lastErrorCode: 'LOCAL_CANONICAL_PERSISTENCE_UNAVAILABLE',
+      }),
     };
   }
   return context;

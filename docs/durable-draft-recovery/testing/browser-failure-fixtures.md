@@ -1,6 +1,6 @@
 # Browser failure and concurrency fixtures
 
-- Status: fixture mechanics implemented; durable-draft V2 acceptance remains pending
+- Status: fixture mechanics and browser-local canonical-cache acceptance implemented; server-linked durable-draft V2 acceptance remains pending
 - Date: 2026-08-05
 - Scope: local, read-only harness validation and future staging-only acceptance support
 
@@ -10,7 +10,7 @@ The browser suite keeps three evidence categories separate:
 
 1. **Harness validation** uses `[HARNESS]` titles under `tests/e2e/harness/`. These tests prove that a browser fault, offline transition, lifecycle event, or isolation primitive behaves as configured. They do not certify application recovery.
 2. **Current baseline characterization** remains in the opt-in Vitest files under `src/test/baseline-characterization/`. Those tests record existing defects and are not release acceptance.
-3. **Future V2 acceptance** lives under `tests/e2e/draft-v2/`. Every current scenario is a requirement-linked `test.fixme` with an activation reason. A passing harness test cannot make one of these scenarios pass.
+3. **Requirement acceptance** lives under `tests/e2e/draft-v2/`. Browser-local boot, cache, fallback, reload, malformed-cache, and client-isolation scenarios are active. Server recovery, email, revision/CAS, server-backed multi-tab conflict, server clear, submission locking, and offline reconciliation remain explicit `test.fixme` cases. A passing harness test cannot make a pending server scenario pass.
 
 No fixture in this foundation submits a questionnaire, sends email, uploads a file, calls Zapier, or deploys Base44 resources.
 
@@ -43,6 +43,16 @@ const capabilities = await getStorageCapabilityDiagnostics(page);
 ```
 
 Browser engines differ in native property descriptors, private-mode quota behavior, and when they surface IndexedDB failures. The fixture deliberately uses standards-level shims with stable exception names rather than reproducing an engine’s internal object identity. Native Safari private browsing, enterprise policies, and real exhausted device storage still require manual device validation.
+
+### Canonical-cache helpers
+
+The fixture also exports:
+
+- `readCanonicalDraftCache(page)`, which selects the newest namespaced `:draft-cache` record from IndexedDB/localStorage and parses only synthetic test state;
+- `replaceCanonicalDraftCacheWithMalformed(page)`, which replaces only namespaced canonical-cache records for malformed-envelope fallback testing; and
+- `installRuntimePersistentWriteFailure(page)`, which injects post-commit IndexedDB/localStorage write failures so reload can prove the previous durable record survived.
+
+These helpers never enumerate or print production data. Active specs use unique `example.test` identities against the read-only local target. Cache inspection is test-only and is not production diagnostic UI.
 
 ## Network and offline modes
 
@@ -108,13 +118,13 @@ Local and production targets reject the write flag before launch.
 
 ## Requirement mapping and pending activation
 
-| Requirement | Pending browser coverage |
+| Requirement | Browser coverage state |
 | --- | --- |
 | `DR-BOOT-001`, `DR-BOOT-002` | Storage-fault boot matrix and bounded bootstrap. |
-| `DR-LOCAL-001`, `DR-SAVE-001` | Last-good snapshot and canonical reload/recovery. |
+| `DR-LOCAL-001`, browser-local part of `DR-MUT-001` | Active last-good snapshot, canonical reload, storage-state, validation/expanded/touched, fallback-mode, malformed-cache, and truthful-status coverage. Canonical server `DR-SAVE-001` remains pending. |
 | `DR-OFFLINE-001` | Offline outbox, lifecycle flush, and reconnect. |
 | `DR-CONCUR-001` | Merge, conflict, stale-save, duplicate, and ordering behavior. |
-| `DR-LOCAL-002`, `DR-SEC-001` | Same-profile client isolation and cross-context authorization. |
+| `DR-LOCAL-002`, `DR-SEC-001` | Same-profile browser client isolation is active; server/cross-context recovery authorization remains pending. |
 
 Run the non-strict report during foundation work:
 
@@ -128,7 +138,9 @@ It emits both text and JSON and exits zero while clearly listing pending release
 npm run test:e2e:pending-strict
 ```
 
-Strict mode fails until every requirement-linked placeholder is activated or removed by its authorized implementation batch. Activation requires the corresponding production code, lower-level tests, staging feature flags, safe write/cleanup authorization where applicable, and observed browser evidence. Removing a pending test merely to make strict mode green is prohibited.
+Strict mode still fails while any server-linked requirement placeholder remains. Activation requires the corresponding production code, lower-level tests, staging feature flags, safe write/cleanup authorization where applicable, and observed browser evidence. Removing a pending test merely to make strict mode green is prohibited.
+
+The current non-strict report contains eight pending scenarios across `DR-CONCUR-001`, `DR-OFFLINE-001`, `DR-SAVE-001`, and `DR-SEC-001`. The activated browser-local cache and isolation subset passes 70/70 executions across the five configured projects; ten executions remain skipped because canonical server recovery and cross-context recovery authorization are intentionally outside this batch.
 
 ## Validation commands
 

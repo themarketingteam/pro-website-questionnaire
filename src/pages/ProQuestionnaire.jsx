@@ -1940,6 +1940,7 @@ export default function ProQuestionnaire() {
         show={showAutoSave}
         storageMode={questionnairePersistence.storageMode}
         getStorageDiagnostics={questionnairePersistence.getStorageDiagnostics}
+        getLocalPersistenceStatus={questionnairePersistence.getLocalPersistenceStatus}
       />
       <Suspense fallback={null}>
         <ReduxDataValidator />
