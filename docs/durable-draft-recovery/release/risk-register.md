@@ -244,7 +244,7 @@ The register's likelihood/severity columns describe the risk before planned cont
 | `RISK-022` | Medium | Critical | The persistent admin-grant sign/verify primitive and exact Base44-admin diagnostic gate are certified in staging. The existing password flow is unchanged; brute-force controls, migration, device persistence, and fleet revocation operations remain absent. |
 | `RISK-023` | Medium | Critical | Selection tests prove the newest submitted record wins over an older active record, but current submitted PDF source remains in-memory and not identity-addressable after reload. Selection does not replace submitted-snapshot binding. [Audit report](../audit/current-system-audit-report.md#submission-and-pdf-behavior). |
 | `RISK-024` | Medium | Critical | Submission callers retain legacy-success compatibility and now distinguish delivered/redirected/suppressed/failed outcomes; remote fallback and end-to-end staging equivalence remain unverified. [Audit report](../audit/current-system-audit-report.md#unconfirmed-and-partially-confirmed-risks). |
-| `RISK-025` | Medium (cleanup absent) | Critical | Future cleanup risk; no retention cleanup was implemented or run. |
+| `RISK-025` | Medium (source controls implemented; live proof absent) | Critical | Local one-year policy, holds, server-time cutoff, dry-run report, report-bound manual apply, event-first deletion, re-evaluation, and checkpoint controls exist. No live dry run, backup restore, RLS/filter proof, alert, secret, deploy, or cleanup has occurred. |
 | `RISK-026` | Medium (local control implemented) | Critical | Version 5 adds trusted-invitation/authorized-draft precedence, untrusted URL downgrade, changed-email namespace separation, cache identity mismatch rejection, and session-stable anonymous isolation. Unit/integration evidence plus the Chromium/Firefox/WebKit synthetic identity matrix is local only; deployed isolation and server authorization remain uncertified. [DRAFT-017](../audit/current-defect-register.md#draft-017--shared-browser-state-can-leak-across-clients). |
 | `RISK-027` | High | Critical | The new canonical cache supplies tested same-browser reload continuity, but the older failure-backup record and acknowledged server drafts still lack authorized public recovery. Cross-device/server restore and the deployed migration matrix remain absent. [DRAFT-004](../audit/current-defect-register.md#draft-004--server-drafts-are-never-restored-into-the-public-form), [DRAFT-005](../audit/current-defect-register.md#draft-005--local-backups-are-write-only). |
 | `RISK-028` | Medium (policy unverified) | Critical | Seven direct calls and absent repository RLS declarations confirmed; exploitability not claimed. [DRAFT-014](../audit/current-defect-register.md#draft-014--draft-data-crosses-a-direct-browser-entity-boundary). |
@@ -590,3 +590,18 @@ their existing release classification. The apply secret is not configured;
 there is no staging RLS proof, real-data dry run, retention/cleanup, reverse
 migration, or production rollback rehearsal. No Base44 or Git remote operation
 occurred.
+
+## 2026-08-06 one-year retention source evidence
+
+The local retention policy reduces source-design uncertainty for `RISK-025`
+with a minimum 365-day server-time window, required hold reasons, recent
+support/replacement/migration exclusions, submitted locks, environment and
+test isolation, bounded dry run, safe IDs/fingerprints, two-hour report-bound
+manual authorization, per-record event-first deletion, re-evaluation, and
+resumable checkpoints. A false schedule environment flag still cannot enable
+unattended apply.
+
+`RISK-025` remains open at Medium/Critical because no real record was analyzed
+or deleted and live Base44 filters, RLS, backup restore, alerts, report review,
+and failure reconciliation are unproved. No secret, schema, function,
+automation, record, production resource, or remote branch changed.

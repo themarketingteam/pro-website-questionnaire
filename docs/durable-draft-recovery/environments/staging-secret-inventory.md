@@ -2,7 +2,7 @@
 
 - Status: **STAGING_CRYPTOGRAPHIC_SECRETS_CONFIGURED**
 - Inventory date: 2026-08-05
-- Inventory rows: **91 names**
+- Inventory rows: **97 names**
 - Current production Base44 secret names observed: **4**
 - Current staging Base44 secret names observed: **8** (six cryptographic secrets and two ordinary staging controls)
 
@@ -51,6 +51,7 @@ The four production names observed through the names-only Base44 secret command 
 | 19d | `PRO_FORM_EMAIL_OTP_SECRET` | Future six-digit OTP HMAC; independent, at least 32 bytes | Later; reserved and not configured | Later; reserved and not configured | Yes | No |
 | 19e | `PRO_FORM_MAGIC_LINK_SECRET` | Future opaque magic-link-token HMAC; independent, at least 32 bytes | Later; reserved and not configured | Later; reserved and not configured | Yes | No |
 | 19f | `PRO_FORM_MIGRATION_APPLY_SECRET` | Independent HMAC key for two-hour one-time admin migration apply and rollback authorization | Later; reserved, not configured | Later; reserved, not configured | Yes | No |
+| 19g | `PRO_FORM_RETENTION_APPLY_SECRET` | Independent HMAC key for two-hour report-bound admin retention apply authorization | Later; reserved, not configured | Later; reserved, not configured | Yes | No |
 | 20 | `CAPTCHA_SITE_KEY` | Future public staging CAPTCHA site key | Later | Later | Yes | No |
 | 21 | `CAPTCHA_SECRET_KEY` | Future backend CAPTCHA verification secret | Later | Later | Yes | No |
 | 20a | `PRO_DRAFT_CAPTCHA_PROVIDER` | Backend provider selector: disabled, turnstile, or staging_test | Later; start `disabled` | Later | Prefer Yes | Safe `disabled` only |
@@ -175,6 +176,19 @@ The eleven exact admin authorization names are reserved by the backend contract.
 environment. This source increment did not generate, configure, query, print,
 or copy a value. Until a later staging-only configuration prompt supplies it,
 dry-run analysis cannot issue an apply token and apply/rollback fail closed.
+
+## 2026-08-06 retention source inventory
+
+`PRO_FORM_RETENTION_APPLY_SECRET` is reserved independently from the admin and
+migration secrets and remains unconfigured. Five ordinary policy names are
+also reserved: `PRO_FORM_DRAFT_RETENTION_DAYS`,
+`PRO_FORM_DRAFT_EVENT_RETENTION_DAYS`,
+`PRO_FORM_DRAFT_RETENTION_DRY_RUN`,
+`PRO_FORM_DRAFT_RETENTION_BATCH_SIZE`, and
+`PRO_FORM_DRAFT_RETENTION_RECENT_SUPPORT_DAYS`. Missing values use the safe
+365/365/true/50/30 defaults; the two retention windows cannot be reduced below
+365 and the batch cannot exceed 200. This source increment did not create,
+query, print, configure, or copy any value.
 
 ## 2026-08-05 staging cryptographic configuration evidence
 

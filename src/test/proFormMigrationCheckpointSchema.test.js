@@ -21,6 +21,9 @@ describe('ProFormMigrationCheckpoint schema', () => {
   it('enforces admin-only CRUD', () => { expect(schema.rls).toEqual(ADMIN_RLS); });
   it('stores hashes but no raw token, grant, answer, or email field', () => {
     expect(schema.properties).toHaveProperty('apply_token_hash');
+    expect(schema.properties).toHaveProperty('retention_apply_token_hash');
+    expect(schema.properties).toHaveProperty('retention_report_hash');
+    expect(schema.properties.retention_cutoff.format).toBe('date-time');
     for (const forbidden of ['apply_token','admin_grant','password','answer_content','email']) expect(schema.properties).not.toHaveProperty(forbidden);
   });
 });

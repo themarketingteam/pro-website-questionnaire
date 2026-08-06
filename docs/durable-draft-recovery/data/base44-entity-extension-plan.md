@@ -366,3 +366,14 @@ tokens, record payloads, answers, and email values are prohibited.
 The entity is cataloged under `securityEntities` so the frozen four-entity
 compatibility manifest and their common-field validator remain unchanged. No
 schema push or type generation is authorized by this addition.
+
+## One-year retention checkpoint extension
+
+The retention runner reuses `ProFormMigrationCheckpoint`; it does not add a
+seventh entity. Optional `retention_cutoff`, `retention_policy_version`,
+`retention_report_hash`, `retention_apply_index`, and one-way retention apply
+token hash/used-at fields distinguish the fixed dry-run approval from
+resumable apply work. `ProFormRecoverySecurityEvent` gains allowlisted
+retention/admin operation and outcome values for content-free audit evidence.
+All changes remain local-only and admin-only. No schema was pushed and no
+record was created, read, updated, or deleted.

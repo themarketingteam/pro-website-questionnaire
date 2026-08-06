@@ -1,0 +1,11 @@
+{
+  // Local, disabled-first schedule declaration. This prompt does not deploy or enable it.
+  "name": "runScheduledProFormDraftRetention",
+  "function": "runScheduledProFormDraftRetention",
+  "schedule": "0 3 1 * *",
+  "timezone": "UTC",
+  "enabled": false,
+  "mode": "dry_run",
+  "alertOnResult": true,
+  "description": "Monthly one-year draft-retention analysis. Manual admin apply remains mandatory."
+}

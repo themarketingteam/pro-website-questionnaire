@@ -22,3 +22,19 @@ Each later command must record its exact exit code and safe result in the
 certification report. A browser failure, inbox ambiguity, PDF mismatch,
 unexpected record, cleanup mismatch, target ambiguity, or production identity
 collision immediately stops the operation.
+
+## One-year retention operation placeholder
+
+This section is documentation only; do not execute it from this source task.
+
+1. `[PLACEHOLDER — DO NOT EXECUTE]` Confirm a restorable environment-specific backup, exact app/environment identity, clean approved release, and no migration rollback dependency.
+2. `[PLACEHOLDER — DO NOT EXECUTE]` Confirm retention remains dry-run, the independent apply secret is configured by an authorized operator, and the monthly schedule is either disabled or analysis-only.
+3. `[PLACEHOLDER — DO NOT EXECUTE]` Run bounded admin dry-run pages to completion; review safe counts, IDs/fingerprints, holds, manual-review rows, event estimates, cutoff, and report hash without printing record content.
+4. `[PLACEHOLDER — DO NOT EXECUTE]` Investigate every manual-review row and any unexpected protected/eligible record. Do not bypass holds or adjust timestamps.
+5. `[PLACEHOLDER — DO NOT EXECUTE]` Request the report-bound apply token as a separate admin action only after recorded approval. Never store or print the token.
+6. `[PLACEHOLDER — DO NOT EXECUTE]` Run bounded apply pages, reconcile event-before-draft counts and safe audits after every page, and resume only with the same authorized checkpoint/token.
+7. `[PLACEHOLDER — DO NOT EXECUTE]` Stop on cross-environment selection, submitted selection, changed fingerprints, partial event failure, count drift, or backup uncertainty. Preserve checkpoint/audit evidence and invoke the incident/restore process.
+
+Setting `PRO_FORM_DRAFT_RETENTION_DRY_RUN=false` is never sufficient authority
+for scheduled apply. Initial cleanup remains manual; unattended destructive
+automation is prohibited.

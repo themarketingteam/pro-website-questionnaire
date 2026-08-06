@@ -257,6 +257,7 @@ for release by this source-only change.
 | `DR-MIG-001` | Pass full, repeated idempotent delta, and final write-freeze migrations. | [ADR-002 §C/E/F](../architecture/ADR-002-blue-green-base44-cutover-and-data-continuity.md) | `B07` | migration runner/checkpoints/ID map (planned) | `UT-MIG-001` | `IT-MIG-001` | `BT-MIG-001` | `EV-STG-MIG-001` three-delta/freeze rehearsal | `EV-PD-MIG-001` blue-to-green batch evidence | Not applicable—pre-cutover gate | Yes | Planned |
 | `DR-MIG-002` | Detect/reconcile late blue writes and pass green-to-blue reversal. | [ADR-002 §E/I](../architecture/ADR-002-blue-green-base44-cutover-and-data-continuity.md) | `B07` | reconciliation observer and reverse runner (planned) | `UT-MIG-002` | `IT-MIG-002` | `BT-MIG-002` | `EV-STG-MIG-002` injected-late-write/reverse proof | `EV-PD-MIG-002` launch reconciliation readiness | `EV-PE-MIG-002` live late-write continuation report | Yes | Planned |
 | `DR-MIG-003` | Prove counts/hashes/relationships/files, exclude staging data, and leave zero unresolved rows. | [ADR-002 §C/D/G](../architecture/ADR-002-blue-green-base44-cutover-and-data-continuity.md) | `B07` | integrity reporter/file verifier/classifier (planned) | `UT-MIG-003` | `IT-MIG-003` | `BT-MIG-003` | `EV-STG-MIG-003` integrity report | `EV-PD-MIG-003` final-delta integrity report | `EV-PE-MIG-003` continuation reconciliation report | Yes | Planned |
+| `DR-RET-001` | Retain eligible unsubmitted drafts/events for at least one year, honor support/migration holds, dry-run first, and require report-bound manual authorization for bounded deletion. | [One-year retention contract](../retention/one-year-draft-retention-contract.md) | `B07` | `proDraftRetention`; retention repository/service/auth; analyze/apply/scheduled functions | `UT-RET-001` policy/token | `IT-RET-001` dry-run/apply/checkpoint | `BT-RET-001` pending admin workflow | `EV-STG-RET-001` real-data dry run/backup/restore pending | `EV-PD-RET-001` production approval pending | `EV-PE-RET-001` continuation reconciliation pending | Yes | Source implemented; no deploy, secret, or deletion |
 | `DR-LOAD-001` | Sustain the greater of business estimate or 250 sessions/1,000 drafts for 60 minutes. | [ADR-001 §A/M](../architecture/ADR-001-approved-product-and-security-decisions.md) | `B06` | realistic load harness and data factory (planned) | `UT-LOAD-001` | `IT-LOAD-001` | `BT-LOAD-001` | `EV-STG-LOAD-001` 60-minute report | `EV-PD-LOAD-001` production-safe capacity sample | `EV-PE-LOAD-001` continuation capacity dashboard | Yes | Planned |
 | `DR-LOAD-002` | Bound request/event growth and payload size with successful-path errors below 0.1%. | [ADR-001 §A/L](../architecture/ADR-001-approved-product-and-security-decisions.md) | `B02`, `B06` | debounce/coalescing policy; payload limits; load telemetry (planned) | `UT-LOAD-002` | `IT-LOAD-002` | `BT-LOAD-002` | `EV-STG-LOAD-002` request/event/payload report | `EV-PD-LOAD-002` configured-limit proof | `EV-PE-LOAD-002` continuation error-rate dashboard | Yes | Planned |
 | `DR-OBS-001` | Emit all required save, recovery, conflict, abuse, SES, submission, PDF, and migration signals. | [ADR-001 §C/H/I/M](../architecture/ADR-001-approved-product-and-security-decisions.md); [ADR-002 §G/I](../architecture/ADR-002-blue-green-base44-cutover-and-data-continuity.md) | `B06`, `B07` | structured telemetry/audit modules and dashboards (planned) | `UT-OBS-001` | `IT-OBS-001` | `BT-OBS-001` | `EV-STG-OBS-001` signal correlation suite | `EV-PD-OBS-001` production dashboard proof | `EV-PE-OBS-001` continuation signal sample | Yes | Planned |
@@ -544,3 +545,14 @@ no Base44 operation occurred and no real data or cloud resource was accessed
 or changed. Live staging RLS, dry-run review, interruption replay, count
 reconciliation, retention, and reverse migration remain open. No requirement
 advances to staging acceptance.
+
+## 2026-08-06 one-year retention source evidence
+
+`DR-RET-001` now has a local policy module, exact-status bounded analyzer,
+report-bound two-hour apply token, event-first per-record deletion service,
+shared migration checkpoint, safe audit vocabulary, and disabled monthly
+dry-run schedule template. Synthetic tests exercise 27+ required boundaries.
+The separate apply secret is unconfigured and no Base44 operation or deletion
+occurred. Live filter/RLS behavior, backup/restore proof, alert delivery,
+reviewed staging dry run, and all production approval remain pending, so this
+is source evidence only and not staging or release acceptance.
