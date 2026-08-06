@@ -625,3 +625,20 @@ secret, schema, function, record, live export, cleanup, and production action.
 `DR-MIG-001`, `DR-MIG-002`, `DR-MIG-003`, `DR-ID-001`, `DR-RLS-001`, and
 `DR-OBS-001` receive no staging acceptance. No live cross-app import occurred,
 and `_next` still does not exist.
+
+## 2026-08-06 release testing control-plane evidence
+
+`DR-TEST-001` now has a machine-readable ten-phase permission/evidence model,
+deterministic staging-only fixture factory, stable-ID coverage validator,
+safe Vitest/Playwright/domain-result normalization, no-deploy orchestrator,
+checksummed evidence builder, and exact-test-run cleanup coordinator. Focused
+tests cover missing/skipped/stale evidence, browsers, security hard stops,
+resume, redaction, checksums, cleanup boundaries, and forbidden commands.
+
+This is local source evidence only. Final staging functional, security,
+capacity, and release-candidate runs remain pending. Production modes are
+disabled and no deployment or production operation occurred.
+
+| Requirement ID | Requirement description | ADR source | Planned implementation batch | Planned source files/modules | Unit test ID | Integration test ID | Browser test ID | Staging evidence | Production-disabled evidence | Production-enabled evidence | Release blocking | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `DR-TEST-001` | Require phase-aware executable release evidence, safe deterministic fixtures, blocking cleanup, and reproducible sanitized bundles. | [Production acceptance criteria](./production-acceptance-criteria.md) | `B06`, `B08` | `config/durable-draft-release-phases.json`; `scripts/run-durable-draft-release-tests.mjs`; `scripts/validate-release-test-coverage.mjs`; `tests/factories/proDraftSyntheticDataFactory.js` | `UT-TEST-001` | `IT-TEST-001` | `BT-TEST-001` | `EV-STG-TEST-001` final functional/security/capacity/RC evidence | Not applicable until a later authorized production-disabled batch | Not applicable until a later authorized enablement batch | Yes | Implemented and locally tested; staging certification pending |

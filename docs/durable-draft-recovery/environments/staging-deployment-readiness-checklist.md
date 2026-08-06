@@ -425,6 +425,19 @@ cleanup were not entered.
 No checklist item is promoted. The decision remains
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
 
+## 2026-08-06 release-test orchestration source checkpoint
+
+- [x] Ten explicit release phases and per-phase permissions are source-defined.
+- [x] Synthetic records require `environment=staging` and `test_run_id`.
+- [x] Missing/skipped/security/browser/cleanup evidence fails closed.
+- [x] Evidence output is checksummed and redacted; raw artifacts remain ignored.
+- [x] Production phases and production cleanup are disabled.
+- [ ] Final staging functional, security, capacity, and release-candidate runs have not occurred.
+- [ ] The approved staging cleanup backend function must exist before any write-enabled run.
+
+No readiness item is promoted by source tooling alone. The decision remains
+**STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
+
 ## 2026-08-06 bidirectional migration utility certification attempt
 
 The [migration utility report](../migration/staging-migration-utility-certification.md)

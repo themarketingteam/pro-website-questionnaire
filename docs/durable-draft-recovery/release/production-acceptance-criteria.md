@@ -390,3 +390,19 @@ Verdicts must name the commit, environment manifest, evidence-set version, block
 ## Current certification state
 
 This document defines future acceptance evidence and does not certify the current revision. The root validation gate is installed, but the normal suite, lint, and typecheck retain known failures; required browser, staging, migration, security, and operational evidence is also incomplete. The current verdict therefore remains `BLOCKED`. The harness changes do not modify application behavior, schema, Base44 cloud resources, production data, SES configuration, email delivery, domains, or release flags.
+
+## Release test control-plane acceptance
+
+Requirement ID: `DR-TEST-001`.
+
+Every release-blocking requirement must resolve to a stable executable test ID,
+the phase's required browser results, and its named reports. Missing, skipped,
+fixme, stale, or certified-without-evidence entries are blocking. A security
+failure stops the run; cleanup failure is blocking; security groups rerun on
+resume. Only phase-labeled green, cutover, and production work may remain
+pending where the phase model explicitly permits it.
+
+Evidence must record commit, environment, test-run ID, normalized status,
+duration, safe error code, and artifact checksums without answers, emails,
+credentials, recovery codes, grants, tokens, query-bearing URLs, or raw browser
+storage state. Deployment success alone never satisfies this requirement.

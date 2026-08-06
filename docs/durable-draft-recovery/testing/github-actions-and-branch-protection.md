@@ -73,3 +73,17 @@ Production deployment, feature enablement, and domain movement must remain separ
 6. Keep the staging workflow manual until implementation, cleanup, external-side-effect, and staging-readiness gates pass.
 7. Review artifact access/retention under the organization data-handling policy.
 8. Record the ruleset evidence in the later release package; source documentation alone does not prove branch protection is active.
+
+## Release orchestration integration
+
+The local `release:*` commands now provide the future authoritative testing
+control plane. Existing quality and manual staging workflows remain unchanged
+in this increment: neither invokes final staging load/security certification,
+grants write/email/migration permission, or deploys. A later workflow prompt
+may call the phase-specific commands only after protected staging URL and
+approval inputs exist and must publish sanitized checksummed evidence rather
+than raw Playwright state.
+
+Do not make deployment a prerequisite substitute for `release:validate-coverage`
+or the phase's browser/security/cleanup reports. Production phase commands are
+currently disabled by source policy and must not be added to GitHub Actions.

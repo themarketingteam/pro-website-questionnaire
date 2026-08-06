@@ -45,3 +45,6 @@ tests/e2e/.auth/
 tests/e2e/**/*.webm
 tests/e2e/**/*.trace.zip
 tests/e2e/**/*.storage-state.json
+
+# Protected local release-test artifacts and raw developer results
+.durable-draft-artifacts/

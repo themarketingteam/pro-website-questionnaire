@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "phases": {
+    "source_foundation": {
+      "requiredRequirementIdPatterns": ["^DR-(SRC|BOOT|LOCAL|TEST)-"],
+      "allowedPendingRequirementCategories": ["staging", "security", "capacity", "migration", "green", "cutover", "production", "post_cutover"],
+      "requiredBrowsers": [],
+      "requiredReports": ["coverage", "unit", "source-safety", "cleanup"],
+      "requiredEnvironment": "local",
+      "writePermission": false,
+      "emailPermission": false,
+      "migrationPermission": false,
+      "productionPermission": false
+    },
+    "staging_functional": {
+      "requiredRequirementIdPatterns": ["^DR-(BOOT|LOCAL|SAVE|REC|CLEAR|NEW|SUBMIT|LIFE|CONCUR|OFFLINE|BROWSER|A11Y)-"],
+      "allowedPendingRequirementCategories": ["security", "capacity", "migration", "green", "cutover", "production", "post_cutover"],
+      "requiredBrowsers": ["chromium", "firefox", "webkit", "mobile-chromium", "mobile-webkit"],
+      "requiredReports": ["coverage", "unit", "integration", "browser-matrix", "cleanup"],
+      "requiredEnvironment": "staging",
+      "writePermission": true,
+      "emailPermission": false,
+      "migrationPermission": false,
+      "productionPermission": false
+    },
+    "staging_security": {
+      "requiredRequirementIdPatterns": ["^DR-(SEC|RLS|ADMIN|ABUSE|CRYPTO|REC)-"],
+      "allowedPendingRequirementCategories": ["capacity", "migration", "green", "cutover", "production", "post_cutover"],
+      "requiredBrowsers": ["chromium", "firefox", "webkit"],
+      "requiredReports": ["coverage", "security-summary", "browser-matrix", "cleanup"],
+      "requiredEnvironment": "staging",
+      "writePermission": true,
+      "emailPermission": true,
+      "migrationPermission": false,
+      "productionPermission": false
+    },
+    "staging_capacity": {
+      "requiredRequirementIdPatterns": ["^DR-(PERF|CAP|SAVE|CONCUR)-"],
+      "allowedPendingRequirementCategories": ["migration", "green", "cutover", "production", "post_cutover"],
+      "requiredBrowsers": ["chromium"],
+      "requiredReports": ["coverage", "performance-summary", "cleanup"],
+      "requiredEnvironment": "staging",
+      "writePermission": true,
+      "emailPermission": false,
+      "migrationPermission": false,
+      "productionPermission": false
+    },
+    "staging_release_candidate": {
+      "requiredRequirementIdPatterns": ["^DR-"],
+      "allowedPendingRequirementCategories": ["green", "cutover", "production", "post_cutover"],
+      "requiredBrowsers": ["chromium", "firefox", "webkit", "mobile-chromium", "mobile-webkit"],
+      "requiredReports": ["coverage", "unit", "integration", "browser-matrix", "security-summary", "performance-summary", "migration-summary", "cleanup"],
+      "requiredEnvironment": "staging",
+      "writePermission": true,
+      "emailPermission": true,
+      "migrationPermission": true,
+      "productionPermission": false
+    },
+    "green_pre_migration": {
+      "requiredRequirementIdPatterns": ["^DR-(SRC|MIG|RLS|SEC|ROLLBACK)-"],
+      "allowedPendingRequirementCategories": ["post_migration", "cutover", "production", "post_cutover"],
+      "requiredBrowsers": ["chromium"],
+      "requiredReports": ["coverage", "security-summary", "migration-summary", "cleanup"],
+      "requiredEnvironment": "green",
+      "writePermission": true,
+      "emailPermission": false,
+      "migrationPermission": true,
+      "productionPermission": false
+    },
+    "green_post_migration": {
+      "requiredRequirementIdPatterns": ["^DR-"],
+      "allowedPendingRequirementCategories": ["cutover", "production", "post_cutover"],
+      "requiredBrowsers": ["chromium", "firefox", "webkit"],
+      "requiredReports": ["coverage", "browser-matrix", "security-summary", "performance-summary", "migration-summary", "cleanup"],
+      "requiredEnvironment": "green",
+      "writePermission": true,
+      "emailPermission": true,
+      "migrationPermission": true,
+      "productionPermission": false
+    },
+    "production_disabled": {
+      "requiredRequirementIdPatterns": ["^DR-"],
+      "allowedPendingRequirementCategories": ["production_enabled", "post_cutover"],
+      "requiredBrowsers": ["chromium", "firefox", "webkit"],
+      "requiredReports": ["coverage", "browser-matrix", "security-summary", "performance-summary", "migration-summary", "cleanup"],
+      "requiredEnvironment": "production",
+      "writePermission": false,
+      "emailPermission": false,
+      "migrationPermission": false,
+      "productionPermission": false,
+      "disabled": true
+    },
+    "production_enabled": {
+      "requiredRequirementIdPatterns": ["^DR-"],
+      "allowedPendingRequirementCategories": ["post_cutover"],
+      "requiredBrowsers": ["chromium", "firefox", "webkit", "mobile-chromium", "mobile-webkit"],
+      "requiredReports": ["coverage", "browser-matrix", "security-summary", "performance-summary", "migration-summary", "cleanup"],
+      "requiredEnvironment": "production",
+      "writePermission": false,
+      "emailPermission": false,
+      "migrationPermission": false,
+      "productionPermission": false,
+      "disabled": true
+    },
+    "post_cutover": {
+      "requiredRequirementIdPatterns": ["^DR-"],
+      "allowedPendingRequirementCategories": [],
+      "requiredBrowsers": ["chromium", "firefox", "webkit", "mobile-chromium", "mobile-webkit"],
+      "requiredReports": ["coverage", "browser-matrix", "security-summary", "performance-summary", "migration-summary", "cleanup"],
+      "requiredEnvironment": "production",
+      "writePermission": false,
+      "emailPermission": false,
+      "migrationPermission": false,
+      "productionPermission": false,
+      "disabled": true
+    }
+  }
+}

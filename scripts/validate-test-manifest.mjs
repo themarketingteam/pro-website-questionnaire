@@ -82,6 +82,13 @@ const requiredFoundationFiles = [
   'tests/e2e/draft-v2/storage-recovery.spec.js',
   'tests/e2e/draft-v2/client-isolation.spec.js',
   'tests/e2e/draft-v2/identity-boundary.spec.js',
+  'config/durable-draft-release-phases.json',
+  'tests/factories/proDraftSyntheticDataFactory.js',
+  'scripts/validate-release-test-coverage.mjs',
+  'scripts/lib/normalize-test-results.mjs',
+  'scripts/run-durable-draft-release-tests.mjs',
+  'scripts/build-durable-draft-evidence-bundle.mjs',
+  'scripts/cleanup-durable-draft-test-data.mjs',
 ];
 
 for (const file of requiredFoundationFiles) {
@@ -201,6 +208,14 @@ const requiredScripts = [
   'test:e2e:harness',
   'test:e2e:pending-report',
   'test:e2e:pending-strict',
+  'release:test',
+  'release:test:staging-functional',
+  'release:test:staging-security',
+  'release:test:staging-capacity',
+  'release:test:staging-rc',
+  'release:validate-coverage',
+  'release:build-evidence',
+  'release:cleanup-test-data',
   'check',
 ];
 
