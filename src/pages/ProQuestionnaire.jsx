@@ -62,6 +62,11 @@ import {
 import { defaultResilientStorage } from '@/lib/resilientStorage';
 import { deriveQuestionnaireBrowserNamespace } from '@/lib/questionnaireBrowserNamespace';
 import { useQuestionnairePersistence } from '@/components/store/QuestionnairePersistenceContext';
+import ProDraftBootstrapGate from '@/components/pro-form/ProDraftBootstrapGate';
+import {
+  frontendRuntimeConfig,
+  isDurableDraftClientEnabled,
+} from '@/lib/proDraftRuntimeConfig';
 
 const DeferredSectionLoader = () => (
   <div className="flex items-center justify-center py-6">
@@ -73,7 +78,7 @@ const EMPTY_OBJECT = Object.freeze({});
 /** @param {any} state */
 const selectQuestionnaireForm = (state) => state?.form || EMPTY_OBJECT;
 
-export default function ProQuestionnaire() {
+function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
   const dispatch = useDispatch();
   const questionnairePersistence = useQuestionnairePersistence();
   const browserNamespace = questionnairePersistence.namespace
@@ -115,6 +120,10 @@ export default function ProQuestionnaire() {
   const [questionnaireSessionId, setQuestionnaireSessionId] = useState('');
 
   useEffect(() => {
+    if (!legacyPersistenceEnabled) {
+      setQuestionnaireSessionId(formState.sessionId || '');
+      return undefined;
+    }
     let active = true;
     getOrCreateQuestionnaireSessionId({
       namespace: browserNamespace,
@@ -123,7 +132,12 @@ export default function ProQuestionnaire() {
       if (active) setQuestionnaireSessionId(sessionId);
     }).catch(() => {});
     return () => { active = false; };
-  }, [browserNamespace, browserStorage]);
+  }, [
+    browserNamespace,
+    browserStorage,
+    formState.sessionId,
+    legacyPersistenceEnabled,
+  ]);
 
   // Extract URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -214,6 +228,7 @@ export default function ProQuestionnaire() {
   ]);
 
   useEffect(() => {
+    if (!legacyPersistenceEnabled) return undefined;
     const handleBeforeUnload = () => {
       void writeDraftFailureBackup({
         namespace: browserNamespace,
@@ -250,7 +265,8 @@ export default function ProQuestionnaire() {
     validationStatus,
     touchedQuestions,
     expandedQuestions,
-    textValidationMeta
+    textValidationMeta,
+    legacyPersistenceEnabled,
   ]);
 
   // Initialize expanded questions on mount
@@ -355,6 +371,7 @@ export default function ProQuestionnaire() {
     touchedQuestionsSnapshot = touchedQuestions,
     expandedQuestionsSnapshot = expandedQuestions
   } = {}) => {
+    if (!legacyPersistenceEnabled) return null;
     if (!questionnaireSessionId) return null;
     return saveDraftSnapshot({
       sessionId: questionnaireSessionId,
@@ -381,10 +398,12 @@ export default function ProQuestionnaire() {
     expandedQuestions,
     credentials,
     businessNameParam,
-    domainParam
+    domainParam,
+    legacyPersistenceEnabled,
   ]);
 
   const queueDraftSave = useCallback((changedQuestionId, nextResponses = responses) => {
+    if (!legacyPersistenceEnabled) return;
     if (hasFinalSubmittedRef.current || !questionnaireSessionId) return;
 
     lastChangedQuestionIdRef.current = changedQuestionId;
@@ -438,7 +457,8 @@ export default function ProQuestionnaire() {
     businessNameParam,
     domainParam,
     saveDraftSnapshot,
-    draftSaveDelayMs
+    draftSaveDelayMs,
+    legacyPersistenceEnabled,
   ]);
 
   const createDraftEvent = useCallback(async ({
@@ -446,6 +466,7 @@ export default function ProQuestionnaire() {
     questionId,
     value
   }) => {
+    if (!legacyPersistenceEnabled) return;
     if (!questionnaireSessionId) return;
     try {
       const question = questionId ? getQuestionById(QUESTIONS, questionId) : null;
@@ -473,7 +494,8 @@ export default function ProQuestionnaire() {
     credentials.businessName,
     credentials.domain,
     credentials.userId,
-    domainParam
+    domainParam,
+    legacyPersistenceEnabled,
   ]);
 
   const queueDraftEvent = useCallback(({
@@ -1997,3 +2019,15 @@ export default function ProQuestionnaire() {
       </ErrorBoundary>
       );
       }
+
+export default function ProQuestionnaire() {
+  const durableDraftV2Enabled = isDurableDraftClientEnabled(frontendRuntimeConfig);
+
+  if (!durableDraftV2Enabled) return <ProQuestionnaireContent />;
+
+  return (
+    <ProDraftBootstrapGate runtimeConfig={frontendRuntimeConfig}>
+      <ProQuestionnaireContent legacyPersistenceEnabled={false} />
+    </ProDraftBootstrapGate>
+  );
+}

@@ -43,6 +43,10 @@ import {
   stopLocalCanonicalDraftPersistence,
 } from './store/localCanonicalDraftPersistence';
 import { QuestionnairePersistenceProvider } from './store/QuestionnairePersistenceContext';
+import {
+  frontendRuntimeConfig,
+  isDurableDraftClientEnabled,
+} from '@/lib/proDraftRuntimeConfig';
 
 const questionnaireRuntimeCache = new Map();
 
@@ -321,7 +325,7 @@ export const bootstrapQuestionnaireStoreRuntime = async (runtime, options = {}) 
       });
     }
   }
-  if (runtime.localPersistence) {
+  if (runtime.localPersistence && options.startLocalPersistence !== false) {
     startLocalCanonicalDraftPersistence(runtime.localPersistence, {
       initialHash,
       scheduleInitial: true,
@@ -351,6 +355,8 @@ export const bootstrapQuestionnaireStoreRuntime = async (runtime, options = {}) 
  *   rehydrationTimeoutMs?: number,
  *   canonicalCacheAdapter?: any,
  *   cacheTimeoutMs?: number,
+ *   identityContext?: any,
+ *   startLocalPersistence?: boolean,
  * }} [options]
  */
 export const createQuestionnaireStoreRuntime = async ({
@@ -361,6 +367,7 @@ export const createQuestionnaireStoreRuntime = async ({
   rehydrationTimeoutMs,
   canonicalCacheAdapter = defaultCanonicalDraftCacheAdapter,
   cacheTimeoutMs,
+  startLocalPersistence = true,
 } = {}) => {
   const storage = storageFactory(namespace);
   try { await storage.probe?.(); } catch {}
@@ -377,6 +384,7 @@ export const createQuestionnaireStoreRuntime = async ({
     canonicalCacheAdapter,
     cacheTimeoutMs,
     identityContext,
+    startLocalPersistence,
   });
 };
 
@@ -446,6 +454,9 @@ export default function ReduxProvider({
     identity.context,
   ), [identity]);
   const [runtime, setRuntime] = useState(null);
+  const ordinaryLocalPersistenceEnabled = !isDurableDraftClientEnabled(
+    frontendRuntimeConfig,
+  );
 
   useEffect(() => {
     let active = true;
@@ -460,6 +471,7 @@ export default function ReduxProvider({
       rehydrationTimeoutMs,
       cacheTimeoutMs,
       canonicalCacheAdapter,
+      startLocalPersistence: ordinaryLocalPersistenceEnabled,
     };
     const runtimePromise = useRuntimeCache
       ? getOrCreateQuestionnaireRuntime(options)
@@ -489,9 +501,11 @@ export default function ReduxProvider({
         ));
         nextRuntime.store.dispatch(patchDraftContext({ namespace }));
         try { await nextRuntime.persistor.flush(); } catch {}
-        startLocalCanonicalDraftPersistence(nextRuntime.localPersistence, {
-          scheduleInitial: true,
-        });
+        if (ordinaryLocalPersistenceEnabled) {
+          startLocalCanonicalDraftPersistence(nextRuntime.localPersistence, {
+            scheduleInitial: true,
+          });
+        }
         safeRemoveSearchParameter('resetFormState');
       }
 
@@ -500,9 +514,11 @@ export default function ReduxProvider({
         if (!useRuntimeCache) await nextRuntime.dispose?.();
         return;
       }
-      startLocalCanonicalDraftPersistence(nextRuntime.localPersistence, {
-        scheduleInitial: false,
-      });
+      if (ordinaryLocalPersistenceEnabled) {
+        startLocalCanonicalDraftPersistence(nextRuntime.localPersistence, {
+          scheduleInitial: false,
+        });
+      }
       mountedRuntime = nextRuntime;
       setRuntime(nextRuntime);
       try { onRuntimeReady?.(nextRuntime); } catch {}
@@ -525,6 +541,7 @@ export default function ReduxProvider({
         canonicalCacheAdapter,
         cacheTimeoutMs,
         identityContext: identity.context,
+        startLocalPersistence: ordinaryLocalPersistenceEnabled,
       });
       if (active) setRuntime(bootstrappedFallback);
       else await bootstrappedFallback.dispose?.();
@@ -542,6 +559,7 @@ export default function ReduxProvider({
     namespace,
     identity,
     onRuntimeReady,
+    ordinaryLocalPersistenceEnabled,
     rehydrationTimeoutMs,
     resolvedHref,
     storageFactory,

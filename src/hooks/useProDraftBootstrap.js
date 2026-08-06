@@ -80,6 +80,10 @@ export const useProDraftBootstrap = (options = {}) => {
     storageMode: snapshot.storageMode || 'unknown',
     mergeRequired: snapshot.mergeRequired === true,
     pendingServerSync: snapshot.pendingServerSync === true,
+    captchaRequired: snapshot.captchaRequired === true,
+    retryAfterSeconds: Number.isSafeInteger(snapshot.retryAfterSeconds)
+      ? snapshot.retryAfterSeconds
+      : 0,
     createNewDraftAssociation: coordinator.createNewDraftAssociation,
     recoverDraftByEmail: coordinator.recoverDraftByEmail,
     recoverDraftByCode: coordinator.recoverDraftByCode,

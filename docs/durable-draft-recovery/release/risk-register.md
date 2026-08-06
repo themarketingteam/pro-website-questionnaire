@@ -197,6 +197,27 @@ limits, trusted-proxy, CAPTCHA, monitoring, 10k corpus, and deployment evidence
 remain blockers. No schema, function, secret, flag, staging/production data,
 email/SES, domain, or Git remote changed.
 
+### 2026-08-06 client recovery entry source implementation
+
+The [opening recovery modal contract](../frontend/opening-recovery-modal-contract.md)
+adds local component and five-browser evidence for explicit new/email/code
+choice, the changed-signed-email boundary, anonymous recovery-risk
+acknowledgement, one-time recovery-code presentation/copy, submitted read-only
+entry, conditional CAPTCHA, retry timing, generic failures, and an always-
+present bootstrap gate. Recovery and CAPTCHA tokens remain transient and are
+excluded from Redux, canonical draft state, URLs, diagnostics, and modal
+summaries.
+
+This reduces implementation uncertainty around accidental implicit recovery,
+credential leakage, and interactive entry before bootstrap. It does not lower
+any risk rating. `RISK-001` remains knowingly accepted at its existing rating:
+the opening disclosure makes clear that exact-email recovery does not prove
+mailbox ownership. Live CAPTCHA hostname/secret/provider behavior, distributed
+rate limits, deployed accessibility and storage-failure behavior, authoritative
+V2 autosave, staging APIs, and production-disabled evidence remain release
+gates. No Base44 resource, email/SES path, domain, production flag, or remote
+Git reference changed.
+
 ## Knowingly accepted risks
 
 ### RISK-001: Public email-only recovery

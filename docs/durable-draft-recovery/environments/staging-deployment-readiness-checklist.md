@@ -146,6 +146,20 @@ Capture sanitized, dated evidence for:
 7. Future SES account state, sender, region, IAM, quota, bounce, and complaint configuration before email enablement.
 8. Zapier staging sink and downstream action inventory before webhook enablement.
 
+### 2026-08-06 client recovery entry local evidence
+
+The opening recovery modal, pre-interaction bootstrap gate, and conditional
+CAPTCHA adapter are implemented in source. Component tests pass 42/42. The
+isolated local visual harness passes 35/35 cases across desktop Chromium,
+Firefox, and WebKit plus mobile Chromium and mobile WebKit. The harness uses an
+in-memory coordinator and makes no external request; it does not certify a
+deployed Base44 site, live recovery API, CAPTCHA provider, storage policy, or
+authoritative autosave.
+
+No readiness item is promoted by local evidence alone. The staging site was not
+deployed, email was not sent, no entity/function/secret/record was changed, and
+the overall decision remains **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
+
 ## Decision
 
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**

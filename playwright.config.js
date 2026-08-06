@@ -103,7 +103,9 @@ export default defineConfig({
         VITE_PRO_DRAFT_EMAIL_OTP_ENABLED: 'false',
         VITE_PRO_DRAFT_MAGIC_LINK_ENABLED: 'false',
         VITE_PRO_DRAFT_DIAGNOSTICS_ENABLED: 'false',
+        VITE_PRO_DRAFT_CAPTCHA_TEST_MODE_ENABLED: 'true',
         VITE_STAGING_BANNER_ENABLED: 'false',
+        E2E_PRO_DRAFT_ENTRY_VISUALS: 'true',
       },
     }
     : undefined,

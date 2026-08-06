@@ -45,13 +45,13 @@ Use `npm run test:e2e:harness` for storage/network/lifecycle/concurrency fixture
 
 Use `npm run test:e2e`, `npm run test:e2e:headed`, or `npm run test:e2e:debug` for the complete current E2E set, headed inspection, or Playwright debugging. Local runs use zero retries; CI may use one retry and must still preserve the first failure evidence. Skipped V2 tests are visible release debt, not passing recovery evidence.
 
-`tests/e2e/draft-v2/bootstrap-controller.spec.js` activates the six nonvisual
-recovery scenarios supported before the opening modal exists: explicit new
-draft creation, stored resume, email/code API handoff, submitted read-only
-hydration, and memory-only credentials. It uses injected synthetic clients and
-creates no Base44 record or external request. Modal rendering/accessibility
-assertions remain deferred, and the eight server-sync/concurrency/offline
-`fixme` cases remain explicit release debt.
+`tests/e2e/draft-v2/bootstrap-controller.spec.js` activates six nonvisual
+recovery scenarios: explicit new draft creation, stored resume, email/code API
+handoff, submitted read-only hydration, and memory-only credentials.
+`opening-recovery-modal.spec.js` adds seven rendered entry scenarios across all
+five projects. Its separate Vite entry is local-only, uses an injected in-memory
+coordinator, and creates no Base44 record or external request. The eight
+server-sync/concurrency/offline `fixme` cases remain explicit release debt.
 
 ## Staging use
 

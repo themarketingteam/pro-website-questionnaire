@@ -130,12 +130,19 @@ const clientContextFromIdentity = (identityContext, environment, overrides = {})
   ...overrides,
 });
 
-const safeDraftSummary = (state, readOnly = false) => Object.freeze({
+const safeDraftSummary = (state, readOnly = false, metadata = {}) => Object.freeze({
   draftId: typeof state?.draftId === 'string' ? state.draftId : null,
   status: typeof state?.draftStatus === 'string' ? state.draftStatus : null,
   clientRevision: Number.isSafeInteger(state?.clientRevision) ? state.clientRevision : null,
   serverRevision: Number.isSafeInteger(state?.serverRevision) ? state.serverRevision : null,
   readOnly: readOnly === true || state?.draftStatus === 'submitted',
+  businessNameDisplay: typeof metadata?.businessNameDisplay === 'string'
+    ? metadata.businessNameDisplay
+    : null,
+  lastSavedAt: typeof metadata?.lastSavedAt === 'string'
+    && Number.isFinite(Date.parse(metadata.lastSavedAt))
+    ? metadata.lastSavedAt
+    : (typeof state?.savedAtServer === 'string' ? state.savedAtServer : null),
 });
 
 export const getSafeBootstrapDiagnostics = (value = {}) => Object.freeze({
@@ -157,6 +164,12 @@ export const getSafeBootstrapDiagnostics = (value = {}) => Object.freeze({
   mergeRequired: value.mergeRequired === true,
   pendingServerSync: value.pendingServerSync === true,
   cancelled: value.cancelled === true,
+  captchaRequired: value.captchaRequired === true,
+  retryAfterSeconds: Number.isSafeInteger(value.retryAfterSeconds)
+    && value.retryAfterSeconds >= 0
+    && value.retryAfterSeconds <= 86400
+    ? value.retryAfterSeconds
+    : 0,
   ...(value.draftSummary ? { draftSummary: safeDraftSummary(
     value.draftSummary,
     value.readOnly,
@@ -305,6 +318,7 @@ export const createProDraftBootstrapCoordinator = (options = {}) => {
     phase: 'idle', outcome: null, errorCode: null, clientChoiceRequired: false,
     readOnly: false, hasRecoveryCode: false, recoveryCodeHintPresent: false,
     storageMode: 'unknown', memoryOnly: false, draftSummary: null,
+    captchaRequired: false, retryAfterSeconds: 0,
   });
   let bootstrapPromise = null;
   let cancelled = false;
@@ -372,7 +386,13 @@ export const createProDraftBootstrapCoordinator = (options = {}) => {
     recoveryCodeForDisplay = saved.bundle?.recoveryCode || null;
     return saved;
   };
-  const hydrate = async ({ serverState, readOnly, outcome, hasExactDraftAuthorization = true }) => {
+  const hydrate = async ({
+    serverState,
+    readOnly,
+    outcome,
+    hasExactDraftAuthorization = true,
+    draftMetadata = null,
+  }) => {
     transition('reconciling_state');
     const localState = localCacheResult?.ok && localCacheResult?.present
       ? localCacheResult.state : null;
@@ -417,7 +437,9 @@ export const createProDraftBootstrapCoordinator = (options = {}) => {
       recoveryCodeHintPresent: Boolean(credentials?.recoveryCodeHint),
       storageMode: state.storageMode,
       memoryOnly: state.memoryOnly,
-      draftSummary: safeDraftSummary(reconciled.state, effectiveReadOnly),
+      draftSummary: safeDraftSummary(reconciled.state, effectiveReadOnly, draftMetadata),
+      captchaRequired: false,
+      retryAfterSeconds: 0,
       mergeRequired: reconciled.mergeRequired,
       pendingServerSync: reconciled.pendingServerSync,
       reconciliation: Object.freeze({
@@ -457,6 +479,7 @@ export const createProDraftBootstrapCoordinator = (options = {}) => {
       serverState: pickCanonicalState(response),
       readOnly: response.readOnly === true || response.draft?.readOnly === true,
       outcome,
+      draftMetadata: response.draft,
     });
   };
 
@@ -484,10 +507,16 @@ export const createProDraftBootstrapCoordinator = (options = {}) => {
       serverState: pickCanonicalState(response),
       readOnly: response.readOnly === true || response.draft?.readOnly === true,
       outcome: 'stored_draft_resumed',
+      draftMetadata: response.draft,
     });
   };
 
-  const recoverWith = async ({ method, input, keepRecoveryCode = true }) => {
+  const recoverWith = async ({
+    method,
+    input,
+    keepRecoveryCode = true,
+    captchaToken,
+  }) => {
     const byCode = method === 'code';
     transition(byCode ? 'recovering_by_code' : 'recovering_by_email');
     let normalizedCode = null;
@@ -507,6 +536,9 @@ export const createProDraftBootstrapCoordinator = (options = {}) => {
           cryptoProvider: options.cryptoProvider,
         }),
         clientContext: { environment: runtimeConfig.environment },
+        ...(typeof captchaToken === 'string' && captchaToken
+          ? { captchaToken }
+          : {}),
       };
     } else {
       const normalized = normalizeRecoveryEmail(input);
@@ -518,6 +550,9 @@ export const createProDraftBootstrapCoordinator = (options = {}) => {
       request = {
         email: normalized.normalizedEmail,
         clientContext: { environment: runtimeConfig.environment },
+        ...(typeof captchaToken === 'string' && captchaToken
+          ? { captchaToken }
+          : {}),
       };
     }
     const response = byCode
@@ -526,6 +561,10 @@ export const createProDraftBootstrapCoordinator = (options = {}) => {
     if (!response?.success || !response.recoveryCompleted) {
       throw Object.assign(new Error('Draft recovery failed.'), {
         code: safeErrorCode(response, PRO_DRAFT_BOOTSTRAP_ERROR_CODES.RECOVERY_FAILED),
+        captchaRequired: response?.captchaRequired === true,
+        retryAfterSeconds: Number.isSafeInteger(response?.retryAfterSeconds)
+          ? response.retryAfterSeconds
+          : 0,
       });
     }
     let existingForRecoveredDraft = credentials?.draftId === response.draft?.draftId
@@ -626,6 +665,7 @@ export const createProDraftBootstrapCoordinator = (options = {}) => {
       serverState: pickCanonicalState(response),
       readOnly: response.readOnly === true || response.draft?.readOnly === true,
       outcome,
+      draftMetadata: response.draft,
     });
   };
 
@@ -759,6 +799,7 @@ export const createProDraftBootstrapCoordinator = (options = {}) => {
               readOnly: response.readOnly === true || response.draft?.readOnly === true,
               outcome: response.created
                 ? 'signed_invitation_new_draft' : 'signed_invitation_resumed',
+              draftMetadata: response.draft,
             });
           }
         }
@@ -805,6 +846,12 @@ export const createProDraftBootstrapCoordinator = (options = {}) => {
         ...state,
         phase: 'error', outcome: null, errorCode: code,
         clientChoiceRequired: false, cancelled,
+        captchaRequired: error?.captchaRequired === true,
+        retryAfterSeconds: Number.isSafeInteger(error?.retryAfterSeconds)
+          && error.retryAfterSeconds >= 0
+          && error.retryAfterSeconds <= 86400
+          ? error.retryAfterSeconds
+          : 0,
       });
       state = failure;
       notify();
@@ -815,11 +862,16 @@ export const createProDraftBootstrapCoordinator = (options = {}) => {
   return Object.freeze({
     bootstrap: (input) => bootstrap(input),
     resumeDraftFromStoredCredentials: () => action(resumeStored),
-    recoverDraftByEmail: (email) => action(() => recoverWith({ method: 'email', input: email })),
+    recoverDraftByEmail: (email, recoveryOptions = {}) => action(() => recoverWith({
+      method: 'email',
+      input: email,
+      captchaToken: recoveryOptions.captchaToken,
+    })),
     recoverDraftByCode: (code, recoveryOptions = {}) => action(() => recoverWith({
       method: 'code',
       input: code,
       keepRecoveryCode: recoveryOptions.keepInBrowser !== false,
+      captchaToken: recoveryOptions.captchaToken,
     })),
     loadAuthorizedDraft: (input) => action(() => loadAuthorized(input)),
     createNewDraftAssociation: (input) => action(() => createNew(input)),
