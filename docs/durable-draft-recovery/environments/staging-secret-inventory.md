@@ -1,10 +1,10 @@
 # Staging Secret and Environment-Name Inventory
 
-- Status: **NAMES_RESERVED_VALUES_NOT_CONFIGURED**
+- Status: **STAGING_CRYPTOGRAPHIC_SECRETS_CONFIGURED**
 - Inventory date: 2026-08-05
-- Inventory rows: **50 names**
+- Inventory rows: **51 names**
 - Current production Base44 secret names observed: **4**
-- Current staging Base44 secret names observed: **0**
+- Current staging Base44 secret names observed: **8** (six cryptographic secrets and two ordinary staging controls)
 
 This is a names-only inventory. It contains no secret value, app ID, API key, credential, password, token, token-bearing URL, analytics property ID, or email address. `VITE_*` values and app IDs are public/runtime configuration rather than private secrets, but they are included because a wrong environment value can still redirect staging traffic or telemetry.
 
@@ -28,11 +28,12 @@ The four production names observed through the names-only Base44 secret command 
 | 12 | `SES_FROM_ADDRESS` | Future verified environment-specific sender | Later | Later | Prefer Yes | No |
 | 13 | `SES_CONFIGURATION_SET` | Future environment-specific SES event routing | Later | Later | Yes | No |
 | 14 | `DRAFT_RECOVERY_PASSWORD` | Current support/admin recovery password and grant signing input | Later | Yes currently; redesign planned | Yes | No |
-| 15 | `PRO_FORM_DRAFT_TOKEN_SECRET` | Future draft token signing/derivation | Later | Later | Yes | No |
-| 16 | `PRO_FORM_DRAFT_LINK_SECRET` | Future signed draft-link integrity | Later | Later | Yes | No |
-| 17 | `PRO_FORM_RECOVERY_CODE_SECRET` | Future recovery-code hashing/derivation | Later | Later | Yes | No |
-| 18 | `PRO_FORM_EMAIL_LOOKUP_SECRET` | Future normalized-email lookup hashing | Later | Later | Yes | No |
-| 19 | `PRO_FORM_ADMIN_GRANT_SECRET` | Future independently rotatable admin-grant signing | Later | Later | Yes | No |
+| 15 | `PRO_FORM_DRAFT_TOKEN_SECRET` | Draft resume-token storage/lookup | Yes; configured independently 2026-08-05 | Later | Yes | No |
+| 16 | `PRO_FORM_DRAFT_LINK_SECRET` | Signed draft-link integrity | Yes; configured independently 2026-08-05 | Later | Yes | No |
+| 17 | `PRO_FORM_RECOVERY_CODE_SECRET` | Recovery-code lookup hashing | Yes; configured independently 2026-08-05 | Later | Yes | No |
+| 18 | `PRO_FORM_EMAIL_LOOKUP_SECRET` | Normalized-email lookup hashing | Yes; configured independently 2026-08-05 | Later | Yes | No |
+| 19 | `PRO_FORM_ADMIN_GRANT_SECRET` | Independently rotatable admin-grant signing | Yes; configured independently 2026-08-05 | Later | Yes | No |
+| 19a | `PRO_FORM_RECOVERY_SESSION_SECRET` | Recovery-session signing | Yes; configured independently 2026-08-05 | Later | Yes | No |
 | 20 | `CAPTCHA_SITE_KEY` | Future public staging CAPTCHA site key | Later | Later | Yes | No |
 | 21 | `CAPTCHA_SECRET_KEY` | Future backend CAPTCHA verification secret | Later | Later | Yes | No |
 | 22 | `PRO_ZAPIER_WEBHOOK_URL` | Production-only Zapier submission destination | No | Yes only with production mode | Yes | No |
@@ -73,14 +74,14 @@ All nine `PRO_DRAFT_*` names below are ordinary configuration values; none is a 
 
 | Name | Classification | Fail-closed/default behavior | Present before staging deployment | Must differ from production | Must remain off until later work |
 | --- | --- | --- | --- | --- | --- |
-| `PRO_DRAFT_ENVIRONMENT` | Ordinary configuration | Missing/invalid becomes `unknown`; V2 is disabled | Yes, exactly `staging` | Yes | N/A |
+| `PRO_DRAFT_ENVIRONMENT` | Ordinary configuration | Missing/invalid becomes `unknown`; V2 is disabled | **Configured**, exactly `staging` | Yes | N/A |
 | `PRO_DRAFT_V2_SERVER_ENABLED` | Ordinary configuration | Missing/invalid is disabled; committed example is `false` | Yes | No initially | Yes, until separate V2 activation |
 | `PRO_DRAFT_V2_KILL_SWITCH` | Ordinary configuration | Committed safe setting is `true`; a missing/malformed control cannot enable V2 | Yes | No initially | Keep on until separate V2 activation |
 | `PRO_DRAFT_PUBLIC_EMAIL_RECOVERY_ENABLED` | Ordinary configuration | Missing/invalid is disabled; default `false` | Yes | No initially | Yes, through the public-recovery implementation batch |
 | `PRO_DRAFT_EMAIL_OTP_ENABLED` | Ordinary configuration | Missing/invalid is disabled; default `false` | Yes | No initially | Yes, until a separately accepted OTP release |
 | `PRO_DRAFT_MAGIC_LINK_ENABLED` | Ordinary configuration | Missing/invalid is disabled; default `false` | Yes | No initially | Yes, until a separately accepted magic-link release |
 | `PRO_DRAFT_EXTERNAL_SIDE_EFFECTS_MODE` | Ordinary configuration | Missing/invalid normalizes to `disabled` and invalidates V2 configuration | Yes, exactly `disabled` initially | Yes when enabled | Keep `disabled` until environment routing is certified |
-| `PRO_DRAFT_DIAGNOSTICS_ENABLED` | Ordinary configuration | Missing/invalid is disabled; staging and production examples are `false` | Yes | No initially | Remains off until backend diagnostics are separately approved |
+| `PRO_DRAFT_DIAGNOSTICS_ENABLED` | Ordinary configuration | Missing/invalid is disabled | **Configured**, exactly `true`, only for the admin-only staging self-check | Yes; production remains absent/off | No public diagnostic is permitted |
 | `PRO_DRAFT_BUILD_SHA` | Ordinary configuration | Missing/unsafe value becomes an empty safe identifier | Yes, immutable build placeholder replaced outside Git | Prefer Yes | N/A |
 
 Frontend `VITE_PRO_DRAFT_*` controls are browser-visible configuration and cannot authorize any backend operation. Backend controls cannot silently enable client UI.
@@ -114,11 +115,26 @@ Both destination values must use HTTPS outside an explicitly injected local test
 
 ## Current gaps and prohibitions
 
-- No SES/AWS, email redirect, CAPTCHA, staging webhook, staging AI, cleanup, telemetry, or file/PDF staging secret has been created.
+- No SES/AWS, email redirect, CAPTCHA, staging webhook, staging AI, cleanup, telemetry, or file/PDF staging secret has been created. The only configured staging names are the six purpose-specific cryptographic secrets and the two ordinary self-check controls listed below.
 - The production Zapier destination is no longer hardcoded or a staging default. `disabled` requires no staging URL; `staging_redirect` fails closed without `STAGING_ZAPIER_WEBHOOK_URL`; production delivery requires the exact production environment/mode pair plus `PRO_ZAPIER_WEBHOOK_URL`.
 - Production analytics IDs, the production Places key, recovery password, OpenAI key, service-role material, and webhook URL must not be copied.
 - `VITE_*` values are exposed to the browser. They must never contain a private credential.
 - A missing redirect, webhook, AI, CAPTCHA, or environment declaration must suppress the related side effect; it must not select production.
 - Backend runtime names 42-50 require reviewed staging values before any later deployment, except optional bounded timeout configuration. The staging redirect URL remains absent and unnecessary while mode is `disabled`. This inventory does not set any value.
 
-No secret was created, changed, copied, rotated, printed, or committed during this inventory.
+## 2026-08-05 staging cryptographic configuration evidence
+
+The following names are configured in the separate `_staging` Base44 app and remain unconfigured in production:
+
+- `PRO_FORM_DRAFT_TOKEN_SECRET`
+- `PRO_FORM_DRAFT_LINK_SECRET`
+- `PRO_FORM_RECOVERY_CODE_SECRET`
+- `PRO_FORM_EMAIL_LOOKUP_SECRET`
+- `PRO_FORM_RECOVERY_SESSION_SECRET`
+- `PRO_FORM_ADMIN_GRANT_SECRET`
+
+Each value was generated independently from 48 random bytes with Node `crypto.randomBytes(48)` and encoded as Base64URL. This exceeds the minimum 32-byte policy. Values were written only to a mode-`0600` temporary file outside both repositories, imported with `npx base44 secrets set --env-file`, never printed, and securely deleted immediately after the successful import. A names-only follow-up listed exactly these six names plus `PRO_DRAFT_ENVIRONMENT` and `PRO_DRAFT_DIAGNOSTICS_ENABLED`.
+
+Production remains names-only unchanged with its pre-existing four names. None of the six new names is configured there. No production value was copied. `DRAFT_RECOVERY_PASSWORD` was absent from staging, was not included in the import, and remains unchanged in production.
+
+Rotation of one purpose secret invalidates or changes only that purpose's derived hashes/tokens. Rotation therefore requires explicit versioning and a bounded compatibility/revocation plan; values must never be printed during validation or rotation.

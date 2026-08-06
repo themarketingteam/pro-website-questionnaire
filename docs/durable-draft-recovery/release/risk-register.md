@@ -58,8 +58,8 @@ The register's likelihood/severity columns describe the risk before planned cont
 | `RISK-002` | Medium | Critical | Current password grant flow exists; future indefinite-grant acceptance remains unchanged. See [admin audit](../audit/current-system-audit-report.md#admin-recovery-summary). |
 | `RISK-003` | Medium | High | Confirmed storage exceptions can fail module import. [DRAFT-001](../audit/current-defect-register.md#draft-001--unsafe-module-evaluation-storage-access). |
 | `RISK-004` | High | High | Continuous canonical browser capture and deterministic same-browser rehydration are implemented/tested locally, but no server acknowledgement, durable outbox, reconnect proof, or deployed storage matrix exists. The latest release gate blocked staging. [DRAFT-005](../audit/current-defect-register.md#draft-005--local-backups-are-write-only), [DRAFT-006](../audit/current-defect-register.md#draft-006--lifecycle-persistence-relies-only-on-beforeunload). |
-| `RISK-005` | High | Critical | Current updates lack revisions/CAS and are non-atomic. [DRAFT-015](../audit/current-defect-register.md#draft-015--draft-upsert-and-mutation-ordering-are-non-atomic). |
-| `RISK-006` | Medium | Critical | Regression is source-permitted but not runtime-reproduced. [DRAFT-016](../audit/current-defect-register.md#draft-016--delayed-draft-writes-can-regress-submitted-state). |
+| `RISK-005` | High | Critical | The revision/idempotency decision primitive is certified in staging, including idempotent and stale rejection checks. Risk remains high because current writers are non-atomic and no save endpoint applies the primitive. [Certification](../security/staging-security-primitives-certification.md); [DRAFT-015](../audit/current-defect-register.md#draft-015--draft-upsert-and-mutation-ordering-are-non-atomic). |
+| `RISK-006` | Medium | Critical | Submitted-regression rejection is certified at the transition-primitive level in staging. Risk remains because current autosave/submit writers do not yet enforce it through a server endpoint. [Certification](../security/staging-security-primitives-certification.md); [DRAFT-016](../audit/current-defect-register.md#draft-016--delayed-draft-writes-can-regress-submitted-state). |
 | `RISK-007` | High | Critical | Clear All retains old identity/draft; delayed-save protection absent. `BC-CLEAR-001/002`; [DRAFT-010](../audit/current-defect-register.md#draft-010--clear-all-races-browser-persistence-and-leaves-the-old-server-draft-active). |
 | `RISK-008` | Low (path absent) | Critical | Future staging SES risk; current audit found no active email path and performed no email operation. |
 | `RISK-009` | Medium (unverified) | High | Future SES readiness risk; no production SES inventory was authorized or performed. |
@@ -71,11 +71,11 @@ The register's likelihood/severity columns describe the risk before planned cont
 | `RISK-015` | Medium (green absent) | Critical | Future clean-green risk; current system verdict is not production-reliable. |
 | `RISK-016` | Medium (reverse path absent) | Critical | Reverse migration is unimplemented and remains a hard pre-cutover dependency. |
 | `RISK-017` | High (cutover absent) | Critical | Future late-write risk; current clients have no revision/write-freeze guard. |
-| `RISK-018` | Low (default-off controls implemented) | Critical | Frontend/backend flags and kill switches are implemented fail closed. The failed source gate correctly prevented deployment, but no candidate staging configuration or deployed-marker proof exists. |
+| `RISK-018` | Low (default-off controls implemented) | Critical | Frontend/backend flags and kill switches remain fail closed. The only new staging deployment is an environment-gated, diagnostics-gated, Base44-admin-only self-check; durable draft V2 and public recovery remain disabled. No production function or secret was added. |
 | `RISK-019` | Medium (green absent) | Critical | The pure selector rejects explicit environment mismatches and staging/test markers during production selection, but clean-green migration, data classification, and deployed isolation remain unimplemented and uncertified. |
-| `RISK-020` | Medium (path absent) | Critical | Version 1 defines a 31-symbol, 20-character format with 99.0839 bits of capacity and unbiased deterministic encoding from supplied bytes. Drift tests forbid ambiguous symbols, random sources, hashing, Base44 calls, and logging in the contract modules. No code was generated, stored, hashed, verified, or exposed; secure generation and abuse controls remain hard dependencies. |
-| `RISK-021` | Low (path absent) | High | Deterministic email validation and PII-free diagnostics exist, and selection ignores email fields entirely. No keyed backend HMAC, authorized association lookup, generic response, rate limit, timing defense, or public email-recovery endpoint exists. |
-| `RISK-022` | Medium | Critical | Current password gate exists; comprehensive brute-force and fleet-revocation proof remains absent. |
+| `RISK-020` | Medium (public path absent) | Critical | Secure recovery-code generation and keyed hashing are certified with independent staging secrets and value-free responses. Public verification, storage, rate limits, delay, lockout, CAPTCHA, and monitoring remain absent, so the release risk is not downgraded. |
+| `RISK-021` | Low (public path absent) | High | Keyed normalized-email hashing is certified with a staging-only secret and no raw email response. Authorized association lookup, uniform public recovery response/timing, rate limit, CAPTCHA, and lockout remain absent. |
+| `RISK-022` | Medium | Critical | The persistent admin-grant sign/verify primitive and exact Base44-admin diagnostic gate are certified in staging. The existing password flow is unchanged; brute-force controls, migration, device persistence, and fleet revocation operations remain absent. |
 | `RISK-023` | Medium | Critical | Selection tests prove the newest submitted record wins over an older active record, but current submitted PDF source remains in-memory and not identity-addressable after reload. Selection does not replace submitted-snapshot binding. [Audit report](../audit/current-system-audit-report.md#submission-and-pdf-behavior). |
 | `RISK-024` | Medium | Critical | Submission callers retain legacy-success compatibility and now distinguish delivered/redirected/suppressed/failed outcomes; remote fallback and end-to-end staging equivalence remain unverified. [Audit report](../audit/current-system-audit-report.md#unconfirmed-and-partially-confirmed-risks). |
 | `RISK-025` | Medium (cleanup absent) | Critical | Future cleanup risk; no retention cleanup was implemented or run. |
@@ -93,6 +93,12 @@ The [staging entity schema certification](../data/staging-entity-schema-certific
 
 `RISK-028` remains policy-unverified because actual public-versus-service-role FLS behavior was not tested. `RISK-029` remains high because the failing normal suite still covers geography and normalization behavior, alongside Q24 and recoverable-backup regressions. No risk is downgraded or accepted by this attempt.
 
+### 2026-08-05 staging security-primitives certification
+
+The [staging security-primitives certification](../security/staging-security-primitives-certification.md) is **SECURITY_PRIMITIVES_CERTIFIED_IN_STAGING**. Six independently generated purpose secrets and two ordinary diagnostic controls are configured only in staging. The only deployed staging function is a POST/JSON/16-KB, environment-gated, diagnostics-gated, Base44-admin-only in-memory self-check. The authenticated live response passed all 17 checks and exact-schema/sensitive-pattern validation.
+
+This evidence reduces uncertainty about the primitive implementations for `RISK-005`, `RISK-006`, `RISK-018`, `RISK-020`, `RISK-021`, and `RISK-022`; it does not lower their release likelihood/severity ratings. No save/bootstrap/public-recovery/admin-migration API exists, and rate limits, CAPTCHA, email, entity authorization, migration, and full application certification remain absent. The full normal suite still has five unrelated failures, so application readiness remains blocked.
+
 ## Knowingly accepted risks
 
 ### RISK-001: Public email-only recovery
@@ -103,6 +109,6 @@ Isaac Hines knowingly accepts that anyone who knows an exact client email and pa
 
 Isaac Hines knowingly accepts the residual theft/replay risk of a password-issued signed browser grant with no fixed expiration. Scope, environment/version checks, binding where practical, secret rotation, version increment, Forget This Device, storage clearing, and audit reduce risk but do not turn the shared-password flow into individual identity. A later individually authenticated admin model remains the required migration path.
 
-## Documentation-only statement
+## Current scope statement
 
-This register distinguishes local identity/recovery-contract evidence from environment or recovery certification. The batch changes local contract source, tests, a package validation script, and documentation; it changes no entity/schema, Base44 app/cloud resource, production data, SES setting, email delivery, domain, recovery endpoint, or release flag.
+This register distinguishes primitive environment evidence from workflow/release certification. This batch configured staging-only secrets and deployed one non-public administrative self-check to the staging app. It changed no entity/schema, production Base44 resource, production secret, production data, SES setting, email delivery, domain, public recovery endpoint, or release flag. Durable draft V2 remains disabled.

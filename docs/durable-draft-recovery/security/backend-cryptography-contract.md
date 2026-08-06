@@ -3,7 +3,7 @@
 - Contract version: `1`
 - Module: `base44/functions/_shared/proDraftSecurity/entry.ts`
 - Runtime target: Base44 Deno Web Crypto and Node/Vitest Web Crypto
-- Deployment status: local source only; no function or public API is deployed by this contract
+- Deployment status: shared source remains endpoint-free; a drift-tested copy is exercised only by the staging admin self-check
 
 ## Scope and security boundary
 
@@ -95,3 +95,13 @@ Rotating any lookup secret changes every hash under that purpose. A later rotati
 - static prohibitions on insecure randomness, legacy digests, logging, environment reads, Base44 operations, and deployment behavior.
 
 Vitest exercises the module through Node Web Crypto. TypeScript static validation covers the Deno-compatible Web Crypto surface and `.ts` import graph. The module uses only web-platform APIs and the existing runtime-neutral backend recovery-code contract.
+
+## Staging certification evidence — 2026-08-05
+
+The separate Base44 staging app now contains independently generated `PRO_FORM_RECOVERY_CODE_SECRET`, `PRO_FORM_EMAIL_LOOKUP_SECRET`, and `PRO_FORM_DRAFT_TOKEN_SECRET` values. Each began as 48 random bytes before Base64URL encoding; all six cross-contract values were checked pairwise distinct. No corresponding purpose secret is configured in production, no production value was copied, and `DRAFT_RECOVERY_PASSWORD` was not changed.
+
+Candidate `b719b0c08c28360c22cfc3cff0eb41fcc1462c02` deployed only the admin-authenticated `proDraftSecuritySelfCheck` function to staging. The authenticated invocation reported security version `1` and true booleans for secret length/separation, recovery-code generation/hash, normalized-email lookup hash, opaque-token generation, resume-token hash, and request-limit behavior. The response passed exact-schema and sensitive-pattern scans. It returned no value, length, hash, hint, email, token, code, draft identifier, or stack trace.
+
+The function bundle contains drift-tested copies of the shared primitives because Base44 function bundles cannot import outside their own directory. A local test requires the bundled sources to remain byte-equivalent to the shared contracts after normalizing only their relative import paths.
+
+This evidence certifies primitive behavior only. It creates no draft bootstrap/save/recovery endpoint, enables no public recovery method, and does not enable durable draft V2.

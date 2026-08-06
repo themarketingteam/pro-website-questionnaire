@@ -3,7 +3,7 @@
 - Contract version: `1`
 - Module: `base44/functions/_shared/proDraftAuthorization/entry.ts`
 - Cryptography dependency: `base44/functions/_shared/proDraftSecurity/entry.ts`
-- Deployment status: local shared source only; this contract creates no endpoint and deploys nothing
+- Deployment status: shared source remains endpoint-free; a drift-tested copy is exercised only by the staging admin self-check
 
 ## Scope and security boundary
 
@@ -142,8 +142,18 @@ Later backend work must:
 7. implement OTP/magic-link rate limits, attempts, delivery, redirect allowlisting, and feature gates only in their later approved batches; and
 8. define bounded secret-rotation/version migration procedures before rotating a live purpose key.
 
-No endpoint, deployment, secret provisioning, entity modification, or UI/feature enablement is part of this contract.
+The shared contract itself creates no endpoint, entity modification, UI, or feature enablement. Staging secret provisioning and the admin-only self-check are recorded separately below; they do not expose a token consumer or public recovery API.
 
 ## Test coverage
 
 `src/test/proDraftAuthorization.test.js` covers canonical sign/verify, payload and signature tampering, extra segments, Base64URL and JSON rejection, duplicate keys, versions, type/scope/purpose separation, environment isolation, temporal bounds, invitation hash binding, exact draft/method recovery authorization, submitted-read behavior, admin persistence and revocation, disabled future claim shapes, PII exclusion, safe diagnostics, injected clocks/token IDs, and static no-endpoint/no-I/O boundaries.
+
+## Staging certification evidence — 2026-08-05
+
+The staging app now contains independent 48-random-byte values for `PRO_FORM_DRAFT_LINK_SECRET`, `PRO_FORM_RECOVERY_SESSION_SECRET`, and `PRO_FORM_ADMIN_GRANT_SECRET`. They are distinct from each other and from the three cryptographic lookup/token secrets. Production contains none of these names. Values were never printed or committed, and `DRAFT_RECOVERY_PASSWORD` remains unchanged.
+
+The staging-only `proDraftSecuritySelfCheck` function requires `PRO_DRAFT_ENVIRONMENT=staging`, `PRO_DRAFT_DIAGNOSTICS_ENABLED=true`, an authenticated `base44.auth.me()` result, and the repository-verified Base44 role `admin`. It does not accept the legacy password-only grant as diagnostic authorization. Outside staging or when diagnostics are disabled it returns 404 before authentication or secret evaluation.
+
+The authenticated staging invocation reported authorization version `1` and true results for recovery-session, signed-invitation, and persistent-admin-grant sign/verify checks, plus tamper, cross-environment, and cross-purpose rejection. Its exact allowlisted response contains booleans and versions only; it contains no raw token, signature, claim state, email, code, hash, draft identifier, or secret metadata.
+
+Rotating each signing secret invalidates only its purpose and requires the associated grant/session/link version and revocation plan. This certification does not migrate the existing password-only admin flow, issue a browser grant, implement OTP or magic links, or create any public recovery endpoint.
