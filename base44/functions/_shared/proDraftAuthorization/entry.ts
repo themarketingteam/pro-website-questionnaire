@@ -41,6 +41,7 @@ export const SIGNED_TOKEN_SCOPES = Object.freeze({
   DRAFT_RECOVER: 'draft:recover',
   DRAFT_READ: 'draft:read',
   DRAFT_WRITE: 'draft:write',
+  DRAFT_EVENTS: 'draft:events',
   DRAFT_SUBMITTED_READ: 'draft:submitted-read',
   ADMIN_DRAFT_RECOVERY: 'admin:draft-recovery',
   EMAIL_OTP: 'email:otp',
@@ -142,8 +143,9 @@ export type RecoverySessionClaims = CommonStructuredClaims & Readonly<{
     | 'draft:read'
     | 'draft:write'
     | 'draft:submitted-read'
+    | 'draft:events'
   )[];
-  recoveryEmailLookupHash: string;
+  recoveryEmailLookupHash?: string;
   recoveryCodeVersion: number;
   recoverySessionVersion: number;
 }>;
@@ -220,7 +222,7 @@ export type RecoverySessionIssueInput = Readonly<{
   sessionIdHash: string;
   authorizationMethod: AuthorizationMethod;
   authorizedScopes: RecoverySessionClaims['authorizedScopes'];
-  recoveryEmailLookupHash: string;
+  recoveryEmailLookupHash?: string;
   recoveryCodeVersion: number;
   recoverySessionVersion: number;
   grantVersion: number;
@@ -308,6 +310,7 @@ const RECOVERY_AUTHORIZED_SCOPES = new Set<SignedTokenScope>([
   SIGNED_TOKEN_SCOPES.DRAFT_READ,
   SIGNED_TOKEN_SCOPES.DRAFT_WRITE,
   SIGNED_TOKEN_SCOPES.DRAFT_SUBMITTED_READ,
+  SIGNED_TOKEN_SCOPES.DRAFT_EVENTS,
 ]);
 const LOWER_HEX_256_PATTERN = /^[0-9a-f]{64}$/u;
 const OPAQUE_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/u;
@@ -370,7 +373,6 @@ const TYPE_CLAIM_KEYS: Readonly<Record<SignedTokenType, readonly string[]>> =
       'sessionIdHash',
       'authorizationMethod',
       'authorizedScopes',
-      'recoveryEmailLookupHash',
       'recoveryCodeVersion',
       'recoverySessionVersion',
     ]),
@@ -486,7 +488,12 @@ function exactClaimKeys(
   claims: Record<string, unknown>,
   type: SignedTokenType,
 ): boolean {
-  const expected = [...COMMON_CLAIM_KEYS, ...TYPE_CLAIM_KEYS[type]].sort();
+  const typeKeys = [...TYPE_CLAIM_KEYS[type]];
+  if (type === SIGNED_TOKEN_TYPES.RECOVERY_SESSION
+    && Object.hasOwn(claims, 'recoveryEmailLookupHash')) {
+    typeKeys.push('recoveryEmailLookupHash');
+  }
+  const expected = [...COMMON_CLAIM_KEYS, ...typeKeys].sort();
   const actual = Object.keys(claims).sort();
   return expected.length === actual.length
     && expected.every((key, index) => key === actual[index]);
@@ -652,16 +659,18 @@ function validateRecoverySessionShape(
       typeof scope !== 'string'
       || !RECOVERY_AUTHORIZED_SCOPES.has(scope as SignedTokenScope)
     ))
-    || !isHash(value.recoveryEmailLookupHash)
+    || (Object.hasOwn(value, 'recoveryEmailLookupHash')
+      && !isHash(value.recoveryEmailLookupHash))
     || !isPositiveInteger(value.recoveryCodeVersion)
     || !isPositiveInteger(value.recoverySessionVersion)
   ) {
     return authorizationError(AUTHORIZATION_ERROR_CODES.TOKEN_CLAIMS_INVALID);
   }
-  if (
-    authorizedScopes.includes(SIGNED_TOKEN_SCOPES.DRAFT_SUBMITTED_READ)
-    && authorizedScopes.length !== 1
-  ) {
+  if (authorizedScopes.includes(SIGNED_TOKEN_SCOPES.DRAFT_SUBMITTED_READ)
+    && authorizedScopes.some((scope) => ![
+      SIGNED_TOKEN_SCOPES.DRAFT_SUBMITTED_READ,
+      SIGNED_TOKEN_SCOPES.DRAFT_READ,
+    ].includes(scope as 'draft:submitted-read' | 'draft:read'))) {
     return authorizationError(AUTHORIZATION_ERROR_CODES.TOKEN_SCOPE_INVALID);
   }
   return { ...common, ...value } as unknown as RecoverySessionClaims;
@@ -935,7 +944,9 @@ export async function issueRecoverySessionToken(
     sessionIdHash: input.sessionIdHash,
     authorizationMethod: input.authorizationMethod,
     authorizedScopes: Object.freeze([...input.authorizedScopes]),
-    recoveryEmailLookupHash: input.recoveryEmailLookupHash,
+    ...(input.recoveryEmailLookupHash
+      ? { recoveryEmailLookupHash: input.recoveryEmailLookupHash }
+      : {}),
     recoveryCodeVersion: input.recoveryCodeVersion,
     recoverySessionVersion: input.recoverySessionVersion,
   });

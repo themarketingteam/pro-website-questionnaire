@@ -1431,7 +1431,7 @@
         "request_id": {"type": "string", "required": true, "classification": "audit_metadata"},
         "environment": {"type": "string", "required": true, "classification": "migration_metadata"},
         "attempt_type": {"type": "string", "required": false, "classification": "audit_metadata"},
-        "outcome": {"type": "string", "required": false, "classification": "audit_metadata"},
+        "outcome": {"type": "string", "required": false, "enum": ["success", "not_found", "invalid_input", "rate_limited", "captcha_required", "captcha_failed", "locked", "superseded", "internal_error"], "classification": "audit_metadata"},
         "subject_hash": {"type": "string", "required": false, "classification": "sensitive_hash"},
         "ip_hash": {"type": "string", "required": false, "classification": "sensitive_hash"},
         "device_hash": {"type": "string", "required": false, "classification": "sensitive_hash"},

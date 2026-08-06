@@ -53,7 +53,7 @@ Unknown types, scopes, claims, and versions are rejected. Non-admin expiry must 
 | `email_otp` | `email:otp` | Disabled framework only |
 | `magic_link` | `email:magic-link` | Disabled framework only |
 
-Recovery-session authorization may additionally carry `draft:read`, `draft:write`, or `draft:submitted-read` in `authorizedScopes`. Submitted-record access must be explicitly `draft:submitted-read`; that scope is exclusive in a recovery session. Later resource functions must independently enforce record lifecycle rules, including limiting write access to active or submit-failed drafts.
+Recovery-session authorization may additionally carry `draft:read`, `draft:write`, `draft:events`, or `draft:submitted-read` in `authorizedScopes`. Submitted-record access must be explicitly `draft:submitted-read`; it may be paired only with ordinary `draft:read`, never write or event scope. Resource functions independently enforce record lifecycle rules.
 
 ## Secret-purpose mapping
 
@@ -80,11 +80,13 @@ A recovery session adds:
 - `draftId` and `sessionIdHash`;
 - `authorizationMethod`: `email`, `recovery_code`, or `signed_invitation`;
 - the explicit `authorizedScopes` set;
-- `recoveryEmailLookupHash`, `recoveryCodeVersion`, and `recoverySessionVersion`.
+- `recoveryCodeVersion` and `recoverySessionVersion`;
+- optional `recoveryEmailLookupHash` only when the authorizing method requires
+  an email association. Recovery-code authorization deliberately omits it.
 
 Issuance defaults to 12 hours and rejects a configured lifetime above 7 days. A later caller may read `PRO_FORM_RECOVERY_SESSION_TTL_SECONDS`, validate it, and pass the resulting seconds to the issue helper; this shared module deliberately does not read runtime configuration itself.
 
-Verification requires the expected environment, grant version, draft ID, authorization method, and recovery-session version, plus any operation-specific required scope. It returns a normalized, frozen claim object and never returns token or signature bytes. A session for one draft or recovery method cannot authorize another. Email recovery may later issue read/write authorization for eligible active drafts and submitted-read authorization for submitted records under the approved policy, but the entity function must still enforce lifecycle eligibility.
+Verification requires the expected environment, grant version, draft ID, authorization method, and recovery-session version, plus any operation-specific required scope. It returns a normalized, frozen claim object and never returns token or signature bytes. A session for one draft or recovery method cannot authorize another. The recovery-code service issues read/write/event scopes for active-like drafts and submitted-read/read scopes for submitted drafts. Email recovery may later issue its separately approved scopes, but every entity function must still enforce lifecycle eligibility.
 
 ## Persistent password-only admin recovery grant
 

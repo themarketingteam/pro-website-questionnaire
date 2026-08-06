@@ -17,7 +17,7 @@
     },
     "outcome": {
       "type": "string",
-      "enum": ["success", "not_found", "invalid_input", "rate_limited", "captcha_required", "captcha_failed", "locked", "internal_error"],
+      "enum": ["success", "not_found", "invalid_input", "rate_limited", "captcha_required", "captcha_failed", "locked", "superseded", "internal_error"],
       "description": "Internal allowlisted outcome; public responses use a generic recovery-not-completed envelope."
     },
     "subject_hash": {

@@ -159,6 +159,24 @@ authorization, the 10k abuse corpus, and deployment certification. No secret
 was configured, no schema/function was pushed, and public email/code recovery
 remains disabled and absent. Production and `main` were untouched.
 
+### 2026-08-05 recovery-code service source implementation
+
+The [recovery-code service flow](../backend/recovery-code-service-flow.md) now
+has local source and mocked-test evidence for backend-only keyed code matching,
+pre-lookup abuse controls, conditional CAPTCHA, lockout, duplicate selection,
+terminal-status denial, minimal success projection, recovery-session scoping,
+load-token handoff, safe event persistence, and fail-closed success auditing.
+This reduces implementation uncertainty for `RISK-020`, `RISK-021`,
+`RISK-026`, `RISK-028`, and `RISK-030`; it does not lower their likelihood or
+severity and does not change the accepted email-only risk.
+
+Residual blockers include live Base44 function bundling, service-role RLS/FLS,
+cross-instance/atomic rate limiting, CAPTCHA/provider and trusted-proxy proof,
+duplicate/unknown-status alert delivery, retention behavior, 10k abuse and
+timing corpora, deployed token/load integration, monitoring, and release review.
+No public flag, UI, schema, function, secret, staging data, production resource,
+or Git remote changed.
+
 ## Knowingly accepted risks
 
 ### RISK-001: Public email-only recovery

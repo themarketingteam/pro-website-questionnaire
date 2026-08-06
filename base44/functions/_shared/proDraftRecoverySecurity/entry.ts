@@ -32,6 +32,7 @@ export const RECOVERY_ATTEMPT_OUTCOMES = Object.freeze([
   'captcha_required',
   'captcha_failed',
   'locked',
+  'superseded',
   'internal_error',
 ] as const);
 

@@ -6,6 +6,7 @@ import {
   projectActiveDraftForAuthorizedClient,
   projectDraftForAdmin,
   projectDraftForPublicFailure,
+  projectDraftRecoverySummaryForAuthorizedClient,
   projectDraftSummaryForAuthorizedClient,
   projectSubmittedDraftForAuthorizedClient,
 } from '../../base44/functions/_shared/proDraftProjection/entry.ts';
@@ -125,6 +126,24 @@ describe('safe draft projections', () => {
       retentionExpiresAt: '2027-08-05T12:00:00.000Z',
     });
     expect(JSON.stringify(admin)).not.toContain('app-sensitive');
+  });
+
+  it('projects the exact minimal recovery success summary', () => {
+    const summary = projectDraftRecoverySummaryForAuthorizedClient(record({
+      business_name: 'Synthetic Business',
+      created_date: '2026-08-01T12:00:00.000Z',
+    }));
+    expect(summary).toEqual({
+      draftId: 'draft-synthetic-1',
+      status: 'active',
+      readOnly: false,
+      businessNameDisplay: 'Synthetic Business',
+      createdAt: '2026-08-01T12:00:00.000Z',
+      lastSavedAt: '2026-08-05T12:00:00.000Z',
+      draftGeneration: 1,
+      recoveryCodeHint: 'X7K9',
+    });
+    expect(JSON.stringify(summary)).not.toMatch(/canonical|email|hash/iu);
   });
 
   it('detects sensitive fields recursively in snake and camel case', () => {

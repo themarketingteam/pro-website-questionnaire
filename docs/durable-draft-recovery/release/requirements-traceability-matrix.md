@@ -159,6 +159,23 @@ certification. No public recovery endpoint, secret configuration, schema push,
 function deployment, release flag, production access, or browser recovery UI
 exists. See [public recovery abuse-control contract](../security/public-recovery-abuse-control-contract.md).
 
+### 2026-08-05 recovery-code service source implementation
+
+The local `recoverProFormDraftByCode` source now enforces exact request keys,
+32 KB POST/JSON parsing, default-off runtime gates, abuse HMACs, event-backed
+IP/subject/global limits, conditional CAPTCHA, temporary lockout, keyed exact
+code lookup, canonical duplicate selection, lifecycle/retention rules, minimal
+projection, safe auditing, and exact-draft recovery-session issuance. Active
+sessions receive read/write/event scopes; submitted sessions receive
+submitted-read/read only. The detached client wrapper does not persist the code
+or token and no UI imports it.
+
+This adds local implementation evidence for `DR-REC-001`, `DR-REC-002`,
+`DR-SEC-001`, and `DR-SEC-002`, including token handoff accepted by the existing
+load function. It is not environment certification: no function/schema was
+deployed or pushed, no secret or flag changed, and public recovery remains off.
+See [recovery-code service flow](../backend/recovery-code-service-flow.md).
+
 ## Coverage summary
 
 ### 2026-08-05 entity-extension staging evidence

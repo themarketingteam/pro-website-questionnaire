@@ -2,7 +2,7 @@
 
 - Status: **STAGING_CRYPTOGRAPHIC_SECRETS_CONFIGURED**
 - Inventory date: 2026-08-05
-- Inventory rows: **66 names**
+- Inventory rows: **67 names**
 - Current production Base44 secret names observed: **4**
 - Current staging Base44 secret names observed: **8** (six cryptographic secrets and two ordinary staging controls)
 
@@ -35,6 +35,7 @@ The four production names observed through the names-only Base44 secret command 
 | 19 | `PRO_FORM_ADMIN_GRANT_SECRET` | Independently rotatable admin-grant signing | Yes; configured independently 2026-08-05 | Later | Yes | No |
 | 19a | `PRO_FORM_RECOVERY_SESSION_SECRET` | Recovery-session signing | Yes; configured independently 2026-08-05 | Later | Yes | No |
 | 19b | `PRO_FORM_ABUSE_HASH_SECRET` | Purpose-separated IP/device/email/code abuse-limit HMAC | Later; reserved, not configured | Later | Yes | No |
+| 19c | `PRO_FORM_RECOVERY_SESSION_TTL_SECONDS` | Positive recovery-session TTL; default 43200, maximum 604800 | Optional | Optional | No | Yes; non-secret bounded configuration only |
 | 20 | `CAPTCHA_SITE_KEY` | Future public staging CAPTCHA site key | Later | Later | Yes | No |
 | 21 | `CAPTCHA_SECRET_KEY` | Future backend CAPTCHA verification secret | Later | Later | Yes | No |
 | 20a | `PRO_DRAFT_CAPTCHA_PROVIDER` | Backend provider selector: disabled, turnstile, or staging_test | Later; start `disabled` | Later | Prefer Yes | Safe `disabled` only |
@@ -136,7 +137,7 @@ Both destination values must use HTTPS outside an explicitly injected local test
 - `VITE_*` values are exposed to the browser. They must never contain a private credential.
 - A missing redirect, webhook, AI, CAPTCHA, or environment declaration must suppress the related side effect; it must not select production.
 - Backend runtime names 42-50 require reviewed staging values before any later deployment, except optional bounded timeout configuration. The staging redirect URL remains absent and unnecessary while mode is `disabled`. This inventory does not set any value.
-- The abuse secret, CAPTCHA variables, public site key, and recovery-policy variables added in rows 19b, 20a-20f, and 50a-50h are reserved only. This prompt configured none of them.
+- The abuse secret, CAPTCHA variables, public site key, and recovery-policy variables added in rows 19b, 20a-20f, and 50a-50h are reserved only. Row 19c is optional, bounded, non-secret source configuration with a 12-hour default. This prompt configured none of them.
 
 ## 2026-08-05 staging cryptographic configuration evidence
 

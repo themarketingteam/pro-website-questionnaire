@@ -480,6 +480,24 @@ describe('recovery-session authorization', () => {
     );
   });
 
+  it('supports code sessions with event scope and no email lookup claim', async () => {
+    const token = await issueRecoverySessionToken(recoveryInput({
+      authorizationMethod: 'recovery_code',
+      authorizedScopes: [
+        SIGNED_TOKEN_SCOPES.DRAFT_READ,
+        SIGNED_TOKEN_SCOPES.DRAFT_WRITE,
+        SIGNED_TOKEN_SCOPES.DRAFT_EVENTS,
+      ],
+      recoveryEmailLookupHash: undefined,
+    }), issueOptions());
+    const claims = await verifyRecoverySessionToken(token, verifyOptions({
+      expectedAuthorizationMethod: 'recovery_code',
+      requiredScopes: [SIGNED_TOKEN_SCOPES.DRAFT_EVENTS],
+    }));
+    expect(claims.authorizedScopes).toContain(SIGNED_TOKEN_SCOPES.DRAFT_EVENTS);
+    expect(claims).not.toHaveProperty('recoveryEmailLookupHash');
+  });
+
   it('enforces the configurable seven-day maximum', async () => {
     await expect(issueRecoverySessionToken(
       recoveryInput(),

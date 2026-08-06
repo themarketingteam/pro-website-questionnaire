@@ -41,7 +41,7 @@ describe('ProFormRecoverySecurityEvent schema', () => {
     ]);
     expect(schema.properties.outcome.enum).toEqual([
       'success', 'not_found', 'invalid_input', 'rate_limited',
-      'captcha_required', 'captcha_failed', 'locked', 'internal_error',
+      'captcha_required', 'captcha_failed', 'locked', 'superseded', 'internal_error',
     ]);
     expect(schema.properties.captcha_required.default).toBe(false);
     expect(schema.properties.captcha_verified.default).toBe(false);

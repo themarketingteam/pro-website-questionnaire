@@ -203,6 +203,38 @@ export function projectDraftSummaryForAuthorizedClient(
   return Object.freeze(output);
 }
 
+/** Minimal summary returned only after exact recovery-code authorization. */
+export function projectDraftRecoverySummaryForAuthorizedClient(
+  recordInput: unknown,
+): Readonly<Record<string, unknown>> {
+  const record = requireRecord(recordInput);
+  const status = typeof record.status === 'string' && record.status.length > 0
+    ? record.status
+    : 'active';
+  const businessName = typeof record.business_name === 'string'
+    ? record.business_name.trim()
+    : '';
+  const output: Record<string, unknown> = {
+    draftId: safeId(value(record, 'id', 'draft_id', 'draftId')),
+    status,
+    readOnly: status === 'submitted',
+    businessNameDisplay: businessName.length > 0 && businessName.length <= 256
+      && !/[\u0000-\u001f\u007f]/u.test(businessName)
+      ? businessName
+      : null,
+    createdAt: safeDate(value(record, 'created_date', 'source_created_date')),
+    lastSavedAt: safeDate(value(record, 'last_saved_at', 'saved_at_server')),
+    draftGeneration: safeInteger(record.draft_generation),
+    recoveryCodeHint: typeof record.recovery_code_hint === 'string'
+      && /^[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{4}$/u.test(record.recovery_code_hint)
+      ? record.recovery_code_hint
+      : null,
+  };
+  if (!output.draftId) return projectionError('PROJECTION_DRAFT_ID_INVALID');
+  assertNoSensitiveDraftFields(output);
+  return Object.freeze(output);
+}
+
 export function projectDraftForAdmin(
   recordInput: unknown,
   options: Readonly<{ includeCanonicalState?: boolean; includeRecoveryEmail?: boolean }> = {},
