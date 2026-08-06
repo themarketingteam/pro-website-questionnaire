@@ -9,7 +9,9 @@ This register distinguishes observed current behavior from future acceptance req
 
 Feature-branch remediation notes preserve the audited production-baseline finding while recording later source changes. They do not certify staging or production and do not change the historical severity counts above.
 
-The 2026-08-06 staging-certification attempt reconfirmed the local browser foundation (35/35 boot and 15/15 isolation/memory executions), but stopped before deployment because the aggregate gate failed lint, typecheck, and 5 of 446 normal tests. See the [blocked staging browser-storage certification](../testing/staging-browser-storage-certification.md). No defect below is environment-certified by that attempt.
+The earlier 2026-08-06 browser-storage attempt reconfirmed local browser evidence but stopped before deployment on aggregate lint, typecheck, and normal-suite failures; its evidence remains in the [blocked browser-storage certification](../testing/staging-browser-storage-certification.md).
+
+The latest canonical-state attempt targeted commit `58f6927577944d686d83eaf19da2a04ffcde87a5`. Its canonical state, cache, local-persistence, bootstrap, and store suites passed within `npm run test:ci`, but the aggregate result was 606 passed and 5 failed of 611 tests. The hard-stop rule prevented every later check, staging checkout update, deploy, and browser matrix. See the [blocked canonical-state certification](../testing/staging-canonical-state-redux-certification.md). No defect below is environment-certified by either attempt.
 
 ## Severity summary
 
@@ -110,7 +112,7 @@ The 2026-08-06 staging-certification attempt reconfirmed the local browser found
 - **Remediation evidence:** `src/test/draftFailureBackup.test.js`; `BC-LOCAL-005`; `BC-LIFE-001`.
 - **Canonical-cache remediation (2026-08-05):** A separate versioned canonical browser cache now continuously stores the complete post-reducer form and is automatically considered after Redux Persist rehydration. This supplies same-browser reload continuity without treating the older failure-backup record as authoritative or deleting it.
 - **Canonical-cache evidence:** `src/test/questionnaireCanonicalDraftCache.test.js`; `src/test/localCanonicalDraftPersistence.test.js`; `src/test/questionnaireLocalBootstrap.test.js`; active `DR-LOCAL-001`, `DR-LOCAL-003`, and `DR-LOCAL-004` Playwright scenarios.
-- **Remediation status:** Same-browser canonical reload is implemented locally. Failure-backup reconciliation/expiry, authorized server recovery, cross-device restore, and environment certification remain pending.
+- **Remediation status:** Same-browser canonical reload is implemented and its focused suite passed locally in the latest aggregate run. The aggregate gate still failed, so deployed rehydration/migration testing did not run. Failure-backup reconciliation/expiry, authorized server recovery, cross-device restore, and environment certification remain pending. See the [blocked canonical-state certification](../testing/staging-canonical-state-redux-certification.md).
 - **Release blocking:** Yes
 
 ## DRAFT-006 — Lifecycle persistence relies only on beforeunload
@@ -128,7 +130,7 @@ The 2026-08-06 staging-certification attempt reconfirmed the local browser found
 - **Current workaround:** Pause after edits and avoid closing/offline transitions; not enforceable.
 - **Permanent implementation batch:** B01/B02/B06 — journal, mutation outbox, browser acceptance.
 - **Feature-branch remediation (2026-08-05):** The canonical browser cache subscribes to complete Redux state after reducers and writes continuously with a 100 ms debounce/500 ms maximum wait. It does not rely on `beforeunload`; unload remains only a best-effort legacy failure-backup supplement.
-- **Remediation status:** Ordinary browser-local edits are continuously cached. Explicit pagehide/visibility flush, server outbox/reconnect reconciliation, abrupt-process-loss certification, and environment certification remain pending.
+- **Remediation status:** Ordinary browser-local edits are continuously cached and the focused local-persistence suite passed within the latest aggregate run. The aggregate gate blocked deployed storage-mode and lifecycle testing. Explicit pagehide/visibility flush, server outbox/reconnect reconciliation, abrupt-process-loss certification, and environment certification remain pending. See the [blocked canonical-state certification](../testing/staging-canonical-state-redux-certification.md).
 - **Release blocking:** Yes
 
 ## DRAFT-007 — Server snapshots can mix response and stale UI maps
@@ -345,7 +347,7 @@ The 2026-08-06 staging-certification attempt reconfirmed the local browser found
 - **Permanent implementation batch:** B02 — render-independent durable mutation outbox and revisioned save.
 - **Feature-branch remediation (2026-08-05):** A store-level post-reducer canonical subscriber now captures the complete local state independently of component effect cleanup, including conditional-child deletion across response, validation, touched, expanded, text, UI-draft, metadata, and question-pointer categories.
 - **Remediation evidence:** `src/test/localCanonicalDraftPersistence.test.js`; whole-form/hidden-child cases in `src/test/questionnaireStore.test.jsx`.
-- **Remediation status:** The browser-local loss mode is mitigated. The existing Base44 server timer remains render-coupled and non-atomic, so server acknowledgement, revision/CAS, and reconciliation are still release-blocking.
+- **Remediation status:** The browser-local loss mode is mitigated and the focused store/local-persistence suites passed within the latest aggregate run. The release gate failed before deployed mutation, reset, or current Base44 save-compatibility testing. The existing Base44 server timer remains render-coupled and non-atomic, so server acknowledgement, revision/CAS, and reconciliation are still release-blocking. See the [blocked canonical-state certification](../testing/staging-canonical-state-redux-certification.md).
 - **Release blocking:** Yes
 
 ## Register controls

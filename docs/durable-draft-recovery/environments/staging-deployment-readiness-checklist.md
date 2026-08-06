@@ -1,9 +1,9 @@
 # Staging Deployment Readiness Checklist
 
 - Current status: **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**
-- Review date: 2026-08-05
+- Review date: 2026-08-06
 - Deployment authorization: **DENIED**
-- Deployment evidence directory/report: [**BLOCKED CERTIFICATION RECORD**](../testing/staging-browser-storage-certification.md)
+- Deployment evidence directory/report: [**BLOCKED CANONICAL-STATE CERTIFICATION RECORD**](../testing/staging-canonical-state-redux-certification.md)
 
 This checklist is fail-closed. `READY` means current evidence exists; `NOT_READY` blocks deployment. `MANUAL_VERIFICATION_REQUIRED` also blocks deployment until dated evidence is captured immediately before the authorized deployment.
 
@@ -11,12 +11,12 @@ This checklist is fail-closed. `READY` means current evidence exists; `NOT_READY
 
 | # | Required gate | Status | Current evidence / remaining work |
 | ---: | --- | --- | --- |
-| 1 | Target guard passes | `READY` | Guard unit suite passes, fingerprint-only verification passes, and the prior clean staging matrix passed with safe staging values. Re-run normal verification immediately before deployment. |
+| 1 | Target guard passes | `NOT_READY` | Read-only fingerprint verification passed for distinct staging and production links, but the normal staging guard was not run after the aggregate test failure. It must pass on the exact clean deployment candidate. |
 | 2 | App ID is confirmed | `READY` | Staging SHA-256 fingerprint matches the registration and differs from production; full IDs remain outside Git. |
 | 3 | Branch is `feature/durable-draft-recovery` | `READY` | Both primary and staging checkouts are on the feature branch. |
-| 4 | Working tree is clean | `READY` | Clean at this audit's start; must be clean again at deployment time. |
-| 5 | Tests pass | `NOT_READY` | The 2026-08-06 exact-candidate rerun passed the manifest, 27/27 characterization tests, 45/45 storage/characterization tests, build, and 50 active local Playwright executions. `npm run test:ci` still fails 5 of 446 normal tests, lint reports 32 errors/18 warnings, and typecheck reports 239 diagnostics. Nine V2/server/concurrency/offline scenarios remain explicit. `npm run check` is nonzero, so the guarded wrapper was not invoked. No deployment exception is approved. |
-| 6 | Production build passes | `READY` | Current baseline build passes; re-run on the exact deployment revision. |
+| 4 | Working tree is clean | `READY` | Both trees were clean when inspected. The primary was at the candidate; the staging checkout was still at an older revision and was deliberately not updated after the hard stop. |
+| 5 | Tests pass | `NOT_READY` | On candidate `58f6927`, `npm run test:manifest` passed, then `npm run test:ci` failed 5 of 611 tests across 2 of 51 files. The five failures cover Q24 normal validation, the historical global-key backup assertion, geographic zero normalization, whitespace filtering, and repair warning shape. All later checks and the wrapper were not run under the required hard-stop rule. No deployment exception is approved. |
+| 6 | Production build passes | `NOT_READY` | Historical candidate build evidence exists, but the required build rerun in this certification attempt was not reached after `test:ci` failed. |
 | 7 | Staging environment variables are present | `NOT_READY` | Deployment examples exist, but staging has zero configured Base44 secrets and no approved ignored environment file is certified. |
 | 8 | External side effects are disabled or redirected | `NOT_READY` | Zapier is now server-policy controlled and defaults disabled, but OpenAI, analytics, Hotjar, Places, public assets, uploads, and parent callbacks still require staging controls/denylists. |
 | 9 | Staging email redirect is tested | `NOT_READY` | No email implementation or `STAGING_EMAIL_REDIRECT_TO` exists. Missing redirect must suppress sending; `[STAGING]` prefix and destination rewrite tests are absent. |
@@ -28,23 +28,24 @@ This checklist is fail-closed. `READY` means current evidence exists; `NOT_READY
 | 15 | Production IDs are denylisted | `NOT_READY` | Deployment targets are cross-checked and staging Zapier selection cannot fall back to production, but analytics, Maps, asset, storage, email, migration, and cleanup production identifiers are not comprehensively denylisted. |
 | 16 | Feature flags are environment-isolated and fail closed | `READY` | Central frontend/backend runtime modules require recognized environments and exact lowercase controls. V2/recovery defaults remain off, client/server authorization is independent, and kill switches override ordinary enable flags. |
 | 17 | Rollback/delete-staging procedure is documented and rehearsed | `NOT_READY` | Draft procedure appears below; owner approval and a non-destructive rehearsal/evidence record are still required. |
-| 18 | `npx base44 whoami` succeeds | `READY` | Authenticated check succeeded before this prompt's read-only CLI operations. |
+| 18 | `npx base44 whoami` succeeds | `NOT_READY` | Authentication succeeded in the primary checkout before validation. The required staging-checkout authentication check was not reached after the hard stop. |
 | 19 | No production deploy wrapper is invoked | `READY` | Neither deployment wrapper nor any deploy/push command was executed. This must remain true until a separate authorization. |
-| 20 | Deployment has an evidence directory/report | `NOT_READY` | The [blocked certification record](../testing/staging-browser-storage-certification.md) captures candidate revision, fingerprints, local gates, and the stop decision. It is not deployment evidence: no deployed URL, current dashboard checks, approver, rollback rehearsal, resource summary, or post-deploy smoke exists. |
+| 20 | Deployment has an evidence directory/report | `NOT_READY` | The [blocked canonical-state record](../testing/staging-canonical-state-redux-certification.md) captures candidate revision, fingerprints, the failed source gate, skipped matrices, and stop decision. It is not deployment evidence: no deployed URL, resource summary, current dashboard checks, approver, rollback rehearsal, or post-deploy smoke exists. |
 | 21 | Safe build metadata is present | `READY` | Frozen metadata exposes only environment, sanitized SHA/time, and safe feature booleans. Missing SHA/time becomes `unknown`; no app ID, URL, token, email, or recovery code is included. |
 | 22 | Runtime markers are machine-verifiable | `READY` | One route-independent shell exposes safe `data-*` markers. Local staging and production previews produced the expected environment/build/disabled-feature values. |
 | 23 | Zapier external delivery is fail closed | `READY` | Shared backend policy requires exact environment/mode pairs, resolves destinations only from server variables, defaults staging to disabled, rejects missing redirect configuration, and exposes no URL/payload in responses or logs. |
 | 24 | Zapier caller outcomes are truthful | `READY` | Main submit, retry, repair, fallback-result plumbing, and admin/test callers distinguish delivered, redirected, suppressed, and failed outcomes. Suppression never sets `zapier_sent=true`; safe diagnostics use existing JSON fields without schema changes. |
 | 25 | GitHub branch protection requires quality checks | `NOT_READY` | Workflow sources define source safety, unit quality, build, E2E harness, and pending-report checks. A repository administrator must run them and configure/verify the `main` ruleset; Codex does not assume administration permission. |
 | 26 | Manual staging E2E is available and safe | `NOT_READY` | The `workflow_dispatch`-only workflow rejects missing/production URLs and forces writes off, but no deployed staging URL or configured `PRO_DRAFT_STAGING_URL` secret exists, so no staging browser evidence can be collected yet. |
+| 27 | Separate staging checkout matches candidate | `NOT_READY` | The staging tree was clean on the feature branch at `0053faf6`, while the candidate was `58f6927`. Fetch and fast-forward were not run after the release-blocking source failure. |
 
 ## Automated repository gate
 
-All validation runs from the repository root. `npm run test:manifest` enforces the normal, characterization, and Playwright naming boundaries and currently reports 44 normal files, 5 characterization files, and 6 Playwright specs. `.github/workflows/durable-draft-quality.yml` runs source safety, all authoritative quality gates, a disabled-V2 build, Chromium harness mechanics, and the non-strict pending report for `main` pull requests and feature-branch pushes. `.github/workflows/durable-draft-staging-e2e.yml` is manual-only and reads the separate staging URL exclusively from `PRO_DRAFT_STAGING_URL`. Neither workflow deploys. Branch protection guidance and remaining manual administration are recorded in [GitHub Actions and branch protection](../testing/github-actions-and-branch-protection.md).
+All validation runs from the repository root. `npm run test:manifest` enforces the normal, characterization, and Playwright naming boundaries and currently reports 51 normal files, 5 characterization files, and 6 Playwright specs. `.github/workflows/durable-draft-quality.yml` runs source safety, all authoritative quality gates, a disabled-V2 build, Chromium harness mechanics, and the non-strict pending report for `main` pull requests and feature-branch pushes. `.github/workflows/durable-draft-staging-e2e.yml` is manual-only and reads the separate staging URL exclusively from `PRO_DRAFT_STAGING_URL`. Neither workflow deploys. Branch protection guidance and remaining manual administration are recorded in [GitHub Actions and branch protection](../testing/github-actions-and-branch-protection.md).
 
 `npm run check` remains the staging and production wrapper gate: it executes lint, typecheck, `test:ci`, and build and reports all four outcomes. Characterization tests are run separately with `npm run test:baseline-characterization`; they preserve known-defect evidence and cannot certify a release. `npm run test:e2e:pending-strict` is required before release but deliberately remains outside foundation CI until the later implementation gate; it currently fails on 8 pending server/concurrency/offline/security scenarios across 4 requirement IDs.
 
-Current local evidence includes 27/27 passing characterization tests, 207/207 focused canonical-cache/Redux tests, and 70/70 active browser-local cache/isolation executions across all five projects. The pending V2 report now contains 8 server/concurrency/offline/security scenarios across 4 requirement IDs. The normal failures cover Q24 validation status, the historical global-key backup assertion, geographic zero normalization, whitespace filtering, and repair warning shape. The 2026-08-06 certification attempt stopped at `npm run check`; the staging wrapper did not run and no staging URL exists, so staging-native and full durable-recovery browser acceptance evidence remain unavailable. These conditions keep deployment authorization denied.
+Historical local evidence includes 27/27 passing characterization tests, 207/207 focused canonical-cache/Redux tests, and 70/70 active browser-local cache/isolation executions across all five projects. In the latest attempt, the canonical-state, cache, local-persistence, local-bootstrap, and store suites passed within the aggregate run, but `npm run test:ci` failed 5 of 611 tests. The attempt stopped at that command; characterization, storage, runtime configuration, focused reruns, pending report, lint, typecheck, build, secret scan, target guard, and staging wrapper were not run. No staging URL exists, so deployed canonical-state acceptance evidence remains unavailable and deployment authorization stays denied.
 
 ## Environment-identification verification
 
@@ -84,6 +85,7 @@ Native Vite `VITE_*` replacement supplies build SHA/time once per build. `vite.c
 | App exists and is reachable | `PASS` | Authenticated app-scoped function/secret/entity read commands completed against the staging-linked checkout. |
 | App-ID fingerprint | `PASS` | Fingerprint `682b3ba54771331270952c7f4a3ac25035417cc9376a93e8b14ffca2e77051f5` matches the registration. |
 | Distinct production/staging IDs | `PASS` | Registered SHA-256 fingerprints differ; full IDs are not recorded. |
+| Exact candidate alignment | `NOT_READY` | Read-only inspection found staging at `0053faf6`, not candidate `58f6927`; it was not updated after the source gate failed. |
 | Cloud app name ends `_staging` | `MANUAL_VERIFICATION_REQUIRED` | Creation-time authenticated dashboard evidence recorded `Pro Website Questionnaire_staging`; the documented CLI exposes no current app-name query. Reconfirm in Overview before deployment. |
 | Remote functions | `PASS` | Current read-only function list count is zero. |
 | Known project entity schemas/records | `PASS` | Privileged read-only checks returned `SCHEMA_UNAVAILABLE` for `ProFormDraft`, `ProFormDraftEvent`, `ProFormSubmission`, and `ProFormSubmissionIntake`; therefore those project record stores are not deployed. |
@@ -147,4 +149,4 @@ Capture sanitized, dated evidence for:
 
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**
 
-The 2026-08-06 attempt is classified **STORAGE_FOUNDATION_BLOCKED**. Do not run `deploy:base44:staging`, `deploy:base44:production`, direct Base44 deploy commands, function/entity/agent/connector/auth/site pushes, secret writes, OAuth authorization, data import, domain attachment, email, or production webhook calls until every blocker is resolved and a separate prompt authorizes the exact deployment.
+The latest 2026-08-06 attempt is classified **CANONICAL_STATE_FOUNDATION_BLOCKED**. Do not run `deploy:base44:staging`, `deploy:base44:production`, direct Base44 deploy commands, function/entity/agent/connector/auth/site pushes, secret writes, OAuth authorization, data import, domain attachment, email, or production webhook calls until every blocker is resolved and a separate prompt authorizes the exact deployment.
