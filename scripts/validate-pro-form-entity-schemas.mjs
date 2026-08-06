@@ -273,7 +273,7 @@ const validateManifestDefinition = (fieldName, definition, manifest) => {
 const validateManifest = (manifest) => {
   if (!isRecord(manifest)) return;
   if (manifest.manifestVersion !== 1) addViolation('MANIFEST_VERSION_INVALID', MANIFEST_RELATIVE_PATH);
-  if (manifest.status !== 'mixed_local_implementation_not_pushed') {
+  if (manifest.status !== 'local_schema_extensions_implemented_not_pushed') {
     addViolation('MANIFEST_STATUS_INVALID', MANIFEST_RELATIVE_PATH);
   }
   if (manifest.nonDeployable !== true) addViolation('MANIFEST_MUST_BE_NON_DEPLOYABLE', MANIFEST_RELATIVE_PATH);

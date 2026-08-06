@@ -1,9 +1,10 @@
 # Base44 Pro Form entity extension and compatibility plan
 
-- Status: `ProFormDraft` extension implemented locally; no entity schema pushed
+- Status: all four Pro Form entity extensions implemented locally; no entity schema pushed
 - Date: 2026-08-05
 - Planning baseline: `50c7379c1cfc30e2d242e917b0abe951e3f75584`
 - Prompt 2 implementation baseline: `8b5aac603bb9c568b7bdc726423852c4e146582a`
+- Prompt 3 implementation baseline: `6cc798f01551b93c1a4ccaeb699f78b8935e4b5c`
 - Branch: `feature/durable-draft-recovery`
 - Base44 CLI inspected locally: `0.1.8`
 - Machine-readable contract: [pro-form-field-manifest.json](./pro-form-field-manifest.json)
@@ -20,25 +21,25 @@ The four existing uppercase schema files remain the authoritative repository con
 3. `base44/entities/ProFormSubmission.jsonc`
 4. `base44/entities/ProFormSubmissionIntake.jsonc`
 
-They are not renamed. Prompt 2 adds 55 optional, field-restricted properties to the local `ProFormDraft` schema while preserving its 30 original properties, sole `session_id` requirement, unconstrained string `status`, and absent entity-level RLS. The other three schemas remain plan-only. The current public questionnaire may continue its compatibility draft/event calls, but none of the new protected fields may be written through anonymous direct entity calls.
+They are not renamed. Prompt 2 added 55 optional protected properties to `ProFormDraft`. Prompt 3 adds 25 to `ProFormDraftEvent`, 16 to `ProFormSubmission`, and 18 to `ProFormSubmissionIntake`. The schemas retain every existing field, required array, nested submission object, enum/default, and entity-level RLS. Current public compatibility payloads remain valid, while every new field is restricted to admin read/write.
 
-The manifest is deliberately stored under `docs/durable-draft-recovery/data`, outside `base44/entities`. It is strict JSON but is not a Base44 entity resource and cannot be included by an entity-directory push. No generated `base44/.types/types.d.ts` exists; Prompt 2 does not generate types because no schema is pushed or deployed.
+The manifest is deliberately stored under `docs/durable-draft-recovery/data`, outside `base44/entities`. It is strict JSON but is not a Base44 entity resource and cannot be included by an entity-directory push. No types are generated because these local schema changes are not pushed or deployed.
 
 ## Current compatibility baseline
 
 | Entity | Existing top-level fields | Existing required array | Repository RLS/FLS | Current compatibility callers |
 | --- | ---: | --- | --- | --- |
 | `ProFormDraft` | 30 original + 55 local optional extensions | `session_id` | No entity RLS; all 55 new fields use admin read/write FLS | Public browser filter/create/update remains compatible; later backend service-role functions own new fields |
-| `ProFormDraftEvent` | 12 | `session_id` | No entity RLS; no FLS | Public browser create; backend repair create |
-| `ProFormSubmission` | 2 large objects | `metadata`, `userdata` | Existing creator/admin read-update-delete and open create/write objects; no FLS | Public and admin browser create; backend fallback/retry/repair create/filter |
-| `ProFormSubmissionIntake` | 33 | `questionnaire_session_id` | Existing admin-only read/update/delete/write; no FLS | Admin browser list; backend fallback/retry/repair create/filter/update |
+| `ProFormDraftEvent` | 12 original + 25 local optional extensions | `session_id` | No entity RLS; all new fields use admin read/write FLS | Public browser create remains compatible; later backend event append owns new fields |
+| `ProFormSubmission` | 2 original large objects + 16 local optional extensions | `metadata`, `userdata` | Existing creator/admin entity RLS unchanged; all new fields use admin read/write FLS | Existing submission payload remains compatible; trusted backend/migration owns linkage fields |
+| `ProFormSubmissionIntake` | 33 original + 18 local optional extensions | `questionnaire_session_id` | Existing admin-only entity RLS unchanged; all new fields use admin read/write FLS | Existing fallback/retry/repair behavior remains compatible |
 
 Compatibility findings:
 
 - `ProFormDraft.status` is an unconstrained existing string. This plan does not add an enum to it, because existing values such as `draft` must remain readable while lifecycle normalization occurs in backend code.
 - `ProFormSubmissionIntake.status` retains exactly `submitted`, `received_intake`, `retry_pending`, `retry_success`, `retry_failed`, and `abandoned`, with default `received_intake`.
 - `ProFormSubmission.metadata` and `userdata` are preserved without restructuring.
-- Runtime backend code already writes/searches `metadata.questionnaire_session_id`, although that nested key is not declared in the current submission schema. The planned top-level `questionnaire_session_id` is therefore conditional and must not be added until one canonical write/backfill/projection rule prevents divergence.
+- Runtime backend code already writes/searches `metadata.questionnaire_session_id`. The new optional top-level value is migration/backend linkage only: trusted writers set both to the same normalized value when both are present, readers fall back to the legacy metadata value, and mismatches are quarantined rather than silently repaired.
 - Existing direct browser operations remain compatibility-only. Future authorization must move to scoped backend functions before draft/event entity RLS is tightened.
 - The schemas contain 27 pre-existing missing-description paths outside Draft: 5 in `ProFormSubmission` and 22 in `ProFormSubmissionIntake`. The validator freezes those exact exceptions, requires descriptions on every new/future field, and rejects any new missing description.
 
@@ -79,7 +80,7 @@ No entity may contain a raw recovery code, normalized recovery-code input, recov
 
 For every proposed field, the manifest is normative and supplies: entity membership, name, type, optional format/enum, no default unless explicitly present, `required:false`, classifications, sensitive flag, FLS requirement, purpose/migration use, public projection rule, and description. Its `group` selects a policy containing canonical-state source, legacy fallback, migration behavior, admin projection, retention behavior, and test requirement. Thus every field has all sixteen required planning attributes without repeating security prose in every row below.
 
-Definitions omit schema defaults except Prompt 2's explicit `retention_hold: false`. That optional default applies to new writes and does not make the field required or assign an expiration to legacy records.
+Definitions omit schema defaults except explicit `retention_hold: false`, `zapier_suppressed: false`, and `zapier_redirected: false`. Defaults affect new writes only and do not make fields required or rewrite legacy records.
 
 ## Common migration metadata
 
@@ -166,48 +167,47 @@ All are admin/backend-only; the reason is sensitive PII. Missing expiration/vers
 
 The common fields in the preceding table are implemented with their planned types and admin read/write FLS. The composite source identity supports full, incremental, late-write, and reverse migration without replacing local Base44 IDs.
 
-## `ProFormDraftEvent` extension plan
+## `ProFormDraftEvent` local extension
 
-Planned count: **25** optional fields: 12 common migration fields plus 13 event-specific fields.
+Implementation status: **25 optional fields implemented locally and not pushed**: 12 common migration fields plus 13 event-specific fields.
 
 - `draft_id` — string; `backend_only`, `sensitive_pii`, `audit_metadata`; direct relationship to the draft, remapped during migration.
-- `event_idempotency_key_hash` — string; `backend_only`, `sensitive_hash`, `audit_metadata`; event retry/replay deduplication.
+- `event_id` — string; `backend_only`, `audit_metadata`; stable retry-safe append and deterministic migration idempotency key.
 - `client_revision` — number; `backend_only`, `canonical_state`, `audit_metadata`; accepted client revision.
 - `server_revision` — number; same classification; resulting server revision.
-- `base_server_revision` — number; `backend_only`, `audit_metadata`; mutation base revision.
-- `mutation_id` — string; `backend_only`, `audit_metadata`; mutation correlation.
 - `source_tab_id` — string; `backend_only`, `audit_metadata`; opaque non-PII per-tab origin.
+- `mutation_id` — string; `backend_only`, `audit_metadata`; mutation correlation.
 - `event_metadata_json` — string; `backend_only`, `sensitive_pii`, `audit_metadata`; allowlisted metadata only.
-- `safe_value_hash` — string; `backend_only`, `sensitive_hash`, `audit_metadata`; optional integrity comparison without projection.
-- `canonical_state_hash` — string; `backend_only`, `sensitive_hash`, `audit_metadata`; links the event to accepted state.
-- `retention_class` — string; `admin_only`, `backend_only`, `retention_metadata`.
-- `retention_anchor_at` — string/date-time; same classification.
-- `support_hold` — boolean; same classification.
+- `value_hash` — string; `backend_only`, `sensitive_hash`, `audit_metadata`; optional integrity comparison without projecting the value.
+- `redaction_level` — string; `admin_only`, `backend_only`, `audit_metadata`; records full, summarized, or omitted value evidence without freezing an enum.
+- `admin_actor_hash` — string; `admin_only`, `backend_only`, `sensitive_hash`, `audit_metadata`; future audit actor reference without raw identity.
+- `retention_expires_at` — string/date-time; `admin_only`, `backend_only`, `retention_metadata`.
+- `retention_hold` — boolean, default `false`; same classification.
+- `retention_hold_reason` — string; `admin_only`, `backend_only`, `sensitive_pii`, `retention_metadata`.
 
 Existing `session_id`, event/value fields, and browser writers remain compatible. New fields are not anonymous-writable. Events inherit draft retention, preserve platform/server order, and are deduplicated/remapped in all migration directions.
 
-## `ProFormSubmission` extension plan
+## `ProFormSubmission` local extension
 
-Planned count: **16** optional fields: 12 common migration fields plus 4 linkage/hash fields. The existing large `metadata` and `userdata` structures remain unchanged.
+Implementation status: **16 optional fields implemented locally and not pushed**: 12 common migration fields plus 4 linkage/hash fields. The existing large `metadata` and `userdata` structures remain unchanged.
 
-- `questionnaire_session_id` — string; `backend_only`, `sensitive_pii`, `audit_metadata`; **conditional** because runtime code already uses `metadata.questionnaire_session_id`. Do not add until one canonical source, compatibility projection, and backfill rule prevent divergent duplicates.
+- `questionnaire_session_id` — string; `backend_only`, `sensitive_pii`, `audit_metadata`; optional top-level migration linkage governed by the equality/fallback/quarantine rule above.
 - `source_draft_id` — string; `backend_only`, `sensitive_pii`, `audit_metadata`; optional source-draft linkage with migration remapping.
 - `submitted_state_hash` — string; `backend_only`, `sensitive_hash`, `submission_lock`; binds the final record to submitted canonical state.
 - `pdf_source_state_hash` — string; `backend_only`, `sensitive_hash`, `submission_lock`; binds PDF regeneration to its exact source.
 
 No field changes final submission payload shape by itself. Existing creators may continue sending only `metadata` and `userdata`. Migration populates linkage/hashes only when a trustworthy source exists; absence is valid for legacy records.
 
-## `ProFormSubmissionIntake` extension plan
+## `ProFormSubmissionIntake` local extension
 
-Planned count: **19** optional fields: 12 common migration fields plus 7 intake-specific fields.
+Implementation status: **18 optional fields implemented locally and not pushed**: 12 common migration fields plus 6 intake-specific fields.
 
 - `source_draft_id` — string; `backend_only`, `sensitive_pii`, `audit_metadata`; optional source-draft relationship.
 - `canonical_state_hash` — string; `backend_only`, `sensitive_hash`, `audit_metadata`; optional integrity linkage.
-- `external_side_effects_mode` — string; `backend_only`, `audit_metadata`; safe disabled/staging/production policy result.
-- `zapier_status` — number; `backend_only`, `audit_metadata`; bounded HTTP status only.
-- `zapier_delivery_outcome` — string; `backend_only`, `audit_metadata`; delivered/redirected/suppressed/failed classification.
-- `zapier_last_attempted_at` — string/date-time; `backend_only`, `audit_metadata`; authoritative attempt time.
-- `zapier_failure_kind` — string; `backend_only`, `audit_metadata`; safe bounded failure kind.
+- `submitted_state_hash` — string; `backend_only`, `sensitive_hash`, `submission_lock`; binds retry/repair evidence to the submitted state.
+- `zapier_suppressed` — boolean, default `false`; `backend_only`, `audit_metadata`; intentional suppression that never implies sent.
+- `zapier_redirected` — boolean, default `false`; `backend_only`, `audit_metadata`; approved non-production redirection without destination data.
+- `zapier_status` — string; `backend_only`, `audit_metadata`; safe bounded delivery status without response content.
 
 The existing status enum, retry counters/errors, AI repair fields, `zapier_sent`, payload evidence, and linked submission ID remain intact. New diagnostics contain no destination URL, secret, provider response body, or submitted payload. Staging/test side-effect context is not copied into green.
 
@@ -231,12 +231,12 @@ The existing status enum, retry counters/errors, AI repair fields, `zapier_sent`
 - parses strict manifest JSON and all four JSONC schemas with `jsonc-parser`;
 - detects duplicate keys from the JSONC syntax tree;
 - verifies exact entity names, uppercase paths, top-level object shape, existing field types, required arrays, Intake enum/default, and RLS baselines;
-- requires every locally implemented Draft field to exist and verifies it is optional, described, classified, nonsecret, and assigned exact admin/backend FLS;
+- requires every locally implemented field to exist and verifies it is optional, described, classified, nonsecret, and assigned exact admin/backend FLS;
 - verifies all four entities carry the same 12 migration fields and types;
 - rejects raw code/token/grant field names;
 - freezes the exact 27 legacy missing-description exceptions and rejects new ones;
-- verifies the pre-extension baseline hash, the implemented local Draft schema hash, and plan-only baselines for the other three entities;
-- runs six focused Vitest cases covering exact Prompt 2 fields, legacy compatibility, raw-material prohibitions, and synthetic legacy/future payload validation;
+- verifies each pre-extension baseline, the preserved existing-property hash, and each implemented local schema hash;
+- runs focused Vitest coverage for all four schemas plus six strict synthetic legacy/extended fixtures;
 - exits nonzero for every violation.
 
 ## Deferred implementation gates
@@ -244,9 +244,9 @@ The existing status enum, retry counters/errors, AI repair fields, `zapier_sent`
 No schema push is authorized by this plan. Before a later staging-only entity push:
 
 1. Review every field against Base44 staging FLS behavior and generated types.
-2. Resolve the conditional submission session linkage.
-3. Keep Draft additions optional and add later entity fields only as optional while retaining exact required arrays/RLS.
-4. Generate local types after schema edits.
+2. Verify the submission top-level/metadata equality and mismatch-quarantine rule in staging backend writers.
+3. Keep every addition optional while retaining exact required arrays/RLS.
+4. Generate local types only in the separately authorized staging workflow.
 5. Run validator, normal/canonical/identity suites, lint, typecheck, build, and staging authorization tests.
 6. Export/checkpoint staging data and compare pre/post schemas.
 7. Push only staging after separate authorization; never use blue production for schema experiments.
@@ -254,4 +254,4 @@ No schema push is authorized by this plan. Before a later staging-only entity pu
 
 ## Local implementation action statement
 
-Prompt 2 edits only the local `ProFormDraft` schema and its validation/planning artifacts. It adds field-level admin restrictions but no entity-level RLS. It does not create or read a record, generate types, push entities, deploy code, send email, run cleanup, invoke recovery, change a domain, or enable a feature.
+Prompts 2 and 3 edit only the four local entity schemas and their validation/planning artifacts. They add field-level admin restrictions without altering entity-level RLS. They do not create or read a record, generate types, push entities, deploy code, send email, run cleanup, invoke recovery, change a domain, or enable a feature.

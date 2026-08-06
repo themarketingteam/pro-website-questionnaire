@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "business_name": "Synthetic Extended Business",
+    "businessDomain": "extended.synthetic.invalid",
+    "submission_datetime": "2026-08-05T12:00:00.000Z",
+    "service_type": "pro"
+  },
+  "userdata": {
+    "company_description": "Synthetic compatibility fixture",
+    "service_offerings": ["Synthetic service"]
+  },
+  "questionnaire_session_id": "session-extended-synthetic",
+  "source_draft_id": "draft-synthetic-1",
+  "submitted_state_hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "pdf_source_state_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "environment": "staging",
+  "test_run_id": "test-run-synthetic-1",
+  "source_app_id": "app-source-synthetic",
+  "source_entity": "ProFormSubmission",
+  "source_record_id": "submission-source-synthetic-1",
+  "source_created_date": "2026-08-05T11:00:00.000Z",
+  "source_updated_date": "2026-08-05T11:30:00.000Z",
+  "migration_batch_id": "batch-synthetic-1",
+  "migration_direction": "blue_to_green",
+  "migrated_at": "2026-08-05T12:00:00.000Z",
+  "source_content_hash": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "migration_version": 1
+}

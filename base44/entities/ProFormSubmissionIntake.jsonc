@@ -125,6 +125,101 @@
     "ai_repair_source": {
       "type": "string",
       "description": "Source context that triggered the AI repair (e.g. admin_manual, scheduled_job, retry_hook)"
+    },
+    "source_draft_id": {
+      "type": "string",
+      "description": "Identifier of the source draft associated with this intake record.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "canonical_state_hash": {
+      "type": "string",
+      "description": "Stable hash of the canonical questionnaire state associated with this intake.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "submitted_state_hash": {
+      "type": "string",
+      "description": "Stable hash of the immutable state used by the intake submission attempt.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "environment": {
+      "type": "string",
+      "description": "Environment classification assigned by trusted backend or migration code.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "test_run_id": {
+      "type": "string",
+      "description": "Synthetic test-run identifier used to exclude test records from production migration.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "zapier_suppressed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether external Zapier delivery was intentionally suppressed without marking it sent.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "zapier_redirected": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether Zapier delivery was redirected to an approved non-production destination.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "zapier_status": {
+      "type": "string",
+      "description": "Safe Zapier delivery status without destination, response body, or payload data.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_app_id": {
+      "type": "string",
+      "description": "Internal Base44 application identifier of the source record.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_entity": {
+      "type": "string",
+      "description": "Source entity name used in the deterministic migration identity.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_record_id": {
+      "type": "string",
+      "description": "Source record identifier used in the deterministic migration identity.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_created_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation timestamp reported by the source platform.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_updated_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Update timestamp reported by the source platform.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "migration_batch_id": {
+      "type": "string",
+      "description": "Identifier of the migration batch that last wrote this record.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "migration_direction": {
+      "type": "string",
+      "description": "Forward or reverse migration direction for the latest migrated representation.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "migrated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Authoritative timestamp when the migration runner wrote this representation.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_content_hash": {
+      "type": "string",
+      "description": "Stable hash of migration-relevant source content excluding destination bookkeeping.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "migration_version": {
+      "type": "number",
+      "description": "Version of the migration transform applied to this record.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
     }
   },
   "required": [

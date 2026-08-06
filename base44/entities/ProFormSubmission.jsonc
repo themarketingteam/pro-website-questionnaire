@@ -341,6 +341,89 @@
           "description": "Q25.1: Additional notes or instructions (only if Q25 is yes)"
         }
       }
+    },
+    "questionnaire_session_id": {
+      "type": "string",
+      "description": "Top-level questionnaire session linkage for trusted backend and migration use.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_draft_id": {
+      "type": "string",
+      "description": "Identifier of the source draft associated with this submission.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "submitted_state_hash": {
+      "type": "string",
+      "description": "Stable hash of the immutable canonical state used for submission.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "pdf_source_state_hash": {
+      "type": "string",
+      "description": "Stable hash of the immutable state used to generate the submission PDF.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "environment": {
+      "type": "string",
+      "description": "Environment classification assigned by trusted backend or migration code.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "test_run_id": {
+      "type": "string",
+      "description": "Synthetic test-run identifier used to exclude test records from production migration.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_app_id": {
+      "type": "string",
+      "description": "Internal Base44 application identifier of the source record.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_entity": {
+      "type": "string",
+      "description": "Source entity name used in the deterministic migration identity.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_record_id": {
+      "type": "string",
+      "description": "Source record identifier used in the deterministic migration identity.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_created_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation timestamp reported by the source platform.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_updated_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Update timestamp reported by the source platform.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "migration_batch_id": {
+      "type": "string",
+      "description": "Identifier of the migration batch that last wrote this record.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "migration_direction": {
+      "type": "string",
+      "description": "Forward or reverse migration direction for the latest migrated representation.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "migrated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Authoritative timestamp when the migration runner wrote this representation.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_content_hash": {
+      "type": "string",
+      "description": "Stable hash of migration-relevant source content excluding destination bookkeeping.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "migration_version": {
+      "type": "number",
+      "description": "Version of the migration transform applied to this record.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
     }
   },
   "required": [

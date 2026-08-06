@@ -1,0 +1,6 @@
+{
+  "session_id": "session-legacy-synthetic",
+  "event_type": "answer_changed",
+  "question_id": "question-synthetic-1",
+  "value_json": "{\"value\":\"synthetic\"}"
+}

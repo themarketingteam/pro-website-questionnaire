@@ -49,6 +49,136 @@
     "created_at_iso": {
       "type": "string",
       "description": "When the event was created"
+    },
+    "draft_id": {
+      "type": "string",
+      "description": "Direct identifier of the ProFormDraft associated with this event.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "event_id": {
+      "type": "string",
+      "description": "Stable idempotency identifier for retry-safe event append and migration replay.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "client_revision": {
+      "type": "number",
+      "description": "Client revision accepted for this event.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "server_revision": {
+      "type": "number",
+      "description": "Authoritative server revision resulting from this event.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_tab_id": {
+      "type": "string",
+      "description": "Opaque non-identity tab identifier associated with the event.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "mutation_id": {
+      "type": "string",
+      "description": "Opaque canonical mutation identifier associated with the event.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "event_metadata_json": {
+      "type": "string",
+      "description": "Serialized allowlisted internal event metadata without raw credentials or recovery secrets.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "value_hash": {
+      "type": "string",
+      "description": "Stable hash of the canonical event value when calculated.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "redaction_level": {
+      "type": "string",
+      "description": "Classification indicating whether value_json contains a full, summarized, or omitted value.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "admin_actor_hash": {
+      "type": "string",
+      "description": "Hashed administrative audit actor reference without raw identity.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "retention_expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Authoritative retention expiration timestamp when assigned.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "retention_hold": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether authorized retention cleanup must preserve this event.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "retention_hold_reason": {
+      "type": "string",
+      "description": "Controlled reason for an authorized event retention hold.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "environment": {
+      "type": "string",
+      "description": "Environment classification assigned by trusted backend or migration code.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "test_run_id": {
+      "type": "string",
+      "description": "Synthetic test-run identifier used to exclude test records from production migration.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_app_id": {
+      "type": "string",
+      "description": "Internal Base44 application identifier of the source record.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_entity": {
+      "type": "string",
+      "description": "Source entity name used in the deterministic migration identity.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_record_id": {
+      "type": "string",
+      "description": "Source record identifier used in the deterministic migration identity.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_created_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation timestamp reported by the source platform.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_updated_date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Update timestamp reported by the source platform.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "migration_batch_id": {
+      "type": "string",
+      "description": "Identifier of the migration batch that last wrote this record.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "migration_direction": {
+      "type": "string",
+      "description": "Forward or reverse migration direction for the latest migrated representation.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "migrated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Authoritative timestamp when the migration runner wrote this representation.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "source_content_hash": {
+      "type": "string",
+      "description": "Stable hash of migration-relevant source content excluding destination bookkeeping.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
+    },
+    "migration_version": {
+      "type": "number",
+      "description": "Version of the migration transform applied to this record.",
+      "rls": {"read": {"user_condition": {"role": "admin"}}, "write": {"user_condition": {"role": "admin"}}}
     }
   },
   "required": [

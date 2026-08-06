@@ -37,6 +37,7 @@ runNode(
     '--config',
     'src/vitest.config.js',
     'src/test/proFormDraftEntitySchema.test.js',
+    'src/test/proFormMigrationEntitySchemas.test.js',
     '--reporter=dot',
     '--no-coverage',
   ],

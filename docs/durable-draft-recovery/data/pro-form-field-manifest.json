@@ -1,6 +1,6 @@
 {
   "manifestVersion": 1,
-  "status": "mixed_local_implementation_not_pushed",
+  "status": "local_schema_extensions_implemented_not_pushed",
   "manifestPath": "docs/durable-draft-recovery/data/pro-form-field-manifest.json",
   "entityDirectory": "base44/entities",
   "nonDeployable": true,
@@ -115,15 +115,15 @@
     "event_contract": {
       "canonicalStateSource": "Accepted draft mutation or backend lifecycle/audit operation.",
       "legacyFallback": "Existing session-linked events remain valid without draft ID, revisions, mutation IDs, or hashes.",
-      "migrationBehavior": "Remap draft relationship, preserve event identity/order, and deduplicate by the safe idempotency hash.",
+      "migrationBehavior": "Remap draft relationship, preserve event identity/order, and deduplicate by stable event_id plus composite source identity.",
       "adminProjectionBehavior": "Admin/backend-only event metadata; existing value fields remain compatibility data pending later minimization.",
       "retentionBehavior": "Retain at least as long as the associated draft and all active holds.",
-      "testRequirement": "Validate relationship remapping, event idempotency, revisions, mutation/tab linkage, safe hashing, and retention inheritance."
+      "testRequirement": "Validate relationship remapping, event_id idempotency, revisions, mutation/tab linkage, value hashing/redaction, administrative actor privacy, and retention inheritance."
     },
     "submission_linkage": {
       "canonicalStateSource": "Finalized draft and immutable submitted-state/PDF hashes.",
       "legacyFallback": "Retain existing metadata/userdata unchanged; absence of linkage fields is valid for legacy submissions.",
-      "migrationBehavior": "Populate only when compatibility review finds a trustworthy source; remap source draft IDs in both directions.",
+      "migrationBehavior": "Populate only from a trustworthy source, require top-level and legacy metadata session values to agree when both exist, quarantine mismatches, and remap source draft IDs in both directions.",
       "adminProjectionBehavior": "Backend/admin-only linkage and integrity hashes; metadata/userdata projections remain unchanged.",
       "retentionBehavior": "Follow completed-submission retention and rollback evidence requirements.",
       "testRequirement": "Prove metadata/userdata byte-shape compatibility, optional linkage, hash equality, and relationship remapping."
@@ -142,7 +142,7 @@
       "migrationBehavior": "Preserve safe diagnostics but exclude staging destinations, test IDs, and staging-only delivery context from green.",
       "adminProjectionBehavior": "Safe delivery mode/status/outcome only; no destination URL, secret, response body, or payload.",
       "retentionBehavior": "Retain with intake retry/incident evidence.",
-      "testRequirement": "Validate disabled/staging/production routing, status bounds, safe outcomes, and absence of destinations or secrets."
+      "testRequirement": "Validate suppressed and redirected flags independently from zapier_sent, bounded safe status text, and absence of destinations or secrets."
     }
   },
   "commonMigrationFields": [
@@ -835,6 +835,17 @@
       "description": "Hash of the backend event idempotency key.",
       "group": "event_contract"
     },
+    "event_id": {
+      "type": "string",
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Provides a stable retry-safe append identity and deterministic event migration upsert key.",
+      "publicProjectionRule": "omit",
+      "description": "Stable idempotency identifier for retry-safe event append and migration replay.",
+      "group": "event_contract"
+    },
     "base_server_revision": {
       "type": "number",
       "classifications": ["backend_only", "audit_metadata"],
@@ -890,6 +901,39 @@
       "description": "Stable hash of the canonicalized event value when hashing is permitted.",
       "group": "event_contract"
     },
+    "value_hash": {
+      "type": "string",
+      "classifications": ["backend_only", "sensitive_hash", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Compares canonical event-value integrity without projecting the underlying value.",
+      "publicProjectionRule": "omit",
+      "description": "Stable hash of the canonical event value when calculated.",
+      "group": "event_contract"
+    },
+    "redaction_level": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves whether legacy value_json evidence is full, summarized, or omitted without changing the value field.",
+      "publicProjectionRule": "omit",
+      "description": "Classification indicating whether value_json contains a full, summarized, or omitted value.",
+      "group": "event_contract"
+    },
+    "admin_actor_hash": {
+      "type": "string",
+      "classifications": ["admin_only", "backend_only", "sensitive_hash", "audit_metadata"],
+      "sensitive": true,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves a privacy-safe administrative audit actor reference without raw identity.",
+      "publicProjectionRule": "omit",
+      "description": "Hashed administrative audit actor reference without raw identity.",
+      "group": "event_contract"
+    },
     "canonical_state_hash": {
       "type": "string",
       "classifications": ["backend_only", "sensitive_hash", "audit_metadata"],
@@ -910,7 +954,7 @@
       "migrationUse": "Adds optional direct submission linkage without restructuring metadata or userdata.",
       "publicProjectionRule": "omit",
       "description": "Questionnaire session identifier linked to the final submission.",
-      "implementationGate": "Do not add until the existing runtime use of metadata.questionnaire_session_id has an approved single-write/backfill/projection rule that prevents divergent duplicate values.",
+      "implementationGate": "Approved for optional top-level storage when trusted writers require equality with metadata.questionnaire_session_id whenever both values exist; mismatches are quarantined rather than overwritten.",
       "group": "submission_linkage"
     },
     "source_draft_id": {
@@ -947,14 +991,38 @@
       "group": "external_side_effect_diagnostics"
     },
     "zapier_status": {
-      "type": "number",
+      "type": "string",
       "classifications": ["backend_only", "audit_metadata"],
       "sensitive": false,
       "required": false,
       "fieldLevelRlsRequirement": "admin_backend_only",
-      "migrationUse": "Preserves the bounded external HTTP status without response content.",
+      "migrationUse": "Preserves a safe bounded delivery status without destination, response body, or submitted payload data.",
       "publicProjectionRule": "omit",
-      "description": "External Zapier HTTP status when a request was attempted.",
+      "description": "Safe Zapier delivery status without destination, response body, or payload data.",
+      "group": "external_side_effect_diagnostics"
+    },
+    "zapier_suppressed": {
+      "type": "boolean",
+      "default": false,
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves intentional suppression independently from the existing zapier_sent delivery flag.",
+      "publicProjectionRule": "omit",
+      "description": "Whether Zapier delivery was intentionally suppressed without being marked sent.",
+      "group": "external_side_effect_diagnostics"
+    },
+    "zapier_redirected": {
+      "type": "boolean",
+      "default": false,
+      "classifications": ["backend_only", "audit_metadata"],
+      "sensitive": false,
+      "required": false,
+      "fieldLevelRlsRequirement": "admin_backend_only",
+      "migrationUse": "Preserves a safe redirection decision while excluding the actual non-production destination.",
+      "publicProjectionRule": "omit",
+      "description": "Whether Zapier delivery was redirected to an approved non-production destination.",
       "group": "external_side_effect_diagnostics"
     },
     "zapier_delivery_outcome": {
@@ -1342,7 +1410,9 @@
     "ProFormDraftEvent": {
       "schemaFile": "base44/entities/ProFormDraftEvent.jsonc",
       "baselineSha256": "4828654d5a77525438daf4c61855542a1302a51b3860a0a671425edc3085f5ae",
-      "implementationStatus": "planned",
+      "baselineExistingPropertiesSha256": "0aed9cd3b0e1317f38d05331f1513fd511b9362b33364706570099a36b43bc37",
+      "implementedSchemaSha256": "e948797ed128f5f1242b18fd8eda6635b92c13385a76bd805df66eeeae2a28ca",
+      "implementationStatus": "local_schema_implemented_not_pushed",
       "existingRequired": ["session_id"],
       "expectedRls": null,
       "legacyDescriptionExceptions": [],
@@ -1362,13 +1432,15 @@
       },
       "proposedFields": [
         "environment", "test_run_id", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version",
-        "draft_id", "event_idempotency_key_hash", "client_revision", "server_revision", "base_server_revision", "mutation_id", "source_tab_id", "event_metadata_json", "safe_value_hash", "canonical_state_hash", "retention_class", "retention_anchor_at", "support_hold"
+        "draft_id", "event_id", "client_revision", "server_revision", "source_tab_id", "mutation_id", "event_metadata_json", "value_hash", "redaction_level", "admin_actor_hash", "retention_expires_at", "retention_hold", "retention_hold_reason"
       ]
     },
     "ProFormSubmission": {
       "schemaFile": "base44/entities/ProFormSubmission.jsonc",
       "baselineSha256": "dd876a669dc103f69464b0a77ec6bf55995dd8c3656d9bb16311ee4145dea5f0",
-      "implementationStatus": "planned",
+      "baselineExistingPropertiesSha256": "905e4b7cfd0b9bd8700cc42bad6c7413597e418cba2e40bcddabee24fa62adab",
+      "implementedSchemaSha256": "3014b208957ffbb721f32e412bd2551ed62d355f1cefb863f87ed39fc2fb3dc4",
+      "implementationStatus": "local_schema_implemented_not_pushed",
       "existingRequired": ["metadata", "userdata"],
       "expectedRls": {
         "create": {},
@@ -1396,7 +1468,9 @@
     "ProFormSubmissionIntake": {
       "schemaFile": "base44/entities/ProFormSubmissionIntake.jsonc",
       "baselineSha256": "3a97cde95ed2ac74158b6f2fe3d755f573c23860bd9b77695586e74db73b3328",
-      "implementationStatus": "planned",
+      "baselineExistingPropertiesSha256": "c5344f8fb288d79d5cf933935060b286fc9624ab40e8a319433eb5b31678a468",
+      "implementedSchemaSha256": "cd2fc8eb55ea769af1defea1b214fff52f198a19fab7a9d518f40b6f119f6745",
+      "implementationStatus": "local_schema_implemented_not_pushed",
       "existingRequired": ["questionnaire_session_id"],
       "expectedRls": {
         "read": {"user_condition": {"role": "admin"}},
@@ -1465,7 +1539,7 @@
       },
       "proposedFields": [
         "environment", "test_run_id", "source_app_id", "source_entity", "source_record_id", "source_created_date", "source_updated_date", "migration_batch_id", "migration_direction", "migrated_at", "source_content_hash", "migration_version",
-        "source_draft_id", "canonical_state_hash", "external_side_effects_mode", "zapier_status", "zapier_delivery_outcome", "zapier_last_attempted_at", "zapier_failure_kind"
+        "source_draft_id", "canonical_state_hash", "submitted_state_hash", "zapier_suppressed", "zapier_redirected", "zapier_status"
       ]
     }
   }

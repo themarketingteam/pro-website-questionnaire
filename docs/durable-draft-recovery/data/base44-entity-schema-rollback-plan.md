@@ -1,15 +1,16 @@
 # Base44 entity schema rollback plan
 
-- Status: `ProFormDraft` schema extended locally; no Base44 push
+- Status: all four Pro Form entity schemas extended locally; no Base44 push
 - Date: 2026-08-05
 - Source planning baseline commit: `50c7379c1cfc30e2d242e917b0abe951e3f75584`
 - Prompt 2 implementation baseline commit: `8b5aac603bb9c568b7bdc726423852c4e146582a`
+- Prompt 3 implementation baseline commit: `6cc798f01551b93c1a4ccaeb699f78b8935e4b5c`
 - Active branch: `feature/durable-draft-recovery`
 - Applies to: `ProFormDraft`, `ProFormDraftEvent`, `ProFormSubmission`, and `ProFormSubmissionIntake`
 
 ## Current baseline
 
-The uppercase schema files and their pre-extension SHA-256 values are recorded in [pro-form-field-manifest.json](./pro-form-field-manifest.json). The manifest additionally records the local implemented `ProFormDraft` hash, while the other three entities remain at their planning baselines. The validator checks this mixed implementation state. This prompt does not push a schema anywhere.
+The uppercase schema files and their pre-extension SHA-256 values are recorded in [pro-form-field-manifest.json](./pro-form-field-manifest.json). For every entity, the manifest also records a canonical hash of the preserved pre-extension properties and a byte hash of the locally extended schema. The validator checks all three layers. No schema is pushed anywhere.
 
 The first future schema change must be staging-only. Blue production remains intact and green production receives no schema until the staging field/FLS/compatibility matrix passes and a separate production-candidate change is authorized.
 
@@ -23,7 +24,7 @@ Before editing or pushing staging schemas:
 4. Preserve the four pre-change schema files and generated type output as release evidence.
 5. Capture current entity RLS and FLS from source and manually verify them in the Base44 dashboard.
 6. Run `npm run test:entity-schemas` before any staging push and preserve its exact local schema hashes.
-7. Resolve all conditional fields, especially submission session linkage, before adding them.
+7. Verify the approved submission session equality/fallback/quarantine contract before any staging writer is enabled.
 
 No production record content is used during staging rehearsal.
 
@@ -36,6 +37,7 @@ For each entity, compare before/after source with:
 - all existing properties, nested submission metadata/userdata, descriptions, types, formats, enums, and defaults;
 - exact required array;
 - exact entity RLS;
+- exact canonical hash of every pre-extension property, including nested `metadata` and `userdata`;
 - every new field's optionality, description, type/format, and admin/backend FLS;
 - absence of raw recovery codes, tokens, grants, credentials, and secret-bearing configuration;
 - generated types and current caller payload compatibility.
@@ -84,6 +86,8 @@ After any later staging or green push, an authorized operator must verify:
 8. Service-role backend calls can use the fields through reviewed functions.
 9. No raw code, token, grant, destination URL, credential, or secret field exists.
 10. No unexpected field, required constraint, entity rename, or deletion occurred.
+11. `zapier_suppressed` and `zapier_redirected` do not set or imply the existing `zapier_sent` field.
+12. Submission top-level and legacy metadata session IDs agree whenever both are present; any mismatch is quarantined.
 
 Screenshots or exports must redact app IDs, emails, record values, and secrets unless stored in the approved restricted evidence system.
 
@@ -116,6 +120,6 @@ Application/source rollback and data rollback are ordered under ADR-002:
 
 Schema field deletion is not part of that emergency path. Optional fields can remain dormant while blue compatibility behavior resumes.
 
-## Planning action statement
+## Local implementation action statement
 
-Prompt 2 changes the local Draft schema but does not push it. This rollback plan does not access production records, create an export, alter a Base44 cloud resource, deploy code, move a domain, run cleanup, or execute a rollback.
+Prompts 2 and 3 change only local schema and validation artifacts and do not push them. This rollback plan does not access production records, create an export, alter a Base44 cloud resource, deploy code, move a domain, run cleanup, or execute a rollback.
