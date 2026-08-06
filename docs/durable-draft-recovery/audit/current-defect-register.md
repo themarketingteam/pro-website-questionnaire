@@ -9,6 +9,8 @@ This register distinguishes observed current behavior from future acceptance req
 
 Feature-branch remediation notes preserve the audited production-baseline finding while recording later source changes. They do not certify staging or production and do not change the historical severity counts above.
 
+The 2026-08-06 staging-certification attempt reconfirmed the local browser foundation (35/35 boot and 15/15 isolation/memory executions), but stopped before deployment because the aggregate gate failed lint, typecheck, and 5 of 446 normal tests. See the [blocked staging browser-storage certification](../testing/staging-browser-storage-certification.md). No defect below is environment-certified by that attempt.
+
 ## Severity summary
 
 | Severity | Count | Meaning in this audit |
@@ -33,7 +35,7 @@ Feature-branch remediation notes preserve the audited production-baseline findin
 - **Permanent implementation batch:** B01 — safe boot and client-scoped browser namespace.
 - **Feature-branch remediation (2026-08-05):** `app-params.js` now guards window/location, URL parsing, storage acquisition/read/write, document access, and URL replacement. Base44 client creation returns value-free diagnostics on failure; authentication bootstrap is bounded to four seconds; non-destructive initialization/render error UI is present. Unit tests and the active seven-mode/five-project Playwright boot matrix provide source/local evidence.
 - **Remediation evidence:** `src/test/appParamsSafety.test.js`; `src/test/base44ClientInitialization.test.js`; `src/test/authContextSafety.test.jsx`; `src/test/appInitializationError.test.jsx`; `src/test/errorBoundarySafety.test.jsx`; `tests/e2e/draft-v2/storage-recovery.spec.js`.
-- **Remediation status:** Implemented on `feature/durable-draft-recovery`; staging, production-disabled, and production-enabled certification remain pending. Draft-store integration and durable server recovery are outside this remediation.
+- **Remediation status:** Implemented on `feature/durable-draft-recovery`; the five-project local boot matrix was reconfirmed, but staging certification is blocked before deployment by the root release gate. Production-disabled and production-enabled certification remain pending. Draft-store integration and durable server recovery are outside this remediation.
 - **Release blocking:** Yes
 
 ## DRAFT-002 — One global Redux persistence key
@@ -52,7 +54,7 @@ Feature-branch remediation notes preserve the audited production-baseline findin
 - **Permanent implementation batch:** B01 — safe boot and client-scoped browser namespace.
 - **Feature-branch remediation (2026-08-05):** `createQuestionnaireStore` now persists approved form fields under `pro-questionnaire:v4:ns_<hash>:redux-state`. `ReduxProvider` derives identity first, caches one runtime per namespace, and resets only the active namespace. Version 3 rehydration normalizes the complete form and discards malformed or hidden-child data safely.
 - **Remediation evidence:** `src/test/questionnaireStore.test.jsx`; `src/test/questionnaireBrowserNamespace.test.js`; `tests/e2e/draft-v2/client-isolation.spec.js`; `BC-LOCAL-001`, `BC-LOCAL-003`, and `BC-LOCAL-004` now assert the remediated contract.
-- **Remediation status:** Local browser isolation is implemented on `feature/durable-draft-recovery`; staging, production-disabled, and production-enabled certification remain pending. No server hydration or authorization is implied.
+- **Remediation status:** Local browser isolation is implemented on `feature/durable-draft-recovery`; the five-project persistence/fallback/memory matrix was reconfirmed 15/15, but staging certification is blocked before deployment. No server hydration or authorization is implied.
 - **Release blocking:** Yes
 
 ## DRAFT-003 — One global questionnaire session key
@@ -71,7 +73,7 @@ Feature-branch remediation notes preserve the audited production-baseline findin
 - **Permanent implementation batch:** B01 — safe boot and client-scoped browser namespace.
 - **Feature-branch remediation (2026-08-05):** Session creation, read, and clear now require the derived namespace and use the version 4 `legacy-session` purpose. Persistent denial retains one namespace-specific in-memory session for the current page. The global key is available only through an explicit authorized legacy helper and is never automatically migrated or deleted.
 - **Remediation evidence:** `src/test/questionnaireSessionId.test.js`; `src/test/legacyQuestionnaireStorage.test.js`; `BC-LOCAL-002`.
-- **Remediation status:** Local session scoping is implemented on `feature/durable-draft-recovery`; authorized server identity/recovery and environment certification remain pending.
+- **Remediation status:** Local session scoping is implemented on `feature/durable-draft-recovery`; refreshed local isolation evidence passed, while authorized server identity/recovery and environment certification remain blocked/pending.
 - **Release blocking:** Yes
 
 ## DRAFT-004 — Server drafts are never restored into the public form
@@ -304,7 +306,7 @@ Feature-branch remediation notes preserve the audited production-baseline findin
 - **Permanent implementation batch:** B01/B03/B05/B06 — identity namespace, server authorization, security certification.
 - **Feature-branch remediation (2026-08-05):** Redux state, session IDs, and failure backups are partitioned by a deterministic version 4 namespace whose keys contain no raw identity components. The active normal/IndexedDB-unavailable browser scenarios prove Client A → Client B → Client A isolation; memory-only mode makes no reload-survival claim.
 - **Remediation evidence:** `src/test/questionnaireBrowserNamespace.test.js`; `src/test/questionnaireStore.test.jsx`; `src/test/questionnaireSessionId.test.js`; required Chromium, Firefox, and WebKit desktop client-isolation matrix passes 9/9 executions.
-- **Remediation status:** The confirmed local shared-browser leak is remediated on `feature/durable-draft-recovery`. Server-side authorization, cross-device recovery, `DR-SEC-001`, and all environment certification remain pending; the namespace hash is not an authorization boundary.
+- **Remediation status:** The confirmed local shared-browser leak is remediated on `feature/durable-draft-recovery`, with the five-project persistence/fallback/memory matrix reconfirmed 15/15. Staging certification stopped before deployment; server-side authorization, cross-device recovery, `DR-SEC-001`, and all environment certification remain pending. The namespace hash is not an authorization boundary.
 - **Release blocking:** Yes
 
 ## DRAFT-018 — Raw/in-flight file selection cannot be restored
