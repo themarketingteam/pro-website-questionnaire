@@ -466,3 +466,12 @@ cutover.
 
 This is local source evidence, not operational acceptance. No app, data, file,
 domain, secret, Base44 deployment, migration apply, or branch push occurred.
+
+## 2026-08-06 migration utility certification addendum
+
+The source certification gate failed three normal-suite assertions after all
+focused migration tests passed. Under this ADR's fail-closed rules, the run
+stopped before staging configuration, schema/function deployment, corpus
+creation, live export, reverse rehearsal, or cleanup. The RPO 0 target and all
+forward/reverse/cutover acceptance remain unproved. `_next` was not created,
+production was untouched, and no domain action occurred.

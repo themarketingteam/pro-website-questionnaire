@@ -612,3 +612,16 @@ late-write polling, file-reference blockers, safe report sanitization, and all
 No requirement advances to staging or production acceptance. No cloud app,
 record, file, secret, function, schema, domain, deployment, migration apply, or
 remote branch was accessed or changed.
+
+## 2026-08-06 bidirectional migration staging certification hard stop
+
+The [staging migration utility report](../migration/staging-migration-utility-certification.md)
+is **MIGRATION_UTILITY_FAILED**. Migration policy, bundle, export/import,
+delta/reverse/file-audit/integrity, and entity-schema gates passed 110 focused
+tests, but `npm test` failed 3 of 2,091 tests. The required hard stop prevented
+the 1,000-record local exercise and every staging checkout update, guard,
+secret, schema, function, record, live export, cleanup, and production action.
+
+`DR-MIG-001`, `DR-MIG-002`, `DR-MIG-003`, `DR-ID-001`, `DR-RLS-001`, and
+`DR-OBS-001` receive no staging acceptance. No live cross-app import occurred,
+and `_next` still does not exist.

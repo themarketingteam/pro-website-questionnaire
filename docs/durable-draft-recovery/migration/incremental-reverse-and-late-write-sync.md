@@ -86,3 +86,11 @@ poll/quiet settings, and conflicts only.
 Focused tests use synthetic in-memory entities for full-to-delta-to-reverse
 identity, overlap, lease, conflict and late-write behavior. No Base44 app,
 production record, domain, secret, deployment, or migration apply was used.
+
+## 2026-08-06 staging certification attempt
+
+The 49-test delta/reverse/late-write/file-audit/integrity suite passed locally.
+The required at-least-1,000-record dual-adapter run and all live staging work
+were not entered because the full source suite then failed 3 of 2,091 tests.
+No operational full, delta, reverse, late-write, file-audit, conflict, or
+integrity verdict is certified by this attempt.

@@ -88,3 +88,12 @@ to disk. Encrypted export is deliberately blocked until an independently
 reviewed encryption implementation exists. This source implementation did not
 read or migrate data, create an app, configure a variable, push a schema,
 deploy a function or contact production.
+
+## 2026-08-06 staging certification attempt
+
+The focused signed-bundle and export/import policy suites passed 31/31 tests,
+but the mandatory full source suite failed 3 of 2,091 tests. The attempt stopped
+before live staging configuration or invocation. The contract therefore has no
+new live authorization, RLS, signature, replay, pagination, relationship, or
+cleanup evidence, and no cross-app import has occurred. See the
+[certification report](./staging-migration-utility-certification.md).

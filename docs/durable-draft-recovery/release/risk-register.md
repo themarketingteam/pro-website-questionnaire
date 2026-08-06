@@ -658,3 +658,13 @@ risk; report sanitization reduces credential and questionnaire-content leakage.
 their prior ratings. Adapter behavior, live leases, real pagination, file
 reachability/copy, staging reverse rehearsal, late-write observation, RLS, and
 cutover/rollback remain unproved. No cloud or production action occurred.
+
+## 2026-08-06 bidirectional migration staging hard stop
+
+The full source suite failed three questionnaire/repair assertions after all
+focused migration gates passed. `RISK-010`, `RISK-011`, `RISK-016`,
+`RISK-019`, and `RISK-025` remain open at their prior ratings: 1,000-record
+adapter scale, live signatures/pagination, RLS, replay, cleanup, file
+references, reverse synchronization, and late writes were not exercised. The
+hard stop prevented all staging and production mutation, so no risk is lowered
+or closed.

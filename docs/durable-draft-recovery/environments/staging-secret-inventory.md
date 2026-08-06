@@ -302,3 +302,12 @@ generated, configured, queried, printed, copied, or deleted. The five ordinary
 retention values were not set. No temporary owner-only environment file was
 created, so no file deletion was required. Existing staging and production
 names-only inventories were not refreshed or changed.
+
+## 2026-08-06 cross-app migration certification attempt
+
+The attempt stopped at the full normal source suite. The reserved
+`PRO_FORM_CROSS_APP_MIGRATION_SECRET` and seven `PRO_FORM_MIGRATION_*` staging
+values were not generated, configured, queried, printed, copied, or deleted.
+No temporary owner-only environment file was created. Synthetic peer IDs were
+not added, and no production or future `_next` ID was allowlisted. Existing
+staging and production names-only inventories were not refreshed or changed.

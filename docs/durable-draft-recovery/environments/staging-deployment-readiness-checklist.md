@@ -425,6 +425,18 @@ cleanup were not entered.
 No checklist item is promoted. The decision remains
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
 
+## 2026-08-06 bidirectional migration utility certification attempt
+
+The [migration utility report](../migration/staging-migration-utility-certification.md)
+is **MIGRATION_UTILITY_FAILED**. All focused migration and schema gates passed,
+then `npm test` failed 3 of 2,091 tests. The staging checkout was not updated;
+the fresh fingerprint, target guard, staging secret import, entity push,
+function deployment, synthetic corpus, export, tamper/replay probes, cleanup,
+and production comparison were not entered.
+
+No checklist item is promoted. The decision remains
+**STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
+
 ## 2026-08-06 restrictive draft RLS certification attempt
 
 The [staging RLS report](../security/staging-draft-rls-certification.md) is
