@@ -2,6 +2,7 @@ import { QUESTIONS } from '@/components/pro-form/questionData';
 import { getAllQuestionIds, getQuestionById } from '@/components/pro-form/questionUtils';
 import {
   DRAFT_STATE_SOURCE_TYPES,
+  DEFAULT_DRAFT_IDENTITY_CONTEXT,
   PRO_FORM_DRAFT_SCHEMA_VERSION,
   createEmptyCanonicalDraftState,
   normalizeCanonicalDraftState,
@@ -31,6 +32,7 @@ export const createEmptyPersistedQuestionnaireState = () => ({
     namespace: null,
     restoredFrom: null,
     lastStateHash: null,
+    ...DEFAULT_DRAFT_IDENTITY_CONTEXT,
   },
   currentQuestionId: null,
   lastChangedQuestionId: null,
@@ -419,6 +421,9 @@ export function normalizePersistedQuestionnaireState(state) {
       expandedQuestions: normalized.expandedQuestions || {},
       textValidationMeta: normalized.textValidationMeta || {},
       credentials: normalized.credentials || {},
+      identityContext: Object.fromEntries(Object.keys(DEFAULT_DRAFT_IDENTITY_CONTEXT).map(
+        (field) => [field, context[field] ?? DEFAULT_DRAFT_IDENTITY_CONTEXT[field]],
+      )),
       uiDraftState: normalized.uiDraftState || {},
       fieldChangeMetadata: normalized.fieldChangeMetadata || {},
       currentQuestionId: normalized.currentQuestionId ?? null,
@@ -472,6 +477,7 @@ export function normalizePersistedQuestionnaireState(state) {
         namespace,
         restoredFrom,
         lastStateHash,
+        ...canonical.identityContext,
       },
       currentQuestionId: canonical.currentQuestionId,
       lastChangedQuestionId: canonical.lastChangedQuestionId,

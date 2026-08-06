@@ -7,6 +7,7 @@ import {
   getSafeCanonicalDraftDiagnostics,
   normalizeCanonicalDraftState,
 } from '@/lib/questionnaireDraftState';
+import { shouldCreateNewDraftAssociation } from '@/lib/proDraftIdentity';
 
 const EMPTY_OBJECT = Object.freeze({});
 const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
@@ -35,6 +36,77 @@ export const selectFieldChangeMetadata = createSelector(
 export const selectDraftContext = createSelector(
   [selectFormState],
   (form) => form.draftContext || EMPTY_OBJECT,
+);
+
+export const selectDraftIdentityContext = createSelector(
+  [selectDraftContext],
+  (context) => Object.freeze({
+    identityContextVersion: context.identityContextVersion ?? null,
+    recoveryEmailSource: context.recoveryEmailSource ?? null,
+    recoveryEmailVerificationStatus: context.recoveryEmailVerificationStatus ?? null,
+    identityAssociationIntent: context.identityAssociationIntent ?? null,
+    anonymousRecoveryAcknowledged: context.anonymousRecoveryAcknowledged === true,
+    signedInvitationEmailChanged: context.signedInvitationEmailChanged === true,
+  }),
+);
+
+export const selectRecoveryEmailSource = createSelector(
+  [selectDraftIdentityContext],
+  (identity) => identity.recoveryEmailSource,
+);
+
+export const selectRecoveryEmailVerificationStatus = createSelector(
+  [selectDraftIdentityContext],
+  (identity) => identity.recoveryEmailVerificationStatus,
+);
+
+export const selectIdentityAssociationIntent = createSelector(
+  [selectDraftIdentityContext],
+  (identity) => identity.identityAssociationIntent,
+);
+
+export const selectHasRecoveryEmail = createSelector(
+  [selectFormState],
+  (form) => Boolean(form.credentials?.recoveryEmail),
+);
+
+export const selectSignedInvitationEmailChanged = createSelector(
+  [selectDraftIdentityContext],
+  (identity) => identity.signedInvitationEmailChanged,
+);
+
+export const selectAnonymousRecoveryAcknowledged = createSelector(
+  [selectDraftIdentityContext],
+  (identity) => identity.anonymousRecoveryAcknowledged,
+);
+
+export const selectRequiresNewDraftAssociation = createSelector(
+  [selectDraftIdentityContext],
+  (identity) => {
+    try { return shouldCreateNewDraftAssociation(identity.identityAssociationIntent); } catch {
+      return false;
+    }
+  },
+);
+
+export const selectDraftRequiresNewAssociation = selectRequiresNewDraftAssociation;
+
+export const selectSafeDraftIdentityDiagnostics = createSelector(
+  [
+    selectDraftIdentityContext,
+    selectHasRecoveryEmail,
+    selectRequiresNewDraftAssociation,
+  ],
+  (identity, hasRecoveryEmail, requiresNewDraftAssociation) => Object.freeze({
+    identityContextVersion: identity.identityContextVersion,
+    identitySource: identity.recoveryEmailSource,
+    associationIntent: identity.identityAssociationIntent,
+    hasRecoveryEmail,
+    verificationState: identity.recoveryEmailVerificationStatus,
+    anonymousRecoveryAcknowledged: identity.anonymousRecoveryAcknowledged,
+    signedInvitationEmailChanged: identity.signedInvitationEmailChanged,
+    requiresNewDraftAssociation,
+  }),
 );
 
 export const selectDraftBootstrapStatus = createSelector(
@@ -93,6 +165,14 @@ export const selectCanonicalDraftState = createSelector(
         expandedQuestions: form.expandedQuestions || {},
         textValidationMeta: form.textValidationMeta || {},
         credentials: form.credentials || {},
+        identityContext: {
+          identityContextVersion: context.identityContextVersion,
+          recoveryEmailSource: context.recoveryEmailSource,
+          recoveryEmailVerificationStatus: context.recoveryEmailVerificationStatus,
+          identityAssociationIntent: context.identityAssociationIntent,
+          anonymousRecoveryAcknowledged: context.anonymousRecoveryAcknowledged,
+          signedInvitationEmailChanged: context.signedInvitationEmailChanged,
+        },
         uiDraftState: form.uiDraftState || {},
         fieldChangeMetadata: form.fieldChangeMetadata || {},
         currentQuestionId: form.currentQuestionId ?? null,

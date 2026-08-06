@@ -9,7 +9,9 @@ import {
 import {
   QUESTIONNAIRE_STORAGE_KEY_VERSIONS,
   buildQuestionnaireStorageKey,
+  getLegacyQuestionnaireStorageKeyCandidates,
 } from '@/lib/questionnaireBrowserNamespace';
+import { normalizeRecoveryEmail } from '@/lib/proDraftIdentity';
 
 export const CANONICAL_DRAFT_CACHE_VERSION = 1;
 export const DEFAULT_CANONICAL_DRAFT_CACHE_TIMEOUT_MS = 2_000;
@@ -19,6 +21,7 @@ export const CANONICAL_DRAFT_CACHE_ERROR_CODES = Object.freeze({
   INVALID_ENVELOPE: 'CANONICAL_CACHE_INVALID_ENVELOPE',
   INVALID_JSON: 'CANONICAL_CACHE_INVALID_JSON',
   INVALID_NAMESPACE_VERSION: 'CANONICAL_CACHE_INVALID_NAMESPACE_VERSION',
+  IDENTITY_MISMATCH: 'CANONICAL_CACHE_IDENTITY_MISMATCH',
   MISSING_DEPENDENCY: 'CANONICAL_CACHE_MISSING_DEPENDENCY',
   READ_FAILED: 'CANONICAL_CACHE_READ_FAILED',
   READ_TIMED_OUT: 'CANONICAL_CACHE_READ_TIMED_OUT',
@@ -198,6 +201,37 @@ const validateEnvelope = async (raw, options = {}) => {
   if (hash !== envelope.canonicalStateHash) {
     throw new CanonicalDraftCacheError(CANONICAL_DRAFT_CACHE_ERROR_CODES.HASH_MISMATCH);
   }
+  if (options.expectedIdentityContext) {
+    const expected = options.expectedIdentityContext;
+    const actual = parsed.state.identityContext || {};
+    const expectedEmail = normalizeRecoveryEmail(
+      expected.normalizedRecoveryEmail || expected.recoveryEmail || '',
+      { allowEmpty: true },
+    );
+    const actualEmail = normalizeRecoveryEmail(
+      parsed.state.credentials?.recoveryEmail || '',
+      { allowEmpty: true },
+    );
+    const expectedIntent = expected.identityAssociationIntent || expected.associationIntent;
+    const mismatch = !expectedEmail.valid
+      || !actualEmail.valid
+      || expectedEmail.normalizedEmail !== actualEmail.normalizedEmail
+      || (expected.recoveryEmailSource && expected.recoveryEmailSource !== actual.recoveryEmailSource)
+      || (expectedIntent && expectedIntent !== actual.identityAssociationIntent)
+      || (
+        expected.recoveryEmailVerificationStatus
+        && expected.recoveryEmailVerificationStatus !== actual.recoveryEmailVerificationStatus
+      )
+      || (
+        Boolean(expected.signedInvitationEmailChanged)
+        !== Boolean(actual.signedInvitationEmailChanged)
+      );
+    if (mismatch) {
+      throw new CanonicalDraftCacheError(
+        CANONICAL_DRAFT_CACHE_ERROR_CODES.IDENTITY_MISMATCH,
+      );
+    }
+  }
   return { envelope: Object.freeze({ ...envelope }), state: parsed.state };
 };
 
@@ -232,6 +266,7 @@ export const createCanonicalDraftCacheKey = (namespaceOrOptions) => {
 
 export const getSafeCanonicalDraftCacheDiagnostics = (value = {}) => {
   const envelope = value?.envelope || value;
+  const state = value?.state;
   const present = value?.present === true || (
     isPlainObject(envelope) && envelope.cacheVersion !== undefined
   );
@@ -252,8 +287,49 @@ export const getSafeCanonicalDraftCacheDiagnostics = (value = {}) => {
       : null,
     storageMode: typeof envelope?.storageMode === 'string' ? envelope.storageMode : null,
     byteSize: Number.isSafeInteger(envelope?.byteSize) ? envelope.byteSize : 0,
+    identitySource: typeof state?.identityContext?.recoveryEmailSource === 'string'
+      ? state.identityContext.recoveryEmailSource
+      : null,
+    associationIntent: typeof state?.identityContext?.identityAssociationIntent === 'string'
+      ? state.identityContext.identityAssociationIntent
+      : null,
+    hasRecoveryEmail: Boolean(state?.credentials?.recoveryEmail),
+    verificationState: typeof state?.identityContext?.recoveryEmailVerificationStatus === 'string'
+      ? state.identityContext.recoveryEmailVerificationStatus
+      : null,
     errorCode: typeof value?.errorCode === 'string' ? value.errorCode : null,
   });
+};
+
+export const inspectLegacyCanonicalDraftCachePresence = async (options = {}) => {
+  const { namespace, storage } = options;
+  if (!storage || typeof storage.getItem !== 'function') {
+    return Object.freeze({ present: false, versions: [], errorCode: 'MISSING_DEPENDENCY' });
+  }
+  const presentVersions = [];
+  try {
+    for (const candidate of getLegacyQuestionnaireStorageKeyCandidates({
+      namespace,
+      purpose: 'draft-cache',
+    })) {
+      const value = await withReadTimeout(
+        () => Promise.resolve(storage.getItem(candidate.key)),
+        options,
+      );
+      if (value !== null && value !== undefined) presentVersions.push(candidate.version);
+    }
+    return Object.freeze({
+      present: presentVersions.length > 0,
+      versions: Object.freeze(presentVersions),
+      errorCode: null,
+    });
+  } catch (error) {
+    return Object.freeze({
+      present: false,
+      versions: Object.freeze([]),
+      errorCode: safeErrorCode(error, CANONICAL_DRAFT_CACHE_ERROR_CODES.READ_FAILED),
+    });
+  }
 };
 
 export const loadCanonicalDraftCache = async (options = {}) => {

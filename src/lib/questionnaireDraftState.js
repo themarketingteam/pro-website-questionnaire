@@ -1,3 +1,11 @@
+import {
+  DRAFT_IDENTITY_ASSOCIATION_INTENTS,
+  DRAFT_IDENTITY_SOURCE_VALUES,
+  EMAIL_VERIFICATION_STATUS_VALUES,
+  PRO_DRAFT_IDENTITY_VERSION,
+  normalizeRecoveryEmail,
+} from './proDraftIdentity.js';
+
 export const PRO_FORM_DRAFT_SCHEMA_VERSION = 4;
 export const PRO_FORM_DRAFT_SCHEMA_MIN_SUPPORTED_VERSION = 2;
 export const PRO_FORM_DRAFT_RECOMMENDED_MAX_BYTES = 750 * 1024;
@@ -67,6 +75,7 @@ const TOP_LEVEL_FIELDS = Object.freeze([
   'expandedQuestions',
   'textValidationMeta',
   'credentials',
+  'identityContext',
   'uiDraftState',
   'fieldChangeMetadata',
   'currentQuestionId',
@@ -87,9 +96,10 @@ const CREDENTIAL_FIELDS = Object.freeze([
   'businessName',
   'domain',
   'domainName',
+  'recoveryEmail',
 ]);
 const CREDENTIAL_FIELD_SET = new Set(CREDENTIAL_FIELDS);
-const SECRET_FIELD_PATTERN = /(?:recovery.?code|resume.?token|admin.?recovery.?grant|base44.?access.?token|access.?token|auth.?token|authorization|aws.?access|aws.?secret|private.?key|client.?secret|password)/i;
+const SECRET_FIELD_PATTERN = /(?:recovery.?code|recovery.?code.?hash|recovery.?session|resume.?token|admin.?recovery.?grant|admin.?grant|identity.?key.?hash|email.?lookup.?hash|draft.?access.?token|base44.?access.?token|access.?token|auth.?token|authorization|aws.?access|aws.?secret|private.?key|client.?secret|password)/i;
 const OPAQUE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 const SAFE_CODE_PATTERN = /^[A-Z0-9_.:-]{1,160}$/;
 const OMIT_VALUE = Symbol('omit-draft-value');
@@ -355,7 +365,133 @@ const normalizeCredentials = (value) => {
         appendPath('$.credentials', key),
       );
     }
-    output[key] = value[key].trim();
+    if (key === 'recoveryEmail') {
+      const normalized = normalizeRecoveryEmail(value[key], { allowEmpty: true });
+      if (!normalized.valid) {
+        throw new DraftStateValidationError(
+          DRAFT_STATE_ERROR_CODES.INVALID_FIELD,
+          '$.credentials.recoveryEmail',
+        );
+      }
+      if (normalized.normalizedEmail) output[key] = normalized.normalizedEmail;
+    } else {
+      output[key] = value[key].trim();
+    }
+  }
+  return output;
+};
+
+export const DEFAULT_DRAFT_IDENTITY_CONTEXT = Object.freeze({
+  identityContextVersion: PRO_DRAFT_IDENTITY_VERSION,
+  recoveryEmailSource: 'migrated_legacy',
+  recoveryEmailVerificationStatus: 'unverified',
+  identityAssociationIntent: 'legacy_migration',
+  anonymousRecoveryAcknowledged: false,
+  signedInvitationEmailChanged: false,
+});
+
+const IDENTITY_CONTEXT_FIELDS = Object.freeze(Object.keys(DEFAULT_DRAFT_IDENTITY_CONTEXT));
+const IDENTITY_CONTEXT_FIELD_SET = new Set(IDENTITY_CONTEXT_FIELDS);
+const IDENTITY_SOURCE_SET = new Set(DRAFT_IDENTITY_SOURCE_VALUES);
+const IDENTITY_INTENT_SET = new Set(DRAFT_IDENTITY_ASSOCIATION_INTENTS);
+const EMAIL_VERIFICATION_SET = new Set(EMAIL_VERIFICATION_STATUS_VALUES);
+
+export const normalizeCanonicalDraftIdentityContext = (
+  value,
+  credentials = {},
+) => {
+  if (value === undefined || value === null) return { ...DEFAULT_DRAFT_IDENTITY_CONTEXT };
+  if (!isPlainDraftObject(value)) {
+    throw new DraftStateValidationError(DRAFT_STATE_ERROR_CODES.INVALID_FIELD, '$.identityContext');
+  }
+  for (const key of Object.keys(value)) {
+    if (isSecretBearingField(key)) {
+      throw new DraftStateValidationError(
+        DRAFT_STATE_ERROR_CODES.SECRET_BEARING_FIELD,
+        appendPath('$.identityContext', key),
+      );
+    }
+    if (!IDENTITY_CONTEXT_FIELD_SET.has(key)) {
+      throw new DraftStateValidationError(
+        DRAFT_STATE_ERROR_CODES.UNKNOWN_FIELD,
+        appendPath('$.identityContext', key),
+      );
+    }
+  }
+  const output = { ...DEFAULT_DRAFT_IDENTITY_CONTEXT, ...value };
+  if (output.identityContextVersion !== PRO_DRAFT_IDENTITY_VERSION) {
+    throw new DraftStateValidationError(
+      DRAFT_STATE_ERROR_CODES.INVALID_FIELD,
+      '$.identityContext.identityContextVersion',
+    );
+  }
+  if (!IDENTITY_SOURCE_SET.has(output.recoveryEmailSource)) {
+    throw new DraftStateValidationError(
+      DRAFT_STATE_ERROR_CODES.INVALID_FIELD,
+      '$.identityContext.recoveryEmailSource',
+    );
+  }
+  if (!EMAIL_VERIFICATION_SET.has(output.recoveryEmailVerificationStatus)) {
+    throw new DraftStateValidationError(
+      DRAFT_STATE_ERROR_CODES.INVALID_FIELD,
+      '$.identityContext.recoveryEmailVerificationStatus',
+    );
+  }
+  if (!IDENTITY_INTENT_SET.has(output.identityAssociationIntent)) {
+    throw new DraftStateValidationError(
+      DRAFT_STATE_ERROR_CODES.INVALID_FIELD,
+      '$.identityContext.identityAssociationIntent',
+    );
+  }
+  if (
+    typeof output.anonymousRecoveryAcknowledged !== 'boolean'
+    || typeof output.signedInvitationEmailChanged !== 'boolean'
+  ) {
+    throw new DraftStateValidationError(DRAFT_STATE_ERROR_CODES.INVALID_FIELD, '$.identityContext');
+  }
+  const hasEmail = Boolean(credentials.recoveryEmail);
+  if (output.recoveryEmailSource === 'anonymous' && hasEmail) {
+    throw new DraftStateValidationError(
+      DRAFT_STATE_ERROR_CODES.INVALID_FIELD,
+      '$.identityContext.recoveryEmailSource',
+    );
+  }
+  if (
+    output.identityAssociationIntent === 'anonymous_start'
+    && !hasEmail
+    && !output.anonymousRecoveryAcknowledged
+  ) {
+    throw new DraftStateValidationError(
+      DRAFT_STATE_ERROR_CODES.INVALID_FIELD,
+      '$.identityContext.anonymousRecoveryAcknowledged',
+    );
+  }
+  if (
+    output.signedInvitationEmailChanged
+    !== (output.identityAssociationIntent === 'changed_signed_email')
+  ) {
+    throw new DraftStateValidationError(
+      DRAFT_STATE_ERROR_CODES.INVALID_FIELD,
+      '$.identityContext.signedInvitationEmailChanged',
+    );
+  }
+  if (output.signedInvitationEmailChanged && (
+    output.recoveryEmailSource !== 'client_entered'
+    || output.recoveryEmailVerificationStatus !== 'unverified'
+  )) {
+    throw new DraftStateValidationError(DRAFT_STATE_ERROR_CODES.INVALID_FIELD, '$.identityContext');
+  }
+  if (
+    output.recoveryEmailVerificationStatus === 'verified_signed_invitation'
+    && output.recoveryEmailSource !== 'signed_invitation'
+  ) {
+    throw new DraftStateValidationError(DRAFT_STATE_ERROR_CODES.INVALID_FIELD, '$.identityContext');
+  }
+  if (
+    ['client_entered', 'recovered_by_email', 'anonymous'].includes(output.recoveryEmailSource)
+    && output.recoveryEmailVerificationStatus !== 'unverified'
+  ) {
+    throw new DraftStateValidationError(DRAFT_STATE_ERROR_CODES.INVALID_FIELD, '$.identityContext');
   }
   return output;
 };
@@ -517,6 +653,7 @@ const buildEmptyCanonicalState = () => ({
   expandedQuestions: {},
   textValidationMeta: {},
   credentials: {},
+  identityContext: { ...DEFAULT_DRAFT_IDENTITY_CONTEXT },
   uiDraftState: {},
   fieldChangeMetadata: {},
   currentQuestionId: null,
@@ -559,6 +696,10 @@ export const createEmptyCanonicalDraftState = (options = {}) => {
   state.sessionId = normalizeNullableString(options.sessionId, '$.sessionId');
   state.sourceTabId = normalizeOpaqueId(options.sourceTabId, '$.sourceTabId');
   state.credentials = normalizeCredentials(options.credentials);
+  state.identityContext = normalizeCanonicalDraftIdentityContext(
+    options.identityContext,
+    state.credentials,
+  );
   return options.freeze === true ? deepFreeze(state) : state;
 };
 
@@ -630,6 +771,7 @@ const normalizeCurrentCanonicalDraftState = (input, options = {}) => {
   if (options.strictServer === true && formType !== 'pro-questionnaire') {
     throw new DraftStateValidationError(DRAFT_STATE_ERROR_CODES.INVALID_FIELD, '$.formType');
   }
+  const credentials = normalizeCredentials(input.credentials);
   const state = {
     schemaVersion,
     formType,
@@ -646,7 +788,8 @@ const normalizeCurrentCanonicalDraftState = (input, options = {}) => {
     touchedQuestions: normalizeBooleanMap(input.touchedQuestions, '$.touchedQuestions'),
     expandedQuestions: normalizeBooleanMap(input.expandedQuestions, '$.expandedQuestions'),
     textValidationMeta: normalizePlainMap(input.textValidationMeta, '$.textValidationMeta'),
-    credentials: normalizeCredentials(input.credentials),
+    credentials,
+    identityContext: normalizeCanonicalDraftIdentityContext(input.identityContext, credentials),
     uiDraftState: normalizeUiDraftState(input.uiDraftState),
     fieldChangeMetadata: normalizeFieldChangeMetadata(input.fieldChangeMetadata),
     currentQuestionId: normalizeNullableString(input.currentQuestionId, '$.currentQuestionId'),
@@ -778,6 +921,23 @@ const legacySourceType = (version, fallback) => {
   return fallback;
 };
 
+const withNormalizedLegacyRecoveryEmail = (credentials, recoveryEmail, warnings) => {
+  const output = { ...(isPlainDraftObject(credentials) ? credentials : {}) };
+  const candidate = recoveryEmail ?? output.recoveryEmail;
+  if (candidate === undefined || candidate === null || candidate === '') {
+    delete output.recoveryEmail;
+    return output;
+  }
+  const normalized = normalizeRecoveryEmail(candidate, { allowEmpty: true });
+  if (!normalized.valid) {
+    delete output.recoveryEmail;
+    addWarning(warnings, 'MALFORMED_LEGACY_RECOVERY_EMAIL');
+    return output;
+  }
+  if (normalized.normalizedEmail) output.recoveryEmail = normalized.normalizedEmail;
+  return output;
+};
+
 export const extractCanonicalStateFromLegacyRedux = (input, options = {}) => {
   const warnings = [];
   let root = input;
@@ -795,12 +955,17 @@ export const extractCanonicalStateFromLegacyRedux = (input, options = {}) => {
   const sourceType = options.sourceType
     || legacySourceType(persistVersion, DRAFT_STATE_SOURCE_TYPES.LEGACY_REDUX);
   const responses = legacyMap(nested.responses, 'RESPONSES_JSON', warnings);
+  const legacyCredentials = withNormalizedLegacyRecoveryEmail(
+    legacyMap(nested.credentials, 'CREDENTIALS_JSON', warnings),
+    nested.recoveryEmail ?? root.recovery_email,
+    warnings,
+  );
   const state = createEmptyCanonicalDraftState({
     formType: options.formType || 'pro-questionnaire',
     draftId: options.draftId ?? root.draftId,
     sessionId: options.sessionId ?? root.sessionId ?? root.questionnaireSessionId,
     sourceTabId: options.sourceTabId ?? root.sourceTabId,
-    credentials: legacyMap(nested.credentials, 'CREDENTIALS_JSON', warnings),
+    credentials: legacyCredentials,
   });
   Object.assign(state, {
     draftStatus: legacyStatus(options.draftStatus ?? root.draftStatus ?? root.status, warnings),
@@ -962,17 +1127,18 @@ export const extractCanonicalStateFromLegacyDraftRecord = (record, options = {})
     addWarning(warnings, 'RESPONSES_RECONSTRUCTED_FROM_MAPPED_PAYLOAD');
   }
 
+  const legacyCredentials = withNormalizedLegacyRecoveryEmail({
+    businessName: record.business_name || effectiveMetadata.business_name || '',
+    domain: record.domain || effectiveMetadata.businessDomain || '',
+    userId: record.user_id || '',
+    userName: record.user_name || '',
+    userEmail: record.user_email || '',
+  }, record.recovery_email || effectiveMetadata.recovery_email, warnings);
   const state = createEmptyCanonicalDraftState({
     formType: 'pro-questionnaire',
     draftId: record.id,
     sessionId: record.session_id,
-    credentials: {
-      businessName: record.business_name || effectiveMetadata.business_name || '',
-      domain: record.domain || effectiveMetadata.businessDomain || '',
-      userId: record.user_id || '',
-      userName: record.user_name || '',
-      userEmail: record.user_email || '',
-    },
+    credentials: legacyCredentials,
   });
   Object.assign(state, {
     draftStatus: legacyStatus(record.status, warnings),
@@ -1363,6 +1529,22 @@ export const getSafeCanonicalDraftDiagnostics = (stateOrResult) => {
     metadataCount: isPlainDraftObject(candidate?.fieldChangeMetadata)
       ? Object.keys(candidate.fieldChangeMetadata).length
       : 0,
+    identityContextVersion: Number.isSafeInteger(candidate?.identityContext?.identityContextVersion)
+      ? candidate.identityContext.identityContextVersion
+      : null,
+    identitySource: IDENTITY_SOURCE_SET.has(candidate?.identityContext?.recoveryEmailSource)
+      ? candidate.identityContext.recoveryEmailSource
+      : null,
+    associationIntent: IDENTITY_INTENT_SET.has(
+      candidate?.identityContext?.identityAssociationIntent,
+    ) ? candidate.identityContext.identityAssociationIntent : null,
+    hasRecoveryEmail: Boolean(candidate?.credentials?.recoveryEmail),
+    recoveryEmailVerificationStatus: EMAIL_VERIFICATION_SET.has(
+      candidate?.identityContext?.recoveryEmailVerificationStatus,
+    ) ? candidate.identityContext.recoveryEmailVerificationStatus : null,
+    signedInvitationEmailChanged: candidate?.identityContext?.signedInvitationEmailChanged === true,
+    anonymousRecoveryAcknowledged:
+      candidate?.identityContext?.anonymousRecoveryAcknowledged === true,
     warningCount: Array.isArray(candidate?.compatibility?.migrationWarnings)
       ? candidate.compatibility.migrationWarnings.length
       : 0,

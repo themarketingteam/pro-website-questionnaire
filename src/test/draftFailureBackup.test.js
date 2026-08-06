@@ -36,7 +36,7 @@ describe('namespaced draft failure backups', () => {
     });
     const backup = await readDraftFailureBackup({ namespace: namespaceA, storage });
     expect(backup).toMatchObject({
-      namespaceVersion: 'v4',
+      namespaceVersion: 'v5',
       sessionId: 'synthetic-session-a',
       storageMode: STORAGE_MODES.LOCALSTORAGE,
       form: {

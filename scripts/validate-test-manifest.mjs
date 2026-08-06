@@ -81,6 +81,7 @@ const requiredFoundationFiles = [
   'src/test/errorBoundarySafety.test.jsx',
   'tests/e2e/draft-v2/storage-recovery.spec.js',
   'tests/e2e/draft-v2/client-isolation.spec.js',
+  'tests/e2e/draft-v2/identity-boundary.spec.js',
 ];
 
 for (const file of requiredFoundationFiles) {

@@ -298,6 +298,10 @@ describe('questionnaire canonical draft cache', () => {
         savedAtClient: null,
         storageMode: null,
         byteSize: 0,
+        identitySource: null,
+        associationIntent: null,
+        hasRecoveryEmail: false,
+        verificationState: null,
         errorCode: 'SYNTHETIC_ERROR',
       });
   });

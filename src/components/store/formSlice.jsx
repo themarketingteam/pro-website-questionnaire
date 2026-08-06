@@ -2,12 +2,14 @@ import { createSlice } from '@reduxjs/toolkit';
 import {
   DRAFT_STATE_ERROR_CODES,
   DRAFT_STATE_STATUS_VALUES,
+  DEFAULT_DRAFT_IDENTITY_CONTEXT,
   DraftStateValidationError,
   PRO_FORM_DRAFT_SCHEMA_VERSION,
   createEmptyCanonicalDraftState,
   getSafeCanonicalDraftDiagnostics,
   migrateCanonicalDraftState,
   normalizeCanonicalDraftState,
+  normalizeCanonicalDraftIdentityContext,
   normalizeFieldChangeMetadata,
   sanitizeDraftSerializableValue,
 } from '@/lib/questionnaireDraftState';
@@ -58,7 +60,16 @@ const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const SAFE_CODE_PATTERN = /^[A-Z0-9_.:-]{1,160}$/;
 const SAFE_OPAQUE_PATTERN = /^[A-Za-z0-9_.:-]{1,256}$/;
 const HASH_PATTERN = /^[a-f0-9]{64}$/;
-const SECRET_KEY_PATTERN = /(?:recovery.?code|resume.?token|admin.?grant|access.?token|authorization|private.?key|client.?secret|password)/i;
+const SECRET_KEY_PATTERN = /(?:recovery.?code|recovery.?code.?hash|recovery.?session|resume.?token|admin.?grant|identity.?key.?hash|email.?lookup.?hash|draft.?access.?token|access.?token|authorization|private.?key|client.?secret|password)/i;
+
+const DRAFT_IDENTITY_CONTEXT_FIELDS = new Set([
+  'identityContextVersion',
+  'recoveryEmailSource',
+  'recoveryEmailVerificationStatus',
+  'identityAssociationIntent',
+  'anonymousRecoveryAcknowledged',
+  'signedInvitationEmailChanged',
+]);
 
 const DRAFT_CONTEXT_FIELDS = new Set([
   'draftId',
@@ -71,6 +82,7 @@ const DRAFT_CONTEXT_FIELDS = new Set([
   'namespace',
   'restoredFrom',
   'lastStateHash',
+  ...DRAFT_IDENTITY_CONTEXT_FIELDS,
 ]);
 
 const LEGACY_FORM_FIELDS = new Set([
@@ -249,6 +261,7 @@ const createDraftContext = () => ({
   namespace: null,
   restoredFrom: null,
   lastStateHash: null,
+  ...DEFAULT_DRAFT_IDENTITY_CONTEXT,
 });
 
 const createDraftBootstrapStatus = () => ({
@@ -303,7 +316,65 @@ const ensureDraftFoundation = (state) => {
   if (!Object.hasOwn(state, 'lastChangedQuestionId')) state.lastChangedQuestionId = null;
   if (!Object.hasOwn(state, 'lastMutation')) state.lastMutation = null;
   if (!Object.hasOwn(state, 'submittedReceipt')) state.submittedReceipt = null;
+  for (const [field, fallback] of Object.entries(DEFAULT_DRAFT_IDENTITY_CONTEXT)) {
+    if (!Object.hasOwn(state.draftContext, field)) state.draftContext[field] = fallback;
+  }
 };
+
+const pickDraftIdentityContext = (draftContext = {}) => Object.fromEntries(
+  [...DRAFT_IDENTITY_CONTEXT_FIELDS].map((field) => [
+    field,
+    Object.hasOwn(draftContext, field)
+      ? draftContext[field]
+      : DEFAULT_DRAFT_IDENTITY_CONTEXT[field],
+  ]),
+);
+
+const validateDraftIdentityCombination = (draftContext, credentials) => (
+  normalizeCanonicalDraftIdentityContext(pickDraftIdentityContext(draftContext), credentials)
+);
+
+export const prepareDraftIdentityContextPayload = (value, { partial = false } = {}) => {
+  if (!isPlainObject(value)) fail('$.draftIdentityContext');
+  const allowed = new Set([...DRAFT_IDENTITY_CONTEXT_FIELDS, 'recoveryEmail']);
+  for (const key of Object.keys(value)) {
+    if (SECRET_KEY_PATTERN.test(key)) {
+      fail(`$.draftIdentityContext.${key}`, DRAFT_STATE_ERROR_CODES.SECRET_BEARING_FIELD);
+    }
+    if (!allowed.has(key)) {
+      fail(`$.draftIdentityContext.${key}`, DRAFT_STATE_ERROR_CODES.UNKNOWN_FIELD);
+    }
+  }
+  const metadata = {};
+  for (const field of DRAFT_IDENTITY_CONTEXT_FIELDS) {
+    if (!partial || Object.hasOwn(value, field)) metadata[field] = value[field];
+  }
+  const recoveryEmail = Object.hasOwn(value, 'recoveryEmail')
+    ? normalizeCredentials({ recoveryEmail: value.recoveryEmail }).recoveryEmail || null
+    : undefined;
+  if (!partial) {
+    const credentials = recoveryEmail ? { recoveryEmail } : {};
+    Object.assign(metadata, normalizeCanonicalDraftIdentityContext(metadata, credentials));
+  } else {
+    const candidate = {
+      ...DEFAULT_DRAFT_IDENTITY_CONTEXT,
+      ...metadata,
+    };
+    const credentials = recoveryEmail ? { recoveryEmail } : {};
+    // Partial payloads receive strict enum/type validation here; full
+    // cross-field validation is repeated atomically against current state.
+    normalizeCanonicalDraftIdentityContext(candidate, credentials);
+  }
+  return {
+    ...metadata,
+    ...(recoveryEmail !== undefined ? { recoveryEmail } : {}),
+  };
+};
+
+export const createSetDraftIdentityContextAction = (value) => ({
+  type: 'form/setDraftIdentityContext',
+  payload: prepareDraftIdentityContextPayload(value, { partial: false }),
+});
 
 const normalizeDraftContextPayload = (value, { partial = false } = {}) => {
   if (!isPlainObject(value)) fail('$.draftContext');
@@ -347,7 +418,16 @@ const normalizeDraftContextPayload = (value, { partial = false } = {}) => {
     }
     return entry;
   });
-  return partial ? output : { ...createDraftContext(), ...output };
+  for (const field of DRAFT_IDENTITY_CONTEXT_FIELDS) {
+    if (!partial || Object.hasOwn(value, field)) {
+      output[field] = Object.hasOwn(value, field)
+        ? value[field]
+        : DEFAULT_DRAFT_IDENTITY_CONTEXT[field];
+    }
+  }
+  const complete = partial ? output : { ...createDraftContext(), ...output };
+  if (!partial) validateDraftIdentityCombination(complete, {});
+  return complete;
 };
 
 const normalizeRestoredSource = (value, path = '$.source') => {
@@ -443,6 +523,7 @@ const normalizeLegacyStatePayload = (value) => {
         namespace: null,
         restoredFrom: null,
         lastStateHash: null,
+        ...canonical.identityContext,
       },
       currentQuestionId: canonical.currentQuestionId,
       lastChangedQuestionId: canonical.lastChangedQuestionId,
@@ -584,6 +665,13 @@ const applyAtomicMutation = (state, rawPayload) => {
   const prepared = attempt(() => prepareFormMutationPayload(rawPayload));
   if (!prepared.valid) return;
   const payload = prepared.value;
+  if (Object.hasOwn(payload, 'setCredentials')) {
+    const identityValid = attempt(() => validateDraftIdentityCombination(
+      state.draftContext,
+      payload.setCredentials,
+    ));
+    if (!identityValid.valid) return;
+  }
   if (state.draftContext.clientRevision >= Number.MAX_SAFE_INTEGER) return;
   const nextClientRevision = state.draftContext.clientRevision + 1;
   const metadata = payload.mutationMetadata;
@@ -819,7 +907,67 @@ const formSlice = createSlice(/** @type {any} */ ({
       reducer: (state, action) => {
         if (shouldIgnoreBecauseSubmitted(state)) return;
         const prepared = attempt(() => normalizeCredentials(action.payload));
-        if (prepared.valid) state.credentials = prepared.value;
+        if (!prepared.valid) return;
+        const credentials = {
+          ...prepared.value,
+          ...(
+            !Object.hasOwn(prepared.value, 'recoveryEmail') && state.credentials?.recoveryEmail
+              ? { recoveryEmail: state.credentials.recoveryEmail }
+              : {}
+          ),
+        };
+        const identityValid = attempt(() => validateDraftIdentityCombination(
+          state.draftContext,
+          credentials,
+        ));
+        if (identityValid.valid) state.credentials = credentials;
+      },
+    },
+    setDraftIdentityContext: {
+      prepare: (payload) => ({
+        payload: prepareDraftIdentityContextPayload(payload, { partial: false }),
+      }),
+      reducer: (state, action) => {
+        ensureDraftFoundation(state);
+        if (shouldIgnoreBecauseSubmitted(state)) return;
+        const prepared = attempt(() => prepareDraftIdentityContextPayload(
+          action.payload,
+          { partial: false },
+        ));
+        if (!prepared.valid) return;
+        const { recoveryEmail, ...metadata } = prepared.value;
+        const credentials = { ...state.credentials };
+        if (recoveryEmail) credentials.recoveryEmail = recoveryEmail;
+        else delete credentials.recoveryEmail;
+        const validated = attempt(() => validateDraftIdentityCombination(metadata, credentials));
+        if (!validated.valid) return;
+        state.credentials = credentials;
+        Object.assign(state.draftContext, validated.value);
+      },
+    },
+    patchDraftIdentityContext: {
+      prepare: (payload) => ({
+        payload: prepareDraftIdentityContextPayload(payload, { partial: true }),
+      }),
+      reducer: (state, action) => {
+        ensureDraftFoundation(state);
+        if (shouldIgnoreBecauseSubmitted(state)) return;
+        const prepared = attempt(() => prepareDraftIdentityContextPayload(
+          action.payload,
+          { partial: true },
+        ));
+        if (!prepared.valid) return;
+        const { recoveryEmail, ...metadataPatch } = prepared.value;
+        const credentials = { ...state.credentials };
+        if (Object.hasOwn(prepared.value, 'recoveryEmail')) {
+          if (recoveryEmail) credentials.recoveryEmail = recoveryEmail;
+          else delete credentials.recoveryEmail;
+        }
+        const proposed = { ...state.draftContext, ...metadataPatch };
+        const validated = attempt(() => validateDraftIdentityCombination(proposed, credentials));
+        if (!validated.valid) return;
+        state.credentials = credentials;
+        Object.assign(state.draftContext, validated.value);
       },
     },
     resetForm: (state) => resetQuestionnaire(state, normalizeResetPayload()),
@@ -955,6 +1103,17 @@ const formSlice = createSlice(/** @type {any} */ ({
           && Object.hasOwn(prepared.value, 'draftStatus')
           && prepared.value.draftStatus !== 'submitted'
         ) delete prepared.value.draftStatus;
+        if ([...DRAFT_IDENTITY_CONTEXT_FIELDS].some((field) => (
+          Object.hasOwn(prepared.value, field)
+        ))) {
+          const proposed = { ...state.draftContext, ...prepared.value };
+          const identityValid = attempt(() => validateDraftIdentityCombination(
+            proposed,
+            state.credentials,
+          ));
+          if (!identityValid.valid) return;
+          Object.assign(prepared.value, identityValid.value);
+        }
         Object.assign(state.draftContext, prepared.value);
       },
     },
@@ -1415,6 +1574,7 @@ const formSlice = createSlice(/** @type {any} */ ({
         namespace,
         restoredFrom: source,
         lastStateHash,
+        ...canonicalState.identityContext,
       };
       state.draftBootstrapStatus = {
         state: 'ready',
@@ -1455,6 +1615,8 @@ export const {
   setExpandedQuestion,
   setAllExpanded,
   setCredentials,
+  setDraftIdentityContext,
+  patchDraftIdentityContext,
   resetForm,
   deleteResponse,
   initializeExpandedQuestions,

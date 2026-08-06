@@ -54,8 +54,8 @@ The latest canonical-state attempt targeted commit `58f6927577944d686d83eaf19da2
 - **Reproduction/evidence:** `BC-LOCAL-001`, `BC-LOCAL-003`, `BC-LOCAL-004`.
 - **Current workaround:** Clear site storage or use a fresh browser profile between clients; this is operationally fragile.
 - **Permanent implementation batch:** B01 — safe boot and client-scoped browser namespace.
-- **Feature-branch remediation (2026-08-05):** `createQuestionnaireStore` now persists approved form fields under `pro-questionnaire:v4:ns_<hash>:redux-state`. `ReduxProvider` derives identity first, caches one runtime per namespace, and resets only the active namespace. Version 3 rehydration normalizes the complete form and discards malformed or hidden-child data safely.
-- **Remediation evidence:** `src/test/questionnaireStore.test.jsx`; `src/test/questionnaireBrowserNamespace.test.js`; `tests/e2e/draft-v2/client-isolation.spec.js`; `BC-LOCAL-001`, `BC-LOCAL-003`, and `BC-LOCAL-004` now assert the remediated contract.
+- **Feature-branch remediation (2026-08-05):** `createQuestionnaireStore` persists approved form fields under identity-aware `pro-questionnaire:v5:ns_<hash>:redux-state`. `ReduxProvider` creates an untrusted client identity before bootstrap, and cache hydration fails closed on an email/source/intent/verification mismatch without deleting the prior value. Verified invitation and authorized-draft priorities require explicit trusted inputs.
+- **Remediation evidence:** `src/test/questionnaireStore.test.jsx`; `src/test/questionnaireBrowserNamespace.test.js`; `src/test/draftIdentityIntegration.test.js`; `tests/e2e/draft-v2/client-isolation.spec.js`; `tests/e2e/draft-v2/identity-boundary.spec.js`.
 - **Remediation status:** Local browser isolation is implemented on `feature/durable-draft-recovery`; the five-project persistence/fallback/memory matrix was reconfirmed 15/15, but staging certification is blocked before deployment. No server hydration or authorization is implied.
 - **Release blocking:** Yes
 
@@ -73,7 +73,7 @@ The latest canonical-state attempt targeted commit `58f6927577944d686d83eaf19da2
 - **Reproduction/evidence:** `BC-LOCAL-002`, `BC-CLEAR-001`, `BC-CLEAR-002`.
 - **Current workaround:** Manually clear site storage before changing clients; no application workflow enforces this.
 - **Permanent implementation batch:** B01 — safe boot and client-scoped browser namespace.
-- **Feature-branch remediation (2026-08-05):** Session creation, read, and clear now require the derived namespace and use the version 4 `legacy-session` purpose. Persistent denial retains one namespace-specific in-memory session for the current page. The global key is available only through an explicit authorized legacy helper and is never automatically migrated or deleted.
+- **Feature-branch remediation (2026-08-05):** Session creation, read, and clear require the derived namespace and now use the version 5 `legacy-session` purpose. Persistent denial retains one namespace-specific in-memory session for the current page. The global and v4 keys are inspection/explicit-migration inputs only and are never automatically hydrated or deleted.
 - **Remediation evidence:** `src/test/questionnaireSessionId.test.js`; `src/test/legacyQuestionnaireStorage.test.js`; `BC-LOCAL-002`.
 - **Remediation status:** Local session scoping is implemented on `feature/durable-draft-recovery`; refreshed local isolation evidence passed, while authorized server identity/recovery and environment certification remain blocked/pending.
 - **Release blocking:** Yes
@@ -310,9 +310,9 @@ The latest canonical-state attempt targeted commit `58f6927577944d686d83eaf19da2
 - **Reproduction/evidence:** `BC-LOCAL-001` through `BC-LOCAL-004`.
 - **Current workaround:** Fresh browser profile/site-data purge for every client; not acceptable at scale.
 - **Permanent implementation batch:** B01/B03/B05/B06 — identity namespace, server authorization, security certification.
-- **Feature-branch remediation (2026-08-05):** Redux state, session IDs, and failure backups are partitioned by a deterministic version 4 namespace whose keys contain no raw identity components. The active normal/IndexedDB-unavailable browser scenarios prove Client A → Client B → Client A isolation; memory-only mode makes no reload-survival claim.
-- **Remediation evidence:** `src/test/questionnaireBrowserNamespace.test.js`; `src/test/questionnaireStore.test.jsx`; `src/test/questionnaireSessionId.test.js`; required Chromium, Firefox, and WebKit desktop client-isolation matrix passes 9/9 executions.
-- **Remediation status:** The confirmed local shared-browser leak is remediated on `feature/durable-draft-recovery`, with the five-project persistence/fallback/memory matrix reconfirmed 15/15. Staging certification stopped before deployment; server-side authorization, cross-device recovery, `DR-SEC-001`, and all environment certification remain pending. The namespace hash is not an authorization boundary.
+- **Feature-branch remediation (2026-08-05):** Redux state, session IDs, canonical cache, and failure backups are partitioned by deterministic version 5 namespace priority: verified invitation, authorized draft, stable user, business/domain, recovery email, then session-stable anonymous ID. A changed signed email cannot reuse its signed namespace, untrusted signed-style URLs remain unverified, and cache identity mismatch preserves but does not hydrate the old value.
+- **Remediation evidence:** `src/test/questionnaireBrowserNamespace.test.js`; `src/test/draftIdentityIntegration.test.js`; `src/test/questionnaireStore.test.jsx`; `src/test/questionnaireSessionId.test.js`; `tests/e2e/draft-v2/identity-boundary.spec.js` across Chromium, Firefox, and WebKit desktop.
+- **Remediation status:** The local shared-browser identity boundary is implemented on `feature/durable-draft-recovery`. Staging certification, server-side authorization, cross-device recovery, `DR-SEC-001`, and all environment certification remain pending. The namespace hash is not an authorization boundary.
 - **Release blocking:** Yes
 
 ## DRAFT-018 — Raw/in-flight file selection cannot be restored

@@ -115,7 +115,7 @@ describe('canonical draft-state constants and empty state', () => {
       'schemaVersion', 'formType', 'draftId', 'sessionId', 'draftStatus',
       'clientRevision', 'serverRevision', 'savedAtClient', 'savedAtServer',
       'sourceTabId', 'responses', 'validationStatus', 'touchedQuestions',
-      'expandedQuestions', 'textValidationMeta', 'credentials', 'uiDraftState',
+      'expandedQuestions', 'textValidationMeta', 'credentials', 'identityContext', 'uiDraftState',
       'fieldChangeMetadata', 'currentQuestionId', 'lastChangedQuestionId',
       'lastMutation', 'submission', 'compatibility',
     ]);

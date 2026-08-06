@@ -2,8 +2,8 @@
 
 - Identity version: `1`
 - Recovery-email normalization version: `1`
-- Module: `src/lib/proDraftIdentity.js`
-- Status: client contract implemented and unit-tested; no recovery UI, backend authorization, Base44 schema, or deployment change
+- Modules: `src/lib/proDraftIdentity.js`; `src/lib/proDraftClientIdentityContext.js`
+- Status: client contract integrated with canonical state, Redux, browser namespace/cache, and bootstrap; no recovery UI, backend authorization, Base44 schema, or deployment change
 - Sources: [ADR-001](./ADR-001-approved-product-and-security-decisions.md), [ADR-003](./ADR-003-draft-identity-recovery-and-lifecycle-contract.md), [canonical draft state](./canonical-draft-state-contract.md), [browser namespace policy](./browser-namespace-and-legacy-key-policy.md)
 
 ## Purpose and boundary
@@ -172,10 +172,16 @@ An `anonymous_start` with no email is invalid until `anonymousRecoveryAcknowledg
 
 The existing browser namespace continues to reduce its identity seed to an opaque `ns_<32 hex>` key segment. Its non-cryptographic hash partitions same-origin browser records only. Raw email, business name, domain, user ID, and invitation ID never appear in generated key names, and the namespace/hash must never authorize server access.
 
+## Client integration adapter
+
+`proDraftClientIdentityContext.js` exports `readProQuestionnaireIdentityParams`, `createClientDraftIdentityContext`, `compareSignedAndEnteredEmail`, `deriveClientDraftAssociationDecision`, and `getSafeClientIdentityContextDiagnostics`. URL parameters are always untrusted claims: they cannot create a verified state or select a signed namespace. Only an explicit trusted-backend result may do so. The adapter maps signed-email changes to a new unverified association and emits diagnostics limited to approved enums, versions, booleans, and an error code.
+
+Canonical schema v4 stores normalized raw recovery email only at `credentials.recoveryEmail`. Redux stores the six non-email metadata fields in `draftContext`. Cache/bootstrap identity mismatch fails closed without deleting the prior value. This integration adds no lookup, entity, recovery-session, email, Base44, or authorization operation.
+
 ## Future backend lookup and verification
 
 A later backend prompt must compute a versioned keyed HMAC of the normalized recovery email, protect/rotate its key, apply abuse controls, and compare only within an authorized backend operation. This client module intentionally computes no lookup hash. Later OTP and magic-link adapters may use the explicit verification states after their separately approved backend verification succeeds; their current disabled state is unchanged.
 
 ## Evidence
 
-`src/test/proDraftIdentity.test.js` covers email/domain boundaries, IDN handling, role/source/intent enums, signed-email changes, anonymous acknowledgement, trusted verification boundary, no-token contexts, input immutability, fresh outputs, safe comparison, and PII-free diagnostics. Passing unit tests are local contract evidence only and do not certify a recovery endpoint, Base44 schema, staging environment, or production behavior.
+`src/test/proDraftIdentity.test.js` and `src/test/draftIdentityIntegration.test.js` cover email/domain boundaries, role/source/intent enums, URL trust, signed-email changes, anonymous acknowledgement, canonical/Redux/cache integration, namespace priority, legacy safety, submitted locking, selectors, and PII-free diagnostics. `tests/e2e/draft-v2/identity-boundary.spec.js` supplies the synthetic three-engine browser matrix. Passing local tests do not certify a recovery endpoint, Base44 schema, staging environment, or production behavior.

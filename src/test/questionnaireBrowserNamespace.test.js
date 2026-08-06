@@ -36,9 +36,15 @@ describe('questionnaire browser namespaces', () => {
     });
   });
 
-  it('uses invitation, user, business/domain, email, then anonymous seed precedence', () => {
-    expect(deriveNamespaceSeed({ signedInvitationId: 'invite', userId: 'user' }))
+  it('uses verified invitation, authorized draft, user, business/domain, email, then anonymous precedence', () => {
+    expect(deriveNamespaceSeed({
+      signedInvitationId: 'invite',
+      signedInvitationVerified: true,
+      userId: 'user',
+    }))
       .toBe('invitation:invite');
+    expect(deriveNamespaceSeed({ currentAuthorizedDraftId: 'draft-1', userId: 'user' }))
+      .toBe('draft:draft-1');
     expect(deriveNamespaceSeed({ userId: 'user', userEmail: 'person@example.test' }))
       .toBe('user:user');
     expect(deriveNamespaceSeed({
@@ -82,12 +88,12 @@ describe('questionnaire browser namespaces', () => {
     ].map((purpose) => buildQuestionnaireStorageKey({ namespace, purpose }));
 
     for (const key of keys) {
-      expect(key).toMatch(/^pro-questionnaire:v4:ns_[a-f\d]{32}:/);
+      expect(key).toMatch(/^pro-questionnaire:v5:ns_[a-f\d]{32}:/);
       expect(key).not.toContain(identity.userId);
       expect(key).not.toContain(identity.userEmail);
       expect(key).not.toContain(identity.businessName);
       expect(key).not.toContain(identity.domainName);
     }
-    expect(QUESTIONNAIRE_STORAGE_KEY_VERSIONS.CURRENT).toBe('v4');
+    expect(QUESTIONNAIRE_STORAGE_KEY_VERSIONS.CURRENT).toBe('v5');
   });
 });

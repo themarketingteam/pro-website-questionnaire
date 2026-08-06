@@ -5,8 +5,12 @@ import { safeGetWindowLocationHref } from '@/lib/browserSafety';
 import { safeRemoveSearchParameter } from '@/lib/app-params';
 import {
   deriveQuestionnaireBrowserNamespace,
-  readQuestionnaireIdentityFromUrl,
 } from '@/lib/questionnaireBrowserNamespace';
+import {
+  createClientDraftIdentityContext,
+  getSafeClientIdentityContextDiagnostics,
+  readProQuestionnaireIdentityParams,
+} from '@/lib/proDraftClientIdentityContext';
 import {
   compareCanonicalDraftFreshness,
   createEmptyCanonicalDraftState,
@@ -14,6 +18,7 @@ import {
 } from '@/lib/questionnaireDraftState';
 import {
   inspectCanonicalDraftCache,
+  inspectLegacyCanonicalDraftCachePresence,
   loadCanonicalDraftCache,
   removeCanonicalDraftCache,
 } from '@/lib/questionnaireCanonicalDraftCache';
@@ -26,6 +31,7 @@ import {
   loadInitialState,
   patchDraftContext,
   resetForm,
+  setDraftIdentityContext,
   setDraftBootstrapLoading,
   setDraftBootstrapReady,
 } from './store/formSlice';
@@ -39,6 +45,39 @@ import {
 import { QuestionnairePersistenceProvider } from './store/QuestionnairePersistenceContext';
 
 const questionnaireRuntimeCache = new Map();
+
+const toReduxDraftIdentityPayload = (context) => ({
+  recoveryEmail: context.normalizedRecoveryEmail || null,
+  identityContextVersion: context.identityVersion,
+  recoveryEmailSource: context.recoveryEmailSource,
+  recoveryEmailVerificationStatus: context.recoveryEmailVerificationStatus,
+  identityAssociationIntent: context.associationIntent,
+  anonymousRecoveryAcknowledged: context.anonymousRecoveryAcknowledged,
+  signedInvitationEmailChanged: context.signedInvitationEmailChanged,
+});
+
+export const resolveClientQuestionnaireIdentity = (href) => {
+  const params = readProQuestionnaireIdentityParams({ href });
+  try {
+    const context = createClientDraftIdentityContext(params);
+    return Object.freeze({
+      context,
+      safeDiagnostics: getSafeClientIdentityContextDiagnostics(context),
+    });
+  } catch (error) {
+    const context = createClientDraftIdentityContext({
+      ...params,
+      recoveryEmail: '',
+      signedInvitationEmail: '',
+      recoveryEmailSource: 'migrated_legacy',
+      associationIntent: 'legacy_migration',
+    });
+    return Object.freeze({
+      context,
+      safeDiagnostics: getSafeClientIdentityContextDiagnostics(context, error?.code || 'INVALID_INPUT'),
+    });
+  }
+};
 
 const defaultStorageFactory = (_namespace) => createResilientStorage();
 
@@ -166,6 +205,7 @@ export const bootstrapQuestionnaireStoreRuntime = async (runtime, options = {}) 
     timeoutMs: options.cacheTimeoutMs,
     ...(Object.hasOwn(options, 'crypto') ? { crypto: options.crypto } : {}),
     ...(options.TextEncoder ? { TextEncoder: options.TextEncoder } : {}),
+    ...(options.identityContext ? { expectedIdentityContext: options.identityContext } : {}),
   };
   runtime.store.dispatch(setDraftBootstrapLoading({
     source: 'browser',
@@ -175,6 +215,11 @@ export const bootstrapQuestionnaireStoreRuntime = async (runtime, options = {}) 
 
   const normalized = normalizePersistedQuestionnaireState(runtime.store.getState()?.form);
   runtime.store.dispatch(loadInitialState(normalized));
+  if (options.identityContext) {
+    runtime.store.dispatch(setDraftIdentityContext(
+      toReduxDraftIdentityPayload(options.identityContext),
+    ));
+  }
   runtime.store.dispatch(patchDraftContext({ namespace: runtime.namespace }));
 
   const inspect = resolveCacheOperation(
@@ -196,6 +241,15 @@ export const bootstrapQuestionnaireStoreRuntime = async (runtime, options = {}) 
       valid: false,
       errorCode: 'CANONICAL_CACHE_INSPECTION_FAILED',
     };
+  }
+  let legacyInspection = { present: false, versions: [], errorCode: null };
+  if (!inspection?.present) {
+    const inspectLegacy = resolveCacheOperation(
+      cacheAdapter,
+      ['inspectLegacyCanonicalDraftCachePresence', 'inspectLegacy'],
+      inspectLegacyCanonicalDraftCachePresence,
+    );
+    try { legacyInspection = await inspectLegacy(cacheOptions); } catch {}
   }
   let cacheResult;
   if (inspection?.present && inspection?.valid) {
@@ -280,6 +334,11 @@ export const bootstrapQuestionnaireStoreRuntime = async (runtime, options = {}) 
       reason: decision.reason,
       cachePresent: inspection?.present === true,
       cacheValid: cacheResult.ok === true && cacheResult.present === true,
+      legacyCachePresent: legacyInspection?.present === true,
+      legacyNamespaceVersions: Array.isArray(legacyInspection?.versions)
+        ? legacyInspection.versions
+        : [],
+      ...getSafeClientIdentityContextDiagnostics(options.identityContext || {}),
     }),
   });
 };
@@ -296,6 +355,7 @@ export const bootstrapQuestionnaireStoreRuntime = async (runtime, options = {}) 
  */
 export const createQuestionnaireStoreRuntime = async ({
   namespace,
+  identityContext,
   storageFactory = defaultStorageFactory,
   storeFactory = createQuestionnaireStore,
   rehydrationTimeoutMs,
@@ -316,6 +376,7 @@ export const createQuestionnaireStoreRuntime = async ({
   return bootstrapQuestionnaireStoreRuntime(runtime, {
     canonicalCacheAdapter,
     cacheTimeoutMs,
+    identityContext,
   });
 };
 
@@ -380,9 +441,10 @@ export default function ReduxProvider({
   const resolvedHref = typeof locationHref === 'string'
     ? locationHref
     : safeGetWindowLocationHref();
+  const identity = useMemo(() => resolveClientQuestionnaireIdentity(resolvedHref), [resolvedHref]);
   const namespace = useMemo(() => deriveQuestionnaireBrowserNamespace(
-    readQuestionnaireIdentityFromUrl({ href: resolvedHref }),
-  ), [resolvedHref]);
+    identity.context,
+  ), [identity]);
   const [runtime, setRuntime] = useState(null);
 
   useEffect(() => {
@@ -392,6 +454,7 @@ export default function ReduxProvider({
 
     const options = {
       namespace,
+      identityContext: identity.context,
       storageFactory,
       storeFactory,
       rehydrationTimeoutMs,
@@ -421,6 +484,9 @@ export default function ReduxProvider({
         );
         try { await remove({ namespace, storage: nextRuntime.storage }); } catch {}
         nextRuntime.store.dispatch(resetForm());
+        nextRuntime.store.dispatch(setDraftIdentityContext(
+          toReduxDraftIdentityPayload(identity.context),
+        ));
         nextRuntime.store.dispatch(patchDraftContext({ namespace }));
         try { await nextRuntime.persistor.flush(); } catch {}
         startLocalCanonicalDraftPersistence(nextRuntime.localPersistence, {
@@ -458,6 +524,7 @@ export default function ReduxProvider({
       const bootstrappedFallback = await bootstrapQuestionnaireStoreRuntime(fallbackRuntime, {
         canonicalCacheAdapter,
         cacheTimeoutMs,
+        identityContext: identity.context,
       });
       if (active) setRuntime(bootstrappedFallback);
       else await bootstrappedFallback.dispose?.();
@@ -473,6 +540,7 @@ export default function ReduxProvider({
     cacheTimeoutMs,
     canonicalCacheAdapter,
     namespace,
+    identity,
     onRuntimeReady,
     rehydrationTimeoutMs,
     resolvedHref,

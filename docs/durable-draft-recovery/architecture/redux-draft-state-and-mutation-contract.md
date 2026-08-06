@@ -36,6 +36,12 @@ The slice adds:
     namespace: null,
     restoredFrom: null,
     lastStateHash: null,
+    identityContextVersion: 1,
+    recoveryEmailSource: 'migrated_legacy',
+    recoveryEmailVerificationStatus: 'unverified',
+    identityAssociationIntent: 'legacy_migration',
+    anonymousRecoveryAcknowledged: false,
+    signedInvitationEmailChanged: false,
   },
   draftBootstrapStatus: {
     state: 'idle',
@@ -64,7 +70,7 @@ The slice adds:
 
 Every initial-state call creates fresh nested values. `namespace` identifies a browser storage namespace; it is not authorization. `lastStateHash` compares state; it is not a credential.
 
-`submittedReceipt`, when present, is limited to:
+The six identity metadata fields live in `draftContext`; normalized raw `recoveryEmail` lives only in `credentials`. Secret recovery material, lookup hashes, tokens, and grants are rejected. `submittedReceipt`, when present, is limited to:
 
 ```js
 {
@@ -165,6 +171,8 @@ Draft-context actions are:
 - `setDraftRevisions`
 - `setDraftStateHash`
 - `clearDraftContext`
+- `setDraftIdentityContext`
+- `patchDraftIdentityContext`
 
 Only documented context fields are accepted. Unknown fields and secret-looking keys are rejected. Ordinary actions cannot move a submitted draft back to active. `clearDraftContext` requires explicit booleans for clearing the session and preserving the browser namespace and submitted receipt.
 
@@ -173,6 +181,8 @@ Bootstrap timestamps are always action inputs. A completed bootstrap is not repl
 Sync actions store safe codes, revisions, timestamps, retry counts, and storage modes only. `server_saved` requires confirmed client/server revisions and a server timestamp. A local save whose mode is `memory_only` becomes `offline_local_only`, never `local_saved`. Submitted sync state is protected from ordinary save/retry/error transitions.
 
 Reducers never call time, randomness, storage, network, Base44, or browser APIs.
+
+Identity setters validate the complete proposed email/metadata combination before mutating either credentials or context. `prepareDraftIdentityContextPayload` and `createSetDraftIdentityContextAction` provide a validated dispatch boundary. Raw malformed actions are atomic no-ops, and both identity actions honor the submitted-state lock.
 
 ## Controlled canonical hydration
 
@@ -226,6 +236,8 @@ No reset action creates or updates a server record.
 ## Selectors
 
 `draftSelectors.js` exports selectors for every new state category, read-only status, safe diagnostics, and canonical projection.
+
+The required identity selectors are `selectDraftIdentityContext`, `selectHasRecoveryEmail`, `selectRecoveryEmailSource`, `selectRecoveryEmailVerificationStatus`, `selectAnonymousRecoveryAcknowledged`, `selectRequiresNewDraftAssociation`, and `selectSafeDraftIdentityDiagnostics`. Additional intent/change aliases support existing callers. None returns the email value.
 
 `selectCanonicalDraftState` returns a typed result:
 

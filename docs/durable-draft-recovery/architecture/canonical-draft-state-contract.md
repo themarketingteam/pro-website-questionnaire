@@ -4,7 +4,7 @@
 - Minimum supported canonical version: `2`
 - Module: `src/lib/questionnaireDraftState.js`
 - Form type: `pro-questionnaire`
-- Status: connected to Redux and the namespaced browser-local cache; not connected to canonical Base44 saving, authorized server recovery, submission locking, or PDF regeneration
+- Status: recovery identity metadata connected to Redux and the namespaced browser-local cache; not connected to canonical Base44 saving, authorized server recovery, submission locking, or PDF regeneration
 
 ## Purpose and version boundary
 
@@ -13,7 +13,7 @@ Version 4 is the first complete canonical envelope shared by future browser pers
 The version is intentionally independent of:
 
 - Redux Persist version 4;
-- browser-storage key version 4;
+- browser-storage key version 5;
 - Base44 entity schemas;
 - function/API revisions.
 
@@ -48,7 +48,16 @@ Historical browser normalization already identifies persisted v2/v3 state. Canon
     "domain": "synthetic.example.test",
     "userId": "synthetic-user",
     "userEmail": "synthetic@example.test",
-    "userName": "Synthetic User"
+    "userName": "Synthetic User",
+    "recoveryEmail": "synthetic@example.test"
+  },
+  "identityContext": {
+    "identityContextVersion": 1,
+    "recoveryEmailSource": "client_entered",
+    "recoveryEmailVerificationStatus": "unverified",
+    "identityAssociationIntent": "new_invitation",
+    "anonymousRecoveryAcknowledged": false,
+    "signedInvitationEmailChanged": false
   },
   "uiDraftState": {
     "/responses/12.1/editor/0": {
@@ -115,7 +124,8 @@ The example is synthetic. Canonical values must not be logged.
 | `touchedQuestions` | Plain object of strict boolean values. |
 | `expandedQuestions` | Plain object of strict boolean values. |
 | `textValidationMeta` | Plain serializable object preserving current textarea validation metadata. |
-| `credentials` | Plain allowlisted object: `userId`, `userEmail`, `userName`, `businessName`, `domain`, and compatibility alias `domainName`. Unknown nonsecret keys are removed; secret-looking keys fail validation. |
+| `credentials` | Plain allowlisted object: `userId`, `userEmail`, `userName`, `businessName`, `domain`, compatibility alias `domainName`, and normalized `recoveryEmail`. Recovery email remains PII in credentials and is never copied into safe diagnostics. Unknown nonsecret keys are removed; secret-looking keys fail validation. |
+| `identityContext` | Identity contract version, approved recovery-email source, verification state, association intent, anonymous-risk acknowledgement, and signed-email-change boolean. It contains no raw email, token, code, hash, or grant. Missing historical v4 metadata receives the safe `migrated_legacy`/`legacy_migration` default without changing schema version 4. |
 | `uiDraftState` | Plain object keyed by scoped canonical path. Each value contains `kind`, positive `version`, serializable `data`, client timestamp, and opaque source-tab ID. Purely visual state is not intended for this map. |
 | `fieldChangeMetadata` | Plain object keyed by canonical JSON Pointer path. Each entry contains an allowed operation, client/server revisions, non-authoritative client time, source-tab ID, and mutation ID. |
 | `currentQuestionId` | String or `null`. |
@@ -139,6 +149,8 @@ The module exports:
 - `DraftStateSerializationError`
 - `isPlainDraftObject`
 - `sanitizeDraftSerializableValue`
+- `DEFAULT_DRAFT_IDENTITY_CONTEXT`
+- `normalizeCanonicalDraftIdentityContext`
 - `createEmptyCanonicalDraftState`
 - `normalizeCanonicalDraftState`
 - `validateCanonicalDraftState`
@@ -207,7 +219,7 @@ Unknown future versions are never normalized as version 4.
 
 `hashCanonicalDraftState` hashes the stable projection with SHA-256 through Web Crypto and returns 64 lowercase hexadecimal characters. Tests exercise both runtime Web Crypto and an injected Node Web Crypto provider. Missing Web Crypto returns the typed `CRYPTO_UNAVAILABLE` failure. A hash proves deterministic state equality only; it is not an authorization credential.
 
-The hash projection includes answer-bearing and conflict-relevant state, including responses, validation, touched/expanded state, text metadata, credentials, UI draft state, field-change metadata, lifecycle status, identities, revisions, source tab, question pointers, mutation metadata, and the final submission identifier.
+The hash projection includes answer-bearing and conflict-relevant state, including responses, validation, touched/expanded state, text metadata, credentials, all six identity metadata fields, UI draft state, field-change metadata, lifecycle status, revisions, source tab, question pointers, mutation metadata, and the final submission identifier.
 
 It excludes exactly these irrelevant/self-referential fields:
 
