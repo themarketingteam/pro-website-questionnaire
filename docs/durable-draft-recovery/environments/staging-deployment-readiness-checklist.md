@@ -205,6 +205,19 @@ Checklist items 5, 6, 7, 9, 13, 15, 17, 20, and the manual domain/account
 checks remain not ready. No readiness item is promoted and the overall decision
 remains **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
 
+### 2026-08-06 client recovery entry certification attempt
+
+The [staging client recovery entry report](../frontend/staging-recovery-entry-certification.md)
+is **CLIENT_RECOVERY_ENTRY_FAILED**. `npm ci` and 394 focused tests succeeded;
+`npm test` failed 5 of 1,496 tests. The mandatory hard stop occurred before the
+staging checkout, fingerprint, target guard, environment flags, build, secret
+scan, deployment, live browsers, synthetic data, cleanup query, or production
+comparison.
+
+No checklist item is promoted. The staging site was not deployed or changed,
+no remote value was printed, no email/webhook/submission/domain action ran,
+and the decision remains **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
+
 ### 2026-08-06 public recovery page and panel local evidence
 
 The account-free `/recover-draft` source route, authorized transient choice

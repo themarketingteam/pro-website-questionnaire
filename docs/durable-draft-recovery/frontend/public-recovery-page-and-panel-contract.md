@@ -95,3 +95,13 @@ The E2E fixture is synthetic and read-only. Live recovery APIs, provider
 CAPTCHA behavior, deployed accessibility certification, and staging operation
 remain separate release gates. No deployment or email operation is authorized
 by this contract.
+
+## Staging certification status
+
+The 2026-08-06 [staging recovery entry attempt](./staging-recovery-entry-certification.md)
+is **CLIENT_RECOVERY_ENTRY_FAILED**. The focused source suite passed, but the
+full normal suite failed five release-blocking assertions. The public route,
+choice list, panel, footer, storage modes, token exclusions, and mobile behavior
+were not deployed or certified in staging. No flag, Base44 resource, email,
+webhook, submission, test record, production system, domain, or remote branch
+was changed by that attempt.

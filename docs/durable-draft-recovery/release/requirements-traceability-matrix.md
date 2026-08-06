@@ -50,6 +50,19 @@ email-associated drafts; tokens remain behind the credential boundary; and
 the legacy path is unchanged. Live staging, automated accessibility auditing,
 ordinary V2 server autosave, and release certification remain pending.
 
+### 2026-08-06 client recovery staging certification attempt
+
+The [staging client recovery entry report](../frontend/staging-recovery-entry-certification.md)
+is **CLIENT_RECOVERY_ENTRY_FAILED**. The focused credential-vault, bootstrap,
+modal, recovery, panel, API-client, public-recovery, and canonical-state gate
+passed 394/394 tests. The required full normal suite then failed 5 of 1,496
+tests, activating the explicit pre-deployment hard stop. No baseline suite,
+lint, typecheck, build, E2E, staging checkout update, target guard, flag check,
+deployment, fixture, live matrix, cleanup mutation, certification push, or
+production operation followed. `DR-MODAL-001`, `DR-REC-001`, `DR-REC-002`,
+`DR-PANEL-001`, `DR-BROWSER-001`, and `DR-A11Y-001` retain local source
+evidence only; none received staging certification.
+
 ### 2026-08-05 bootstrap/load implementation evidence
 
 | Requirement | Local implementation evidence | Test evidence | Remaining release gate |

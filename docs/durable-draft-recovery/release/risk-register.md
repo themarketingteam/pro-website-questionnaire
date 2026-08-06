@@ -350,3 +350,17 @@ credentials remains material; and deployed DOM, analytics, accessibility,
 CAPTCHA, API-scope, and browser evidence remain pending. This is source and
 synthetic local-browser work only. No autosave migration, email, Base44 cloud
 change, deployment, production action, or remote Git operation occurred.
+
+## 2026-08-06 client recovery staging certification failure
+
+The [client recovery staging report](../frontend/staging-recovery-entry-certification.md)
+is **CLIENT_RECOVERY_ENTRY_FAILED**. Focused source tests passed 394/394, but
+five full-suite questionnaire/repair assertions failed and activated the
+pre-deployment hard stop. No deployed evidence was collected for the accepted
+unverified-email risk, browser credential exposure, cross-draft authorization,
+storage fallback, panel DOM/log exclusion, CAPTCHA, or accessibility behavior.
+
+No risk is closed or lowered. The staging app, feature flags, entities,
+functions, secrets, records, SES, Zapier, domain, and production app were not
+operated on. No synthetic records were created, so no cleanup mutation was
+needed. No branch was pushed.

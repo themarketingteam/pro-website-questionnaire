@@ -140,3 +140,11 @@ request and may expose the email-authorized older-draft list. The persistent
 V2 panel is rendered immediately before Question 1 with compact footer access;
 it is never rendered in the global header. Neither surface changes this
 modal's V2-disabled legacy behavior or activates ongoing server autosave.
+
+## Staging certification status
+
+The 2026-08-06 [staging recovery entry attempt](./staging-recovery-entry-certification.md)
+failed its full normal source gate after the focused recovery suite passed.
+The modal was therefore not enabled, deployed, or exercised against staging in
+that attempt. Existing local component/browser evidence remains source-only;
+this contract has no staging certification.

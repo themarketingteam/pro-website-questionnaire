@@ -88,3 +88,13 @@ Playwright stores screenshots only on failure and retains failed-run traces and 
 Safe network/artifact URL summaries remove every query parameter and fragment. The lower-level URL redactor also replaces `access_token`, `recoveryCode`, `draftAccessToken`, and `userEmail` values when a diagnostic specifically exercises query redaction. Authorization, cookie, and set-cookie text is removed from captured messages. HTML reports, `test-results`, traces, videos, authentication state, and generated evidence directories are ignored by Git. Review artifacts as potentially sensitive operational evidence and store approved copies only in the restricted release-evidence system.
 
 The current harness does not authenticate, submit, email, upload, call Zapier, or create Base44 records. Future production-disabled smoke testing requires a separately approved prompt, explicit production flag, production target review, and continued write prohibition.
+
+## 2026-08-06 client recovery staging attempt
+
+The Prompt 4 certification attempt stopped at the failing full normal source
+suite before any local or staging Playwright command. The last observed local
+pending report for candidate `cdd68c2f58d95f0c39c325ab1ee942d44bd83fe2`
+remains `FOUNDATION_PENDING_ALLOWED` with eight explicit server/concurrency/
+offline/security cases. It was not promoted to certification evidence and was
+not rerun after the hard stop. No trace, screenshot, video, storage state,
+credential dump, or deployed-browser artifact was created by the attempt.
