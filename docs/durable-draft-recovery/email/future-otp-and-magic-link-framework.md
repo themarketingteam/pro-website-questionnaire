@@ -181,3 +181,14 @@ string rather than numeric zero latitude/longitude, whitespace-only service
 offering retention, and the missing `taggedPeople` coercion warning. None is
 in a file changed by this increment. The focused framework, authorization,
 entity, generated-security-bundle, and build gates all passed.
+
+## 2026-08-06 staging certification attempt
+
+The [staging SES report](./staging-ses-recovery-email-certification.md) is
+**SES_RECOVERY_EMAIL_BLOCKED**. The disabled-function/client focused suite
+passed 15/15 tests, but the later full normal gate failed five unrelated
+questionnaire/repair assertions. No future function was deployed or invoked;
+no attempt record, OTP, magic token, secret, email, public URL, route, or side
+effect was created. All four frontend/backend flags remain unchanged and
+disabled by source default. Live feature-disabled certification remains
+pending a future fully passing deployment gate.

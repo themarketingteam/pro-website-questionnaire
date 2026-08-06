@@ -281,3 +281,17 @@ secrets are not configured, functions are not deployed, public validation and
 abuse controls are not connected, no email or URL exists, and neither flag is
 enabled. Initial unverified email recovery is unchanged. No requirement
 advances to staging, production-disabled, or production-enabled acceptance.
+
+### 2026-08-06 staging SES certification attempt
+
+The [staging SES recovery-email report](../email/staging-ses-recovery-email-certification.md)
+is **SES_RECOVERY_EMAIL_BLOCKED**. The transport, template, recovery delivery,
+future-disabled, entity, and security/authorization focused gates passed
+242/242 tests, but the ordered normal suite failed 5 of 1,354 tests. The hard
+stop prevented AWS/SES inventory, redirect verification, target guarding,
+secret configuration, schema/function deployment, synthetic delivery, inbox
+verification, live idempotency/failure checks, record scans, and cleanup.
+
+This attempt adds failure evidence only. It does not advance `DR-EMAIL-001`,
+`DR-EMAIL-002`, `DR-RLS-001`, `DR-OBS-001`, `DR-SEC-001`, `DR-SEC-002`, or
+`DR-REL-001`. No environment or release requirement is newly certified.

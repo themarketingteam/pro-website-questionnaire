@@ -282,3 +282,16 @@ replay/race, delivery, secret-rotation, and account-recovery risks. Those need
 separate threat/privacy review and live staging evidence. Both flags remain
 false; no schema/secret/function was pushed or configured, no email/value was
 sent, no UI/route was added, and no Git remote changed.
+
+## 2026-08-06 staging SES certification attempt
+
+The [staging SES recovery-email report](../email/staging-ses-recovery-email-certification.md)
+is **SES_RECOVERY_EMAIL_BLOCKED**. Focused source gates passed, but five normal
+suite failures activated the pre-deployment hard stop. SES region/account
+status, verified sender, quota, bounce/complaint routing, dedicated
+least-privilege staging IAM, and internal redirect ownership therefore remain
+unknown and unconfigured.
+
+No risk rating changes. `RISK-008` remains without live redirect/inbox proof
+and `RISK-009` remains blocking. No AWS/Base44 configuration, schema, function,
+record, email, inbox, provider, production, domain, or remote Git operation ran.

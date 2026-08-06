@@ -176,3 +176,17 @@ function, fixture, live API, cleanup, frontend, or side-effect check ran.
 No readiness item is promoted. Frontend public recovery remains disabled in
 source, its deployed value was not rechecked, and the overall decision remains
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
+
+### 2026-08-06 staging SES recovery-email attempt
+
+The [staging SES report](../email/staging-ses-recovery-email-certification.md)
+is **SES_RECOVERY_EMAIL_BLOCKED**. Focused email/security/schema gates passed
+242/242 tests, then `npm test` failed the same five questionnaire/repair
+assertions. The source-gate hard stop occurred before the separate staging
+checkout, fresh fingerprint, target guard, SES inventory, redirect inbox,
+secret import, entity push, function deployment, delivery, inbox review, or
+cleanup.
+
+Checklist items 5, 6, 7, 9, 13, 15, 17, 20, and the manual domain/account
+checks remain not ready. No readiness item is promoted and the overall decision
+remains **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.

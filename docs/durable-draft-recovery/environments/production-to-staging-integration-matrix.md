@@ -147,3 +147,13 @@ release blockers. No other integration row is promoted by this change.
 The isolated app is not deployable yet. `INT-005` is now fail-closed in source and safe only while mode remains `disabled`; staging redirect still lacks an approved sink and downstream inventory. `INT-009`, `INT-010`, `INT-016`, `INT-017`, `INT-019`, `INT-020`, and `INT-021` remain production-bound or insufficiently isolated and must be disabled, separated, or deny-listed before staging deployment.
 
 No deployment, real webhook call, email send, connector authorization, secret creation, data copy, domain operation, or production-side mutation occurred. All delivery tests used injected fake adapters and reserved invalid/local test URLs.
+
+## 2026-08-06 staging SES certification attempt
+
+The [staging SES report](../email/staging-ses-recovery-email-certification.md)
+is **SES_RECOVERY_EMAIL_BLOCKED**. The source hard stop preceded all AWS and
+staging operations, so `INT-014` remains unconfigured and inactive. No intended
+or actual recipient reached SES, no production credential/destination was
+selected, no client was contacted, and no other integration—including
+Zapier—was invoked. Live redirect, sender, IAM, quota, complaint/bounce,
+idempotency, inbox, and cleanup evidence remains absent.

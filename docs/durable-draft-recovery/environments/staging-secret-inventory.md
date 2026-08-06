@@ -209,3 +209,16 @@ The existing sanitized evidence still records staging external side effects as
 `disabled`; cloud state was not refreshed. Before any staging delivery, the
 real redirect must be configured outside Git and validated by presence/domain
 only. No real internal address belongs in this inventory.
+
+## 2026-08-06 staging SES certification attempt
+
+The [certification attempt](../email/staging-ses-recovery-email-certification.md)
+stopped at the full normal test gate. No AWS or Base44 secret was created,
+queried, imported, printed, copied, or deleted. No temporary env file was
+created, so no temporary-file deletion was required. The approved internal
+redirect recipient was not supplied or verified, and no masked address can be
+recorded.
+
+All ten preferred email configuration names remain planned/unconfigured by
+this attempt. OTP and magic-link secrets also remain unconfigured. Existing
+names-only staging and production inventories were not refreshed or mutated.

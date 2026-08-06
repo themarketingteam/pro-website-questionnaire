@@ -236,3 +236,17 @@ synthetic clients.
 Until those blockers close, email mode remains `disabled`, OTP/magic link
 remain disabled, the schema remains local-only, and no SES delivery is
 authorized.
+
+## 2026-08-06 staging certification attempt
+
+The [staging certification report](./staging-ses-recovery-email-certification.md)
+is **SES_RECOVERY_EMAIL_BLOCKED**. Focused transport (20/20), template (14/14),
+recovery delivery/client (26/26), future-disabled (15/15), entity (27/27), and
+security/authorization (140/140) gates passed. The normal suite then failed
+five established assertions, so the ordered hard stop prevented lint,
+typecheck, build, target guard, SES inventory/configuration, deployment, and
+all live delivery/inbox checks.
+
+The sender, staging redirect, SES account status, dedicated IAM, and provider
+behavior remain source contracts only. No AWS/Base44 value was configured and
+no email was sent.
