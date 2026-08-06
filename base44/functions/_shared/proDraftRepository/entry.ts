@@ -3,6 +3,7 @@
 export const PRO_DRAFT_REPOSITORY_VERSION = 1;
 export const DEFAULT_DRAFT_QUERY_LIMIT = 25;
 export const MAX_DRAFT_QUERY_LIMIT = 100;
+export const MAX_EMAIL_RECOVERY_QUERY_LIMIT = 5000;
 export const MAX_EVENT_QUERY_LIMIT = 500;
 
 export const PRO_DRAFT_REPOSITORY_ERROR_CODES = Object.freeze({
@@ -219,7 +220,18 @@ export function findDraftsByRecoveryEmailLookupHash(
   hash: unknown,
   limit?: unknown,
 ): Promise<readonly DraftRecord[]> {
-  return findDraftsByHash(repository, 'recovery_email_lookup_hash', hash, limit);
+  const repo = requireRepository(repository);
+  const queryLimit = boundedLimit(
+    limit,
+    MAX_EMAIL_RECOVERY_QUERY_LIMIT,
+    DEFAULT_DRAFT_QUERY_LIMIT,
+  );
+  return safeRead(async () => Object.freeze(records(await repo.drafts.filter(
+    { recovery_email_lookup_hash: requireHash(hash) },
+    '-created_date',
+    queryLimit,
+    0,
+  ))));
 }
 
 export function findDraftsByRecoveryCodeHash(

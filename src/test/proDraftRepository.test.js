@@ -64,7 +64,6 @@ describe('Base44 draft repository boundary', () => {
   it.each([
     ['resume_token_hash', findDraftsByResumeTokenHash],
     ['identity_key_hash', findDraftsByIdentityKeyHash],
-    ['recovery_email_lookup_hash', findDraftsByRecoveryEmailLookupHash],
     ['recovery_code_hash', findDraftsByRecoveryCodeHash],
   ])('uses a bounded filter for %s', async (field, operation) => {
     const sdk = createSdk();
@@ -73,6 +72,17 @@ describe('Base44 draft repository boundary', () => {
     expect(repository.drafts.filter).toHaveBeenCalledWith(
       { [field]: HASH },
       '-updated_date',
+      DEFAULT_DRAFT_QUERY_LIMIT,
+      0,
+    );
+  });
+
+  it('queries email associations by server-created order with a bounded limit', async () => {
+    const repository = createDraftRepository(createSdk());
+    await findDraftsByRecoveryEmailLookupHash(repository, HASH);
+    expect(repository.drafts.filter).toHaveBeenCalledWith(
+      { recovery_email_lookup_hash: HASH },
+      '-created_date',
       DEFAULT_DRAFT_QUERY_LIMIT,
       0,
     );

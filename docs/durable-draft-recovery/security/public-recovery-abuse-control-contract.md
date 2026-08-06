@@ -1,7 +1,7 @@
 # Public recovery abuse-control contract
 
 - Contract version: `1`
-- Source status: implemented and locally tested; no public endpoint, schema push, secret configuration, or deployment
+- Source status: abuse controls and public code/email recovery endpoints implemented and locally tested; no schema push, secret configuration, or deployment
 - Security policy: `base44/functions/_shared/proDraftRecoverySecurity/entry.ts`
 - CAPTCHA provider: `base44/functions/_shared/proDraftCaptcha/entry.ts`
 - Device identifier: `src/lib/proDraftDeviceId.js`
@@ -15,10 +15,11 @@ be sufficient to recover the newest eligible questionnaire after abuse
 controls. This is a privacy risk, not an authorization guarantee, and does not
 permit cross-email, cross-code, cross-client, or cross-environment exposure.
 
-This foundation adds rate limits, temporary lockout, conditional CAPTCHA,
-random device correlation, generic public failures, and a security-event audit
-contract. It does not expose or enable email recovery, recovery-code recovery,
-OTP, magic links, or any other public recovery function.
+The source implementation applies rate limits, temporary lockout, conditional
+CAPTCHA, random device correlation, generic public failures, minimum timing,
+and security-event auditing to public code and email recovery. Email recovery
+remains deliberately unverified. The endpoints are not deployed or enabled by
+this source-only change; OTP and magic links remain disabled future frameworks.
 
 ## Security-event entity
 
@@ -149,8 +150,10 @@ Missing and wrong emails use equivalent wording. Missing and wrong codes use
 equivalent wording where input parsing permits. Public responses never state
 that an email is absent, a code exists or expired, or how many drafts exist.
 Rate-limit/lockout paths may return bounded retry timing and CAPTCHA necessity,
-but not subject existence. Authorized success may later expose an allowlisted
-draft summary only after recovery succeeds.
+but not subject existence. Authorized success exposes one allowlisted draft
+summary only after recovery succeeds. Associated choices require the resulting
+email session's `draft:list-associated` scope and token-bound lookup hash;
+recovery-code and invitation sessions cannot list them.
 
 ## Monitoring requirements
 

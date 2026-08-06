@@ -53,7 +53,7 @@ Unknown types, scopes, claims, and versions are rejected. Non-admin expiry must 
 | `email_otp` | `email:otp` | Disabled framework only |
 | `magic_link` | `email:magic-link` | Disabled framework only |
 
-Recovery-session authorization may additionally carry `draft:read`, `draft:write`, `draft:events`, or `draft:submitted-read` in `authorizedScopes`. Submitted-record access must be explicitly `draft:submitted-read`; it may be paired only with ordinary `draft:read`, never write or event scope. Resource functions independently enforce record lifecycle rules.
+Recovery-session authorization may additionally carry `draft:read`, `draft:write`, `draft:events`, `draft:submitted-read`, or `draft:list-associated` in `authorizedScopes`. Submitted-record access must be explicitly `draft:submitted-read`; it may be paired with ordinary `draft:read` and, for email sessions only, `draft:list-associated`, never write or event scope. `draft:list-associated` is valid only when `authorizationMethod` is `email` and a valid `recoveryEmailLookupHash` is present. Recovery-code and signed-invitation sessions cannot carry this scope. Resource functions independently enforce record lifecycle rules.
 
 ## Secret-purpose mapping
 
@@ -81,12 +81,13 @@ A recovery session adds:
 - `authorizationMethod`: `email`, `recovery_code`, or `signed_invitation`;
 - the explicit `authorizedScopes` set;
 - `recoveryCodeVersion` and `recoverySessionVersion`;
-- optional `recoveryEmailLookupHash` only when the authorizing method requires
-  an email association. Recovery-code authorization deliberately omits it.
+- `recoveryEmailLookupHash` is mandatory for `authorizationMethod: email` and
+  is the resource binding for `draft:list-associated`; other methods cannot
+  use that scope.
 
 Issuance defaults to 12 hours and rejects a configured lifetime above 7 days. A later caller may read `PRO_FORM_RECOVERY_SESSION_TTL_SECONDS`, validate it, and pass the resulting seconds to the issue helper; this shared module deliberately does not read runtime configuration itself.
 
-Verification requires the expected environment, grant version, draft ID, authorization method, and recovery-session version, plus any operation-specific required scope. It returns a normalized, frozen claim object and never returns token or signature bytes. A session for one draft or recovery method cannot authorize another. The recovery-code service issues read/write/event scopes for active-like drafts and submitted-read/read scopes for submitted drafts. Email recovery may later issue its separately approved scopes, but every entity function must still enforce lifecycle eligibility.
+Verification requires the expected environment, grant version, draft ID, authorization method, and recovery-session version, plus any operation-specific required scope. It returns a normalized, frozen claim object and never returns token or signature bytes. A session for one draft or recovery method cannot authorize another. The recovery-code service issues read/write/event scopes for active-like drafts and submitted-read/read scopes for submitted drafts. The email service adds `draft:list-associated` to those status-derived sets and binds it to the email lookup hash and environment. Listing uses only that verified claim; selection timing-safely matches the selected record's lookup hash before issuing a new exact-draft session. Every entity function still enforces lifecycle eligibility.
 
 ## Persistent password-only admin recovery grant
 
@@ -137,7 +138,7 @@ Later backend work must:
 
 1. inject environment-specific secrets and current revocation versions without logging them;
 2. verify signed invitations before draft association or lookup;
-3. issue recovery sessions only after an approved recovery proof and enforce lifecycle/scopes again at every draft operation;
+3. keep the implemented unverified-email policy explicitly accepted and enforce lifecycle/scopes again at every draft operation; replace that proof step with OTP/magic link when separately approved;
 4. read and validate `PRO_FORM_RECOVERY_SESSION_TTL_SECONDS` before passing a TTL to the module;
 5. migrate the legacy seven-day admin flow, implement random-device storage and Forget This Device, and keep admin authorization separate from user authentication;
 6. add server-side audit events using nonsecret fingerprints only;
@@ -148,7 +149,7 @@ The shared contract itself creates no endpoint, entity modification, UI, or feat
 
 ## Test coverage
 
-`src/test/proDraftAuthorization.test.js` covers canonical sign/verify, payload and signature tampering, extra segments, Base64URL and JSON rejection, duplicate keys, versions, type/scope/purpose separation, environment isolation, temporal bounds, invitation hash binding, exact draft/method recovery authorization, submitted-read behavior, admin persistence and revocation, disabled future claim shapes, PII exclusion, safe diagnostics, injected clocks/token IDs, and static no-endpoint/no-I/O boundaries.
+`src/test/proDraftAuthorization.test.js` covers canonical sign/verify, payload and signature tampering, extra segments, Base64URL and JSON rejection, duplicate keys, versions, type/scope/purpose separation, environment isolation, temporal bounds, invitation hash binding, exact draft/method recovery authorization, submitted-read behavior, email-only list-associated scope and hash binding, recovery-code/invitation scope rejection, admin persistence and revocation, disabled future claim shapes, PII exclusion, safe diagnostics, injected clocks/token IDs, and static no-endpoint/no-I/O boundaries.
 
 ## Staging certification evidence — 2026-08-05
 

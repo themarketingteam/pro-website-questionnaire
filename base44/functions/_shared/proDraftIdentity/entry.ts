@@ -13,6 +13,36 @@ export const RECOVERY_CODE_GROUP_SIZE = 4;
 export const RECOVERY_CODE_GROUP_COUNT = 5;
 export const RECOVERY_CODE_ENTROPY_BITS = RECOVERY_CODE_LENGTH
   * Math.log2(RECOVERY_CODE_ALPHABET.length);
+export const RECOVERY_EMAIL_NORMALIZATION_VERSION = 1;
+
+export const RECOVERY_EMAIL_ERROR_CODES = Object.freeze({
+  CONTROL_CHARACTER: 'RECOVERY_EMAIL_CONTROL_CHARACTER',
+  DOMAIN_CONSECUTIVE_DOTS: 'RECOVERY_EMAIL_DOMAIN_CONSECUTIVE_DOTS',
+  DOMAIN_INVALID: 'RECOVERY_EMAIL_DOMAIN_INVALID',
+  DOMAIN_LABEL_HYPHEN: 'RECOVERY_EMAIL_DOMAIN_LABEL_HYPHEN',
+  DOMAIN_LABEL_TOO_LONG: 'RECOVERY_EMAIL_DOMAIN_LABEL_TOO_LONG',
+  DOMAIN_TOO_LONG: 'RECOVERY_EMAIL_DOMAIN_TOO_LONG',
+  EMBEDDED_WHITESPACE: 'RECOVERY_EMAIL_EMBEDDED_WHITESPACE',
+  INVALID_AT_COUNT: 'RECOVERY_EMAIL_INVALID_AT_COUNT',
+  INVALID_TYPE: 'RECOVERY_EMAIL_INVALID_TYPE',
+  LOCAL_PART_TOO_LONG: 'RECOVERY_EMAIL_LOCAL_PART_TOO_LONG',
+  MISSING_DOMAIN: 'RECOVERY_EMAIL_MISSING_DOMAIN',
+  MISSING_LOCAL_PART: 'RECOVERY_EMAIL_MISSING_LOCAL_PART',
+  REQUIRED: 'RECOVERY_EMAIL_REQUIRED',
+  TOO_LONG: 'RECOVERY_EMAIL_TOO_LONG',
+} as const);
+
+export type RecoveryEmailErrorCode = typeof RECOVERY_EMAIL_ERROR_CODES[
+  keyof typeof RECOVERY_EMAIL_ERROR_CODES
+];
+
+export type RecoveryEmailNormalizationResult = Readonly<{
+  valid: boolean;
+  displayEmail: string;
+  normalizedEmail: string;
+  normalizationVersion: 1;
+  errorCode: RecoveryEmailErrorCode | null;
+}>;
 
 export const RECOVERY_CODE_ERROR_CODES = Object.freeze({
   INVALID_TYPE: 'RECOVERY_CODE_INVALID_TYPE',
@@ -48,6 +78,9 @@ const NORMALIZED_PATTERN = new RegExp(
 );
 const REJECTION_SAMPLING_LIMIT = Math.floor(256 / RECOVERY_CODE_ALPHABET.length)
   * RECOVERY_CODE_ALPHABET.length;
+const ASCII_CONTROL_PATTERN = /[\u0000-\u001f\u007f]/u;
+const EMBEDDED_WHITESPACE_PATTERN = /\s/u;
+const DOMAIN_LABEL_PATTERN = /^[a-z\d-]+$/iu;
 
 const invalidCodeResult = (
   errorCode: RecoveryCodeErrorCode,
@@ -118,6 +151,106 @@ export function validateRecoveryCodeFormat(
     valid: result.valid,
     normalizedLength: result.normalizedLength,
     errorCode: result.errorCode,
+  });
+}
+
+function invalidEmail(
+  errorCode: RecoveryEmailErrorCode,
+  displayEmail = '',
+): RecoveryEmailNormalizationResult {
+  return Object.freeze({
+    valid: false,
+    displayEmail,
+    normalizedEmail: '',
+    normalizationVersion: RECOVERY_EMAIL_NORMALIZATION_VERSION,
+    errorCode,
+  });
+}
+
+function normalizedUnicode(value: string): string {
+  try {
+    return value.normalize('NFC');
+  } catch {
+    return value;
+  }
+}
+
+function asciiEmailDomain(domain: string): string | null {
+  try {
+    const parsed = new URL(`https://${domain}`);
+    if (parsed.username || parsed.password || parsed.port || parsed.search
+      || parsed.hash || parsed.pathname !== '/') return null;
+    return parsed.hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/** Normalizes an email association. This deliberately does not verify ownership. */
+export function normalizeRecoveryEmail(
+  input: unknown,
+): RecoveryEmailNormalizationResult {
+  if (typeof input !== 'string') {
+    return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.INVALID_TYPE);
+  }
+  if (ASCII_CONTROL_PATTERN.test(input)) {
+    return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.CONTROL_CHARACTER);
+  }
+  const displayEmail = normalizedUnicode(input).trim();
+  if (displayEmail === '') return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.REQUIRED);
+  if (EMBEDDED_WHITESPACE_PATTERN.test(displayEmail)) {
+    return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.EMBEDDED_WHITESPACE, displayEmail);
+  }
+  if (displayEmail.length > 254) {
+    return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.TOO_LONG, displayEmail);
+  }
+  if ([...displayEmail].filter((character) => character === '@').length !== 1) {
+    return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.INVALID_AT_COUNT, displayEmail);
+  }
+  const separator = displayEmail.indexOf('@');
+  const localPart = displayEmail.slice(0, separator);
+  const displayDomain = displayEmail.slice(separator + 1);
+  if (localPart === '') {
+    return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.MISSING_LOCAL_PART, displayEmail);
+  }
+  if (displayDomain === '') {
+    return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.MISSING_DOMAIN, displayEmail);
+  }
+  if (localPart.length > 64) {
+    return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.LOCAL_PART_TOO_LONG, displayEmail);
+  }
+  if (displayDomain.length > 253) {
+    return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.DOMAIN_TOO_LONG, displayEmail);
+  }
+  if (displayDomain.includes('..')) {
+    return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.DOMAIN_CONSECUTIVE_DOTS, displayEmail);
+  }
+  const domain = asciiEmailDomain(displayDomain);
+  if (!domain) return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.DOMAIN_INVALID, displayEmail);
+  if (domain.length > 253) {
+    return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.DOMAIN_TOO_LONG, displayEmail);
+  }
+  for (const label of domain.split('.')) {
+    if (label === '' || !DOMAIN_LABEL_PATTERN.test(label)) {
+      return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.DOMAIN_INVALID, displayEmail);
+    }
+    if (label.length > 63) {
+      return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.DOMAIN_LABEL_TOO_LONG, displayEmail);
+    }
+    if (label.startsWith('-') || label.endsWith('-')) {
+      return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.DOMAIN_LABEL_HYPHEN, displayEmail);
+    }
+  }
+  const normalizedEmail = `${localPart.toLowerCase()}@${domain}`;
+  if (normalizedEmail.length > 254) {
+    return invalidEmail(RECOVERY_EMAIL_ERROR_CODES.TOO_LONG, displayEmail);
+  }
+  return Object.freeze({
+    valid: true,
+    displayEmail,
+    normalizedEmail,
+    normalizationVersion: RECOVERY_EMAIL_NORMALIZATION_VERSION,
+    errorCode: null,
   });
 }
 
@@ -232,6 +365,7 @@ export type DraftSelectionRecord = Readonly<{
   retention_deleted?: unknown;
   deletion_finalized?: unknown;
   retentionDeletionFinalized?: unknown;
+  retention_expires_at?: unknown;
   is_staging?: unknown;
   is_test?: unknown;
   test_record?: unknown;
@@ -241,6 +375,7 @@ export type DraftSelectionRecord = Readonly<{
 
 export type DraftSelectionOptions = Readonly<{
   expectedEnvironment?: DraftEnvironment;
+  now?: Date | number | string;
 }>;
 
 export type DraftSelectionWarning =
@@ -380,6 +515,13 @@ export function isDraftEligibleForAutomaticEmailRecovery(
     'deletion_finalized',
     'retentionDeletionFinalized',
   ])) return false;
+  if (options.now !== undefined && typeof value.retention_expires_at === 'string') {
+    const now = options.now instanceof Date ? options.now.getTime()
+      : typeof options.now === 'number' ? options.now : Date.parse(options.now);
+    const retentionExpiry = Date.parse(value.retention_expires_at);
+    if (Number.isFinite(now) && Number.isFinite(retentionExpiry)
+      && retentionExpiry <= now) return false;
+  }
 
   return isEnvironmentEligible(value, options.expectedEnvironment);
 }

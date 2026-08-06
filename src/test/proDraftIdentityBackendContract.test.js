@@ -20,6 +20,7 @@ import {
   isDraftEligibleForAutomaticEmailRecovery,
   normalizeLegacyDraftStatus,
   normalizeRecoveryCodeInput,
+  normalizeRecoveryEmail,
   selectNewestEligibleDraft,
   sortDraftsForEmailRecovery,
   validateRecoveryCodeFormat,
@@ -120,6 +121,18 @@ describe('backend recovery-code conformance', () => {
 });
 
 describe('backend status and email-recovery selection conformance', () => {
+  it('normalizes an email association without claiming ownership verification', () => {
+    expect(normalizeRecoveryEmail('  Synthetic.User@EXAMPLE.test  ')).toMatchObject({
+      valid: true,
+      normalizedEmail: 'synthetic.user@example.test',
+      normalizationVersion: 1,
+    });
+    expect(normalizeRecoveryEmail('not-an-email')).toMatchObject({
+      valid: false,
+      normalizedEmail: '',
+    });
+  });
+
   it.each(fixtures.statusNormalization)(
     'normalizes status $input to $expected',
     ({ input, isValidLegacyDraft, expected }) => {
@@ -178,6 +191,24 @@ describe('backend status and email-recovery selection conformance', () => {
     expect(result.selected?.id).toBe('eligible');
     expect(result.eligibleCount).toBe(1);
     expect(result.excludedCount).toBe(5);
+  });
+
+  it('excludes a draft whose retention deadline has elapsed', () => {
+    const result = selectNewestEligibleDraft([
+      makeRecord('active', {
+        id: 'expired-by-retention',
+        retention_expires_at: '2026-01-02T00:00:00.000Z',
+      }),
+      makeRecord('active', {
+        id: 'still-eligible',
+        created_date: '2025-12-01T00:00:00.000Z',
+        retention_expires_at: '2026-12-01T00:00:00.000Z',
+      }),
+    ], {
+      expectedEnvironment: 'production',
+      now: new Date('2026-02-01T00:00:00.000Z'),
+    });
+    expect(result.selected?.id).toBe('still-eligible');
   });
 
   it('uses created_at_server only after created_date and never updated dates', () => {

@@ -498,6 +498,51 @@ describe('recovery-session authorization', () => {
     expect(claims).not.toHaveProperty('recoveryEmailLookupHash');
   });
 
+  it('binds list-associated scope to email sessions and their lookup hash', async () => {
+    const token = await issueRecoverySessionToken(recoveryInput({
+      authorizedScopes: [
+        SIGNED_TOKEN_SCOPES.DRAFT_READ,
+        SIGNED_TOKEN_SCOPES.DRAFT_LIST_ASSOCIATED,
+      ],
+    }), issueOptions());
+    await expect(verifyRecoverySessionToken(token, verifyOptions({
+      requiredScopes: [SIGNED_TOKEN_SCOPES.DRAFT_LIST_ASSOCIATED],
+    }))).resolves.toMatchObject({
+      authorizationMethod: 'email',
+      recoveryEmailLookupHash: HASHES.email,
+    });
+
+    for (const authorizationMethod of ['recovery_code', 'signed_invitation']) {
+      await expectAuthorizationCode(issueRecoverySessionToken(recoveryInput({
+        authorizationMethod,
+        authorizedScopes: [
+          SIGNED_TOKEN_SCOPES.DRAFT_READ,
+          SIGNED_TOKEN_SCOPES.DRAFT_LIST_ASSOCIATED,
+        ],
+      }), issueOptions()), AUTHORIZATION_ERROR_CODES.TOKEN_SCOPE_INVALID);
+    }
+    await expectAuthorizationCode(issueRecoverySessionToken(recoveryInput({
+      recoveryEmailLookupHash: undefined,
+    }), issueOptions()), AUTHORIZATION_ERROR_CODES.TOKEN_SCOPE_INVALID);
+  });
+
+  it('allows submitted email sessions to retain list-associated scope only', async () => {
+    await expect(issueRecoverySessionToken(recoveryInput({
+      authorizedScopes: [
+        SIGNED_TOKEN_SCOPES.DRAFT_SUBMITTED_READ,
+        SIGNED_TOKEN_SCOPES.DRAFT_READ,
+        SIGNED_TOKEN_SCOPES.DRAFT_LIST_ASSOCIATED,
+      ],
+    }), issueOptions())).resolves.toBeTypeOf('string');
+    await expectAuthorizationCode(issueRecoverySessionToken(recoveryInput({
+      authorizedScopes: [
+        SIGNED_TOKEN_SCOPES.DRAFT_SUBMITTED_READ,
+        SIGNED_TOKEN_SCOPES.DRAFT_LIST_ASSOCIATED,
+        SIGNED_TOKEN_SCOPES.DRAFT_WRITE,
+      ],
+    }), issueOptions()), AUTHORIZATION_ERROR_CODES.TOKEN_SCOPE_INVALID);
+  });
+
   it('enforces the configurable seven-day maximum', async () => {
     await expect(issueRecoverySessionToken(
       recoveryInput(),

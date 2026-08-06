@@ -6,6 +6,7 @@ import {
   projectActiveDraftForAuthorizedClient,
   projectDraftForAdmin,
   projectDraftForPublicFailure,
+  projectDraftRecoveryChoiceForAuthorizedClient,
   projectDraftRecoverySummaryForAuthorizedClient,
   projectDraftSummaryForAuthorizedClient,
   projectSubmittedDraftForAuthorizedClient,
@@ -144,6 +145,25 @@ describe('safe draft projections', () => {
       recoveryCodeHint: 'X7K9',
     });
     expect(JSON.stringify(summary)).not.toMatch(/canonical|email|hash/iu);
+  });
+
+  it('projects the exact associated-choice allowlist', () => {
+    const choice = projectDraftRecoveryChoiceForAuthorizedClient(record({
+      business_name: 'Synthetic Business',
+      created_date: '2026-08-01T12:00:00.000Z',
+      status: 'submitted',
+    }), 'draft-synthetic-1');
+    expect(choice).toEqual({
+      draftId: 'draft-synthetic-1',
+      status: 'submitted',
+      readOnly: true,
+      businessNameDisplay: 'Synthetic Business',
+      createdAt: '2026-08-01T12:00:00.000Z',
+      lastSavedAt: '2026-08-05T12:00:00.000Z',
+      draftGeneration: 1,
+      isCurrentSelection: true,
+    });
+    expect(JSON.stringify(choice)).not.toMatch(/answer|email|domain|hash|token/iu);
   });
 
   it('detects sensitive fields recursively in snake and camel case', () => {

@@ -177,6 +177,26 @@ timing corpora, deployed token/load integration, monitoring, and release review.
 No public flag, UI, schema, function, secret, staging data, production resource,
 or Git remote changed.
 
+### 2026-08-06 email recovery and associated-choice source implementation
+
+The [email recovery and draft-choice flow](../backend/email-recovery-and-draft-choice-flow.md)
+adds local source and mocked-test evidence for exact normalized-email lookup,
+newest server-created eligible selection, email-only `draft:list-associated`
+authorization, safe bounded choice listing, exact-draft reselection, submitted
+read-only behavior, token/load handoff, generic failures, timing controls, and
+fail-closed success-event persistence. Raw email is excluded from tokens,
+diagnostics, logs, events, and responses, but ownership is deliberately not
+verified and no message is sent.
+
+`RISK-001` therefore remains explicitly accepted at High likelihood and
+Critical severity. Abuse controls and hash/scope binding reduce enumeration and
+cross-scope implementation risk; they do not prove mailbox ownership. Any
+confirmed cross-email/hash bypass still requires immediate public-email-
+recovery disablement and a failed release. Live service-role/FLS, distributed
+limits, trusted-proxy, CAPTCHA, monitoring, 10k corpus, and deployment evidence
+remain blockers. No schema, function, secret, flag, staging/production data,
+email/SES, domain, or Git remote changed.
+
 ## Knowingly accepted risks
 
 ### RISK-001: Public email-only recovery

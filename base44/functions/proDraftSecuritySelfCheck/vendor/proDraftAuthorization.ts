@@ -42,6 +42,7 @@ export const SIGNED_TOKEN_SCOPES = Object.freeze({
   DRAFT_READ: 'draft:read',
   DRAFT_WRITE: 'draft:write',
   DRAFT_EVENTS: 'draft:events',
+  DRAFT_LIST_ASSOCIATED: 'draft:list-associated',
   DRAFT_SUBMITTED_READ: 'draft:submitted-read',
   ADMIN_DRAFT_RECOVERY: 'admin:draft-recovery',
   EMAIL_OTP: 'email:otp',
@@ -144,6 +145,7 @@ export type RecoverySessionClaims = CommonStructuredClaims & Readonly<{
     | 'draft:write'
     | 'draft:submitted-read'
     | 'draft:events'
+    | 'draft:list-associated'
   )[];
   recoveryEmailLookupHash?: string;
   recoveryCodeVersion: number;
@@ -311,6 +313,7 @@ const RECOVERY_AUTHORIZED_SCOPES = new Set<SignedTokenScope>([
   SIGNED_TOKEN_SCOPES.DRAFT_WRITE,
   SIGNED_TOKEN_SCOPES.DRAFT_SUBMITTED_READ,
   SIGNED_TOKEN_SCOPES.DRAFT_EVENTS,
+  SIGNED_TOKEN_SCOPES.DRAFT_LIST_ASSOCIATED,
 ]);
 const LOWER_HEX_256_PATTERN = /^[0-9a-f]{64}$/u;
 const OPAQUE_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/u;
@@ -670,7 +673,17 @@ function validateRecoverySessionShape(
     && authorizedScopes.some((scope) => ![
       SIGNED_TOKEN_SCOPES.DRAFT_SUBMITTED_READ,
       SIGNED_TOKEN_SCOPES.DRAFT_READ,
-    ].includes(scope as 'draft:submitted-read' | 'draft:read'))) {
+      SIGNED_TOKEN_SCOPES.DRAFT_LIST_ASSOCIATED,
+    ].includes(scope as 'draft:submitted-read' | 'draft:read'
+      | 'draft:list-associated'))) {
+    return authorizationError(AUTHORIZATION_ERROR_CODES.TOKEN_SCOPE_INVALID);
+  }
+  if (value.authorizationMethod === 'email'
+    && !Object.hasOwn(value, 'recoveryEmailLookupHash')) {
+    return authorizationError(AUTHORIZATION_ERROR_CODES.TOKEN_SCOPE_INVALID);
+  }
+  if (authorizedScopes.includes(SIGNED_TOKEN_SCOPES.DRAFT_LIST_ASSOCIATED)
+    && value.authorizationMethod !== 'email') {
     return authorizationError(AUTHORIZATION_ERROR_CODES.TOKEN_SCOPE_INVALID);
   }
   return { ...common, ...value } as unknown as RecoverySessionClaims;

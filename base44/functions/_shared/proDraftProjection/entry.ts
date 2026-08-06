@@ -235,6 +235,26 @@ export function projectDraftRecoverySummaryForAuthorizedClient(
   return Object.freeze(output);
 }
 
+/** Associated-draft choice projection after a verified email-recovery session. */
+export function projectDraftRecoveryChoiceForAuthorizedClient(
+  recordInput: unknown,
+  currentDraftId: string,
+): Readonly<Record<string, unknown>> {
+  const summary = projectDraftRecoverySummaryForAuthorizedClient(recordInput);
+  const output = {
+    draftId: summary.draftId,
+    status: summary.status,
+    readOnly: summary.readOnly,
+    businessNameDisplay: summary.businessNameDisplay,
+    createdAt: summary.createdAt,
+    lastSavedAt: summary.lastSavedAt,
+    draftGeneration: summary.draftGeneration,
+    isCurrentSelection: summary.draftId === currentDraftId,
+  };
+  assertNoSensitiveDraftFields(output);
+  return Object.freeze(output);
+}
+
 export function projectDraftForAdmin(
   recordInput: unknown,
   options: Readonly<{ includeCanonicalState?: boolean; includeRecoveryEmail?: boolean }> = {},

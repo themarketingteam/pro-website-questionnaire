@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   PRO_DRAFT_RECOVERY_FUNCTION_NAME,
+  PRO_DRAFT_RECOVERY_FUNCTION_NAMES,
   createProDraftRecoveryApiClient,
 } from '@/lib/proDraftRecoveryApiClient';
 
@@ -36,6 +37,21 @@ const serverSuccess = Object.freeze({
     draftGeneration: 2,
     recoveryCodeHint: 'JKMN',
   },
+});
+
+const choicesSuccess = Object.freeze({
+  success: true,
+  requestId: `pdrq_${'L'.repeat(43)}`,
+  choices: Object.freeze([{
+    draftId: 'draft-synthetic-code-2',
+    status: 'submitted',
+    readOnly: true,
+    businessNameDisplay: 'Synthetic Business Two',
+    createdAt: '2033-05-02T00:00:00.000Z',
+    lastSavedAt: '2033-05-16T00:00:00.000Z',
+    draftGeneration: 3,
+    isCurrentSelection: false,
+  }]),
 });
 
 function harness(response = { data: serverSuccess }, runtimeOverrides = {}) {
@@ -132,5 +148,97 @@ describe('proDraftRecoveryApiClient', () => {
     const malformed = await client.recoverProFormDraftByCode(request);
     expect(malformed.success).toBe(false);
     expect(malformed).not.toHaveProperty('draft');
+  });
+
+  it('invokes email recovery without storing or echoing email', async () => {
+    const response = { data: {
+      ...serverSuccess,
+      otherEligibleDraftsAvailable: true,
+      internalEmail: 'must-not-escape@example.test',
+    } };
+    const { client, invoke } = harness(response);
+    const emailRequest = {
+      email: 'synthetic.owner@example.test',
+      clientContext: { environment: 'staging' },
+    };
+    const result = await client.recoverProFormDraftByEmail(emailRequest);
+    expect(invoke).toHaveBeenCalledWith(PRO_DRAFT_RECOVERY_FUNCTION_NAMES.email, {
+      ...emailRequest,
+      apiVersion: 1,
+    });
+    expect(result.otherEligibleDraftsAvailable).toBe(true);
+    expect(JSON.stringify(result)).not.toContain('must-not-escape@example.test');
+    expect(client.getDiagnostics()).toMatchObject({
+      storesRecoveryEmail: false,
+      sendsEmail: false,
+      verifiesEmailOwnership: false,
+    });
+  });
+
+  it('lists a safe allowlist and selects an exact choice', async () => {
+    const invoke = vi.fn()
+      .mockResolvedValueOnce({ data: {
+        ...choicesSuccess,
+        email: 'must-not-escape@example.test',
+      } })
+      .mockResolvedValueOnce({ data: serverSuccess });
+    const client = createProDraftRecoveryApiClient({
+      client: { functions: { invoke } },
+      runtimeConfig: runtime(),
+    });
+    const authorization = { recoverySessionToken: 't'.repeat(43) };
+    const listed = await client.listProFormDraftRecoveryChoices(authorization);
+    expect(listed).toEqual(choicesSuccess);
+    expect(JSON.stringify(listed)).not.toMatch(/email|hash|token/iu);
+    const selection = {
+      recoverySessionToken: 't'.repeat(43),
+      selectedDraftId: 'draft-synthetic-code-2',
+    };
+    const selected = await client.selectProFormDraftRecoveryChoice(selection);
+    expect(selected).toEqual(serverSuccess);
+    expect(invoke).toHaveBeenNthCalledWith(
+      1,
+      PRO_DRAFT_RECOVERY_FUNCTION_NAMES.listChoices,
+      { ...authorization, apiVersion: 1 },
+    );
+    expect(invoke).toHaveBeenNthCalledWith(
+      2,
+      PRO_DRAFT_RECOVERY_FUNCTION_NAMES.selectChoice,
+      { ...selection, apiVersion: 1 },
+    );
+  });
+
+  it('allows only an explicit nonproduction staging test override', async () => {
+    const disabled = harness({ data: serverSuccess }, {
+      publicEmailRecoveryEnabled: false,
+    });
+    expect((await disabled.client.recoverProFormDraftByEmail({ email: 'x@y.test' })).success)
+      .toBe(false);
+    expect(disabled.invoke).not.toHaveBeenCalled();
+
+    const invoke = vi.fn(async () => ({ data: serverSuccess }));
+    const stagingClient = createProDraftRecoveryApiClient({
+      client: { functions: { invoke } },
+      runtimeConfig: runtime({ publicEmailRecoveryEnabled: false }),
+      stagingTestOverride: true,
+    });
+    expect((await stagingClient.selectProFormDraftRecoveryChoice({
+      recoverySessionToken: 't'.repeat(43),
+      selectedDraftId: 'draft-synthetic-code-1',
+    })).success).toBe(true);
+    expect(invoke).toHaveBeenCalledOnce();
+
+    const productionInvoke = vi.fn(async () => ({ data: serverSuccess }));
+    const productionClient = createProDraftRecoveryApiClient({
+      client: { functions: { invoke: productionInvoke } },
+      runtimeConfig: runtime({
+        environment: 'production',
+        publicEmailRecoveryEnabled: false,
+      }),
+      stagingTestOverride: true,
+    });
+    expect((await productionClient.recoverProFormDraftByEmail({ email: 'x@y.test' })).success)
+      .toBe(false);
+    expect(productionInvoke).not.toHaveBeenCalled();
   });
 });

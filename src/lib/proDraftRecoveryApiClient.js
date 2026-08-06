@@ -7,6 +7,12 @@ import {
 
 export const PRO_DRAFT_RECOVERY_API_CLIENT_VERSION = 1;
 export const PRO_DRAFT_RECOVERY_FUNCTION_NAME = 'recoverProFormDraftByCode';
+export const PRO_DRAFT_RECOVERY_FUNCTION_NAMES = Object.freeze({
+  code: PRO_DRAFT_RECOVERY_FUNCTION_NAME,
+  email: 'recoverProFormDraftByEmail',
+  listChoices: 'listProFormDraftRecoveryChoices',
+  selectChoice: 'selectProFormDraftRecoveryChoice',
+});
 
 const GENERIC_MESSAGE =
   'We could not recover a questionnaire with the information provided.';
@@ -43,7 +49,7 @@ function safeDate(value) {
     : null;
 }
 
-function success(body) {
+function success(body, { includeOtherEligible = false } = {}) {
   if (!isPlainObject(body) || body.success !== true
     || body.recoveryCompleted !== true
     || typeof body.requestId !== 'string'
@@ -80,57 +86,123 @@ function success(body) {
     recoverySessionToken: body.recoverySessionToken,
     recoverySessionExpiresAt: body.recoverySessionExpiresAt,
     draft,
+    ...(includeOtherEligible
+      ? { otherEligibleDraftsAvailable: body.otherEligibleDraftsAvailable === true }
+      : {}),
   });
 }
 
-function enabled(runtimeConfig) {
-  return isDurableDraftClientEnabled(runtimeConfig)
-    && isPublicEmailRecoveryClientEnabled(runtimeConfig);
+function choice(value) {
+  if (!isPlainObject(value) || typeof value.draftId !== 'string'
+    || !SAFE_DRAFT_ID.test(value.draftId)) return null;
+  return Object.freeze({
+    draftId: value.draftId,
+    status: typeof value.status === 'string' ? value.status : 'active',
+    readOnly: value.readOnly === true,
+    businessNameDisplay: typeof value.businessNameDisplay === 'string'
+      ? value.businessNameDisplay : null,
+    createdAt: safeDate(value.createdAt),
+    lastSavedAt: safeDate(value.lastSavedAt),
+    draftGeneration: Number.isSafeInteger(value.draftGeneration)
+      && value.draftGeneration >= 0 ? value.draftGeneration : null,
+    isCurrentSelection: value.isCurrentSelection === true,
+  });
+}
+
+function choicesSuccess(body) {
+  if (!isPlainObject(body) || body.success !== true
+    || typeof body.requestId !== 'string' || !SAFE_REQUEST_ID.test(body.requestId)
+    || !Array.isArray(body.choices) || body.choices.length > 25) return null;
+  const choices = body.choices.map(choice);
+  if (choices.some((item) => item === null)) return null;
+  return Object.freeze({
+    success: true,
+    requestId: body.requestId,
+    choices: Object.freeze(choices),
+  });
+}
+
+function enabled(runtimeConfig, stagingTestOverride) {
+  if (!isDurableDraftClientEnabled(runtimeConfig)) return false;
+  if (isPublicEmailRecoveryClientEnabled(runtimeConfig)) return true;
+  return stagingTestOverride === true
+    && ['local', 'test', 'staging'].includes(runtimeConfig?.environment);
 }
 
 export function createProDraftRecoveryApiClient({
   client = base44,
   runtimeConfig = frontendRuntimeConfig,
+  stagingTestOverride = false,
 } = {}) {
   const invoke = client?.functions?.invoke;
   const available = typeof invoke === 'function';
+  const featureEnabled = enabled(runtimeConfig, stagingTestOverride);
+  const invokeRecovery = async (functionName, request) => {
+    if (!featureEnabled || !available || !isPlainObject(request)) {
+      return { body: null, failure: failure() };
+    }
+    const input = Object.freeze({
+      ...request,
+      apiVersion: PRO_DRAFT_RECOVERY_API_CLIENT_VERSION,
+    });
+    try {
+      const response = await invoke.call(client.functions, functionName, input);
+      const body = isPlainObject(response) && isPlainObject(response.data)
+        ? response.data : null;
+      return { body, failure: body ? null : failure() };
+    } catch (error) {
+      const body = isPlainObject(error?.response)
+        && isPlainObject(error.response.data) ? error.response.data : {};
+      return { body: null, failure: failure(body) };
+    }
+  };
   return Object.freeze({
     async recoverProFormDraftByCode(request) {
-      if (!enabled(runtimeConfig) || !available || !isPlainObject(request)) {
-        return failure();
-      }
-      const input = Object.freeze({
-        ...request,
-        apiVersion: PRO_DRAFT_RECOVERY_API_CLIENT_VERSION,
-      });
-      try {
-        const response = await invoke.call(
-          client.functions,
-          PRO_DRAFT_RECOVERY_FUNCTION_NAME,
-          input,
-        );
-        const body = isPlainObject(response) && isPlainObject(response.data)
-          ? response.data
-          : null;
-        if (!body) return failure();
-        if (body.success === true) return success(body) ?? failure(body);
-        return failure(body);
-      } catch (error) {
-        const body = isPlainObject(error?.response)
-          && isPlainObject(error.response.data)
-          ? error.response.data
-          : {};
-        return failure(body);
-      }
+      const result = await invokeRecovery(PRO_DRAFT_RECOVERY_FUNCTION_NAMES.code, request);
+      if (!result.body) return result.failure;
+      return result.body.success === true
+        ? success(result.body) ?? failure(result.body) : failure(result.body);
+    },
+    async recoverProFormDraftByEmail(request) {
+      const result = await invokeRecovery(PRO_DRAFT_RECOVERY_FUNCTION_NAMES.email, request);
+      if (!result.body) return result.failure;
+      return result.body.success === true
+        ? success(result.body, { includeOtherEligible: true }) ?? failure(result.body)
+        : failure(result.body);
+    },
+    async listProFormDraftRecoveryChoices(request) {
+      const result = await invokeRecovery(
+        PRO_DRAFT_RECOVERY_FUNCTION_NAMES.listChoices,
+        request,
+      );
+      if (!result.body) return result.failure;
+      return result.body.success === true
+        ? choicesSuccess(result.body) ?? failure(result.body)
+        : failure(result.body);
+    },
+    async selectProFormDraftRecoveryChoice(request) {
+      const result = await invokeRecovery(
+        PRO_DRAFT_RECOVERY_FUNCTION_NAMES.selectChoice,
+        request,
+      );
+      if (!result.body) return result.failure;
+      return result.body.success === true
+        ? success(result.body) ?? failure(result.body)
+        : failure(result.body);
     },
     getDiagnostics() {
       return Object.freeze({
         version: PRO_DRAFT_RECOVERY_API_CLIENT_VERSION,
         functionName: PRO_DRAFT_RECOVERY_FUNCTION_NAME,
+        functionNames: PRO_DRAFT_RECOVERY_FUNCTION_NAMES,
         available,
-        enabled: enabled(runtimeConfig),
+        enabled: featureEnabled,
+        stagingTestOverride: stagingTestOverride === true,
         storesRecoveryCode: false,
+        storesRecoveryEmail: false,
         storesRecoverySessionToken: false,
+        sendsEmail: false,
+        verifiesEmailOwnership: false,
         dispatchesReduxActions: false,
       });
     },
@@ -141,6 +213,18 @@ export const proDraftRecoveryApiClient = createProDraftRecoveryApiClient();
 
 export function recoverProFormDraftByCode(request) {
   return proDraftRecoveryApiClient.recoverProFormDraftByCode(request);
+}
+
+export function recoverProFormDraftByEmail(request) {
+  return proDraftRecoveryApiClient.recoverProFormDraftByEmail(request);
+}
+
+export function listProFormDraftRecoveryChoices(request) {
+  return proDraftRecoveryApiClient.listProFormDraftRecoveryChoices(request);
+}
+
+export function selectProFormDraftRecoveryChoice(request) {
+  return proDraftRecoveryApiClient.selectProFormDraftRecoveryChoice(request);
 }
 
 export function getSafeProDraftRecoveryApiClientDiagnostics(
