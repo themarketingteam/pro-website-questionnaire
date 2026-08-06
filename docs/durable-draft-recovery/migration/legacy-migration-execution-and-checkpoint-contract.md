@@ -72,3 +72,12 @@ No `npx base44` command, schema push, function deployment, secret operation,
 record read/write, production access, or remote Git push occurred. Live
 staging RLS, real-data dry run, interruption rehearsal, reconciliation,
 operator review, retention execution, and reverse migration remain required.
+
+## 2026-08-06 staging certification attempt
+
+The [combined staging report](./staging-legacy-migration-and-retention-certification.md)
+is **LEGACY_MIGRATION_AND_RETENTION_FAILED**. Local focused migration tests
+passed, but the full normal suite failed and triggered the mandatory hard
+stop. No Base44 authentication, secret, entity, function, checkpoint, record,
+dry run, apply, duplicate resolution, rollback, cleanup, production action, or
+remote push occurred. This contract remains source-only.

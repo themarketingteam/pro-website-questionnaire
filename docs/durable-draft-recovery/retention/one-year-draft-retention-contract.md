@@ -111,3 +111,12 @@ dry-run review, and production authorization remain release blockers.
 This increment executed no Base44 command, schema push, function deploy,
 secret operation, data query, deletion, scheduled job, branch push, or
 production operation.
+
+## 2026-08-06 staging certification attempt
+
+The [combined staging report](../migration/staging-legacy-migration-and-retention-certification.md)
+is **LEGACY_MIGRATION_AND_RETENTION_FAILED**. The 48-test retention suite
+passed, but the full normal suite failed and stopped the workflow before
+staging authentication, configuration, deployment, fixtures, dry run,
+test-only apply, scheduling, RLS inspection, or cleanup. No record was read or
+deleted, and this policy remains uncertified in staging.

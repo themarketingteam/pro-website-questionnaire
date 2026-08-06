@@ -435,3 +435,14 @@ certifications are not passing and the primary checkout is production-linked.
 No readiness item is promoted. No counts, entity push, denial attack, backend
 flow, browser matrix, regression, or cleanup query ran. The decision remains
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
+
+## 2026-08-06 legacy migration and retention certification attempt
+
+The [combined report](../migration/staging-legacy-migration-and-retention-certification.md)
+is **LEGACY_MIGRATION_AND_RETENTION_FAILED**. Focused source gates passed, but
+`npm test` failed 3 of 1,975 tests. Staging checkout update, fingerprint,
+target guard, authentication, secrets, retention values, entity/function
+deployment, fixtures, live certification, cleanup, and push were not entered.
+
+No checklist item is promoted. The decision remains
+**STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.

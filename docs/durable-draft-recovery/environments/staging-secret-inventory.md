@@ -269,3 +269,12 @@ was created. `PRO_FORM_ADMIN_GRANT_SECRET` presence was not freshly queried,
 and none of the nine version/rate/lockout/timing values was configured or
 changed. Existing names-only staging and production inventories were not
 refreshed or mutated.
+
+## 2026-08-06 migration and retention staging certification attempt
+
+The attempt stopped at the full normal source suite. Neither
+`PRO_FORM_MIGRATION_APPLY_SECRET` nor `PRO_FORM_RETENTION_APPLY_SECRET` was
+generated, configured, queried, printed, copied, or deleted. The five ordinary
+retention values were not set. No temporary owner-only environment file was
+created, so no file deletion was required. Existing staging and production
+names-only inventories were not refreshed or changed.

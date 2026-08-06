@@ -556,3 +556,16 @@ The separate apply secret is unconfigured and no Base44 operation or deletion
 occurred. Live filter/RLS behavior, backup/restore proof, alert delivery,
 reviewed staging dry run, and all production approval remain pending, so this
 is source evidence only and not staging or release acceptance.
+
+## 2026-08-06 legacy migration and retention staging hard stop
+
+The [combined certification report](../migration/staging-legacy-migration-and-retention-certification.md)
+is **LEGACY_MIGRATION_AND_RETENTION_FAILED**. Focused migration, duplicate,
+retention, checkpoint, admin, and RLS gates passed, but the full normal suite
+failed 3 of 1,975 tests. The required stop occurred before every Base44,
+staging checkout, secret, schema, function, fixture, apply, rollback,
+retention, security-probe, cleanup, and push action.
+
+`DR-MIG-001`, `DR-MIG-002`, `DR-MIG-003`, `DR-RET-001`, `DR-RLS-001`, and
+`DR-OBS-001` receive no staging acceptance. Resume/idempotency and test-only
+deletion were not observed live.

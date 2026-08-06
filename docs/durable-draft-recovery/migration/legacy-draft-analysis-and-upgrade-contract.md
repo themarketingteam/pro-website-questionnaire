@@ -176,3 +176,11 @@ accessed or changed by this implementation.
 No `npx base44` command ran. No Base44 client was constructed and no cloud,
 record, schema, function, secret, deployment, feature-branch push, or `main`
 operation occurred.
+
+## 2026-08-06 combined staging attempt
+
+The [combined staging report](./staging-legacy-migration-and-retention-certification.md)
+is **LEGACY_MIGRATION_AND_RETENTION_FAILED**. Focused legacy analysis and
+migration tests passed, but the full normal suite failed before authentication,
+deployment, fixture creation, upgrade execution, or cleanup. This upgrade
+contract therefore has no new live-staging evidence.

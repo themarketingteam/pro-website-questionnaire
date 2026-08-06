@@ -38,3 +38,10 @@ This section is documentation only; do not execute it from this source task.
 Setting `PRO_FORM_DRAFT_RETENTION_DRY_RUN=false` is never sufficient authority
 for scheduled apply. Initial cleanup remains manual; unattended destructive
 automation is prohibited.
+
+## 2026-08-06 migration/retention attempt status
+
+The source gate failed before this runbook could be used. Every migration,
+duplicate, rollback, retention, security, and cleanup step above remains a
+placeholder. Do not execute it until all normal source gates pass and a new
+staging-only authorization verifies the target guard.

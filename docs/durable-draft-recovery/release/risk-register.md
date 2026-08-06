@@ -605,3 +605,12 @@ unattended apply.
 or deleted and live Base44 filters, RLS, backup restore, alerts, report review,
 and failure reconciliation are unproved. No secret, schema, function,
 automation, record, production resource, or remote branch changed.
+
+## 2026-08-06 combined migration/retention staging hard stop
+
+The combined staging attempt failed at the full source suite after all focused
+migration/retention/security gates passed. `RISK-010`, `RISK-011`, `RISK-016`,
+`RISK-019`, and `RISK-025` remain open at their existing ratings because no
+live checkpoint, apply/resume, duplicate, rollback, retention, RLS, or cleanup
+evidence was gathered. The hard stop prevented all Base44 and production
+operations, so no risk is lowered or closed.
