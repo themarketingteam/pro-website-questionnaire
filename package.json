@@ -25,6 +25,7 @@
     "test:recovery-email-service": "npm run test:manifest && vitest run --config src/vitest.config.js src/test/proDraftRecoveryEmailService.test.js src/test/sendProFormDraftRecoveryCodeEmail.test.js --reporter=dot --no-coverage",
     "test:replacement-selection": "npm run test:manifest && vitest run --config src/vitest.config.js src/test/proDraftReplacementEmailSelection.test.js src/test/proDraftIdentity.test.js --reporter=dot --no-coverage",
     "test:admin-no-direct-entities": "node scripts/validate-admin-recovery-no-direct-entity-access.mjs",
+    "test:no-sensitive-frontend-entities": "node scripts/validate-sensitive-entity-access.mjs",
     "test:save-concurrency": "npm run test:manifest && vitest run --config src/vitest.config.js src/test/saveProFormDraft.test.js src/test/proDraftRepository.test.js src/test/proDraftSaveEvents.integration.test.js --reporter=dot --no-coverage",
     "test:ci": "npm run test:manifest && vitest run --config src/vitest.config.js --reporter=dot --no-coverage",
     "test:manifest": "node scripts/validate-test-manifest.mjs",

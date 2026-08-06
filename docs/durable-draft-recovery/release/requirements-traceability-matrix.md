@@ -1,5 +1,19 @@
 # Durable Draft Recovery Requirements Traceability Matrix
 
+## 2026-08-06 backend-only sensitive entity access evidence
+
+| Requirement | Source evidence | Test evidence | Status |
+|---|---|---|---|
+| Production browser cannot access sensitive entities directly | Policy JSON, AST/bundle validator, retired legacy draft/event paths | Static validator and focused guard tests | Locally tested; staging/RLS pending |
+| Browser E2E fails on direct sensitive entity transport | Shared redacting Playwright route guard | Harness 95/95; guarded submission/PDF 85/85 | Locally tested |
+| Kill switch cannot fall back to legacy direct CRUD | `ProDraftServiceUnavailable`, V2-only questionnaire transport | Kill-switch/cache-preservation tests | Locally tested |
+| Function invocation remains the frontend server boundary | Draft sync/admin API clients and questionnaire function calls | API/handler guard tests | Locally tested |
+| Restrictive entity RLS | Deferred by prompt; no schema edits | None in this increment | Open/release-blocking |
+
+The complete evidence and command outcomes are recorded in the
+[backend-only access policy](../security/backend-only-sensitive-entity-access-policy.md).
+No deployment or production change occurred.
+
 ## 2026-08-06 admin recovery UI source evidence
 
 The password-only admin recovery UI now uses the persistent grant lifecycle

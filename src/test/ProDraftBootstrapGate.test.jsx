@@ -111,10 +111,14 @@ describe('ProDraftBootstrapGate', () => {
     expect(screen.queryByRole('button', { name: 'Questionnaire child' })).not.toBeInTheDocument();
   });
 
-  it('preserves the legacy flow exactly when V2 is disabled', () => {
+  it('fails closed with controlled recovery UX when V2 is disabled', () => {
     const subject = coordinator();
     renderGate({ enabled: false, subject });
-    expect(screen.getByRole('button', { name: 'Questionnaire child' })).toBeVisible();
+    expect(screen.getByRole('heading', {
+      name: 'Questionnaire Saving Is Temporarily Unavailable',
+    })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Questionnaire child' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open Draft Recovery' })).toBeVisible();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(subject.bootstrap).not.toHaveBeenCalled();
   });

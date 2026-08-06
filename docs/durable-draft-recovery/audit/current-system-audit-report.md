@@ -1,5 +1,22 @@
 # Current Draft System Audit Report
 
+## 2026-08-06 backend-only sensitive entity access addendum
+
+The production frontend no longer contains direct CRUD/event transport for
+`ProFormDraft`, `ProFormDraftEvent`, `ProFormRecoverySecurityEvent`,
+`ProFormEmailVerificationAttempt`, or `ProFormSubmissionIntake`. Questionnaire draft
+traffic is backend-function-only when durable V2 is enabled; disabled or
+killed V2 now renders a controlled service-unavailable/recovery state without
+clearing local state. A policy-driven AST/bundle validator and shared
+Playwright request guard fail closed on regression. The historical direct-call
+descriptions below remain audit evidence for the pre-remediation revision and
+are superseded for current source by the
+[backend-only access policy](../security/backend-only-sensitive-entity-access-policy.md).
+
+This is local source evidence, not RLS or deployed staging certification.
+Entity schemas/RLS were not changed, and no cloud deployment or production
+operation occurred.
+
 ## 2026-08-06 backend administration addendum
 
 Source now provides five backend-only recovery administration functions plus a shared persistent-grant request boundary and bounded service. Retry and AI repair use the same environment/version/device-bound grant and no longer trust Base44 admin login, frontend role flags, or the legacy password-derived grant. Approved projections omit credential/idempotency hashes; edit keys are allowlisted, revision-checked, idempotent, submitted-lock aware, and audited. The current admin UI intentionally remains unmigrated, so its direct entity calls are a next-prompt release gap. No deployment, schema push, production access, or external delivery occurred.

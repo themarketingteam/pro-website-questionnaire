@@ -5,7 +5,6 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
 import { createQuestionnaireStore } from '@/components/store/store';
 import { loadInitialState } from '@/components/store/formSlice';
-import { createFindExistingDraftBySessionId } from '@/lib/draftPersistence';
 import { createResilientStorage } from '@/lib/resilientStorage';
 import {
   buildQuestionnaireStorageKey,
@@ -270,24 +269,6 @@ describe('baseline characterization: questionnaire mutation bypasses', () => {
     vi.useRealTimers();
   });
 
-  it('[BC-CLEAR-002][DR-CLEAR-001] can rediscover the old server draft because the session ID is unchanged', async () => {
-    const draftRecordIdRef = { current: '' };
-    const filter = vi.fn().mockResolvedValue([{
-      id: 'synthetic-old-draft',
-      session_id: 'synthetic-stable-session',
-      responses_json: JSON.stringify({ '6': 'Synthetic old answer' }),
-    }]);
-    const findExistingDraft = createFindExistingDraftBySessionId({ draftRecordIdRef });
-
-    const found = await findExistingDraft({
-      sessionId: await storage.getItem(SESSION_STORAGE_KEY),
-      entities: { ProFormDraft: { filter } },
-    });
-
-    expect(found.id).toBe('synthetic-old-draft');
-    expect(filter).toHaveBeenCalledWith({ session_id: 'synthetic-stable-session' });
-  });
-
   it('[BC-COND-001][DR-MUT-001][DR-SAVE-001] cleans hidden child browser state but cancels the queued server snapshot', async () => {
     store.dispatch(loadInitialState(completeFormState({
       responses: { '1': 'yes', '1.1': 'Synthetic child answer' },
@@ -319,7 +300,7 @@ describe('baseline characterization: questionnaire mutation bypasses', () => {
     expect(base44.entities.ProFormDraft.filter).not.toHaveBeenCalled();
     expect(base44.entities.ProFormDraft.create).not.toHaveBeenCalled();
     expect(base44.entities.ProFormDraft.update).not.toHaveBeenCalled();
-    expect(base44.entities.ProFormDraftEvent.create).toHaveBeenCalled();
+    expect(base44.entities.ProFormDraftEvent.create).not.toHaveBeenCalled();
 
     vi.useRealTimers();
     await persistor.flush();

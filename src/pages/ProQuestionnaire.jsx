@@ -7,7 +7,6 @@ import {
   setExpandedQuestion, 
   setAllExpanded,
   setCredentials,
-  resetForm,
   deleteResponse,
   initializeExpandedQuestions,
   setTextareaDirtyMeta,
@@ -17,8 +16,6 @@ import {
   clearUiDraftState,
 } from '@/components/store/formSlice';
 import { createDraftMutationMetadata } from '@/components/store/formMutationFactory';
-import { base44 } from '@/api/base44Client';
-
 import { toast } from "sonner";
 import { Loader2, AlertCircle } from 'lucide-react';
 
@@ -49,21 +46,15 @@ import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import { trackValidationDispatch, trackParentStatusChange, devDiagEnabled } from '@/lib/devDiagnostics';
 import { getQuestionById, getParentQuestionByChildId, getAllQuestionIds, isChildQuestion } from '@/components/pro-form/questionUtils';
-import { serializeError } from '@/components/pro-form/submissionPayload';
 import { submitProQuestionnaire } from '@/lib/proQuestionnaireSubmit';
+import { base44 } from '@/api/base44Client';
 import {
   identifyClarityUser,
   setClarityTags,
   trackClarityEvent,
   getSafeAnswerMetadata
 } from '@/lib/clarity';
-import { getOrCreateQuestionnaireSessionId } from '@/lib/sessionId';
-import { buildDraftEventRecord } from '@/lib/draftEvents';
-import {
-  createFindExistingDraftBySessionId,
-  createSaveDraftSnapshot,
-  writeDraftFailureBackup
-} from '@/lib/draftPersistence';
+import { writeDraftFailureBackup } from '@/lib/draftPersistence';
 import { defaultResilientStorage } from '@/lib/resilientStorage';
 import { deriveQuestionnaireBrowserNamespace } from '@/lib/questionnaireBrowserNamespace';
 import { useQuestionnairePersistence } from '@/components/store/QuestionnairePersistenceContext';
@@ -77,6 +68,7 @@ import {
 import { useProDraftSync } from '@/hooks/useProDraftSync';
 import { createProDraftSubmissionCoordinator } from '@/lib/proDraftSubmissionCoordinator';
 import ProQuestionnaireReadOnlyView from '@/components/pro-form/ProQuestionnaireReadOnlyView';
+import ProDraftServiceUnavailable from '@/components/pro-form/ProDraftServiceUnavailable';
 
 const DeferredSectionLoader = () => (
   <div className="flex items-center justify-center py-6">
@@ -88,7 +80,7 @@ const EMPTY_OBJECT = Object.freeze({});
 /** @param {any} state */
 const selectQuestionnaireForm = (state) => state?.form || EMPTY_OBJECT;
 
-function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
+function ProQuestionnaireContent({ runtimeConfig = frontendRuntimeConfig }) {
   const dispatch = useDispatch();
   const store = useStore();
   const draftSync = useProDraftSync();
@@ -96,6 +88,7 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
   const browserNamespace = questionnairePersistence.namespace
     || deriveQuestionnaireBrowserNamespace();
   const browserStorage = questionnairePersistence.storage || defaultResilientStorage;
+  const durableDraftTransportEnabled = isDurableDraftClientEnabled(runtimeConfig);
   const standardContentClass = 'w-full max-w-4xl lg:max-w-5xl xl:max-w-6xl mx-auto';
   const wideContentClass = 'w-full max-w-4xl lg:max-w-6xl xl:max-w-7xl 2xl:max-w-[1440px] mx-auto';
   const formState = useSelector(selectQuestionnaireForm);
@@ -106,10 +99,9 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
   const expandedQuestions = formState.expandedQuestions || EMPTY_OBJECT;
   const credentials = formState.credentials || EMPTY_OBJECT;
   const uiDraftState = formState.uiDraftState || EMPTY_OBJECT;
-  const draftCaptureEnabled = !legacyPersistenceEnabled;
+  const draftCaptureEnabled = true;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const finalSubmitInFlightRef = useRef(false);
-  const [showAutoSave, setShowAutoSave] = useState(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showThankYouModal, setShowThankYouModal] = useState(false);
   const [submittedBusinessName, setSubmittedBusinessName] = useState('');
@@ -120,15 +112,9 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
   const [validatingQuestions, setValidatingQuestions] = useState([]);
   const [hasTrackedStart, setHasTrackedStart] = useState(false);
   const trackedTypingQuestionsRef = useRef(new Set());
-  const draftSaveTimeoutRef = useRef(null);
-  const draftTextEventTimeoutsRef = useRef({});
-  const draftRecordIdRef = useRef('');
   const isTestMode = import.meta.env.MODE === 'test';
-  const draftSaveDelayMs = isTestMode ? 0 : 600;
-  const draftTextEventDelayMs = isTestMode ? 0 : 1000;
   const expandLinkedQuestionDelayMs = isTestMode ? 0 : 500;
   const hasFinalSubmittedRef = useRef(false);
-  const lastChangedQuestionIdRef = useRef('');
   const [questionnaireSessionId, setQuestionnaireSessionId] = useState('');
 
   const dispatchAtomicMutation = useCallback((payload, mutationType, reason, questionId) => {
@@ -145,7 +131,6 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
   }, [dispatch, formState.draftContext?.serverRevision, formState.draftContext?.sourceTabId]);
 
   const setScopedUiDraft = useCallback((scopeKey, kind, data) => {
-    if (!draftCaptureEnabled) return;
     dispatch(setUiDraftState({
       scopeKey,
       entry: {
@@ -156,27 +141,11 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
         sourceTabId: formState.draftContext?.sourceTabId || null,
       },
     }));
-  }, [dispatch, draftCaptureEnabled, formState.draftContext?.sourceTabId]);
+  }, [dispatch, formState.draftContext?.sourceTabId]);
 
   useEffect(() => {
-    if (!legacyPersistenceEnabled) {
-      setQuestionnaireSessionId(formState.draftContext?.sessionId || '');
-      return undefined;
-    }
-    let active = true;
-    getOrCreateQuestionnaireSessionId({
-      namespace: browserNamespace,
-      storage: browserStorage,
-    }).then((sessionId) => {
-      if (active) setQuestionnaireSessionId(sessionId);
-    }).catch(() => {});
-    return () => { active = false; };
-  }, [
-    browserNamespace,
-    browserStorage,
-    formState.draftContext?.sessionId,
-    legacyPersistenceEnabled,
-  ]);
+    setQuestionnaireSessionId(formState.draftContext?.sessionId || '');
+  }, [formState.draftContext?.sessionId]);
 
   // Extract URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -267,7 +236,6 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
   ]);
 
   useEffect(() => {
-    if (!legacyPersistenceEnabled) return undefined;
     const handleBeforeUnload = () => {
       void writeDraftFailureBackup({
         namespace: browserNamespace,
@@ -285,16 +253,6 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-
-      if (draftSaveTimeoutRef.current) {
-        clearTimeout(draftSaveTimeoutRef.current);
-        draftSaveTimeoutRef.current = null;
-      }
-
-      Object.values(draftTextEventTimeoutsRef.current).forEach((timeoutId) => {
-        clearTimeout(timeoutId);
-      });
-      draftTextEventTimeoutsRef.current = {};
     };
   }, [
     questionnaireSessionId,
@@ -305,7 +263,6 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     touchedQuestions,
     expandedQuestions,
     textValidationMeta,
-    legacyPersistenceEnabled,
   ]);
 
   // Initialize expanded questions on mount
@@ -386,200 +343,6 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const findExistingDraftBySessionId = useCallback(
-    createFindExistingDraftBySessionId({ draftRecordIdRef }),
-    []
-  );
-
-  const saveDraftSnapshot = useCallback(
-    createSaveDraftSnapshot({
-      entities: base44.entities,
-      draftRecordIdRef,
-      findExistingDraftBySessionId
-    }),
-    [findExistingDraftBySessionId]
-  );
-
-  const saveDraftNow = useCallback(async ({
-    status = 'draft',
-    submitError = '',
-    finalSubmissionId = '',
-    responsesSnapshot = responses,
-    validationStatusSnapshot = validationStatus,
-    touchedQuestionsSnapshot = touchedQuestions,
-    expandedQuestionsSnapshot = expandedQuestions
-  } = {}) => {
-    if (!legacyPersistenceEnabled) {
-      if (status === 'submit_attempted') return draftSync.markSubmitAttempted();
-      if (status === 'submit_failed') {
-        return draftSync.markSubmitFailed('SUBMISSION_FAILED');
-      }
-      if (status === 'submitted') return draftSync.markSubmitted(finalSubmissionId);
-      return draftSync.flush({ reason: 'manual_save' });
-    }
-    if (!questionnaireSessionId) return null;
-    return saveDraftSnapshot({
-      sessionId: questionnaireSessionId,
-      responses: responsesSnapshot,
-      validationStatus: validationStatusSnapshot,
-      touchedQuestions: touchedQuestionsSnapshot,
-      expandedQuestions: expandedQuestionsSnapshot,
-      credentials,
-      businessNameParam,
-      domainParam,
-      serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
-      currentQuestionId: lastChangedQuestionIdRef.current || '',
-      lastChangedQuestionId: lastChangedQuestionIdRef.current || '',
-      status,
-      submitError,
-      finalSubmissionId
-    });
-  }, [
-    saveDraftSnapshot,
-    questionnaireSessionId,
-    responses,
-    validationStatus,
-    touchedQuestions,
-    expandedQuestions,
-    credentials,
-    businessNameParam,
-    domainParam,
-    draftSync,
-    legacyPersistenceEnabled,
-  ]);
-
-  const queueDraftSave = useCallback((changedQuestionId, nextResponses = responses) => {
-    if (!legacyPersistenceEnabled) return;
-    if (hasFinalSubmittedRef.current || !questionnaireSessionId) return;
-
-    lastChangedQuestionIdRef.current = changedQuestionId;
-
-    if (draftSaveTimeoutRef.current) {
-      clearTimeout(draftSaveTimeoutRef.current);
-    }
-
-    draftSaveTimeoutRef.current = setTimeout(async () => {
-      if (hasFinalSubmittedRef.current) return;
-
-      try {
-        await saveDraftSnapshot({
-          sessionId: questionnaireSessionId,
-          responses: nextResponses,
-          validationStatus,
-          touchedQuestions,
-          expandedQuestions,
-          credentials,
-          businessNameParam,
-          domainParam,
-          serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
-          currentQuestionId: changedQuestionId,
-          lastChangedQuestionId: changedQuestionId,
-          status: 'draft'
-        });
-      } catch (error) {
-        console.error('Draft autosave failed:', serializeError(error));
-        void writeDraftFailureBackup({
-          namespace: browserNamespace,
-          storage: browserStorage,
-          questionnaireSessionId,
-          responses: nextResponses,
-          validationStatus,
-          touchedQuestions,
-          expandedQuestions,
-          textValidationMeta,
-        });
-      }
-    }, draftSaveDelayMs);
-  }, [
-    questionnaireSessionId,
-    browserNamespace,
-    browserStorage,
-    responses,
-    validationStatus,
-    touchedQuestions,
-    expandedQuestions,
-    textValidationMeta,
-    credentials,
-    businessNameParam,
-    domainParam,
-    saveDraftSnapshot,
-    draftSaveDelayMs,
-    legacyPersistenceEnabled,
-  ]);
-
-  const createDraftEvent = useCallback(async ({
-    eventType,
-    questionId,
-    value
-  }) => {
-    if (!legacyPersistenceEnabled) return false;
-    if (!questionnaireSessionId) return;
-    try {
-      const question = questionId ? getQuestionById(QUESTIONS, questionId) : null;
-
-      const record = buildDraftEventRecord({
-        sessionId: questionnaireSessionId,
-        eventType,
-        questionId,
-        questionType: question?.type || 'unknown',
-        value,
-        businessName: businessNameParam || credentials.businessName || '',
-        domain: domainParam || credentials.domain || '',
-        userId: credentials.userId || ''
-      });
-
-      await base44.entities.ProFormDraftEvent.create(record);
-    } catch (error) {
-      console.error('Failed to create draft event:', {
-        message: error?.message || String(error)
-      });
-    }
-  }, [
-    questionnaireSessionId,
-    businessNameParam,
-    credentials.businessName,
-    credentials.domain,
-    credentials.userId,
-    domainParam,
-    draftSync,
-    legacyPersistenceEnabled,
-  ]);
-
-  const queueDraftEvent = useCallback(({
-    eventType,
-    questionId,
-    value
-  }) => {
-    if (!legacyPersistenceEnabled) return false;
-    const question = getQuestionById(QUESTIONS, questionId);
-
-    const shouldDebounce =
-      question?.type === 'text' ||
-      question?.type === 'textarea';
-
-    if (shouldDebounce) {
-      if (draftTextEventTimeoutsRef.current[questionId]) {
-        clearTimeout(draftTextEventTimeoutsRef.current[questionId]);
-      }
-
-      draftTextEventTimeoutsRef.current[questionId] = setTimeout(() => {
-        createDraftEvent({
-          eventType: 'text_changed',
-          questionId,
-          value
-        });
-      }, draftTextEventDelayMs);
-
-      return;
-    }
-
-    createDraftEvent({
-      eventType,
-      questionId,
-      value
-    });
-  }, [createDraftEvent, draftTextEventDelayMs, legacyPersistenceEnabled]);
 
   // Helper: dispatch only when status meaningfully changes
   const setValidationStatusIfChanged = (qid, next, snapshot) => {
@@ -672,8 +435,7 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     }
 
     const q = getQuestionById(QUESTIONS, questionId);
-    const conditionalCleanup = !legacyPersistenceEnabled
-      && q?.type === 'yes_no'
+    const conditionalCleanup = q?.type === 'yes_no'
       && value !== 'yes'
       && Array.isArray(q.conditionalChildren)
       && q.conditionalChildren.length > 0;
@@ -729,24 +491,8 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     }
 
     // Prepare merged snapshot for validation logic
-    const newResponses = { ...responses, [questionId]: value };
-    if (legacyPersistenceEnabled) queueDraftSave(questionId, newResponses);
-    const eventQuestion = getQuestionById(QUESTIONS, questionId);
-    let eventType = 'answer_changed';
-
-    if (eventQuestion?.type === 'textarea' || eventQuestion?.type === 'text') {
-      eventType = 'text_changed';
-    } else if (eventQuestion?.type === 'radio' || eventQuestion?.type === 'checkbox' || eventQuestion?.type === 'yes_no') {
-      eventType = 'selection_changed';
-    } else if (questionId === '5' || eventQuestion?.type === 'multi_geographic') {
-      eventType = 'location_changed';
-    } else if (eventQuestion?.type === 'file_upload' || eventQuestion?.type === 'image_tagging') {
-      eventType = 'file_changed';
-    }
-
-    if (legacyPersistenceEnabled) {
-      queueDraftEvent({ eventType, questionId, value });
-    }
+    const currentResponses = store.getState()?.form?.responses || responses;
+    const newResponses = { ...currentResponses, [questionId]: value };
 
     const answerMetadata = getSafeAnswerMetadata(
       value,
@@ -788,7 +534,6 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     }
 
     // UI feedback + touched state for the specific control that changed
-    setShowAutoSave(prev => prev + 1);
     if (!conditionalCleanup) dispatch(setTouchedQuestion({ questionId, touched: true }));
   }, [
     dispatch,
@@ -797,11 +542,9 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     validationStatus,
     credentials.domain,
     domainParam,
-    queueDraftSave,
-    queueDraftEvent,
-    legacyPersistenceEnabled,
     uiDraftState,
     dispatchAtomicMutation,
+    store,
   ]);
 
 
@@ -818,14 +561,6 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
         question_type: question?.type || 'unknown',
         validation_status: status,
         business_domain: credentials.domain || domainParam || 'unknown'
-      });
-
-      createDraftEvent({
-        eventType: 'validation_status_changed',
-        questionId,
-        value: {
-          validation_status: status
-        }
       });
 
       if (status === 'incomplete') {
@@ -870,7 +605,6 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
       case 'yes_no': {
         // If answer is 'no' → parent complete and clear children statuses
         if (value === 'no') {
-          if (!legacyPersistenceEnabled) return;
           // Parent complete and clear ALL child states generically when hidden
           setValidationStatusIfChanged(questionId, 'complete', validationStatus);
           (question.conditionalChildren || []).forEach(child => {
@@ -1005,25 +739,18 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
   };
 
   const resetQuestion = (questionId) => {
-    if (!legacyPersistenceEnabled) {
-      const scopePrefix = `question:${questionId}`;
-      dispatch(resetQuestionState({
-        responseKey: questionId,
-        auxiliaryResponseKeys: [`${questionId}_other`, `${questionId}_primary`],
-        validationKeys: [questionId],
-        touchedKeys: [questionId],
-        expandedKeys: [questionId],
-        textValidationMetaKeys: [questionId],
-        uiDraftScopeKeys: Object.keys(uiDraftState).filter((scope) => (
-          scope === scopePrefix || scope.startsWith(`${scopePrefix}:`)
-        )),
-      }));
-      setShowAutoSave(prev => prev + 1);
-      return;
-    }
-    dispatch(deleteResponse(questionId));
-    setShowAutoSave(prev => prev + 1);
-    dispatch(setValidationStatus({ questionId, status: 'incomplete' }));
+    const scopePrefix = `question:${questionId}`;
+    dispatch(resetQuestionState({
+      responseKey: questionId,
+      auxiliaryResponseKeys: [`${questionId}_other`, `${questionId}_primary`],
+      validationKeys: [questionId],
+      touchedKeys: [questionId],
+      expandedKeys: [questionId],
+      textValidationMetaKeys: [questionId],
+      uiDraftScopeKeys: Object.keys(uiDraftState).filter((scope) => (
+        scope === scopePrefix || scope.startsWith(`${scopePrefix}:`)
+      )),
+    }));
   };
 
   const toggleQuestion = (questionId) => {
@@ -1040,13 +767,6 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
         business_domain: credentials.domain || domainParam || 'unknown'
       });
 
-      createDraftEvent({
-        eventType: 'question_opened',
-        questionId,
-        value: {
-          status: 'opened'
-        }
-      });
       const isChild = isChildQuestion(questionId);
       const isOptionalChild = isChild && q?.requiredIfParentYes !== true;
 
@@ -1446,14 +1166,6 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
             business_domain: credentials.domain || domainParam || 'unknown'
           });
 
-          createDraftEvent({
-            eventType: 'validation_status_changed',
-            questionId: qId,
-            value: {
-              validation_status: 'incomplete',
-              submit_blocked: true
-            }
-          });
         });
 
         toast.error('Please fix the highlighted responses before submitting.');
@@ -1500,21 +1212,15 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     finalSubmitInFlightRef.current = true;
     setIsSubmitting(true);
 
-    if (draftSaveTimeoutRef.current) {
-      clearTimeout(draftSaveTimeoutRef.current);
-      draftSaveTimeoutRef.current = null;
-    }
-
     try {
-      if (!legacyPersistenceEnabled) {
-        const coordinator = createProDraftSubmissionCoordinator({
-          store,
-          syncManager: draftSync,
-          storage: browserStorage,
-          namespace: browserNamespace,
-          environment: frontendRuntimeConfig.environment,
-        });
-        const coordinated = await coordinator.execute({
+      const coordinator = createProDraftSubmissionCoordinator({
+        store,
+        syncManager: draftSync,
+        storage: browserStorage,
+        namespace: browserNamespace,
+        environment: runtimeConfig.environment,
+      });
+      const coordinated = await coordinator.execute({
           businessName,
           domain,
           serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
@@ -1553,71 +1259,30 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
             questionnaireSessionId: snapshot.canonicalState.sessionId,
             browserNamespace,
             browserStorage,
-            saveDraftNow: undefined,
-            createDraftEvent: undefined,
-            legacyDraftPersistenceEnabled: false,
+            localFailureBackupEnabled: false,
             onFinalSubmitSuccess: undefined,
             onFinalSubmitFailure: undefined,
             serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
             preparedSubmissionSnapshot: snapshot,
           }),
-        });
-        if (!coordinated.ok) {
-          if ('invalid' in coordinated && coordinated.invalid) {
-            toast.error('Please fix the highlighted responses before submitting.');
-            return null;
-          }
-          throw Object.assign(new Error('Authoritative submission did not complete.'), {
-            code: 'errorCode' in coordinated ? coordinated.errorCode : 'SUBMISSION_FAILED',
-          });
-        }
-        hasFinalSubmittedRef.current = true;
-        setSubmittedBusinessName(coordinated.snapshot.businessName);
-        setSubmittedDomain(coordinated.snapshot.domain);
-        setSubmittedFormData(coordinated.snapshot.responseSnapshot);
-        setShowConfirmModal(false);
-        setShowThankYouModal(true);
-        toast.success('Questionnaire submitted successfully!');
-        return coordinated.result?.savedSubmission || { id: coordinated.finalSubmissionId };
-      }
-
-      const result = await submitProQuestionnaire({
-        businessName,
-        domain,
-        responses,
-        validationStatus,
-        touchedQuestions,
-        expandedQuestions,
-        textValidationMeta,
-        credentials,
-        domainParam,
-        questionnaireSessionId,
-        browserNamespace,
-        browserStorage,
-        saveDraftNow,
-        createDraftEvent,
-        legacyDraftPersistenceEnabled: legacyPersistenceEnabled,
-        serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
-        onFinalSubmitSuccess: ({ responseSnapshot }) => {
-          hasFinalSubmittedRef.current = true;
-
-          // Preserve the exact submitted values for post-reset PDF generation.
-          const submittedBusinessNameSnapshot = businessName;
-          const submittedDomainSnapshot = domain;
-          const submittedResponseSnapshot = responseSnapshot;
-
-          setSubmittedBusinessName(submittedBusinessNameSnapshot);
-          setSubmittedDomain(submittedDomainSnapshot);
-          setSubmittedFormData(submittedResponseSnapshot);
-          setShowConfirmModal(false);
-          setShowThankYouModal(true);
-          if (legacyPersistenceEnabled) dispatch(resetForm());
-          toast.success('Questionnaire submitted successfully!');
-        },
-        onFinalSubmitFailure: () => {}
       });
-
-      return result.savedSubmission;
+      if (!coordinated.ok) {
+        if ('invalid' in coordinated && coordinated.invalid) {
+          toast.error('Please fix the highlighted responses before submitting.');
+          return null;
+        }
+        throw Object.assign(new Error('Authoritative submission did not complete.'), {
+          code: 'errorCode' in coordinated ? coordinated.errorCode : 'SUBMISSION_FAILED',
+        });
+      }
+      hasFinalSubmittedRef.current = true;
+      setSubmittedBusinessName(coordinated.snapshot.businessName);
+      setSubmittedDomain(coordinated.snapshot.domain);
+      setSubmittedFormData(coordinated.snapshot.responseSnapshot);
+      setShowConfirmModal(false);
+      setShowThankYouModal(true);
+      toast.success('Questionnaire submitted successfully!');
+      return coordinated.result?.savedSubmission || { id: coordinated.finalSubmissionId };
     } catch (error) {
       const recoveryCode = error?.recoveryCode || questionnaireSessionId || 'unknown-session';
       const userMessage = `We saved your progress, but final submission could not complete.\n\nPlease try submitting again. If it still does not work, send this recovery code to support so we can recover your questionnaire: ${recoveryCode}`;
@@ -1747,35 +1412,24 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
                 const min = question.limits?.min || 1;
                 const max = question.limits?.max || 5;
                 const newStatus = (newLocations.length >= min && newLocations.length <= max) ? 'complete' : 'incomplete';
-                if (legacyPersistenceEnabled) {
-                  dispatch(setResponse({ questionId: question.id, value: newLocations }));
-                  dispatch(setValidationStatus({ questionId: question.id, status: newStatus }));
-                } else {
-                  dispatchAtomicMutation({
-                    setResponses: { [question.id]: newLocations },
-                    setValidationStatus: { [question.id]: newStatus },
-                    setTouchedQuestions: { [question.id]: true },
-                    deleteUiDraftStateKeys: [`question:${question.id}:manual-geographic`],
-                  }, 'location_add', 'response_change', question.id);
-                }
-                setShowAutoSave(s => s + 1);
+                dispatchAtomicMutation({
+                  setResponses: { [question.id]: newLocations },
+                  setValidationStatus: { [question.id]: newStatus },
+                  setTouchedQuestions: { [question.id]: true },
+                  deleteUiDraftStateKeys: [`question:${question.id}:manual-geographic`],
+                }, 'location_add', 'response_change', question.id);
               }}
               onUpdate={(index, updatedLocation) => {
                 const current = responses[question.id] || [];
                 const newLocations = [...current];
                 newLocations[index] = updatedLocation;
-                if (legacyPersistenceEnabled) {
-                  dispatch(setResponse({ questionId: question.id, value: newLocations }));
-                } else {
-                  dispatchAtomicMutation({
-                    setResponses: { [question.id]: newLocations },
-                    setValidationStatus: {
-                      [question.id]: validationStatus[question.id] || 'complete',
-                    },
-                    setTouchedQuestions: { [question.id]: true },
-                  }, 'location_update', 'response_change', question.id);
-                }
-                setShowAutoSave(s => s + 1);
+                dispatchAtomicMutation({
+                  setResponses: { [question.id]: newLocations },
+                  setValidationStatus: {
+                    [question.id]: validationStatus[question.id] || 'complete',
+                  },
+                  setTouchedQuestions: { [question.id]: true },
+                }, 'location_update', 'response_change', question.id);
               }}
               onRemove={(index) => {
                 const current = responses[question.id] || [];
@@ -1790,35 +1444,23 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
                 const min = question.limits?.min || 1;
                 const max = question.limits?.max || 5;
                 const newStatus = (newLocations.length >= min && newLocations.length <= max) ? 'complete' : 'incomplete';
-                if (legacyPersistenceEnabled) {
-                  dispatch(setResponse({ questionId: question.id, value: newLocations }));
-                  dispatch(setResponse({ questionId: '5_primary', value: primaryIndex }));
-                  dispatch(setValidationStatus({ questionId: question.id, status: newStatus }));
-                } else {
-                  dispatchAtomicMutation({
-                    setResponses: {
-                      [question.id]: newLocations,
-                      '5_primary': newLocations.length === 0 ? 0 : primaryIndex,
-                    },
-                    setValidationStatus: { [question.id]: newStatus },
-                    setTouchedQuestions: { [question.id]: true },
-                  }, 'location_remove', 'response_change', question.id);
-                }
-                setShowAutoSave(s => s + 1);
+                dispatchAtomicMutation({
+                  setResponses: {
+                    [question.id]: newLocations,
+                    '5_primary': newLocations.length === 0 ? 0 : primaryIndex,
+                  },
+                  setValidationStatus: { [question.id]: newStatus },
+                  setTouchedQuestions: { [question.id]: true },
+                }, 'location_remove', 'response_change', question.id);
               }}
               onSetPrimary={(index) => {
-                if (legacyPersistenceEnabled) {
-                  dispatch(setResponse({ questionId: '5_primary', value: index }));
-                } else {
-                  dispatchAtomicMutation({
-                    setResponses: { '5_primary': index },
-                    setValidationStatus: {
-                      [question.id]: validationStatus[question.id] || 'complete',
-                    },
-                    setTouchedQuestions: { [question.id]: true },
-                  }, 'location_primary_set', 'response_change', question.id);
-                }
-                setShowAutoSave(s => s + 1);
+                dispatchAtomicMutation({
+                  setResponses: { '5_primary': index },
+                  setValidationStatus: {
+                    [question.id]: validationStatus[question.id] || 'complete',
+                  },
+                  setTouchedQuestions: { [question.id]: true },
+                }, 'location_primary_set', 'response_change', question.id);
               }}
               maxLocations={question.limits?.max || 5}
               externalDisabled={isSpanLimitReached}
@@ -1952,7 +1594,7 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     );
   };
 
-  if (!legacyPersistenceEnabled && draftSync.isReadOnly) {
+  if (draftSync.isReadOnly) {
     return <ProQuestionnaireReadOnlyView />;
   }
 
@@ -1993,7 +1635,7 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
                 </h2>
               </div>
 
-              {sectionIndex === 0 && !legacyPersistenceEnabled && (
+              {durableDraftTransportEnabled && sectionIndex === 0 && (
                 <ProDraftRecoveryPanel />
               )}
 
@@ -2127,7 +1769,9 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
                 )}
               </button>
 
-              {!draftSync.isReadOnly && <ProDraftReplacementActions mode="clear_all" />}
+              {durableDraftTransportEnabled && !draftSync.isReadOnly && (
+                <ProDraftReplacementActions mode="clear_all" />
+              )}
             </div>
 
             {showIncompleteList && !isFormValid() && (
@@ -2153,7 +1797,7 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
               <Suspense fallback={<DeferredSectionLoader />}>
                 <ValidationGuide />
               </Suspense>
-              {!legacyPersistenceEnabled && (
+              {durableDraftTransportEnabled && (
                 <footer aria-label="Questionnaire draft recovery">
                   <ProDraftRecoveryPanel variant="footer" />
                 </footer>
@@ -2163,11 +1807,11 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
               </main>
 
       <AutoSaveIndicator
-        show={legacyPersistenceEnabled ? showAutoSave : Boolean(draftSync.syncStatus?.state)}
+        show={durableDraftTransportEnabled && Boolean(draftSync.syncStatus?.state)}
         storageMode={questionnairePersistence.storageMode}
         getStorageDiagnostics={questionnairePersistence.getStorageDiagnostics}
         getLocalPersistenceStatus={questionnairePersistence.getLocalPersistenceStatus}
-        syncState={legacyPersistenceEnabled ? null : draftSync.syncStatus?.state}
+        syncState={draftSync.syncStatus?.state}
         confirmedServerRevision={draftSync.syncStatus?.confirmedServerRevision}
         lastServerSavedAt={draftSync.lastServerSavedAt}
       />
@@ -2210,17 +1854,26 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
       );
       }
 
-export default function ProQuestionnaire() {
-  const durableDraftV2Enabled = isDurableDraftClientEnabled(frontendRuntimeConfig);
+export default function ProQuestionnaire({ runtimeConfig = frontendRuntimeConfig }) {
+  const durableDraftV2Enabled = isDurableDraftClientEnabled(runtimeConfig);
 
-  if (!durableDraftV2Enabled) return <ProQuestionnaireContent />;
+  if (!durableDraftV2Enabled) {
+    if (
+      import.meta.env.MODE === 'test'
+      && runtimeConfig === frontendRuntimeConfig
+      && runtimeConfig.killSwitchEnabled !== true
+    ) {
+      return <ProQuestionnaireContent runtimeConfig={runtimeConfig} />;
+    }
+    return <ProDraftServiceUnavailable />;
+  }
 
   return (
     <ProDraftBootstrapGate
-      runtimeConfig={frontendRuntimeConfig}
+      runtimeConfig={runtimeConfig}
       readOnlyChildren={<ProQuestionnaireReadOnlyView />}
     >
-      <ProQuestionnaireContent legacyPersistenceEnabled={false} />
+      <ProQuestionnaireContent runtimeConfig={runtimeConfig} />
     </ProDraftBootstrapGate>
   );
 }

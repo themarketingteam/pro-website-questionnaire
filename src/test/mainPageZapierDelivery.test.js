@@ -68,8 +68,6 @@ describe('main-page Zapier delivery', () => {
       expandedQuestions: {},
       credentials: {},
       questionnaireSessionId: 'session-live-1',
-      saveDraftNow: vi.fn(async () => ({ id: 'draft-live-1' })),
-      createDraftEvent: vi.fn(async () => ({ id: 'event-live-1' })),
       onFinalSubmitSuccess,
     });
 
@@ -84,12 +82,8 @@ describe('main-page Zapier delivery', () => {
     expect(onFinalSubmitSuccess).toHaveBeenCalledOnce();
   });
 
-  it('uses only the injected V2 sync/event path and suppresses legacy draft entity writes', async () => {
+  it('does not accept or invoke legacy draft/event persistence callbacks', async () => {
     base44.functions.invoke.mockResolvedValue({ data: { success: true } });
-    const saveDraftNow = vi.fn(async ({ status }) => ({
-      id: status === 'submitted' ? 'submission-live-1' : 'draft-live-1',
-    }));
-    const createDraftEvent = vi.fn(async () => ({ accepted: true }));
 
     await submitProQuestionnaire({
       businessName: 'Live Client',
@@ -100,21 +94,8 @@ describe('main-page Zapier delivery', () => {
       expandedQuestions: {},
       credentials: {},
       questionnaireSessionId: 'session-live-1',
-      saveDraftNow,
-      createDraftEvent,
-      legacyDraftPersistenceEnabled: false,
     });
 
-    expect(saveDraftNow).toHaveBeenCalledWith(expect.objectContaining({
-      status: 'submit_attempted',
-    }));
-    expect(saveDraftNow).toHaveBeenCalledWith(expect.objectContaining({
-      status: 'submitted',
-      finalSubmissionId: 'submission-live-1',
-    }));
-    expect(createDraftEvent).toHaveBeenCalledWith(expect.objectContaining({
-      eventType: 'submitted',
-    }));
     expect(base44.entities.ProFormDraft.create).not.toHaveBeenCalled();
     expect(base44.entities.ProFormDraft.update).not.toHaveBeenCalled();
     expect(base44.entities.ProFormDraftEvent.create).not.toHaveBeenCalled();

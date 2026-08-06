@@ -8,6 +8,7 @@ import {
   canRunWriteTests,
   resolveE2ETarget,
 } from '../helpers/targetSafety.js';
+import { installSensitiveEntityNetworkGuard } from '../helpers/sensitiveEntityNetworkGuard.js';
 
 const target = resolveE2ETarget(process.env);
 
@@ -16,12 +17,19 @@ export const test = base.extend({
     const blockedRequests = await installReadOnlyNetworkPolicy(page, target);
     const consoleCapture = installConsoleCapture(page);
     const networkCapture = installNetworkCapture(page);
-    const capture = { blockedRequests, consoleCapture, networkCapture };
+    const sensitiveEntityGuard = installSensitiveEntityNetworkGuard(page);
+    const capture = {
+      blockedRequests,
+      consoleCapture,
+      networkCapture,
+      sensitiveEntityGuard,
+    };
 
     await use(capture);
 
     consoleCapture.stop();
     networkCapture.stop();
+    sensitiveEntityGuard.stop();
 
     await testInfo.attach('safe-console-summary.json', {
       body: Buffer.from(JSON.stringify(consoleCapture.safeSummary(), null, 2)),
@@ -30,11 +38,14 @@ export const test = base.extend({
     await testInfo.attach('safe-network-summary.json', {
       body: Buffer.from(JSON.stringify({
         ...networkCapture.safeSummary(),
+        ...sensitiveEntityGuard.safeSummary(),
         blockedRequestCount: blockedRequests.length,
         blockedRequests,
       }, null, 2)),
       contentType: 'application/json',
     });
+
+    sensitiveEntityGuard.assertNoViolations();
   }, { auto: true }],
 });
 

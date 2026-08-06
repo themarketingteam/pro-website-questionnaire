@@ -1,5 +1,24 @@
 # Staging Deployment Readiness Checklist
 
+## Backend-only sensitive entity boundary (2026-08-06)
+
+- [x] Remove production frontend direct access to all five sensitive entities.
+- [x] Route durable questionnaire and admin operations through backend functions.
+- [x] Fail closed with controlled recovery UX when V2 is disabled or killed.
+- [x] Add policy-driven AST, alias, exception-expiry, and built-output validation.
+- [x] Install a redacting sensitive-entity network guard in the shared Playwright fixture.
+- [x] Pass focused tests (60/60), harness tests (95/95), guarded browser submission/PDF tests (85/85), build, and source/bundle validation.
+- [ ] Resolve the three established normal-suite failures (1,806/1,809 passed).
+- [ ] Resolve or formally disposition repository lint/typecheck debt.
+- [ ] Apply and verify restrictive entity RLS in the separately authorized prompt.
+- [ ] Run credentialed staging browser/network certification against a verified target.
+- [ ] Obtain separate deployment authorization; this increment performed no deployment or push.
+
+Overall status remains **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT** and
+deployment authorization remains **DENIED**. See the
+[backend-only access policy](../security/backend-only-sensitive-entity-access-policy.md)
+for the exact command evidence and the terminated broad-matrix target mismatch.
+
 ## Backend admin recovery gate (2026-08-06)
 
 - [x] Source functions require persistent environment/version/device-bound grants.

@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "sensitiveEntities": [
+    "ProFormDraft",
+    "ProFormDraftEvent",
+    "ProFormRecoverySecurityEvent",
+    "ProFormEmailVerificationAttempt",
+    "ProFormSubmissionIntake"
+  ],
+  "sourceRoots": [
+    "src",
+    "tests/e2e",
+    "base44/functions",
+    "scripts/migrations"
+  ],
+  "allowedLocations": [
+    {
+      "pattern": "base44/functions/**",
+      "operations": ["*"],
+      "rule": "backend-service-role-only"
+    },
+    {
+      "pattern": "scripts/migrations/**",
+      "operations": ["create", "update", "filter", "list", "get", "delete", "bulkCreate", "updateMany", "access"],
+      "rule": "approved-migration-only"
+    },
+    {
+      "pattern": "src/test/**",
+      "operations": ["*"],
+      "rule": "approved-synthetic-test-mock"
+    },
+    {
+      "pattern": "tests/e2e/attack/**",
+      "operations": ["*"],
+      "rule": "approved-low-level-attack-test"
+    }
+  ],
+  "forbiddenLocations": [
+    {
+      "pattern": "src/**",
+      "operations": ["*"],
+      "rule": "no-sensitive-frontend-entity-access"
+    },
+    {
+      "pattern": "tests/e2e/**",
+      "operations": ["*"],
+      "rule": "no-sensitive-e2e-sdk-access"
+    }
+  ],
+  "builtOutput": {
+    "directory": "dist",
+    "extensions": [".js", ".mjs", ".cjs", ".html"]
+  },
+  "exemptions": []
+}

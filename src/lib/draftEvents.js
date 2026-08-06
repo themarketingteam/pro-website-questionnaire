@@ -48,7 +48,9 @@ export const getSelectedOptionCount = (value) => {
   return 0;
 };
 
-export const buildDraftEventRecord = ({
+// Pure compatibility fixture only. Production event persistence is owned by
+// proFormDraftSyncManager -> proDraftApiClient.appendProFormDraftEvents.
+export const buildLegacyDraftEventFixture = ({
   sessionId,
   eventType,
   questionId,

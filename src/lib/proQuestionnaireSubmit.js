@@ -8,13 +8,10 @@ import {
   createProFormSubmissionWithFallback,
   serializeSubmitError
 } from '@/lib/proSubmissionResilience';
-import { buildDraftEventRecord } from '@/lib/draftEvents';
 import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
 import { getSubmitDebugFailureMode, shouldSimulateSubmitFailure } from '@/lib/submitDebugFlags';
 import {
-  getSafeSubmitContext,
-  safeJsonStringify,
-  safeNowIso
+  getSafeSubmitContext
 } from '@/lib/browserSafety';
 import { defaultResilientStorage } from '@/lib/resilientStorage';
 import { deriveQuestionnaireBrowserNamespace } from '@/lib/questionnaireBrowserNamespace';
@@ -42,95 +39,6 @@ export const writeFailedSubmissionBackup = async ({
   expandedQuestions,
   textValidationMeta,
 });
-
-export const writeDraftFailureBackup = async ({
-  namespace = deriveQuestionnaireBrowserNamespace(),
-  storage = defaultResilientStorage,
-  questionnaireSessionId,
-  responses,
-  validationStatus,
-  touchedQuestions,
-  expandedQuestions,
-  textValidationMeta,
-}) => writeScopedDraftFailureBackup({
-  namespace,
-  storage,
-  questionnaireSessionId,
-  responses,
-  validationStatus,
-  touchedQuestions,
-  expandedQuestions,
-  textValidationMeta,
-});
-
-export const safeDraftSave = async ({
-  saveDraftNow,
-  namespace,
-  storage,
-  questionnaireSessionId,
-  responsesSnapshot,
-  validationStatusSnapshot,
-  touchedQuestionsSnapshot,
-  expandedQuestionsSnapshot,
-  textValidationMetaSnapshot,
-  options = {},
-  legacyDraftFailureBackupEnabled = true,
-}) => {
-  if (typeof saveDraftNow !== 'function') {
-    return null;
-  }
-
-  try {
-    return await saveDraftNow({
-      ...options,
-      responsesSnapshot,
-      validationStatusSnapshot,
-      touchedQuestionsSnapshot,
-      expandedQuestionsSnapshot
-    });
-  } catch (error) {
-    const serialized = serializeSubmitError(error);
-
-    console.error('Non-fatal draft save failed:', serialized);
-
-    if (legacyDraftFailureBackupEnabled) {
-      await writeDraftFailureBackup({
-        namespace,
-        storage,
-        questionnaireSessionId,
-        responses: responsesSnapshot,
-        validationStatus: validationStatusSnapshot,
-        touchedQuestions: touchedQuestionsSnapshot,
-        expandedQuestions: expandedQuestionsSnapshot,
-        textValidationMeta: textValidationMetaSnapshot
-      });
-    }
-
-    return null;
-  }
-};
-
-export const createDraftEventSafe = async ({
-  createDraftEvent,
-  eventType,
-  questionId = '',
-  value = {}
-}) => {
-  if (typeof createDraftEvent !== 'function') {
-    return null;
-  }
-
-  try {
-    return await createDraftEvent({
-      eventType,
-      questionId,
-      value
-    });
-  } catch (error) {
-    console.error('Non-fatal draft event failed:', serializeSubmitError(error));
-    return null;
-  }
-};
 
 const withClientTimeout = (promiseFactory, timeoutMs = 5000) => {
   let timeoutId;
@@ -301,9 +209,7 @@ export const submitProQuestionnaire = async ({
   questionnaireSessionId,
   browserNamespace = deriveQuestionnaireBrowserNamespace(),
   browserStorage = defaultResilientStorage,
-  saveDraftNow,
-  createDraftEvent,
-  legacyDraftPersistenceEnabled = true,
+  localFailureBackupEnabled = false,
   onFinalSubmitSuccess,
   onFinalSubmitFailure,
   serviceOptionsGrouped = {},
@@ -325,15 +231,8 @@ export const submitProQuestionnaire = async ({
   });
   const responseSnapshotMetadata = buildResponseSnapshotMetadata(responseSnapshot, validationStatus);
   const submitDebugMode = getSubmitDebugFailureMode();
-  const safeDraftSaveForSubmission = (options) => safeDraftSave({
-    namespace: browserNamespace,
-    storage: browserStorage,
-    textValidationMetaSnapshot: textValidationMeta,
-    legacyDraftFailureBackupEnabled: legacyDraftPersistenceEnabled,
-    ...options,
-  });
   const writeFailedSubmissionBackupForSubmission = (options) => (
-    legacyDraftPersistenceEnabled ? writeFailedSubmissionBackup({
+    localFailureBackupEnabled ? writeFailedSubmissionBackup({
       namespace: browserNamespace,
       storage: browserStorage,
       validationStatus,
@@ -346,34 +245,6 @@ export const submitProQuestionnaire = async ({
 
   const recordSubmitStage = async (stage, details = {}) => {
     const safeDetails = sanitizeStageDetails(details);
-
-    if (legacyDraftPersistenceEnabled) {
-      try {
-        const eventRecord = buildDraftEventRecord({
-          sessionId: questionnaireSessionId,
-          eventType: 'submit_stage',
-          questionId: stage,
-          questionType: 'submit_stage',
-          value: {
-            stage,
-            timestamp: safeNowIso(),
-            questionnaireSessionId,
-            businessName: businessName || '',
-            domain: resolvedDomain,
-            failureKind: safeDetails.failureKind || '',
-            usedFallback: Boolean(safeDetails.usedFallback),
-            ...safeDetails
-          },
-          businessName,
-          domain: resolvedDomain,
-          userId: credentials?.userId || credentials?.id || ''
-        });
-
-        await base44.entities.ProFormDraftEvent.create(eventRecord);
-      } catch {
-        // no-op
-      }
-    }
 
     try {
       trackClarityEvent(`pro_questionnaire_${stage}`, {
@@ -392,25 +263,6 @@ export const submitProQuestionnaire = async ({
   };
 
   await recordSubmitStage('submit_started');
-  await createDraftEventSafe({
-    createDraftEvent,
-    eventType: 'submit_attempted',
-    value: {
-      status: 'submit_attempted'
-    }
-  });
-
-  await safeDraftSaveForSubmission({
-    saveDraftNow,
-    questionnaireSessionId,
-    responsesSnapshot: responseSnapshot,
-    validationStatusSnapshot: validationStatus,
-    touchedQuestionsSnapshot: touchedQuestions,
-    expandedQuestionsSnapshot: expandedQuestions,
-    options: {
-      status: 'submit_attempted'
-    }
-  });
 
   let transformedPayload;
 
@@ -440,34 +292,6 @@ export const submitProQuestionnaire = async ({
     await recordSubmitStage('payload_transform_failed', {
       error: serializedError,
       failureKind: serializedError.failureKind
-    });
-
-    await createDraftEventSafe({
-      createDraftEvent,
-      eventType: 'submit_transform_failed',
-      value: {
-        stage: 'payload_transform_failed',
-        failureKind: serializedError.failureKind,
-        recovery_code: recoveryCode,
-        responseSnapshotMetadata
-      }
-    });
-
-    await safeDraftSaveForSubmission({
-      saveDraftNow,
-      questionnaireSessionId,
-      responsesSnapshot: responseSnapshot,
-      validationStatusSnapshot: validationStatus,
-      touchedQuestionsSnapshot: touchedQuestions,
-      expandedQuestionsSnapshot: expandedQuestions,
-      options: {
-        status: 'submit_failed',
-        submitError: safeJsonStringify({
-          stage: 'payload_transform_failed',
-          serializedError,
-          responseSnapshotMetadata
-        })
-      }
     });
 
     await writeFailedSubmissionBackupForSubmission({
@@ -589,34 +413,6 @@ export const submitProQuestionnaire = async ({
       failureKind: serializedError.failureKind
     });
 
-    await createDraftEventSafe({
-      createDraftEvent,
-      eventType: 'submit_validation_failed',
-      value: {
-        stage: 'payload_validation_failed',
-        failureKind: serializedError.failureKind,
-        recovery_code: recoveryCode,
-        responseSnapshotMetadata
-      }
-    });
-
-    await safeDraftSaveForSubmission({
-      saveDraftNow,
-      questionnaireSessionId,
-      responsesSnapshot: responseSnapshot,
-      validationStatusSnapshot: validationStatus,
-      touchedQuestionsSnapshot: touchedQuestions,
-      expandedQuestionsSnapshot: expandedQuestions,
-      options: {
-        status: 'submit_failed',
-        submitError: safeJsonStringify({
-          stage: 'payload_validation_failed',
-          serializedError,
-          responseSnapshotMetadata
-        })
-      }
-    });
-
     await writeFailedSubmissionBackupForSubmission({
       questionnaireSessionId,
       responseSnapshot,
@@ -722,28 +518,6 @@ export const submitProQuestionnaire = async ({
       serializedError: serialized
     });
 
-    await createDraftEventSafe({
-      createDraftEvent,
-      eventType: 'submit_failed_after_fallback',
-      value: {
-        status: 'submit_failed',
-        recovery_code: recoveryCode
-      }
-    });
-
-    await safeDraftSaveForSubmission({
-      saveDraftNow,
-      questionnaireSessionId,
-      responsesSnapshot: responseSnapshot,
-      validationStatusSnapshot: validationStatus,
-      touchedQuestionsSnapshot: touchedQuestions,
-      expandedQuestionsSnapshot: expandedQuestions,
-      options: {
-        status: 'submit_failed',
-        submitError: safeJsonStringify(serialized)
-      }
-    });
-
     await writeFailedSubmissionBackupForSubmission({
       questionnaireSessionId,
       responseSnapshot,
@@ -778,56 +552,6 @@ export const submitProQuestionnaire = async ({
 
   if (resilientSubmitResult.usedFallback) {
     await recordSubmitStage('fallback_success', { usedFallback: true });
-    await createDraftEventSafe({
-      createDraftEvent,
-      eventType: receivedViaIntake ? 'submit_received_via_intake' : 'submit_fallback_success',
-      value: {
-        status: 'submitted',
-        used_fallback: true,
-        received_via_intake: receivedViaIntake,
-        intake_id: intakeId,
-        final_submission_id: savedSubmission?.id || ''
-      }
-    });
-  }
-
-  await safeDraftSaveForSubmission({
-    saveDraftNow,
-    questionnaireSessionId,
-    responsesSnapshot: responseSnapshot,
-    validationStatusSnapshot: validationStatus,
-    touchedQuestionsSnapshot: touchedQuestions,
-    expandedQuestionsSnapshot: expandedQuestions,
-    options: {
-      status: 'submitted',
-      finalSubmissionId: savedSubmission?.id || ''
-    }
-  });
-
-  await createDraftEventSafe({
-    createDraftEvent,
-    eventType: 'submitted',
-    value: {
-      status: 'submitted',
-      final_submission_id: savedSubmission?.id || ''
-    }
-  });
-
-  if (receivedViaIntake) {
-    createDraftEventSafe({
-      createDraftEvent,
-      eventType: 'submit_received_via_intake',
-      value: {
-        status: 'received_intake',
-        intake_id: intakeId || resilientSubmitResult?.intakeId || '',
-        questionnaire_session_id: questionnaireSessionId || '',
-        business_name: businessName || '',
-        domain: domain || credentials?.domain || domainParam || '',
-        used_fallback: true,
-        zapier_skipped: true,
-        reason: 'Client was allowed to continue because a durable intake record was created instead of a final ProFormSubmission.'
-      }
-    });
   }
 
   let zapierDelivery = null;
@@ -836,46 +560,6 @@ export const submitProQuestionnaire = async ({
     // Fire-and-forget requests can be cancelled when the thank-you view replaces
     // the questionnaire immediately after submission on the published site.
     zapierDelivery = await sendZapierSafe(transformedPayload, { timeoutMs: 10000 });
-    if (!zapierDelivery.ok) {
-      await createDraftEventSafe({
-        createDraftEvent,
-        eventType: 'zapier_delivery_failed_after_submit',
-        value: {
-          status: 'zapier_failed',
-          final_submission_id: savedSubmission?.id || '',
-          failureKind: zapierDelivery.error?.failureKind || 'unknown',
-          zapier_suppressed: false,
-          zapier_redirected: false,
-          zapier_status: zapierDelivery.externalStatus
-        }
-      });
-    } else if (zapierDelivery.suppressed) {
-      await createDraftEventSafe({
-        createDraftEvent,
-        eventType: 'zapier_delivery_suppressed_after_submit',
-        value: {
-          status: 'zapier_suppressed',
-          final_submission_id: savedSubmission?.id || '',
-          environment: zapierDelivery.environment,
-          zapier_suppressed: true,
-          zapier_redirected: false,
-          zapier_status: null
-        }
-      });
-    } else if (zapierDelivery.redirected) {
-      await createDraftEventSafe({
-        createDraftEvent,
-        eventType: 'zapier_delivery_redirected_after_submit',
-        value: {
-          status: 'zapier_redirected',
-          final_submission_id: savedSubmission?.id || '',
-          environment: zapierDelivery.environment,
-          zapier_suppressed: false,
-          zapier_redirected: true,
-          zapier_status: zapierDelivery.externalStatus
-        }
-      });
-    }
   } else if (resilientSubmitResult.zapierSent) {
     zapierDelivery = {
       ok: true,

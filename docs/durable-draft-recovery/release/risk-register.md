@@ -1,5 +1,19 @@
 # Durable Draft Recovery Risk Register
 
+## 2026-08-06 direct sensitive entity access hardening
+
+| Risk | Control added | Residual / release gate |
+|---|---|---|
+| Browser bypasses backend authorization with direct sensitive-entity SDK calls | Legacy draft/event browser CRUD removed; policy-driven source and bundle validation forbids five sensitive entities | Restrictive cloud RLS and authorized staging proof remain release-blocking |
+| Refactor hides access behind alias, bracket, concatenation, or dynamic lookup | AST/alias validator and regression fixtures fail closed | Keep policy and built-output scan mandatory in CI |
+| Direct REST transport returns through E2E-only code | Shared Playwright guard rejects observed Base44 entity route shapes and redacts diagnostics | Credentialed staging network capture remains pending |
+| Kill switch silently restores unsafe legacy writes | Disabled/killed V2 pauses edits/writes and offers retry/recovery without clearing local state | Availability tradeoff accepted; blue application remains rollback point |
+
+Local static, focused, harness, build, and bounded browser gates passed. The
+normal suite retains three established failures, and repository lint/typecheck
+debt remains; risk ratings are therefore not promoted to production-certified.
+No RLS, cloud, production, domain, or delivery state changed.
+
 ## 2026-08-06 backend administration update
 
 | Risk | Control | Residual status |

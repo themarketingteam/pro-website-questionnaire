@@ -16,6 +16,7 @@ import ProDraftEntryModal from './ProDraftEntryModal';
 import { ProDraftSyncProvider } from '@/contexts/ProDraftSyncContext';
 import { ProDraftConflictProvider } from '@/contexts/ProDraftConflictContext';
 import ProDraftConflictDialog from './ProDraftConflictDialog';
+import ProDraftServiceUnavailable from './ProDraftServiceUnavailable';
 
 const PREPARING_PHASES = new Set([
   'idle',
@@ -163,8 +164,9 @@ const EnabledProDraftBootstrapGate = ({
 export default function ProDraftBootstrapGate({
   enabled = isDurableDraftClientEnabled(frontendRuntimeConfig),
   children,
+  disabledChildren = <ProDraftServiceUnavailable />,
   ...props
 }) {
-  if (!enabled) return children;
+  if (!enabled) return disabledChildren;
   return <EnabledProDraftBootstrapGate {...props}>{children}</EnabledProDraftBootstrapGate>;
 }
