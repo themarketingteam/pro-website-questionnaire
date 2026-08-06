@@ -87,6 +87,12 @@ The register's likelihood/severity columns describe the risk before planned cont
 | `RISK-031` | High | High | Browser/page-only wording is implemented/tested locally, but no deployed UI/network matrix or server-confirmed state exists; best-effort server-save paths remain. [DRAFT-013](../audit/current-defect-register.md#draft-013--autosave-wording-inaccurately-claims-secure-cookie-persistence). |
 | `RISK-032` | Low in source; unverified after deploy | Critical | Hardcoded production destination removed; policy/fake-adapter suite proves fail-closed selection and zero-fetch disabled/test/unknown paths. No real webhook or staging deployment was exercised. |
 
+### 2026-08-05 entity-extension staging attempt
+
+The [staging entity schema certification](../data/staging-entity-schema-certification.md) is **ENTITY_EXTENSIONS_BLOCKED**. Candidate `9ca8e6478facd6d5cfa1e2f51986ba12fc1a26d1` passed the 18/18 focused schema suite but failed 5 of 780 normal tests. The stop preserved the current risk posture: no staging schema push, type generation, CRUD, FLS test, questionnaire smoke, cleanup operation, production access, or feature-branch push occurred.
+
+`RISK-028` remains policy-unverified because actual public-versus-service-role FLS behavior was not tested. `RISK-029` remains high because the failing normal suite still covers geography and normalization behavior, alongside Q24 and recoverable-backup regressions. No risk is downgraded or accepted by this attempt.
+
 ## Knowingly accepted risks
 
 ### RISK-001: Public email-only recovery

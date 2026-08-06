@@ -255,3 +255,9 @@ No schema push is authorized by this plan. Before a later staging-only entity pu
 ## Local implementation action statement
 
 Prompts 2 and 3 edit only the four local entity schemas and their validation/planning artifacts. They add field-level admin restrictions without altering entity-level RLS. They do not create or read a record, generate types, push entities, deploy code, send email, run cleanup, invoke recovery, change a domain, or enable a feature.
+
+## Staging certification attempt
+
+The 2026-08-05 Prompt 4 attempt is classified **ENTITY_EXTENSIONS_BLOCKED**. On candidate `9ca8e6478facd6d5cfa1e2f51986ba12fc1a26d1`, dependency installation passed and the schema validator/focused suite passed 18/18, but the full normal suite failed 5 of 780 tests. The required hard stop fired before staging checkout update, authentication in that checkout, target guard, record inventory, entity push, type generation, CRUD, field-level-security testing, browser compatibility smoke, or cleanup.
+
+The four extended schemas therefore remain local-only. No staging or production entity was read or mutated, no deleted-entity count was observed, and no generated type or deployed compatibility claim is available. See the [blocked staging entity schema certification](staging-entity-schema-certification.md).
