@@ -151,3 +151,14 @@ Capture sanitized, dated evidence for:
 **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**
 
 The narrow backend result is **SECURITY_PRIMITIVES_CERTIFIED_IN_STAGING**. That classification authorizes no further deployment and does not change the overall **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT** decision. Five unrelated normal tests and broader entity/site/side-effect/data/browser/rollback gates remain incomplete. Do not run another Base44 deploy/push, production operation, OAuth authorization, data import, domain attachment, email, or webhook call without new exact authorization and passing applicable gates.
+
+### 2026-08-05 authoritative API attempt
+
+The [authoritative draft API report](../backend/staging-authoritative-draft-api-certification.md)
+is **AUTHORITATIVE_DRAFT_APIS_BLOCKED**. Focused client/backend tests passed,
+but the ordered full normal suite failed 5 of 1,160 tests. The source-gate hard
+stop occurred before staging checkout update, fingerprint collection, target
+guard, secret/flag configuration, schema push, function deployment, live API or
+concurrency checks, fixture creation/cleanup, and deployed frontend regression.
+No readiness item is promoted by this attempt, and the decision remains
+**STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.

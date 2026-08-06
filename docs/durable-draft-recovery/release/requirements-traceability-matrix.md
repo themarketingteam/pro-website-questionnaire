@@ -133,6 +133,16 @@ This overlay records baseline and feature-branch evidence. A historical characte
 | `DR-OBS-001` | Existing analytics/logging does not provide the required acknowledged-revision and recovery telemetry evidence. | [Audit report](../audit/current-system-audit-report.md) | — | Planned |
 | `DR-REL-001` | Non-deploying quality and manual staging-E2E workflow sources exist. Candidate `9ca8e64` passed 18/18 focused schema tests but failed 5 of 780 normal tests, correctly stopping before staging checkout update, guard, deployment, and feature-branch push. GitHub branch protection remains administrator-unverified; staging/green certification and disabled deployment have not occurred. | [Blocked entity-schema staging attempt](../data/staging-entity-schema-certification.md); [GitHub Actions controls](../testing/github-actions-and-branch-protection.md); [staging readiness checklist](../environments/staging-deployment-readiness-checklist.md); [implementation dependency map](../audit/implementation-dependency-map.md) | `npm run test:entity-schemas` pass; `npm test` fail; later release checks not run under hard-stop rule | Blocked before staging deployment |
 
+### 2026-08-05 authoritative API certification attempt
+
+The detached frontend client contract and its focused tests are implemented,
+but [live staging certification](../backend/staging-authoritative-draft-api-certification.md)
+is **AUTHORITATIVE_DRAFT_APIS_BLOCKED**. The ordered source gate stopped after
+the normal suite passed 1,155/1,160 tests. Consequently `DR-SAVE-001`,
+`DR-REV-001`, `DR-SUBTERM-001`, `DR-CONCUR-001`, and `DR-REL-001` receive no new
+environment evidence or certified status. No schema, function, flag, secret,
+data, or frontend deployment operation occurred.
+
 ## Coverage summary
 
 ### 2026-08-05 entity-extension staging evidence

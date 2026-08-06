@@ -127,6 +127,21 @@ service-role/FLS behavior, or deployed response/log confidentiality. Those are
 release blockers, so `RISK-005` and `RISK-006` retain their prior ratings. No
 schema, flag, frontend, production, email, domain, or deployment state changed.
 
+### 2026-08-05 authoritative API certification attempt
+
+The [authoritative API certification](../backend/staging-authoritative-draft-api-certification.md)
+is **AUTHORITATIVE_DRAFT_APIS_BLOCKED**. A detached, fail-closed frontend client
+contract passed its focused tests, but the full normal suite failed five
+existing questionnaire/submission-repair assertions and stopped the attempt
+before staging work. No live authorization, idempotency, submitted-lock,
+stored-record confidentiality, event deduplication, or Base44 conditional
+update proof was collected. `RISK-005`, `RISK-006`, `RISK-028`, `RISK-029`, and
+`RISK-030` retain their existing ratings; no risk is downgraded or accepted.
+
+No staging schema, secret, runtime flag, function, data, cleanup, or site state
+changed. Production and `main` were untouched, and the feature branch was not
+pushed.
+
 ## Knowingly accepted risks
 
 ### RISK-001: Public email-only recovery

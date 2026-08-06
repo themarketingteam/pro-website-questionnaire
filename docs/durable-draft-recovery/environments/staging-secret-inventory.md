@@ -138,3 +138,11 @@ Each value was generated independently from 48 random bytes with Node `crypto.ra
 Production remains names-only unchanged with its pre-existing four names. None of the six new names is configured there. No production value was copied. `DRAFT_RECOVERY_PASSWORD` was absent from staging, was not included in the import, and remains unchanged in production.
 
 Rotation of one purpose secret invalidates or changes only that purpose's derived hashes/tokens. Rotation therefore requires explicit versioning and a bounded compatibility/revocation plan; values must never be printed during validation or rotation.
+
+## 2026-08-05 authoritative API attempt
+
+The attempt stopped at the source gate before any secret operation. No
+`PRO_FORM_IDEMPOTENCY_SECRET` value was generated, imported, printed, or
+queried, and the prior names-only inventory was not changed. Its required
+staging presence and production absence remain to be proved during a future
+authorized attempt. No temporary environment file was created.

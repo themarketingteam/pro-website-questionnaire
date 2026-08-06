@@ -310,3 +310,19 @@ Before any public functions are created, staging certification must prove:
 6. event batching/deduplication and snapshot independence;
 7. no-store/request-ID envelopes and recursive sensitive-field scans;
 8. test-run isolation and no production data/external side effects.
+
+## 2026-08-05 frontend client and certification attempt
+
+`src/lib/proDraftApiClient.js` now provides a detached version-1 client contract
+for the four exact `base44.functions.invoke` names. It uses Web Crypto for
+bootstrap tokens and idempotency keys, sanitizes errors, exposes only safe
+diagnostics, performs no browser-storage or Redux operation, and has no current
+questionnaire integration. Calls remain disabled by the frontend V2 runtime
+flag except for an explicit, test-run-bound staging override.
+
+The associated source tests passed, but the aggregate normal suite failed five
+existing assertions and triggered the required hard stop. The
+[staging certification report](staging-authoritative-draft-api-certification.md)
+is therefore **AUTHORITATIVE_DRAFT_APIS_BLOCKED**. No schema, secret, flag,
+function, data, frontend deployment, or production state changed. All live
+requirements above remain pending.
