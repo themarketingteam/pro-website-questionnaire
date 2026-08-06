@@ -429,3 +429,9 @@ No risk is closed or lowered. The staging app, feature flags, entities,
 functions, secrets, records, SES, Zapier, domain, and production app were not
 operated on. No synthetic records were created, so no cleanup mutation was
 needed. No branch was pushed.
+
+## 2026-08-06 Clear All and Start New transaction source evidence
+
+The [transaction contract](../backend/clear-all-and-start-new-transaction-contract.md) reduces source-design uncertainty for `RISK-005`, `RISK-006`, `RISK-007`, `RISK-008`, and `RISK-029`. The implementation uses exact-draft scopes, expected revisions, purpose-keyed idempotency, pending/committed markers, no-delete retention, submitted-record immutability, stale-save-invalidating supersession, committed-only replacement email selection, one-time hashed credentials, and non-rollback email failures. Synthetic fault tests prove retry reuse rather than duplicate creation.
+
+No rating is lowered or risk closed. Live Base44 create/CAS/FLS behavior, multi-instance races, SES routing, operational pending repair, browser integration, and staging certification remain unproved. No schema/function was pushed, no cloud record or secret changed, no email was sent, no production/domain operation occurred, and no Git branch was pushed.

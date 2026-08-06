@@ -58,6 +58,13 @@ const FIELD_CATEGORIES = {
     'draft_generation',
     'previous_draft_id',
     'replacement_draft_id',
+    'replacement_transaction_id',
+    'replacement_transaction_status',
+    'replacement_transaction_started_at',
+    'replacement_transaction_completed_at',
+    'replacement_transaction_error_code',
+    'draft_origin',
+    'replacement_operation_idempotency_hash',
     'superseded_at',
     'superseded_reason',
     'status_version',
@@ -203,8 +210,8 @@ describe('ProFormDraft entity schema extension', () => {
     expect(Object.keys(draftPlan.existingFields)).toHaveLength(30);
   });
 
-  it('implements exactly the 64 optional protected fields with admin/backend FLS', () => {
-    expect(new Set(EXPECTED_NEW_FIELDS).size).toBe(64);
+  it('implements exactly the 71 optional protected fields with admin/backend FLS', () => {
+    expect(new Set(EXPECTED_NEW_FIELDS).size).toBe(71);
     expect([...draftPlan.proposedFields].sort()).toEqual([...EXPECTED_NEW_FIELDS].sort());
 
     for (const fieldName of EXPECTED_NEW_FIELDS) {

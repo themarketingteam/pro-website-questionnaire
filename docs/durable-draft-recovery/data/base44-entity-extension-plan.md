@@ -21,7 +21,7 @@ The four existing uppercase schema files remain the authoritative repository con
 3. `base44/entities/ProFormSubmission.jsonc`
 4. `base44/entities/ProFormSubmissionIntake.jsonc`
 
-They are not renamed. The local foundation now has 64 optional protected properties on `ProFormDraft`: the prior 60 extensions plus four recovery-email delivery diagnostics. Prompt 3 added 25 to `ProFormDraftEvent`, 16 to `ProFormSubmission`, and 18 to `ProFormSubmissionIntake`. The schemas retain every existing field, required array, nested submission object, enum/default, and entity-level RLS. Current public compatibility payloads remain valid, while every new field is restricted to admin read/write.
+They are not renamed. The local foundation now has 71 optional protected properties on `ProFormDraft`: the prior 64 extensions plus seven Clear All/Start New transaction fields. Prompt 3 added 25 to `ProFormDraftEvent`, 16 to `ProFormSubmission`, and 18 to `ProFormSubmissionIntake`. The schemas retain every existing field, required array, nested submission object, enum/default, and entity-level RLS. Current public compatibility payloads remain valid, while every new field is restricted to admin read/write.
 
 The manifest is deliberately stored under `docs/durable-draft-recovery/data`, outside `base44/entities`. It is strict JSON but is not a Base44 entity resource and cannot be included by an entity-directory push. No types are generated because these local schema changes are not pushed or deployed.
 
@@ -62,7 +62,7 @@ RLS/FLS and atomic one-time-consumption certification.
 
 | Entity | Existing top-level fields | Existing required array | Repository RLS/FLS | Current compatibility callers |
 | --- | ---: | --- | --- | --- |
-| `ProFormDraft` | 30 original + 64 local optional extensions | `session_id` | No entity RLS; all 64 new fields use admin read/write FLS | Public browser filter/create/update remains compatible; later backend service-role functions own new fields |
+| `ProFormDraft` | 30 original + 71 local optional extensions | `session_id` | No entity RLS; all 71 new fields use admin read/write FLS | Public browser filter/create/update remains compatible; later backend service-role functions own new fields |
 | `ProFormDraftEvent` | 12 original + 25 local optional extensions | `session_id` | No entity RLS; all new fields use admin read/write FLS | Public browser create remains compatible; later backend event append owns new fields |
 | `ProFormSubmission` | 2 original large objects + 16 local optional extensions | `metadata`, `userdata` | Existing creator/admin entity RLS unchanged; all new fields use admin read/write FLS | Existing submission payload remains compatible; trusted backend/migration owns linkage fields |
 | `ProFormSubmissionIntake` | 33 original + 18 local optional extensions | `questionnaire_session_id` | Existing admin-only entity RLS unchanged; all new fields use admin read/write FLS | Existing fallback/retry/repair behavior remains compatible |
@@ -140,7 +140,7 @@ The fields support ADR-002 initial full migration, overlapping incremental delta
 
 ## `ProFormDraft` local extension
 
-Implementation status: **64 optional fields implemented locally and not pushed**: 52 draft-specific fields plus the 12 common migration fields. All 64 use admin read/write FLS. Existing browser payloads remain valid because `session_id` is still the only required field.
+Implementation status: **71 optional fields implemented locally and not pushed**: 59 draft-specific fields plus the 12 common migration fields. All 71 use admin read/write FLS. Existing browser payloads remain valid because `session_id` is still the only required field. The latest seven fields support recoverable replacement transactions and incomplete-replacement email exclusion.
 
 ### Canonical state (7)
 

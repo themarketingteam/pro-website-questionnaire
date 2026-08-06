@@ -498,6 +498,10 @@ export function isDraftEligibleForAutomaticEmailRecovery(
     isValidLegacyDraft: isValidLegacyDraftRecord(value),
   });
   if (!ELIGIBLE_STATUS_SET.has(status)) return false;
+  if (value.replacement_transaction_status !== undefined
+    && value.replacement_transaction_status !== null
+    && value.replacement_transaction_status !== ''
+    && value.replacement_transaction_status !== 'committed') return false;
   if (hasValue(value.superseded_by_draft_id)) return false;
   if (status === 'cleared_superseded' && hasValue(value.replacement_draft_id)) {
     return false;

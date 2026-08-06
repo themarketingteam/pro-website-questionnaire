@@ -17,6 +17,8 @@ export const PRO_DRAFT_API_OPERATION_NAMES = Object.freeze({
   LOAD_DRAFT: 'load_draft',
   SAVE_DRAFT: 'save_draft',
   APPEND_EVENTS: 'append_events',
+  CLEAR_AND_REPLACE_DRAFT: 'clear_and_replace_draft',
+  START_NEW_DRAFT: 'start_new_draft',
 } as const);
 
 export const PRO_DRAFT_AUTHORIZATION_METHODS = Object.freeze({

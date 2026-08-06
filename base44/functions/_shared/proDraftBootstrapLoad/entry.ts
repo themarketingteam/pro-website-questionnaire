@@ -604,6 +604,7 @@ async function createNewDraft(
     form_type: 'pro-questionnaire',
     status: 'active',
     status_version: 1,
+    draft_origin: 'initial',
     draft_generation: 1,
     recovery_code_hash: recoveryCodeHash,
     recovery_code_version: recovery.version,

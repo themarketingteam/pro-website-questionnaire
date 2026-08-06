@@ -59,6 +59,7 @@ import {
   getBackendRuntimeConfig,
 } from '../proDraftRuntimeConfig/entry.ts';
 import { PRO_FORM_IDEMPOTENCY_SECRET } from '../proDraftBootstrapLoad/entry.ts';
+import { deliverProDraftRecoveryEmail } from '../proDraftRecoveryEmailService/entry.ts';
 
 export const PRO_DRAFT_RECOVERY_EMAIL_DELIVERY_VERSION = 1;
 export const MAX_RECOVERY_EMAIL_REQUEST_BYTES = 32 * 1024;
@@ -681,6 +682,47 @@ async function executeDelivery(
     now,
   );
   await requirePurposeRelationship(validated, draft, repository);
+
+  // Locally created replacement transactions use the same internal service as
+  // Clear All/Start New. Legacy records retain the prior delivery path until
+  // their transaction marker is migrated.
+  if (draft.replacement_transaction_status === 'committed'
+    && validated.purpose !== 'staging_self_check') {
+    const delivered = await deliverProDraftRecoveryEmail({
+      repository,
+      draft,
+      recoveryCode: validated.recoveryCode,
+      purpose: validated.purpose,
+      operationIdempotencyKey: validated.idempotencyKey,
+      requestId,
+      environment: runtime.environment,
+      now,
+      testRunId: validated.testRunId,
+    }, {
+      getEnvironmentValue: dependencies.getEnvironmentValue,
+      sendEmail: dependencies.sendEmail,
+      renderEmail: dependencies.renderEmail,
+    });
+    if (!delivered.attempted && !delivered.delivered) {
+      return fail(RECOVERY_EMAIL_DELIVERY_ERROR_CODES.RECOVERY_EMAIL_UNAVAILABLE, 422);
+    }
+    if (delivered.delivered) {
+      return successResponse(requestId, {
+        delivered: true,
+        redirected: delivered.redirected,
+        suppressed: false,
+        idempotent: delivered.idempotent,
+        deliveryUncertain: delivered.deliveryUncertain,
+        status: delivered.deliveryUncertain ? 'delivery_uncertain' : 'sent',
+        canRetry: false,
+        retryAfterSeconds: 0,
+      });
+    }
+    return fail(RECOVERY_EMAIL_DELIVERY_ERROR_CODES.DELIVERY_FAILED, 502, {
+      canRetry: delivered.canRetry,
+      deliveryUncertain: delivered.deliveryUncertain,
+    });
+  }
 
   const keyHash = await idempotencyHash(
     validated.draftId,

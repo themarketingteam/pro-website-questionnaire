@@ -377,3 +377,9 @@ verification, live idempotency/failure checks, record scans, and cleanup.
 This attempt adds failure evidence only. It does not advance `DR-EMAIL-001`,
 `DR-EMAIL-002`, `DR-RLS-001`, `DR-OBS-001`, `DR-SEC-001`, `DR-SEC-002`, or
 `DR-REL-001`. No environment or release requirement is newly certified.
+
+### 2026-08-06 Clear All and Start New transaction source
+
+The [transaction contract](../backend/clear-all-and-start-new-transaction-contract.md), seven protected entity fields, replacement/email services, two backend functions, repository compare-and-set additions, and 33 focused tests add local source evidence for `DR-CLEAR-001`, `DR-CLEAR-002`, `DR-ID-003`, `DR-EMAIL-002`, `DR-OBS-001`, and the stale-write portion of `DR-SAVE-001`. Clear All retains and supersedes only active/submit-failed sources; Start New performs no submitted-record write; partial transactions are retry-addressable and email-ineligible; one-time credentials are hashed-only at rest; and email failure does not roll back commit.
+
+This is source-only evidence. No entity schema or function was pushed, no Base44 app/data was mutated, no email was sent, no deployment occurred, and no UI was added. Live Base44 CAS, FLS, SES routing, and staging recovery remain uncertified; no requirement advances to staging or production acceptance.

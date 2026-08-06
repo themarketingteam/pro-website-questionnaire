@@ -63,6 +63,15 @@ export interface ConditionalDraftDeliveryMetadataUpdateInput {
   readonly changes: Readonly<Record<string, unknown>>;
 }
 
+export interface ConditionalDraftReplacementMetadataUpdateInput {
+  readonly draftId: string;
+  readonly expectedUpdatedDate: string;
+  readonly expectedStatus: string;
+  readonly expectedServerRevision: number;
+  readonly expectedTransactionStatus?: string;
+  readonly changes: Readonly<Record<string, unknown>>;
+}
+
 const ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/u;
 const HASH_PATTERN = /^[0-9a-f]{64}$/u;
 const STATUS_PATTERN = /^[a-z][a-z0-9_]{0,63}$/u;
@@ -78,6 +87,13 @@ const DELIVERY_METADATA_FIELDS = new Set([
   'recovery_email_delivery_purpose',
   'recovery_email_provider_message_id',
   'recovery_email_last_request_id',
+]);
+const REPLACEMENT_METADATA_FIELDS = new Set([
+  'replacement_draft_id',
+  'replacement_transaction_id',
+  'replacement_transaction_status',
+  'replacement_transaction_completed_at',
+  'replacement_transaction_error_code',
 ]);
 
 export class ProDraftRepositoryError extends Error {
@@ -276,6 +292,18 @@ export async function findDraftByBootstrapIdempotencyHash(
   return matches[0] ?? null;
 }
 
+export async function findReplacementDrafts(
+  repository: DraftRepository,
+  previousDraftId: unknown,
+  operationIdempotencyHash: unknown,
+): Promise<readonly DraftRecord[]> {
+  const repo = requireRepository(repository);
+  return safeRead(async () => Object.freeze(records(await repo.drafts.filter({
+    previous_draft_id: requireId(previousDraftId),
+    replacement_operation_idempotency_hash: requireHash(operationIdempotencyHash),
+  }, '-created_date', 2, 0))));
+}
+
 export async function createDraftRecord(
   repository: DraftRepository,
   data: unknown,
@@ -403,6 +431,65 @@ export async function conditionalUpdateDraftDeliveryMetadata(
       status: input.expectedStatus,
       server_revision: input.expectedServerRevision,
     }, { $set: { ...input.changes } });
+  } catch {
+    return repositoryError(PRO_DRAFT_REPOSITORY_ERROR_CODES.WRITE_FAILED, true);
+  }
+  if (!isPlainObject(result) || !Number.isSafeInteger(result.updated)) {
+    return repositoryError(
+      PRO_DRAFT_REPOSITORY_ERROR_CODES.CONDITIONAL_UPDATE_UNSUPPORTED,
+    );
+  }
+  if (result.updated === 0) {
+    return repositoryError(PRO_DRAFT_REPOSITORY_ERROR_CODES.CONDITIONAL_CONFLICT);
+  }
+  if (result.updated !== 1) {
+    return repositoryError(
+      PRO_DRAFT_REPOSITORY_ERROR_CODES.CONDITIONAL_UPDATE_UNSUPPORTED,
+    );
+  }
+  const accepted = await getDraftById(repo, draftId);
+  if (accepted.status !== input.expectedStatus
+    || accepted.server_revision !== input.expectedServerRevision
+    || Object.entries(input.changes).some(([field, value]) => accepted[field] !== value)) {
+    return repositoryError(
+      PRO_DRAFT_REPOSITORY_ERROR_CODES.CONDITIONAL_POST_READ_MISMATCH,
+    );
+  }
+  return accepted;
+}
+
+/** Compare-and-set replacement metadata without changing canonical revision/state. */
+export async function conditionalUpdateDraftReplacementMetadata(
+  repository: DraftRepository,
+  input: ConditionalDraftReplacementMetadataUpdateInput,
+): Promise<DraftRecord> {
+  const repo = requireRepository(repository);
+  if (!isPlainObject(input)
+    || typeof input.expectedUpdatedDate !== 'string'
+    || Number.isNaN(Date.parse(input.expectedUpdatedDate))
+    || !STATUS_PATTERN.test(input.expectedStatus)
+    || !Number.isSafeInteger(input.expectedServerRevision)
+    || input.expectedServerRevision < 0
+    || (input.expectedTransactionStatus !== undefined
+      && !STATUS_PATTERN.test(input.expectedTransactionStatus))
+    || !isPlainObject(input.changes)
+    || Object.keys(input.changes).length < 1
+    || Object.keys(input.changes).some((field) => !REPLACEMENT_METADATA_FIELDS.has(field))) {
+    return repositoryError(PRO_DRAFT_REPOSITORY_ERROR_CODES.INPUT_INVALID);
+  }
+  const draftId = requireId(input.draftId);
+  const query: Record<string, unknown> = {
+    id: draftId,
+    updated_date: input.expectedUpdatedDate,
+    status: input.expectedStatus,
+    server_revision: input.expectedServerRevision,
+  };
+  if (input.expectedTransactionStatus !== undefined) {
+    query.replacement_transaction_status = input.expectedTransactionStatus;
+  }
+  let result: unknown;
+  try {
+    result = await repo.drafts.updateMany(query, { $set: { ...input.changes } });
   } catch {
     return repositoryError(PRO_DRAFT_REPOSITORY_ERROR_CODES.WRITE_FAILED, true);
   }

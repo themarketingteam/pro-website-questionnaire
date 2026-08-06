@@ -382,6 +382,64 @@
         "write": { "user_condition": { "role": "admin" } }
       }
     },
+    "replacement_transaction_id": {
+      "type": "string",
+      "description": "Opaque backend-generated identifier binding every step of a Clear All or Start New replacement transaction",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "replacement_transaction_status": {
+      "type": "string",
+      "description": "Backend-managed replacement transaction status: pending, committed, orphaned, or failed",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "replacement_transaction_started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Server timestamp when the replacement transaction began",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "replacement_transaction_completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Server timestamp when the replacement transaction committed",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "replacement_transaction_error_code": {
+      "type": "string",
+      "description": "Safe bounded replacement failure code without credentials, PII, or exception details",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "draft_origin": {
+      "type": "string",
+      "description": "Backend-managed origin: initial, clear_all_replacement, or start_new_after_submission",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
+    "replacement_operation_idempotency_hash": {
+      "type": "string",
+      "description": "Backend-only keyed hash deduplicating a source draft replacement operation without storing the raw key",
+      "rls": {
+        "read": { "user_condition": { "role": "admin" } },
+        "write": { "user_condition": { "role": "admin" } }
+      }
+    },
     "superseded_at": {
       "type": "string",
       "format": "date-time",
