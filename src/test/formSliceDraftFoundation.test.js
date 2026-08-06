@@ -564,9 +564,13 @@ describe('controlled canonical hydration and explicit reset', () => {
       completedAt: '2026-08-05T14:00:00.000Z',
     }));
     expect(state.submittedReceipt).toEqual({
+      draftId: 'draft-2',
       finalSubmissionId: 'submission-2',
       submittedAt: '2026-08-05T13:00:00.000Z',
+      submittedStateHash: 'c'.repeat(64),
+      pdfSourceStateHash: 'd'.repeat(64),
       pdfAvailable: true,
+      submissionLockPending: false,
     });
     state = reducer(state, applyFormMutation({
       setResponses: { '6': 'Blocked edit' },

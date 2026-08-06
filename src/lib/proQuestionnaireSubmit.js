@@ -306,10 +306,14 @@ export const submitProQuestionnaire = async ({
   legacyDraftPersistenceEnabled = true,
   onFinalSubmitSuccess,
   onFinalSubmitFailure,
-  serviceOptionsGrouped = {}
+  serviceOptionsGrouped = {},
+  preparedSubmissionSnapshot = null,
 }) => {
-  const responseSnapshot = responses && typeof responses === 'object' && !Array.isArray(responses)
-    ? { ...responses }
+  const authoritativeResponses = preparedSubmissionSnapshot?.responseSnapshot || responses;
+  const responseSnapshot = authoritativeResponses
+    && typeof authoritativeResponses === 'object'
+    && !Array.isArray(authoritativeResponses)
+    ? { ...authoritativeResponses }
     : {};
   const recoveryCode = questionnaireSessionId || 'unknown-session';
   const resolvedDomain = domain || credentials?.domain || domainParam || 'unknown';
@@ -420,12 +424,13 @@ export const submitProQuestionnaire = async ({
       throw transformError;
     }
 
-    transformedPayload = transformResponsesToPayload(
-      responseSnapshot,
-      businessName,
-      domain,
-      serviceOptionsGrouped
-    );
+    transformedPayload = preparedSubmissionSnapshot?.mappedPayload
+      || transformResponsesToPayload(
+        responseSnapshot,
+        businessName,
+        domain,
+        serviceOptionsGrouped
+      );
     await recordSubmitStage('payload_transform_success', {
       payloadSizeChars: safePayloadSize(transformedPayload)
     });

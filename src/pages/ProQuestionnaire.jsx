@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
-import { useSelector, useDispatch } from 'react-redux';
+import { useSelector, useDispatch, useStore } from 'react-redux';
 import { 
   setResponse, 
   setValidationStatus, 
@@ -75,6 +75,8 @@ import {
   isDurableDraftClientEnabled,
 } from '@/lib/proDraftRuntimeConfig';
 import { useProDraftSync } from '@/hooks/useProDraftSync';
+import { createProDraftSubmissionCoordinator } from '@/lib/proDraftSubmissionCoordinator';
+import ProQuestionnaireReadOnlyView from '@/components/pro-form/ProQuestionnaireReadOnlyView';
 
 const DeferredSectionLoader = () => (
   <div className="flex items-center justify-center py-6">
@@ -88,6 +90,7 @@ const selectQuestionnaireForm = (state) => state?.form || EMPTY_OBJECT;
 
 function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
   const dispatch = useDispatch();
+  const store = useStore();
   const draftSync = useProDraftSync();
   const questionnairePersistence = useQuestionnairePersistence();
   const browserNamespace = questionnairePersistence.namespace
@@ -1503,6 +1506,81 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     }
 
     try {
+      if (!legacyPersistenceEnabled) {
+        const coordinator = createProDraftSubmissionCoordinator({
+          store,
+          syncManager: draftSync,
+          storage: browserStorage,
+          namespace: browserNamespace,
+          environment: frontendRuntimeConfig.environment,
+        });
+        const coordinated = await coordinator.execute({
+          businessName,
+          domain,
+          serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
+          validateFinal: async () => {
+            const finalValidationPassed = await runFinalValidations();
+            const latest = (/** @type {any} */ (store.getState()))?.form || {};
+            const firstInvalidQuestionId = QUESTIONS.find((question) => (
+              latest.validationStatus?.[question.id] === 'incomplete'
+              || latest.validationStatus?.[question.id] === 'needs_work'
+            ))?.id || null;
+            return {
+              valid: finalValidationPassed && isFormValid(),
+              validationStatus: latest.validationStatus || {},
+              touchedQuestions: latest.touchedQuestions || {},
+              expandedQuestions: latest.expandedQuestions || {},
+              textValidationMeta: latest.textValidationMeta || {},
+              firstInvalidQuestionId,
+            };
+          },
+          focusInvalidQuestion: (questionId) => {
+            if (!questionId) return;
+            setShowIncompleteList(true);
+            globalThis.document?.querySelector?.(`[data-question-id="${questionId}"]`)
+              ?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+          },
+          externalSubmit: (snapshot) => submitProQuestionnaire({
+            businessName: snapshot.businessName,
+            domain: snapshot.domain,
+            responses: snapshot.responseSnapshot,
+            validationStatus: snapshot.canonicalState.validationStatus,
+            touchedQuestions: snapshot.canonicalState.touchedQuestions,
+            expandedQuestions: snapshot.canonicalState.expandedQuestions,
+            textValidationMeta: snapshot.canonicalState.textValidationMeta,
+            credentials: snapshot.canonicalState.credentials,
+            domainParam,
+            questionnaireSessionId: snapshot.canonicalState.sessionId,
+            browserNamespace,
+            browserStorage,
+            saveDraftNow: undefined,
+            createDraftEvent: undefined,
+            legacyDraftPersistenceEnabled: false,
+            onFinalSubmitSuccess: undefined,
+            onFinalSubmitFailure: undefined,
+            serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
+            preparedSubmissionSnapshot: snapshot,
+          }),
+        });
+        if (!coordinated.ok) {
+          if ('invalid' in coordinated && coordinated.invalid) {
+            toast.error('Please fix the highlighted responses before submitting.');
+            return null;
+          }
+          throw Object.assign(new Error('Authoritative submission did not complete.'), {
+            code: 'errorCode' in coordinated ? coordinated.errorCode : 'SUBMISSION_FAILED',
+          });
+        }
+        hasFinalSubmittedRef.current = true;
+        setSubmittedBusinessName(coordinated.snapshot.businessName);
+        setSubmittedDomain(coordinated.snapshot.domain);
+        setSubmittedFormData(coordinated.snapshot.responseSnapshot);
+        setShowConfirmModal(false);
+        setShowThankYouModal(true);
+        toast.success('Questionnaire submitted successfully!');
+        return coordinated.result?.savedSubmission || { id: coordinated.finalSubmissionId };
+      }
+
       const result = await submitProQuestionnaire({
         businessName,
         domain,
@@ -1874,6 +1952,10 @@ function ProQuestionnaireContent({ legacyPersistenceEnabled = true }) {
     );
   };
 
+  if (!legacyPersistenceEnabled && draftSync.isReadOnly) {
+    return <ProQuestionnaireReadOnlyView />;
+  }
+
   return (
     <ErrorBoundary>
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
@@ -2136,7 +2218,7 @@ export default function ProQuestionnaire() {
   return (
     <ProDraftBootstrapGate
       runtimeConfig={frontendRuntimeConfig}
-      readOnlyActions={<ProDraftReplacementActions mode="start_new" />}
+      readOnlyChildren={<ProQuestionnaireReadOnlyView />}
     >
       <ProQuestionnaireContent legacyPersistenceEnabled={false} />
     </ProDraftBootstrapGate>

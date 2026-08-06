@@ -228,3 +228,13 @@ The critical ordering is parent response -> queued snapshot -> event -> validati
 ## Required mutation test families
 
 Every `T-MUT-*` test must assert the post-action Redux state, persisted browser JSON, draft record revision/payload, event record, final mapper result and PDF model result where applicable. Every `T-ATOM-*` test must deliberately pause between current dispatch/write steps to prove the inconsistent state and later certify the atomic replacement. Offline/close tests must run with fake timers plus a reload from both browser and server sources.
+## 2026-08-06 terminal submission additions
+
+| Mutation | Canonical write | Server acknowledgement | Terminal behavior |
+| --- | --- | --- | --- |
+| Final validation result | Atomic Redux validation/touched/expanded/text metadata | Required before continuation | Invalid remains editable; no external call |
+| Submit attempt | `draftStatus=submit_attempted` | Required | Failure prevents external call |
+| External failure | `draftStatus=submit_failed`, safe code | Retried by ordinary recovery policy | Answers/cache/vault retained |
+| External success | Final ID, timestamp, submitted/PDF hashes | Required submitted-status/hash match | Read-only; delayed ordinary writes rejected |
+| Final-lock partial failure | Safe receipt `submissionLockPending=true` | Retry lock only | External call is never automatically repeated |
+| Read-only/PDF action | No canonical mutation | None | Exact submitted hash/identity verification |

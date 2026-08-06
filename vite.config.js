@@ -40,6 +40,10 @@ export default defineConfig({
           process.cwd(),
           'tests/e2e/fixtures/pro-draft-replacement.html',
         ),
+        'pro-draft-submission': resolve(
+          process.cwd(),
+          'tests/e2e/fixtures/pro-draft-submission.html',
+        ),
       },
     },
   } : undefined,

@@ -308,3 +308,11 @@ No readiness item is promoted. Ordinary V2 server autosave was not migrated;
 no email, entity, function, secret, record, site, domain, connector, webhook,
 Base44 deployment, production action, or Git push occurred. The decision
 remains **STAGING_CREATED_NOT_READY_FOR_DEPLOYMENT**.
+## 2026-08-06 authoritative submission source checkpoint
+
+- [x] Final validation and `submit_attempted` require authoritative saves before external submission.
+- [x] Submitted state, safe receipt, read-only recovery, and exact-draft PDF source are implemented locally.
+- [x] External-success/final-lock partial failure does not duplicate external submission.
+- [x] Required focused and synthetic browser sources exist.
+- [ ] Live staging submission, intake, recovery, and PDF certification has not run.
+- [ ] Full repository gates must pass before any deployment authorization.

@@ -260,6 +260,7 @@ const publicStatus = (status) => Object.freeze({
   lastServerSavedAt: status.lastServerSavedAt,
   confirmedClientRevision: status.confirmedClientRevision,
   confirmedServerRevision: status.confirmedServerRevision,
+  confirmedStateHash: status.confirmedStateHash,
   isReadOnly: status.isReadOnly,
   hasConflict: status.hasConflict,
   conflictCount: status.conflictCount,
@@ -441,6 +442,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
     lastServerSavedAt: null,
     confirmedClientRevision: null,
     confirmedServerRevision: null,
+    confirmedStateHash: null,
     isReadOnly: false,
     hasConflict: false,
     conflictCount: 0,
@@ -796,7 +798,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
     );
   };
 
-  const scheduleRetry = (error) => {
+  const scheduleRetry = (error, runOptions = {}) => {
     const nextRetry = status.retryCount + 1;
     if (nextRetry > maxRetries) {
       attempt = null;
@@ -824,7 +826,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
     clearTimer(retryTimer);
     retryTimer = setTimer(() => {
       retryTimer = null;
-      void runSave({ reason: pendingReason, retry: true });
+      void runSave({ ...runOptions, reason: pendingReason, retry: true });
     }, delay);
     log('warn', 'save_retry_scheduled', { delay, errorCode });
     return publicStatus(status);
@@ -1007,7 +1009,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
       });
     }
     if (error?.retryable === true || Number(error?.status) >= 500 || Number(error?.status) === 0) {
-      return scheduleRetry(error);
+      return scheduleRetry(error, runOptions);
     }
     attempt = null;
     networkBlockState = DRAFT_SYNC_MANAGER_STATES.ERROR;
@@ -1083,7 +1085,8 @@ export const createProFormDraftSyncManager = (options = {}) => {
           syncReason,
           requestedStatus: prepared.canonical.draftStatus,
         });
-        if (operationGeneration !== lifecycleGeneration || status.disposed || status.locked) {
+        if (operationGeneration !== lifecycleGeneration || status.disposed
+          || (status.locked && runOptions.allowSubmitted !== true)) {
           return publicStatus(status);
         }
         validateAcceptedResponse(response, prepared.canonical, prepared.stateHash);
@@ -1094,9 +1097,21 @@ export const createProFormDraftSyncManager = (options = {}) => {
         dispatch(setDraftServerSaved({
           confirmedClientRevision: response.acceptedClientRevision,
           confirmedServerRevision: response.acceptedServerRevision,
+          confirmedStateHash: response.stateHash,
           lastServerSavedAt: savedAt,
         }));
         dispatch(setDraftStateHash(response.stateHash));
+        if (prepared.canonical.draftStatus === 'submitted') {
+          dispatch(setDraftSubmitted({
+            draftId: prepared.canonical.draftId,
+            finalSubmissionId: prepared.canonical.submission.finalSubmissionId,
+            submittedAt: prepared.canonical.submission.submittedAt,
+            submittedStateHash: response.stateHash,
+            pdfSourceStateHash: response.stateHash,
+            pdfAvailable: true,
+            submissionLockPending: false,
+          }));
+        }
         lastAcceptedSignature = prepared.signature;
         lastAcceptedBaseState = normalizeCanonicalDraftState({
           ...prepared.canonical,
@@ -1120,6 +1135,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
           lastServerSavedAt: savedAt,
           confirmedClientRevision: response.acceptedClientRevision,
           confirmedServerRevision: response.acceptedServerRevision,
+          confirmedStateHash: response.stateHash,
           hasConflict: false,
           conflictCount: 0,
           conflictRoundCount: 0,
@@ -1578,6 +1594,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
     if (!canonical) return publicStatus(status);
     const submittedAt = nowIso(clock);
     dispatch(setDraftSubmitted({
+      draftId: canonical.draftId,
       finalSubmissionId,
       submittedAt,
       pdfAvailable: true,
@@ -1586,15 +1603,30 @@ export const createProFormDraftSyncManager = (options = {}) => {
       clientRevision: Math.min(Number.MAX_SAFE_INTEGER, canonical.clientRevision + 1),
       serverRevision: canonical.serverRevision,
     }));
-    status.locked = true;
     status.isReadOnly = true;
-    networkBlockState = DRAFT_SYNC_MANAGER_STATES.SUBMITTED;
     const current = canonicalOrNull();
     if (current) {
       lastObservedRevision = current.clientRevision;
       lastObservedSignature = contentSignature(current);
     }
-    await saveImmediately('submitted', { force: true, allowSubmitted: true });
+    const saved = await saveImmediately('submitted', { force: true, allowSubmitted: true });
+    const accepted = saved.state === DRAFT_SYNC_MANAGER_STATES.SUBMITTED
+      && typeof saved.confirmedStateHash === 'string';
+    if (accepted) {
+      dispatch(setDraftSubmitted({
+        draftId: canonical.draftId,
+        finalSubmissionId,
+        submittedAt,
+        submittedStateHash: saved.confirmedStateHash,
+        pdfSourceStateHash: saved.confirmedStateHash,
+        pdfAvailable: true,
+        submissionLockPending: false,
+      }));
+    }
+    status.locked = true;
+    networkBlockState = accepted
+      ? DRAFT_SYNC_MANAGER_STATES.SUBMITTED
+      : DRAFT_SYNC_MANAGER_STATES.ERROR;
     try {
       conflictAdapter.broadcastTerminalStatus?.(Object.freeze({
         status: 'submitted',
@@ -1603,12 +1635,34 @@ export const createProFormDraftSyncManager = (options = {}) => {
       }));
     } catch {}
     return updateStatus({
-      state: DRAFT_SYNC_MANAGER_STATES.SUBMITTED,
+      state: accepted ? DRAFT_SYNC_MANAGER_STATES.SUBMITTED : DRAFT_SYNC_MANAGER_STATES.ERROR,
       locked: true,
       isReadOnly: true,
-      pending: false,
+      pending: !accepted,
       errorCode: status.errorCode,
     });
+  };
+
+  const cancelPendingOrdinaryWork = ({ preserveEvents = false } = {}) => {
+    lifecycleGeneration += 1;
+    clearSaveTimers();
+    clearTimer(retryTimer);
+    clearTimer(reconnectTimer);
+    retryTimer = null;
+    reconnectTimer = null;
+    attempt = null;
+    status.pending = false;
+    if (!preserveEvents) {
+      clearTimer(eventTimer);
+      clearTimer(eventRetryTimer);
+      eventTimer = null;
+      eventRetryTimer = null;
+      eventAttempt = null;
+      eventQueue.length = 0;
+      eventIds.clear();
+      status.eventQueueSize = 0;
+    }
+    return updateStatus({ pending: false });
   };
 
   const invalidateAfterSupersession = () => {
@@ -1727,6 +1781,7 @@ export const createProFormDraftSyncManager = (options = {}) => {
     markSubmitAttempted,
     markSubmitFailed,
     markSubmitted,
+    cancelPendingOrdinaryWork,
     invalidateAfterSupersession,
     getPendingConflict,
     resolveConflictChoices,

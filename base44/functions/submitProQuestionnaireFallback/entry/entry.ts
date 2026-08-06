@@ -86,6 +86,11 @@ const buildIntakePayload = ({
   source,
   zapierSent = false
 }) => ({
+  source_draft_id: normalizedPayload?.source_draft_id || '',
+  canonical_state_hash: normalizedPayload?.submitted_state_hash || '',
+  submitted_state_hash: normalizedPayload?.submitted_state_hash || '',
+  environment: normalizedPayload?.environment || 'unknown',
+  test_run_id: normalizedPayload?.test_run_id || '',
   business_name: normalizedPayload?.metadata?.business_name || submitContext?.business_name || '',
   business_domain: normalizedPayload?.metadata?.businessDomain || submitContext?.domain || '',
   user_email: submitContext?.user_email || '',

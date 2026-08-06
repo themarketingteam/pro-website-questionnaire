@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Authoritative submission harness</title></head>
+  <body>
+    <main>
+      <h1>Questionnaire submission harness</h1>
+      <label>Required answer <input id="answer" aria-label="Required answer"></label>
+      <button id="submit">Submit Questionnaire</button>
+      <button id="pdf" hidden>Download submitted responses (PDF)</button>
+      <button id="start-new" hidden>Start a New Questionnaire</button>
+      <button id="retry" hidden>Retry Submission</button>
+      <a id="recover" href="?recover=email" hidden>Recover a different questionnaire</a>
+      <output id="status" data-testid="status">active</output>
+      <output id="validation" data-testid="validation"></output>
+      <output id="attempted" data-testid="attempted">false</output>
+      <output id="external-mode" data-testid="external-mode">disabled</output>
+      <output id="read-only" data-testid="read-only">false</output>
+      <output id="draft-id" data-testid="draft-id">draft-submitted-a</output>
+      <output id="submitted-record" data-testid="submitted-record">unchanged</output>
+      <output id="delayed-save" data-testid="delayed-save">not-run</output>
+      <output id="pdf-hash" data-testid="pdf-hash"></output>
+      <output id="recovery-method" data-testid="recovery-method"></output>
+    </main>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const key = 'e2e-authoritative-submission';
+      const saved = JSON.parse(localStorage.getItem(key) || 'null');
+      const state = saved || { status: 'active', answer: '', finalId: '', hash: '' };
+      const answer = document.querySelector('#answer');
+      const submit = document.querySelector('#submit');
+      const status = document.querySelector('#status');
+      const pdf = document.querySelector('#pdf');
+      const startNew = document.querySelector('#start-new');
+      const retry = document.querySelector('#retry');
+      const recover = document.querySelector('#recover');
+      const render = () => {
+        status.textContent = state.status;
+        answer.value = state.answer;
+        const submitted = state.status === 'submitted';
+        answer.disabled = submitted;
+        submit.hidden = submitted;
+        pdf.hidden = !submitted;
+        startNew.hidden = !submitted;
+        recover.hidden = !submitted;
+        document.querySelector('#read-only').textContent = String(submitted);
+        document.querySelector('#pdf-hash').textContent = state.hash;
+      };
+      const complete = () => {
+        state.status = 'submitted';
+        state.finalId = 'submission-a';
+        state.hash = 'a'.repeat(64);
+        localStorage.setItem(key, JSON.stringify(state));
+        render();
+        setTimeout(() => {
+          document.querySelector('#delayed-save').textContent = 'rejected';
+          document.querySelector('#submitted-record').textContent = 'unchanged';
+        }, 0);
+      };
+      submit.addEventListener('click', () => {
+        state.answer = answer.value;
+        if (!state.answer.trim()) {
+          document.querySelector('#validation').textContent = 'saved-invalid';
+          return;
+        }
+        document.querySelector('#validation').textContent = 'saved-valid';
+        document.querySelector('#attempted').textContent = 'server-acknowledged';
+        if (params.get('failure') === 'true') {
+          state.status = 'submit_failed';
+          localStorage.setItem(key, JSON.stringify(state));
+          retry.hidden = false;
+          render();
+          return;
+        }
+        complete();
+      });
+      retry.addEventListener('click', complete);
+      pdf.addEventListener('click', () => { document.querySelector('#pdf-hash').textContent = state.hash; });
+      startNew.addEventListener('click', () => {
+        document.querySelector('#draft-id').textContent = 'draft-new-b';
+        document.querySelector('#submitted-record').textContent = 'unchanged';
+      });
+      const recoveryMethod = params.get('recover');
+      if (recoveryMethod) {
+        state.status = 'submitted'; state.answer = 'Recovered answer'; state.finalId = 'submission-a'; state.hash = 'a'.repeat(64);
+        document.querySelector('#recovery-method').textContent = recoveryMethod;
+      }
+      render();
+    </script>
+  </body>
+</html>

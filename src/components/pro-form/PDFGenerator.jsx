@@ -56,8 +56,10 @@ const buildFilename = (businessName, now) => {
   return `${condensedName}_KaseyaWebsite_ContentQuestionnaire_Responses_${dateString}.pdf`;
 };
 
-export const generatePDF = async (formData, businessName, domain) => {
-  const now = new Date();
+export const generatePDF = async (formData, businessName, domain, submissionDate = undefined) => {
+  const parsedSubmissionDate = submissionDate ? new Date(submissionDate) : null;
+  const now = parsedSubmissionDate && !Number.isNaN(parsedSubmissionDate.getTime())
+    ? parsedSubmissionDate : new Date();
   const filename = buildFilename(businessName, now);
   const model = buildQuestionnairePdfModel({
     formData,

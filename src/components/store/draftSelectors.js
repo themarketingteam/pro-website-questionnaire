@@ -181,8 +181,8 @@ export const selectCanonicalDraftState = createSelector(
         submission: {
           finalSubmissionId: receipt?.finalSubmissionId ?? null,
           submittedAt: receipt?.submittedAt ?? null,
-          submittedStateHash: null,
-          pdfSourceStateHash: null,
+          submittedStateHash: receipt?.submittedStateHash ?? null,
+          pdfSourceStateHash: receipt?.pdfSourceStateHash ?? null,
           lastSubmissionErrorCode: null,
         },
         compatibility: {

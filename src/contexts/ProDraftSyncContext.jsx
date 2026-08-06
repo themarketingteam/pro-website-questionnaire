@@ -47,6 +47,7 @@ const DEFAULT_CONTEXT = Object.freeze({
   scheduleSave: (..._args) => EMPTY_STATUS,
   flush: NOOP_ASYNC,
   queueEvent: (..._args) => false,
+  flushEvents: NOOP_ASYNC,
   syncStatus: EMPTY_STATUS,
   lastServerSavedAt: null,
   isReadOnly: false,
@@ -57,6 +58,7 @@ const DEFAULT_CONTEXT = Object.freeze({
   markSubmitAttempted: NOOP_ASYNC,
   markSubmitFailed: NOOP_ASYNC,
   markSubmitted: NOOP_ASYNC,
+  cancelPendingOrdinaryWork: (..._args) => EMPTY_STATUS,
   replacementLifecycle: null,
   enabled: false,
 });
@@ -259,6 +261,7 @@ const EnabledProDraftSyncProvider = ({
     scheduleSave: record.manager.scheduleSave,
     flush: record.manager.flush,
     queueEvent: record.manager.queueEvent,
+    flushEvents: record.manager.flushEvents,
     syncStatus,
     lastServerSavedAt: syncStatus.lastServerSavedAt,
     isReadOnly: syncStatus.isReadOnly,
@@ -269,6 +272,7 @@ const EnabledProDraftSyncProvider = ({
     markSubmitAttempted: record.manager.markSubmitAttempted,
     markSubmitFailed: record.manager.markSubmitFailed,
     markSubmitted: record.manager.markSubmitted,
+    cancelPendingOrdinaryWork: record.manager.cancelPendingOrdinaryWork,
     replacementLifecycle: Object.freeze({
       flush: record.manager.flush,
       saveImmediately: record.manager.saveImmediately,

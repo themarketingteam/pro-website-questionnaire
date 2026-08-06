@@ -442,18 +442,46 @@ const normalizeStorageMode = (value, path = '$.storageMode') => {
 
 const normalizeSubmittedReceipt = (value) => {
   if (!isPlainObject(value)) fail('$.submittedReceipt');
-  const allowed = new Set(['finalSubmissionId', 'submittedAt', 'pdfAvailable']);
+  const allowed = new Set([
+    'draftId',
+    'finalSubmissionId',
+    'submittedAt',
+    'submittedStateHash',
+    'pdfSourceStateHash',
+    'pdfAvailable',
+    'submissionLockPending',
+  ]);
   for (const key of Object.keys(value)) {
     if (!allowed.has(key)) fail(`$.submittedReceipt.${key}`, DRAFT_STATE_ERROR_CODES.UNKNOWN_FIELD);
   }
   if (typeof value.pdfAvailable !== 'boolean') fail('$.submittedReceipt.pdfAvailable');
   return {
+    ...(Object.hasOwn(value, 'draftId') ? {
+      draftId: normalizeNullableString(value.draftId, '$.submittedReceipt.draftId'),
+    } : {}),
     finalSubmissionId: normalizeNullableString(
       value.finalSubmissionId,
       '$.submittedReceipt.finalSubmissionId',
     ),
     submittedAt: normalizeTimestamp(value.submittedAt, '$.submittedReceipt.submittedAt'),
+    ...(Object.hasOwn(value, 'submittedStateHash') ? { submittedStateHash: (() => {
+      if (value.submittedStateHash === undefined || value.submittedStateHash === null) return null;
+      if (typeof value.submittedStateHash !== 'string' || !HASH_PATTERN.test(value.submittedStateHash)) {
+        fail('$.submittedReceipt.submittedStateHash');
+      }
+      return value.submittedStateHash;
+    })() } : {}),
+    ...(Object.hasOwn(value, 'pdfSourceStateHash') ? { pdfSourceStateHash: (() => {
+      if (value.pdfSourceStateHash === undefined || value.pdfSourceStateHash === null) return null;
+      if (typeof value.pdfSourceStateHash !== 'string' || !HASH_PATTERN.test(value.pdfSourceStateHash)) {
+        fail('$.submittedReceipt.pdfSourceStateHash');
+      }
+      return value.pdfSourceStateHash;
+    })() } : {}),
     pdfAvailable: value.pdfAvailable,
+    ...(Object.hasOwn(value, 'submissionLockPending') ? {
+      submissionLockPending: value.submissionLockPending === true,
+    } : {}),
   };
 };
 
@@ -1676,9 +1704,13 @@ const formSlice = createSlice(/** @type {any} */ ({
         || submission.finalSubmissionId
         || submission.submittedAt
       ) ? {
+          draftId: canonicalState.draftId,
           finalSubmissionId: submission.finalSubmissionId,
           submittedAt: submission.submittedAt,
+          submittedStateHash: submission.submittedStateHash,
+          pdfSourceStateHash: submission.pdfSourceStateHash,
           pdfAvailable: Boolean(submission.pdfSourceStateHash),
+          submissionLockPending: false,
         } : null;
     });
   },

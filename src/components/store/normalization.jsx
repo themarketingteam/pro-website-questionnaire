@@ -436,8 +436,8 @@ export function normalizePersistedQuestionnaireState(state) {
       submission: {
         finalSubmissionId: receipt?.finalSubmissionId ?? null,
         submittedAt: receipt?.submittedAt ?? null,
-        submittedStateHash: null,
-        pdfSourceStateHash: null,
+        submittedStateHash: receipt?.submittedStateHash ?? null,
+        pdfSourceStateHash: receipt?.pdfSourceStateHash ?? null,
         lastSubmissionErrorCode: null,
       },
       compatibility: {
@@ -491,9 +491,13 @@ export function normalizePersistedQuestionnaireState(state) {
         || canonical.submission.finalSubmissionId
         || canonical.submission.submittedAt
       ) ? {
+          draftId: canonical.draftId,
           finalSubmissionId: canonical.submission.finalSubmissionId,
           submittedAt: canonical.submission.submittedAt,
+          submittedStateHash: canonical.submission.submittedStateHash,
+          pdfSourceStateHash: canonical.submission.pdfSourceStateHash,
           pdfAvailable: receipt?.pdfAvailable === true,
+          submissionLockPending: receipt?.submissionLockPending === true,
         } : null,
     };
   } catch {
