@@ -108,3 +108,17 @@ unchanged. This follow-up adds local admin-only entity RLS for
 admin-only support-entity rules. No Base44 deploy, entity push, production
 operation, feature-branch push, domain change, or `main` change occurred.
 Staging must still certify authorized backend paths before any RLS push.
+
+## Prompt 3 denial and bundle safeguards
+
+The browser client error policy converts backend authorization, RLS/service
+role, feature/kill-switch, network, conflict, and lock failures into bounded
+safe outcomes. None enables an entity fallback. Admin authorization rejection
+removes the persistent grant and returns to the password gate; an RLS
+configuration failure does not remove a valid grant. Public recovery wording
+remains generic.
+
+Production builds now end with `test:sensitive-built-bundle`; the same scanner
+can run source-only or built-only. CI source safety runs both the frontend
+direct-access validator and backend service-role validator. The deployment
+precheck also requires a clean result from both layers.

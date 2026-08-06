@@ -69,6 +69,7 @@ import { useProDraftSync } from '@/hooks/useProDraftSync';
 import { createProDraftSubmissionCoordinator } from '@/lib/proDraftSubmissionCoordinator';
 import ProQuestionnaireReadOnlyView from '@/components/pro-form/ProQuestionnaireReadOnlyView';
 import ProDraftServiceUnavailable from '@/components/pro-form/ProDraftServiceUnavailable';
+import { decideProDraftKillSwitchOutcome } from '@/lib/proDraftKillSwitchPolicy';
 
 const DeferredSectionLoader = () => (
   <div className="flex items-center justify-center py-6">
@@ -1854,7 +1855,10 @@ function ProQuestionnaireContent({ runtimeConfig = frontendRuntimeConfig }) {
       );
       }
 
-export default function ProQuestionnaire({ runtimeConfig = frontendRuntimeConfig }) {
+export default function ProQuestionnaire({
+  runtimeConfig = frontendRuntimeConfig,
+  killSwitchContext = undefined,
+}) {
   const durableDraftV2Enabled = isDurableDraftClientEnabled(runtimeConfig);
 
   if (!durableDraftV2Enabled) {
@@ -1865,7 +1869,33 @@ export default function ProQuestionnaire({ runtimeConfig = frontendRuntimeConfig
     ) {
       return <ProQuestionnaireContent runtimeConfig={runtimeConfig} />;
     }
-    return <ProDraftServiceUnavailable />;
+    const policy = decideProDraftKillSwitchOutcome(killSwitchContext || {
+      isNewDraftStart: true,
+      recoveryBackendEnabled: runtimeConfig.publicEmailRecoveryEnabled === true,
+    });
+    if (policy.readOnly && policy.persistentStateRetained) {
+      return <ProQuestionnaireReadOnlyView />;
+    }
+    if (policy.localEditingAllowed && policy.persistentStateRetained) {
+      return (
+        <>
+          <aside
+            role="status"
+            className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-center font-semibold text-amber-900"
+          >
+            Server synchronization is paused. You may continue editing this persistent browser draft,
+            but changes will remain on this device until service is restored.
+          </aside>
+          <ProQuestionnaireContent runtimeConfig={runtimeConfig} />
+        </>
+      );
+    }
+    return (
+      <ProDraftServiceUnavailable
+        policy={policy}
+        recoveryCode={killSwitchContext?.recoveryCode || ''}
+      />
+    );
   }
 
   return (

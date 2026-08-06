@@ -195,7 +195,7 @@ describe('frontend authoritative draft API client contract', () => {
         },
       },
     });
-    expect(normalized).toEqual({
+    expect(normalized).toMatchObject({
       code: 'REVISION_CONFLICT',
       status: 409,
       retryable: false,

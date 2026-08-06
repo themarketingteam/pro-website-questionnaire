@@ -28,7 +28,7 @@ const basePolicy = (overrides = {}) => ({
     { pattern: 'src/**', operations: ['*'], rule: 'frontend-forbidden' },
     { pattern: 'tests/e2e/**', operations: ['*'], rule: 'e2e-forbidden' },
   ],
-  builtOutput: { directory: 'dist', extensions: ['.js'] },
+  builtOutput: { directory: 'dist', extensions: ['.js'], excludeSourceMaps: true },
   exemptions: [],
   ...overrides,
 });
@@ -107,5 +107,33 @@ describe('sensitive entity static validator', () => {
       }),
     ]));
     expect(JSON.stringify(findings)).not.toContain('synthetic');
+  });
+
+  it('fails built validation when direct access survives tree shaking', async () => {
+    const root = await createFixture({
+      'dist/app.js': 'client.entities.ProFormDraft.get("draft");',
+    });
+    const result = await validateSensitiveEntityAccess({
+      root,
+      policyPath: 'policy.json',
+      builtOnly: true,
+    });
+    expect(result.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ rule: 'no-sensitive-entity-access-in-built-output' }),
+    ]));
+  });
+
+  it('requires source maps to be explicitly excluded from bundle policy', async () => {
+    const root = await createFixture({}, basePolicy({
+      builtOutput: { directory: 'dist', extensions: ['.js'] },
+    }));
+    const result = await validateSensitiveEntityAccess({
+      root,
+      policyPath: 'policy.json',
+      builtOnly: true,
+    });
+    expect(result.findings).toEqual([
+      expect.objectContaining({ rule: 'built-source-maps-must-be-explicitly-excluded' }),
+    ]);
   });
 });

@@ -77,6 +77,11 @@ jobs:
       - name: Validate authoritative test manifest
         run: npm run test:manifest
 
+      - name: Enforce frontend and backend sensitive-entity boundaries
+        run: |
+          npm run test:no-sensitive-frontend-entities -- --source-only
+          npm run test:sensitive-service-role
+
   unit-quality:
     name: Unit quality
     runs-on: ubuntu-latest

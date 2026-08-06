@@ -37,7 +37,9 @@ describe('V2 handler-level persistence guard', () => {
 
   it('renders controlled unavailable UX when V2 is disabled or killed', () => {
     expect(page).toContain('if (!durableDraftV2Enabled)');
-    expect(page).toContain('return <ProDraftServiceUnavailable />');
+    expect(page).toContain('<ProDraftServiceUnavailable');
+    expect(page).toContain('policy={policy}');
+    expect(page).toContain('policy.localEditingAllowed && policy.persistentStateRetained');
     expect(page).not.toContain('base44.entities');
   });
 

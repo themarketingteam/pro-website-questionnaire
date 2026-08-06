@@ -7,9 +7,11 @@ export default function ProDraftServiceUnavailable({
   onRetry = undefined,
   onOpenRecovery = undefined,
   clipboard = globalThis.navigator?.clipboard,
+  policy = undefined,
 }) {
   const [copyStatus, setCopyStatus] = useState('idle');
   const canCopyRecoveryCode = typeof recoveryCode === 'string' && recoveryCode.length > 0;
+  const outcome = policy?.outcome || 'maintenance_required';
 
   const retry = () => {
     if (typeof onRetry === 'function') {
@@ -50,6 +52,21 @@ export default function ProDraftServiceUnavailable({
         <p className="mt-3 text-sm text-slate-600">
           Editing and new server writes are paused while durable questionnaire saving is unavailable.
         </p>
+        {outcome === 'continue_local_only' && (
+          <p className="mt-3 font-semibold text-amber-800">
+            Your persistent browser draft is retained, but server synchronization is paused.
+          </p>
+        )}
+        {outcome === 'recovery_only' && (
+          <p className="mt-3 font-semibold text-amber-800">
+            This browser has memory-only draft state. Copy your recovery code now if it is available.
+          </p>
+        )}
+        {outcome === 'continue_read_only' && (
+          <p className="mt-3 font-semibold text-slate-800">
+            Your submitted questionnaire remains available as a local read-only record.
+          </p>
+        )}
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <button
@@ -59,7 +76,7 @@ export default function ProDraftServiceUnavailable({
           >
             Retry
           </button>
-          {typeof onOpenRecovery === 'function' ? (
+          {policy?.recoveryRouteAvailable !== false && (typeof onOpenRecovery === 'function' ? (
             <button
               type="button"
               onClick={onOpenRecovery}
@@ -74,7 +91,7 @@ export default function ProDraftServiceUnavailable({
             >
               Open Draft Recovery
             </a>
-          )}
+          ))}
           {canCopyRecoveryCode && (
             <button
               type="button"

@@ -1,5 +1,23 @@
 # Staging Deployment Readiness Checklist
 
+## Prompt 3 final local RLS gate (2026-08-06)
+
+- [x] Normalize browser authorization/RLS/feature/network/conflict/lock failures without raw SDK detail.
+- [x] Prohibit retry storms and direct entity fallback.
+- [x] Formalize submitted read-only, persistent local-only, memory recovery-only, and new-start maintenance outcomes.
+- [x] Require sensitive source, service-role, and built-bundle scans.
+- [x] Add required-function authorization-order coverage.
+- [x] Add fail-closed `precheck:rls` and synthetic success/failure tests.
+- [x] Add an RLS-first emergency rollback runbook.
+- [ ] Replace blocked authoritative API certification with passing staging evidence.
+- [ ] Replace failed admin certification with passing staging evidence.
+- [ ] Replace blocked full-lifecycle certification with passing staging evidence.
+- [ ] Run from the separately verified staging-linked checkout.
+
+Current `npm run precheck:rls` result: **BLOCKED**, with the three missing
+passing certifications and `PRODUCTION_APP_LINK_FORBIDDEN`. No entity push or
+deployment is permitted from this checkout.
+
 ## Local draft entity RLS boundary (2026-08-06)
 
 - [x] Verify Base44 RLS operations, equality-only `user_condition`, and service-role admin semantics from bundled documentation.

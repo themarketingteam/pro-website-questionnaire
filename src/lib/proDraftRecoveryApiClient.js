@@ -4,6 +4,10 @@ import {
   isDurableDraftClientEnabled,
   isPublicEmailRecoveryClientEnabled,
 } from '@/lib/proDraftRuntimeConfig';
+import {
+  emitSafeDraftClientMetric,
+  normalizeProDraftClientError,
+} from '@/lib/proDraftClientErrorPolicy';
 
 export const PRO_DRAFT_RECOVERY_API_CLIENT_VERSION = 1;
 export const PRO_DRAFT_RECOVERY_FUNCTION_NAME = 'recoverProFormDraftByCode';
@@ -29,7 +33,7 @@ function boundedRetry(value) {
   return Number.isSafeInteger(value) && value >= 0 && value <= 86400 ? value : 0;
 }
 
-function failure(body = {}) {
+function failure(body = {}, normalized = null) {
   return Object.freeze({
     success: false,
     recoveryCompleted: false,
@@ -40,6 +44,12 @@ function failure(body = {}) {
     requestId: typeof body.requestId === 'string' && SAFE_REQUEST_ID.test(body.requestId)
       ? body.requestId
       : null,
+    failureKind: normalized?.kind || 'unknown',
+    authorizationRequired: normalized?.authorizationRequired === true,
+    recoveryRequired: normalized?.recoveryRequired === true,
+    configurationError: normalized?.configurationError === true,
+    retryable: normalized?.retryable === true,
+    preserveLocalState: true,
   });
 }
 
@@ -133,13 +143,20 @@ export function createProDraftRecoveryApiClient({
   client = base44,
   runtimeConfig = frontendRuntimeConfig,
   stagingTestOverride = false,
+  onSafeMetric = undefined,
 } = {}) {
   const invoke = client?.functions?.invoke;
   const available = typeof invoke === 'function';
   const featureEnabled = enabled(runtimeConfig, stagingTestOverride);
   const invokeRecovery = async (functionName, request) => {
     if (!featureEnabled || !available || !isPlainObject(request)) {
-      return { body: null, failure: failure() };
+      const normalized = normalizeProDraftClientError({}, {
+        audience: 'recovery',
+        featureDisabled: !featureEnabled,
+        killSwitchEnabled: runtimeConfig?.killSwitchEnabled === true,
+        fallbackCode: 'RECOVERY_NOT_COMPLETED',
+      });
+      return { body: null, failure: failure({}, normalized) };
     }
     const input = Object.freeze({
       ...request,
@@ -153,7 +170,12 @@ export function createProDraftRecoveryApiClient({
     } catch (error) {
       const body = isPlainObject(error?.response)
         && isPlainObject(error.response.data) ? error.response.data : {};
-      return { body: null, failure: failure(body) };
+      const normalized = normalizeProDraftClientError(error, {
+        audience: 'recovery',
+        fallbackCode: 'RECOVERY_NOT_COMPLETED',
+      });
+      emitSafeDraftClientMetric(onSafeMetric, { operation: functionName, ...normalized });
+      return { body: null, failure: failure(body, normalized) };
     }
   };
   return Object.freeze({

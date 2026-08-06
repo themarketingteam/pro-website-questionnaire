@@ -1,5 +1,9 @@
 import { base44 } from '@/api/base44Client';
 import { defaultProDraftAdminGrantVault } from '@/lib/proDraftAdminGrantVault';
+import {
+  emitSafeDraftClientMetric,
+  normalizeProDraftClientError,
+} from '@/lib/proDraftClientErrorPolicy';
 
 export const PRO_DRAFT_ADMIN_API_VERSION = 1;
 
@@ -20,12 +24,24 @@ const unwrap = (response) => response && typeof response === 'object' && 'data' 
 
 export function normalizeAdminApiError(error) {
   const payload = unwrap(error?.response) ?? error?.response?.data ?? {};
-  return Object.freeze({
-    code: typeof payload?.errorCode === 'string' ? payload.errorCode : 'ADMIN_API_REQUEST_FAILED',
-    message: typeof payload?.message === 'string' ? payload.message : 'The administrative recovery request failed.',
-    requestId: typeof payload?.requestId === 'string' ? payload.requestId : null,
-    authorizationRequired: error?.response?.status === 401 || payload?.errorCode === 'ADMIN_API_AUTHORIZATION_DENIED',
+  const normalized = normalizeProDraftClientError(error, {
+    audience: 'admin',
+    fallbackCode: 'ADMIN_API_REQUEST_FAILED',
   });
+  return Object.freeze({
+    ...normalized,
+    code: normalized.code,
+    message: normalized.message,
+    requestId: typeof payload?.requestId === 'string' ? payload.requestId : null,
+  });
+}
+
+class ProDraftAdminApiError extends Error {
+  constructor(details) {
+    super(details.message);
+    this.name = 'ProDraftAdminApiError';
+    Object.assign(this, details);
+  }
 }
 
 export function getSafeAdminApiDiagnostics() {
@@ -36,6 +52,7 @@ export function createProDraftAdminApiClient(options = {}) {
   const invoke = options.invoke ?? ((name, body) => base44.functions.invoke(name, body));
   const vault = options.vault ?? defaultProDraftAdminGrantVault;
   const authorization = options.authorization ?? null;
+  const onSafeMetric = options.onSafeMetric;
 
   async function credentials() {
     const grant = await authorization?.getGrantForAuthorizedRequest?.();
@@ -66,11 +83,13 @@ export function createProDraftAdminApiClient(options = {}) {
       }
       return data;
     } catch (error) {
-      if (error?.response?.status === 401 || error?.response?.data?.errorCode === 'ADMIN_API_AUTHORIZATION_DENIED') {
+      const normalized = normalizeAdminApiError(error);
+      if (normalized.authorizationRequired) {
         await vault.removeAdminRecoveryGrant();
         await authorization?.handleAdminGrantRejected?.();
       }
-      throw error;
+      emitSafeDraftClientMetric(onSafeMetric, { operation: name, ...normalized });
+      throw new ProDraftAdminApiError(normalized);
     }
   }
 

@@ -1,5 +1,21 @@
 # Durable Draft Recovery Requirements Traceability Matrix
 
+## 2026-08-06 Prompt 3 local RLS safeguard evidence
+
+| Requirement | Source evidence | Test evidence | Status |
+|---|---|---|---|
+| Safe RLS/auth/network/conflict/lock normalization | `proDraftClientErrorPolicy.js` and six client integrations | Error-policy and RLS integration suites | Locally passed |
+| Four kill-switch outcomes preserve state | `proDraftKillSwitchPolicy.js` | Submitted, persistent, memory-only, new-start matrix | Locally passed |
+| No retry storm or direct fallback | One-shot clients and nonretryable auth/RLS classifications | RLS denial integration tests | Locally passed |
+| Required function authorization order | Required-function contract and service-role validator | 18-function guarded order matrix | Locally passed |
+| No direct access in production bundle | Mandatory built scan and explicit source-map exclusion | Bundle scanner fixtures; exact build pending final validation | Implemented locally |
+| Deployment evidence and target fail closed | `precheck-draft-rls-deployment.mjs` | Direct access, missing function, production link, valid fixture | Locally passed; real precheck blocked |
+| Emergency rollback preserves RLS first | RLS emergency rollback runbook | Documentation review | Local evidence only |
+
+`DR-RLS-001` remains **implemented locally, not pushed, and not live-certified**.
+The real precheck currently rejects the three blocked staging certifications
+and the primary checkout's production app link.
+
 ## 2026-08-06 local draft entity RLS evidence
 
 | Requirement | Source evidence | Test evidence | Status |

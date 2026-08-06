@@ -10,6 +10,7 @@ const unavailableConfig = Object.freeze({
   durableDraftV2Enabled: false,
   environment: 'staging',
   killSwitchEnabled: true,
+  publicEmailRecoveryEnabled: true,
 });
 
 describe('ProDraftServiceUnavailable', () => {

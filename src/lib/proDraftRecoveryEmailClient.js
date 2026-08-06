@@ -3,6 +3,10 @@ import {
   frontendRuntimeConfig,
   isDurableDraftClientEnabled,
 } from '@/lib/proDraftRuntimeConfig';
+import {
+  emitSafeDraftClientMetric,
+  normalizeProDraftClientError,
+} from '@/lib/proDraftClientErrorPolicy';
 
 export const PRO_DRAFT_RECOVERY_EMAIL_CLIENT_VERSION = 1;
 export const PRO_DRAFT_RECOVERY_EMAIL_FUNCTION_NAME =
@@ -49,7 +53,7 @@ function retrySeconds(value) {
   return Number.isSafeInteger(value) && value >= 0 && value <= 3600 ? value : 0;
 }
 
-export function normalizeRecoveryEmailDeliveryError(value = {}) {
+export function normalizeRecoveryEmailDeliveryError(value = {}, normalized = null) {
   const body = isPlainObject(value) ? value : {};
   return Object.freeze({
     success: false,
@@ -62,6 +66,10 @@ export function normalizeRecoveryEmailDeliveryError(value = {}) {
     canRetry: body.canRetry === true,
     retryAfterSeconds: retrySeconds(body.retryAfterSeconds),
     deliveryUncertain: body.deliveryUncertain === true,
+    failureKind: normalized?.kind || 'unknown',
+    authorizationRequired: normalized?.authorizationRequired === true,
+    configurationError: normalized?.configurationError === true,
+    preserveLocalState: true,
   });
 }
 
@@ -93,6 +101,7 @@ function normalizeSuccess(value) {
 export function createProDraftRecoveryEmailClient({
   client = base44,
   runtimeConfig = frontendRuntimeConfig,
+  onSafeMetric = undefined,
 } = {}) {
   const invoke = client?.functions?.invoke;
   const available = typeof invoke === 'function';
@@ -103,7 +112,13 @@ export function createProDraftRecoveryEmailClient({
       || !enabled
       || !isPlainObject(request)
       || Object.keys(request).some((key) => !REQUEST_KEYS.has(key))) {
-      return normalizeRecoveryEmailDeliveryError();
+      const normalized = normalizeProDraftClientError({}, {
+        audience: 'recovery',
+        featureDisabled: !enabled,
+        killSwitchEnabled: runtimeConfig?.killSwitchEnabled === true,
+        fallbackCode: 'RECOVERY_EMAIL_DELIVERY_FAILED',
+      });
+      return normalizeRecoveryEmailDeliveryError({}, normalized);
     }
     const input = Object.freeze({ ...request, apiVersion: 1 });
     try {
@@ -124,7 +139,15 @@ export function createProDraftRecoveryEmailClient({
         && isPlainObject(error.response.data)
         ? error.response.data
         : {};
-      return normalizeRecoveryEmailDeliveryError(body);
+      const normalized = normalizeProDraftClientError(error, {
+        audience: 'recovery',
+        fallbackCode: 'RECOVERY_EMAIL_DELIVERY_FAILED',
+      });
+      emitSafeDraftClientMetric(onSafeMetric, {
+        operation: PRO_DRAFT_RECOVERY_EMAIL_FUNCTION_NAME,
+        ...normalized,
+      });
+      return normalizeRecoveryEmailDeliveryError(body, normalized);
     }
   };
 

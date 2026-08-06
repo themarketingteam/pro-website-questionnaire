@@ -3,6 +3,10 @@ import {
   frontendRuntimeConfig,
   isDurableDraftClientEnabled,
 } from '@/lib/proDraftRuntimeConfig';
+import {
+  emitSafeDraftClientMetric,
+  normalizeProDraftClientError,
+} from '@/lib/proDraftClientErrorPolicy';
 
 export const PRO_DRAFT_API_CLIENT_VERSION = 1;
 
@@ -22,7 +26,6 @@ export const PRO_DRAFT_API_CLIENT_ERROR_CODES = Object.freeze({
   CRYPTO_UNAVAILABLE: 'DRAFT_API_CRYPTO_UNAVAILABLE',
 });
 
-const SAFE_ERROR_CODE = /^[A-Z][A-Z0-9_]{0,95}$/u;
 const SAFE_REQUEST_ID = /^pdrq_[A-Za-z0-9_-]{20,123}$/u;
 const SAFE_TEST_RUN_ID = /^[A-Za-z0-9._:-]{1,128}$/u;
 const SAFE_CONFLICT_ID = /^[A-Za-z0-9._:-]{1,256}$/u;
@@ -40,6 +43,11 @@ class ProDraftApiClientError extends Error {
     this.retryAfterSeconds = details.retryAfterSeconds;
     this.mergeRequired = details.mergeRequired;
     this.conflict = details.conflict;
+    this.kind = details.kind;
+    this.authorizationRequired = details.authorizationRequired === true;
+    this.recoveryRequired = details.recoveryRequired === true;
+    this.configurationError = details.configurationError === true;
+    this.preserveLocalState = details.preserveLocalState !== false;
   }
 }
 
@@ -101,29 +109,28 @@ export function normalizeDraftApiError(error) {
   const status = safeStatus(response.status ?? error?.status);
   const retryAfterSeconds = safeRetryAfterSeconds(response, body);
   const conflict = body.mergeRequired === true ? safeConflictMetadata(body.conflict) : null;
+  const normalized = normalizeProDraftClientError(error, {
+    fallbackCode: PRO_DRAFT_API_CLIENT_ERROR_CODES.INVOCATION_FAILED,
+  });
   return Object.freeze({
-    code: typeof body.errorCode === 'string' && SAFE_ERROR_CODE.test(body.errorCode)
-      ? body.errorCode
-      : PRO_DRAFT_API_CLIENT_ERROR_CODES.INVOCATION_FAILED,
+    ...normalized,
+    code: normalized.code,
     status,
-    retryable: body.retryable === true || status >= 500,
-    requestId: typeof body.requestId === 'string' && SAFE_REQUEST_ID.test(body.requestId)
-      ? body.requestId
-      : null,
-    message: publicMessage(status),
+    retryable: normalized.retryable,
     ...(retryAfterSeconds > 0 ? { retryAfterSeconds } : {}),
     ...(body.mergeRequired === true ? { mergeRequired: true } : {}),
     ...(conflict ? { conflict } : {}),
   });
 }
 
-function throwClientError(code, status = 503, retryable = false) {
+function throwClientError(code, status = 503, retryable = false, policy = {}) {
   throw new ProDraftApiClientError(Object.freeze({
+    ...policy,
     code,
     status,
     retryable,
     requestId: null,
-    message: publicMessage(status),
+    message: policy.message || publicMessage(status),
   }));
 }
 
@@ -185,6 +192,7 @@ function stagingOverrideAllowed(runtimeConfig, request, options) {
 export function createProDraftApiClient({
   client = base44,
   runtimeConfig = frontendRuntimeConfig,
+  onSafeMetric = undefined,
 } = {}) {
   const invoke = client?.functions?.invoke;
   const available = typeof invoke === 'function';
@@ -193,7 +201,11 @@ export function createProDraftApiClient({
     const request = validatedRequest(requestInput);
     const enabled = isDurableDraftClientEnabled(runtimeConfig);
     if (!enabled && !stagingOverrideAllowed(runtimeConfig, request, options)) {
-      return throwClientError(PRO_DRAFT_API_CLIENT_ERROR_CODES.DISABLED, 503);
+      const policy = normalizeProDraftClientError({}, {
+        featureDisabled: true,
+        killSwitchEnabled: runtimeConfig?.killSwitchEnabled === true,
+      });
+      return throwClientError(PRO_DRAFT_API_CLIENT_ERROR_CODES.DISABLED, 503, false, policy);
     }
     if (!available) {
       return throwClientError(
@@ -214,7 +226,9 @@ export function createProDraftApiClient({
       return response.data;
     } catch (error) {
       if (error instanceof ProDraftApiClientError) throw error;
-      throw new ProDraftApiClientError(normalizeDraftApiError(error));
+      const normalized = normalizeDraftApiError(error);
+      emitSafeDraftClientMetric(onSafeMetric, { operation, ...normalized });
+      throw new ProDraftApiClientError(normalized);
     }
   }
 

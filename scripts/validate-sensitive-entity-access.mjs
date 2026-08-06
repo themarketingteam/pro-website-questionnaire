@@ -245,6 +245,7 @@ export async function validateSensitiveEntityAccess({
   policyPath = DEFAULT_POLICY,
   buildDirectory = undefined,
   sourceOnly = false,
+  builtOnly = false,
   today = new Date().toISOString().slice(0, 10),
 } = {}) {
   const policy = JSON.parse(await readFile(path.resolve(root, policyPath), 'utf8'));
@@ -252,18 +253,29 @@ export async function validateSensitiveEntityAccess({
     !entry.reason || !entry.owner || !entry.removeBy || String(entry.removeBy) < today
   ));
   const findings = [];
-  for (const sourceRoot of policy.sourceRoots || []) {
-    for (const file of await listFiles(root, sourceRoot, SOURCE_EXTENSIONS)) {
-      const source = await readFile(path.resolve(root, file), 'utf8');
-      for (const finding of scanSourceText({ file, source, sensitiveEntities: policy.sensitiveEntities })) {
-        const decision = policyDecision(finding, policy, today);
-        if (!decision.allowed) findings.push({ ...finding, rule: decision.rule });
+  if (!builtOnly) {
+    for (const sourceRoot of policy.sourceRoots || []) {
+      for (const file of await listFiles(root, sourceRoot, SOURCE_EXTENSIONS)) {
+        const source = await readFile(path.resolve(root, file), 'utf8');
+        for (const finding of scanSourceText({ file, source, sensitiveEntities: policy.sensitiveEntities })) {
+          const decision = policyDecision(finding, policy, today);
+          if (!decision.allowed) findings.push({ ...finding, rule: decision.rule });
+        }
       }
     }
   }
   if (!sourceOnly) {
     const directory = buildDirectory || policy.builtOutput?.directory;
     const extensions = new Set(policy.builtOutput?.extensions || ['.js', '.html']);
+    if (policy.builtOutput?.excludeSourceMaps !== true || extensions.has('.map')) {
+      findings.push({
+        file: policyPath,
+        line: 1,
+        entity: '<built-policy>',
+        operation: 'source_map_policy',
+        rule: 'built-source-maps-must-be-explicitly-excluded',
+      });
+    }
     for (const file of await listFiles(root, directory, extensions)) {
       const source = await readFile(path.resolve(root, file), 'utf8');
       findings.push(...scanBuiltText({ file, source, sensitiveEntities: policy.sensitiveEntities }));
@@ -284,7 +296,15 @@ export async function validateSensitiveEntityAccess({
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) {
   const sourceOnly = process.argv.includes('--source-only');
-  const result = await validateSensitiveEntityAccess({ sourceOnly });
+  const builtOnly = process.argv.includes('--built-only');
+  if (sourceOnly && builtOnly) {
+    console.error('SENSITIVE_ENTITY_ACCESS_POLICY_FAILED');
+    console.error('config/sensitive-entity-access-policy.json:1 arguments [source-only-built-only-conflict]');
+    process.exitCode = 2;
+  }
+  const result = sourceOnly && builtOnly
+    ? { findings: [], policy: { sensitiveEntities: [] } }
+    : await validateSensitiveEntityAccess({ sourceOnly, builtOnly });
   if (result.findings.length > 0) {
     console.error('SENSITIVE_ENTITY_ACCESS_POLICY_FAILED');
     for (const finding of result.findings) {
@@ -292,6 +312,6 @@ if (isMain) {
     }
     process.exitCode = 1;
   } else {
-    console.log(`Sensitive entity access policy passed for ${result.policy.sensitiveEntities.length} entities.`);
+    console.log(`Sensitive entity access policy passed for ${result.policy.sensitiveEntities.length} entities (${builtOnly ? 'built' : sourceOnly ? 'source' : 'source+built'}).`);
   }
 }

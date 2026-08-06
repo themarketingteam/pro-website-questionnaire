@@ -91,7 +91,7 @@ describe('proDraftRecoveryApiClient', () => {
       retryAfterSeconds: 45,
       requestId: `pdrq_${'R'.repeat(43)}`,
     } });
-    await expect(client.recoverProFormDraftByCode(request)).resolves.toEqual({
+    await expect(client.recoverProFormDraftByCode(request)).resolves.toMatchObject({
       success: false,
       recoveryCompleted: false,
       errorCode: 'RECOVERY_NOT_COMPLETED',

@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { normalizeProDraftClientError } from '@/lib/proDraftClientErrorPolicy';
 
 const DEFAULT_TIMEOUT_MS = 15000;
 const MAX_MESSAGE_LENGTH = 500;
@@ -107,13 +108,19 @@ export const classifySubmitError = (error) => {
 
 export const serializeSubmitError = (error) => {
   const failureKind = classifySubmitError(error);
+  const draftPolicy = normalizeProDraftClientError(error, {
+    fallbackCode: 'SUBMISSION_BACKEND_REQUEST_FAILED',
+  });
+  const redactProviderDetail = failureKind === 'auth' || failureKind === 'permission';
 
   return {
     name: truncateString(error?.name ?? '', MAX_MESSAGE_LENGTH),
-    message: getErrorMessage(error),
+    message: redactProviderDetail ? draftPolicy.message : getErrorMessage(error),
     status: getErrorStatus(error),
     statusText: getErrorStatusText(error),
-    code: truncateString(error?.code ?? error?.response?.data?.code ?? '', MAX_MESSAGE_LENGTH),
+    code: redactProviderDetail
+      ? draftPolicy.code
+      : truncateString(error?.code ?? error?.response?.data?.code ?? '', MAX_MESSAGE_LENGTH),
     type: truncateString(error?.type ?? '', MAX_MESSAGE_LENGTH),
     failureKind,
     isAuthLike: failureKind === 'auth',
@@ -122,8 +129,11 @@ export const serializeSubmitError = (error) => {
     isTimeoutLike: failureKind === 'timeout',
     isServerLike: failureKind === 'server',
     isRateLimitLike: failureKind === 'rate_limit',
-    stackSnippet: truncateString(error?.stack ?? '', MAX_STACK_LENGTH),
-    rawString: truncateString(typeof error === 'string' ? error : String(error ?? ''), MAX_RAW_LENGTH)
+    draftFailureKind: draftPolicy.kind,
+    preserveLocalState: true,
+    stackSnippet: redactProviderDetail ? '' : truncateString(error?.stack ?? '', MAX_STACK_LENGTH),
+    rawString: redactProviderDetail
+      ? '' : truncateString(typeof error === 'string' ? error : String(error ?? ''), MAX_RAW_LENGTH)
   };
 };
 

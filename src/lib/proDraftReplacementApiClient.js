@@ -4,6 +4,10 @@ import {
   frontendRuntimeConfig,
   isDurableDraftClientEnabled,
 } from '@/lib/proDraftRuntimeConfig';
+import {
+  emitSafeDraftClientMetric,
+  normalizeProDraftClientError,
+} from '@/lib/proDraftClientErrorPolicy';
 
 export const PRO_DRAFT_REPLACEMENT_CLIENT_VERSION = 1;
 export const PRO_DRAFT_REPLACEMENT_FUNCTION_NAMES = Object.freeze({
@@ -21,7 +25,6 @@ export const PRO_DRAFT_REPLACEMENT_CLIENT_ERROR_CODES = Object.freeze({
   CRYPTO_UNAVAILABLE: 'DRAFT_REPLACEMENT_CRYPTO_UNAVAILABLE',
 });
 
-const SAFE_CODE = /^[A-Z][A-Z0-9_]{0,95}$/u;
 const SAFE_REQUEST_ID = /^pdrq_[A-Za-z0-9_-]{20,123}$/u;
 const SAFE_ID = /^[A-Za-z0-9._:-]{1,256}$/u;
 const SAFE_TEST_RUN_ID = /^[A-Za-z0-9._:-]{1,128}$/u;
@@ -61,24 +64,27 @@ export function normalizeReplacementApiError(error) {
   const status = boundedStatus(response.status ?? error?.status);
   const replacementRecoveryRequired = body.replacementRecoveryRequired === true
     || error?.replacementRecoveryRequired === true;
+  const normalized = normalizeProDraftClientError(error, {
+    fallbackCode: PRO_DRAFT_REPLACEMENT_CLIENT_ERROR_CODES.INVOCATION_FAILED,
+  });
   return Object.freeze({
-    code: typeof body.errorCode === 'string' && SAFE_CODE.test(body.errorCode)
-      ? body.errorCode
-      : (typeof error?.code === 'string' && SAFE_CODE.test(error.code)
-        ? error.code : PRO_DRAFT_REPLACEMENT_CLIENT_ERROR_CODES.INVOCATION_FAILED),
+    ...normalized,
     status,
-    retryable: body.retryable === true || error?.retryable === true || status >= 500,
+    retryable: normalized.retryable,
     replacementRecoveryRequired,
     requestId: typeof body.requestId === 'string' && SAFE_REQUEST_ID.test(body.requestId)
       ? body.requestId : null,
-    message: publicMessage(status, replacementRecoveryRequired),
+    message: replacementRecoveryRequired
+      ? publicMessage(status, true)
+      : normalized.message,
   });
 }
 
-const fail = (code, status = 400, retryable = false) => {
+const fail = (code, status = 400, retryable = false, policy = {}) => {
   throw new ProDraftReplacementClientError(Object.freeze({
+    ...policy,
     code, status, retryable, replacementRecoveryRequired: false,
-    requestId: null, message: publicMessage(status),
+    requestId: null, message: policy.message || publicMessage(status),
   }));
 };
 
@@ -150,13 +156,18 @@ export function createProDraftReplacementApiClient({
   runtimeConfig = frontendRuntimeConfig,
   credentialVault = defaultProDraftCredentialVault,
   cryptoProvider = globalThis.crypto,
+  onSafeMetric = undefined,
 } = {}) {
   const invoke = client?.functions?.invoke;
   const available = typeof invoke === 'function';
 
   async function call(functionName, input = {}) {
     if (!isDurableDraftClientEnabled(runtimeConfig)) {
-      return fail(PRO_DRAFT_REPLACEMENT_CLIENT_ERROR_CODES.DISABLED, 503);
+      const policy = normalizeProDraftClientError({}, {
+        featureDisabled: true,
+        killSwitchEnabled: runtimeConfig?.killSwitchEnabled === true,
+      });
+      return fail(PRO_DRAFT_REPLACEMENT_CLIENT_ERROR_CODES.DISABLED, 503, false, policy);
     }
     if (!available) return fail(PRO_DRAFT_REPLACEMENT_CLIENT_ERROR_CODES.UNAVAILABLE, 503, true);
     if (!isPlainObject(input) || typeof input.browserNamespace !== 'string'
@@ -193,7 +204,9 @@ export function createProDraftReplacementApiClient({
       return normalizeResponse(response?.data);
     } catch (error) {
       if (error instanceof ProDraftReplacementClientError) throw error;
-      throw new ProDraftReplacementClientError(normalizeReplacementApiError(error));
+      const normalized = normalizeReplacementApiError(error);
+      emitSafeDraftClientMetric(onSafeMetric, { operation: functionName, ...normalized });
+      throw new ProDraftReplacementClientError(normalized);
     }
   }
 

@@ -140,3 +140,52 @@ local contracts only and do not establish live RLS enforcement.
 
 No entity push, function deploy, site deploy, application deploy, production
 operation, feature-branch push, or `main` push is authorized by this contract.
+
+## Prompt 3 local deployment safeguards
+
+All draft, recovery, replacement, recovery-email, admin, and submission client
+failures now share a safe classification policy. Authorization failures direct
+the caller to recovery or the admin password gate; RLS/service-role failures
+become configuration errors; conflicts and submitted/superseded locks remain
+distinct; only bounded network and rate failures are retryable. Provider
+messages, entity responses, answers, and credentials are never projected.
+
+`src/lib/proDraftKillSwitchPolicy.js` defines the four fail-closed outcomes and
+always forbids direct entity fallback, new server-draft creation, destructive
+reset, and a false secure-save claim. Submitted local state is read-only,
+persistent active state is local-only with sync visibly paused, memory-only
+state is recovery-only, and a new start requires maintenance.
+
+The production build now runs the built-output sensitive-entity scan. Source
+maps are explicitly excluded by policy and are not accepted as production
+bundle evidence. CI independently runs source and service-role boundaries.
+
+`npm run precheck:rls` verifies schema RLS, source and bundle access, required
+function presence, service-role policy, three staging certifications, staging
+secret/flag documentation, feature branch, and staging app link. On 2026-08-06
+the real checkout correctly failed with:
+
+- `STAGING_API_CERTIFICATION_MISSING`
+- `STAGING_ADMIN_CERTIFICATION_MISSING`
+- `STAGING_LIFECYCLE_CERTIFICATION_MISSING`
+- `PRODUCTION_APP_LINK_FORBIDDEN`
+
+This is a blocked deployment precheck, not staging RLS certification. See the
+[emergency rollback runbook](../runbooks/draft-rls-emergency-rollback.md).
+
+Prompt 3 validation produced the following local evidence:
+
+| Command / group | Result |
+|---|---|
+| Focused client/error/kill-switch/RLS/order/precheck suite | Exit 0; 128/128 tests passed |
+| `npm run test:no-sensitive-frontend-entities -- --source-only` | Exit 0; five sensitive entities passed the source policy |
+| `npm run test:sensitive-service-role` | Exit 0; four protected entities passed the service-role audit |
+| `npm run build` | Exit 0; Vite build and mandatory built-output scan passed |
+| `npm test -- --run` | Exit 1; 1,874/1,877 passed, with the same three established unrelated normalization/repair failures |
+| Changed-file ESLint | Exit 0; no errors and five warnings, including one ignored test-file notice |
+| `npm run lint` | Exit 1; repository baseline remains 28 errors and 14 warnings |
+| `npm run typecheck` | Exit 2; existing project-wide JavaScript/dependency diagnostics remain |
+| `npm run precheck:rls` | Exit 1; stopped on the four staging/production-link blockers listed above |
+
+No schema was pushed, no function or site was deployed, no Base44 record or
+secret was changed, and neither the feature branch nor `main` was pushed.

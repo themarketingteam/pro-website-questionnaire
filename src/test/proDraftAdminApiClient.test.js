@@ -23,11 +23,11 @@ describe('admin API client', () => {
     const v = vault(); const authorization = { getGrantForAuthorizedRequest: vi.fn(async () => bundle.grant), handleAdminGrantRejected: vi.fn(async () => {}) };
     const error = Object.assign(new Error('denied'), { response: { status: 401, data: { errorCode: 'ADMIN_API_AUTHORIZATION_DENIED' } } });
     const client = createProDraftAdminApiClient({ invoke: vi.fn(async () => { throw error; }), vault: v, authorization });
-    await expect(client.getDraft({})).rejects.toBe(error); expect(v.removeAdminRecoveryGrant).toHaveBeenCalledOnce(); expect(authorization.handleAdminGrantRejected).toHaveBeenCalledOnce();
+    await expect(client.getDraft({})).rejects.toMatchObject({ authorizationRequired: true, reauthorizeAdmin: true }); expect(v.removeAdminRecoveryGrant).toHaveBeenCalledOnce(); expect(authorization.handleAdminGrantRejected).toHaveBeenCalledOnce();
   });
   it('does not retry failed writes', async () => {
     const invoke = vi.fn(async () => { throw new Error('network'); }); const client = createProDraftAdminApiClient({ invoke, vault: vault() });
-    await expect(client.updateDraft({})).rejects.toThrow('network'); expect(invoke).toHaveBeenCalledOnce();
+    await expect(client.updateDraft({})).rejects.toMatchObject({ kind: 'network', retryable: true }); expect(invoke).toHaveBeenCalledOnce();
   });
   it('normalizes errors and reports no URL or logging transport', () => {
     expect(normalizeAdminApiError({ response: { status: 401, data: { errorCode: 'ADMIN_API_AUTHORIZATION_DENIED', requestId: 'r1' } } })).toMatchObject({ authorizationRequired: true, requestId: 'r1' });

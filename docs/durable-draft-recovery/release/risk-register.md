@@ -1,5 +1,20 @@
 # Durable Draft Recovery Risk Register
 
+## 2026-08-06 final local RLS pre-deployment safeguards
+
+| Risk | Control added | Residual / release gate |
+|---|---|---|
+| RLS or authorization failure triggers insecure browser fallback | Shared client error policy; no direct-fallback outcome | Live staging denial/network inspection pending |
+| Kill switch destroys or misrepresents local state | Four-outcome policy preserves state, credentials, locks, and visible sync pause | Product UI acceptance in deployed staging pending |
+| Dead direct-access code survives tree shaking | Mandatory post-build sensitive bundle scan; source maps explicitly excluded | Re-run for the exact deploy artifact |
+| Service-role access precedes authorization | Required-function order contract plus service-role source validator | Live error/metric ordering pending |
+| RLS deploy targets production or lacks evidence | `precheck:rls` denies production links and missing certifications | Current real precheck is blocked on four codes |
+| Emergency response reopens public entity access | Time-limited, approval-bound last-resort runbook | Human approval and monitoring remain required |
+
+The current production-linked checkout is deliberately not deployable. The
+blocked precheck prevents availability work from silently weakening the data
+boundary.
+
 ## 2026-08-06 local draft entity RLS hardening
 
 | Risk | Control added | Residual / release gate |
