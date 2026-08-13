@@ -13,7 +13,12 @@
   "memory_config": {
     "enabled": true,
     "scope": "both",
+    "include_other_conversation_context": false,
     "instructions": null
   },
+  "voice_config": {
+    "voice_id": null
+  },
+  "allow_anonymous_access": false,
   "name": "form_qa_validator"
 }
