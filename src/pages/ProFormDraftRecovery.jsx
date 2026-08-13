@@ -458,9 +458,9 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-sm font-semibold text-slate-700">Final Submission Payload</p>
               {isMappedPayloadOverride ? (
-                <Badge className="bg-blue-100 text-blue-800 text-xs">Manually edited — mapped_payload_json</Badge>
+                <Badge className="brand-payload-badge text-xs">Manually edited — mapped_payload_json</Badge>
               ) : (
-                <Badge className="bg-slate-100 text-slate-600 text-xs">Computed from responses_json</Badge>
+                <Badge className="brand-payload-badge brand-payload-badge--computed text-xs">Computed from responses_json</Badge>
               )}
               <span className="text-xs text-slate-500">(used by Retry Submission)</span>
             </div>

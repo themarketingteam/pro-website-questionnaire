@@ -198,6 +198,31 @@
   letter-spacing: 0.12em;
 }
 
+.draft-recovery-brand .brand-payload-badge {
+  border-color: #cacaef;
+  background: var(--msp-blue-100);
+  color: var(--msp-blue-600);
+  font-weight: 500;
+}
+
+.draft-recovery-brand .brand-payload-badge:hover {
+  border-color: #bdbdff;
+  background: var(--msp-blue-200);
+  color: var(--msp-blue-900);
+}
+
+.draft-recovery-brand .brand-payload-badge--computed {
+  border-color: #d8d8e5;
+  background: #f3f3f8;
+  color: #4d4d68;
+}
+
+.draft-recovery-brand .brand-payload-badge--computed:hover {
+  border-color: #c8c8d8;
+  background: #e7e7f0;
+  color: var(--msp-blue-900);
+}
+
 .draft-recovery-brand .brand-button-primary {
   border-color: var(--msp-blue-500);
   background: var(--msp-blue-500);

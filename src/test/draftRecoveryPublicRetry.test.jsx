@@ -64,6 +64,7 @@ describe('public draft recovery actions', () => {
     expect(screen.getByRole('button', { name: 'Repair + Retry' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Endpoint Payload' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Raw Draft' })).toBeInTheDocument();
+    expect(screen.getByText('Manually edited — mapped_payload_json')).toHaveClass('brand-payload-badge');
     fireEvent.click(await screen.findByRole('button', { name: /retry submission/i }));
 
     await waitFor(() => {
