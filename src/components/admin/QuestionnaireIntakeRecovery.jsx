@@ -16,19 +16,19 @@ import AdminQuestionnairePdfSection from '@/components/admin/AdminQuestionnaireP
 import { getIntakePdfPayload } from '@/lib/questionnairePdfVersions';
 
 const statusStyles = {
-  received_intake: 'bg-amber-100 text-amber-800',
-  retry_failed: 'bg-red-100 text-red-700',
-  retry_success: 'bg-green-100 text-green-700',
-  submitted: 'bg-slate-100 text-slate-700'
+  received_intake: 'brand-status-badge brand-status-badge--warning',
+  retry_failed: 'brand-status-badge brand-status-badge--danger',
+  retry_success: 'brand-status-badge brand-status-badge--success',
+  submitted: 'brand-status-badge brand-status-badge--neutral'
 };
 
 const aiStatusStyles = {
-  diagnosed: 'bg-blue-100 text-blue-700',
-  repair_ready: 'bg-indigo-100 text-indigo-700',
-  retry_success: 'bg-green-100 text-green-700',
-  retry_failed: 'bg-red-100 text-red-700',
-  needs_human_review: 'bg-amber-100 text-amber-800',
-  running: 'bg-slate-100 text-slate-600'
+  diagnosed: 'brand-status-badge brand-status-badge--info',
+  repair_ready: 'brand-status-badge brand-status-badge--info',
+  retry_success: 'brand-status-badge brand-status-badge--success',
+  retry_failed: 'brand-status-badge brand-status-badge--danger',
+  needs_human_review: 'brand-status-badge brand-status-badge--warning',
+  running: 'brand-status-badge brand-status-badge--neutral'
 };
 
 const formatDate = (value) => {
@@ -62,7 +62,7 @@ function AiRepairSection({ intake }) {
       <div className="grid gap-2 md:grid-cols-2 text-sm">
         {intake.ai_repair_status && (
           <p><span className="font-medium">Status:</span>{' '}
-            <Badge className={aiStatusStyles[intake.ai_repair_status] || 'bg-slate-100 text-slate-700'}>
+            <Badge className={aiStatusStyles[intake.ai_repair_status] || 'brand-status-badge brand-status-badge--neutral'}>
               {intake.ai_repair_status}
             </Badge>
           </p>
@@ -159,9 +159,9 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
               <p className="text-sm text-slate-900">{formatDate(intake.created_at_server || intake.created_date)}</p>
             </div>
             <div className="space-y-1">
-              <Badge className={statusStyles[intake.status] || 'bg-slate-100 text-slate-700'}>{intake.status || '—'}</Badge>
+              <Badge className={statusStyles[intake.status] || 'brand-status-badge brand-status-badge--neutral'}>{intake.status || '—'}</Badge>
               {intake.ai_repair_status && (
-                <Badge className={aiStatusStyles[intake.ai_repair_status] || 'bg-slate-100 text-slate-600'}>
+                <Badge className={aiStatusStyles[intake.ai_repair_status] || 'brand-status-badge brand-status-badge--neutral'}>
                   AI: {intake.ai_repair_status}
                 </Badge>
               )}

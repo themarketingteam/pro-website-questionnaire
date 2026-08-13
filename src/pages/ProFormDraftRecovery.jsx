@@ -33,10 +33,10 @@ const safeJsonParse = (value, fallback = {}) => {
 };
 
 const statusStyles = {
-  draft: 'bg-slate-100 text-slate-700',
-  submit_attempted: 'bg-amber-100 text-amber-800',
-  submit_failed: 'bg-red-100 text-red-700',
-  submitted: 'bg-green-100 text-green-700'
+  draft: 'brand-status-badge brand-status-badge--neutral',
+  submit_attempted: 'brand-status-badge brand-status-badge--warning',
+  submit_failed: 'brand-status-badge brand-status-badge--danger',
+  submitted: 'brand-status-badge brand-status-badge--success'
 };
 
 const formatDate = (value) => {

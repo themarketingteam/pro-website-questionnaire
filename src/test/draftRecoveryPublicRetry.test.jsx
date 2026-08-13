@@ -36,6 +36,27 @@ describe('public draft recovery actions', () => {
     expect(screen.queryByText('Questionnaire Intake Recovery')).not.toBeInTheDocument();
   });
 
+  it('uses explicit high-contrast styling for draft and submitted status badges', async () => {
+    base44.entities.ProFormDraft.list.mockResolvedValue([
+      {
+        id: 'draft-status-1',
+        business_name: 'Draft Status Client',
+        status: 'draft',
+      },
+      {
+        id: 'submitted-status-1',
+        business_name: 'Submitted Status Client',
+        status: 'submitted',
+      },
+    ]);
+
+    renderRecoveryPage();
+
+    expect(await screen.findByText('Draft Status Client')).toBeInTheDocument();
+    expect(screen.getByText('draft')).toHaveClass('brand-status-badge', 'brand-status-badge--neutral');
+    expect(screen.getByText('submitted')).toHaveClass('brand-status-badge', 'brand-status-badge--success');
+  });
+
   it('passes the verified recovery grant to Retry and AI Repair + Retry', async () => {
     base44.entities.ProFormDraft.list.mockResolvedValue([{
       id: 'draft-public-1',
