@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,10 +13,11 @@ import { toast } from 'sonner';
  * Props:
  *   draft        — the ProFormDraft record
  *   computedPayload — the live-computed payload (used as initial JSON value when mapped_payload_json is absent)
+ *   saveDraft(updates) — persists the allow-listed updates through the recovery backend
  *   onSaved(updatedDraft) — called after a successful save with the updated draft
  *   onCancel()   — called when the user cancels
  */
-export default function DraftEditPanel({ draft, computedPayload, onSaved, onCancel }) {
+export default function DraftEditPanel({ draft, computedPayload, saveDraft, onSaved, onCancel }) {
   const [businessName, setBusinessName] = useState(draft.business_name || '');
   const [domain, setDomain] = useState(draft.domain || '');
   const [userEmail, setUserEmail] = useState(draft.user_email || '');
@@ -86,9 +86,10 @@ export default function DraftEditPanel({ draft, computedPayload, onSaved, onCanc
         mapped_payload_json: JSON.stringify(parsedPayload),
       };
 
-      await base44.entities.ProFormDraft.update(draft.id, updates);
+      if (typeof saveDraft !== 'function') throw new Error('Draft saving is unavailable.');
+      const updatedDraft = await saveDraft(updates);
       toast.success('Draft saved successfully');
-      onSaved?.({ ...draft, ...updates });
+      onSaved?.({ ...draft, ...updates, ...(updatedDraft || {}) });
     } catch (err) {
       toast.error(`Save failed: ${err?.message || 'Unknown error'}`);
     } finally {

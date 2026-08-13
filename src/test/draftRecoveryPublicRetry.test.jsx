@@ -13,9 +13,42 @@ const renderRecoveryPage = () => render(
 );
 
 describe('public draft recovery actions', () => {
+  let draftRecords;
+  let intakeRecords;
+
   beforeEach(() => {
-    base44.entities.ProFormDraft.list.mockResolvedValue([]);
-    base44.entities.ProFormSubmissionIntake.list.mockResolvedValue([]);
+    draftRecords = [];
+    intakeRecords = [];
+    base44.functions.invoke.mockImplementation(async (name, payload = {}) => {
+      if (name === 'queryDraftRecoveryRecords') {
+        const source = payload.recordType === 'intake' ? intakeRecords : draftRecords;
+        if (payload.action === 'get') {
+          return {
+            data: {
+              success: true,
+              record: source.find((record) => record.id === payload.recordId),
+            },
+          };
+        }
+        return {
+          data: {
+            success: true,
+            records: source,
+            page: payload.page || 1,
+            pageSize: payload.pageSize || 25,
+            hasMore: false,
+            hasAnyRecords: source.length > 0,
+            duplicateSessionIds: [],
+          },
+        };
+      }
+
+      if (name === 'retryProQuestionnaireIntakeSubmission') {
+        return { data: { success: true, linkedSubmissionId: 'retried-submission-id' } };
+      }
+
+      return { data: { success: true } };
+    });
   });
 
   it('renders the branded recovery workspace shell', async () => {
@@ -31,13 +64,22 @@ describe('public draft recovery actions', () => {
     renderRecoveryPage();
 
     await waitFor(() => {
-      expect(base44.entities.ProFormSubmissionIntake.list).toHaveBeenCalled();
+      expect(base44.functions.invoke).toHaveBeenCalledWith(
+        'queryDraftRecoveryRecords',
+        expect.objectContaining({
+          action: 'list',
+          recordType: 'intake',
+          pageSize: 25,
+          recoveryGrant,
+        }),
+      );
     });
+    expect(base44.entities.ProFormSubmissionIntake.list).not.toHaveBeenCalled();
     expect(screen.queryByText('Questionnaire Intake Recovery')).not.toBeInTheDocument();
   });
 
   it('uses explicit high-contrast styling for draft and submitted status badges', async () => {
-    base44.entities.ProFormDraft.list.mockResolvedValue([
+    draftRecords = [
       {
         id: 'draft-status-1',
         business_name: 'Draft Status Client',
@@ -48,7 +90,7 @@ describe('public draft recovery actions', () => {
         business_name: 'Submitted Status Client',
         status: 'submitted',
       },
-    ]);
+    ];
 
     renderRecoveryPage();
 
@@ -57,8 +99,67 @@ describe('public draft recovery actions', () => {
     expect(screen.getByText('submitted')).toHaveClass('brand-status-badge', 'brand-status-badge--success');
   });
 
+  it('requests server-filtered draft pages without using direct entity list reads', async () => {
+    base44.functions.invoke.mockImplementation(async (name, payload = {}) => {
+      if (name !== 'queryDraftRecoveryRecords') return { data: { success: true } };
+      if (payload.recordType === 'intake') {
+        return { data: { success: true, records: [], hasMore: false, hasAnyRecords: false } };
+      }
+
+      const record = payload.page === 2
+        ? { id: 'page-2', business_name: 'Second Page Client', status: 'submitted' }
+        : { id: 'page-1', business_name: 'First Page Client', status: 'draft' };
+      return {
+        data: {
+          success: true,
+          records: [record],
+          page: payload.page,
+          pageSize: payload.pageSize,
+          hasMore: payload.page === 1,
+          hasAnyRecords: true,
+          duplicateSessionIds: [],
+        },
+      };
+    });
+
+    renderRecoveryPage();
+
+    expect(await screen.findByText('First Page Client')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(await screen.findByText('Second Page Client')).toBeInTheDocument();
+    expect(base44.functions.invoke).toHaveBeenCalledWith(
+      'queryDraftRecoveryRecords',
+      expect.objectContaining({
+        action: 'list',
+        recordType: 'draft',
+        page: 2,
+        pageSize: 25,
+        status: 'all',
+        archiveState: 'active',
+        recoveryGrant,
+      }),
+    );
+
+    fireEvent.change(
+      screen.getByPlaceholderText('Search by business name, domain, user email, or session ID'),
+      { target: { value: 'client.example' } },
+    );
+    await waitFor(() => {
+      expect(base44.functions.invoke).toHaveBeenCalledWith(
+        'queryDraftRecoveryRecords',
+        expect.objectContaining({
+          action: 'list',
+          recordType: 'draft',
+          page: 1,
+          search: 'client.example',
+        }),
+      );
+    });
+    expect(base44.entities.ProFormDraft.list).not.toHaveBeenCalled();
+  });
+
   it('passes the verified recovery grant to Retry and AI Repair + Retry', async () => {
-    base44.entities.ProFormDraft.list.mockResolvedValue([{
+    draftRecords = [{
       id: 'draft-public-1',
       session_id: 'session-public-1',
       business_name: 'Public Recovery Client',
@@ -72,11 +173,11 @@ describe('public draft recovery actions', () => {
         userdata: { question_1: 'answer' },
       }),
       responses_json: '{}',
-    }]);
+    }];
 
     renderRecoveryPage();
     fireEvent.click(await screen.findByText('Public Recovery Client'));
-    expect(screen.getByRole('button', { name: /download pdf/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /download pdf/i })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Actions' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'AI Actions' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Data Copy Options (JSON)' })).toBeInTheDocument();
@@ -113,18 +214,18 @@ describe('public draft recovery actions', () => {
   });
 
   it('passes the verified recovery grant to intake Retry and AI Repair + Retry', async () => {
-    base44.entities.ProFormSubmissionIntake.list.mockResolvedValue([{
+    intakeRecords = [{
       id: 'intake-public-1',
       questionnaire_session_id: 'session-public-2',
       business_name: 'Public Intake Client',
       business_domain: 'intake.example',
       status: 'received_intake',
-    }]);
+    }];
 
     renderRecoveryPage();
     fireEvent.click(await screen.findByText('Public Intake Client'));
     expect(screen.getByText('Questionnaire Intake Recovery')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /download pdf/i })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /download pdf/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /retry submission/i }));
 
     await waitFor(() => {

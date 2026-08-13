@@ -122,6 +122,14 @@ export interface ProFormDraft {
    * True if the AI-repaired payload was accepted and used in a submission attempt for this draft
    */
   ai_repair_applied?: boolean;
+  /**
+   * When this draft was moved out of the active recovery dataset
+   */
+  archived_at?: string;
+  /**
+   * Policy or administrator reason for archiving this draft
+   */
+  archive_reason?: string;
 }
 
 export interface ProFormDraftEvent {
@@ -529,6 +537,14 @@ export interface ProFormSubmissionIntake {
    * Source context that triggered the AI repair (e.g. admin_manual, scheduled_job, retry_hook)
    */
   ai_repair_source?: string;
+  /**
+   * When this intake was moved out of the active recovery dataset
+   */
+  archived_at?: string;
+  /**
+   * Policy or administrator reason for archiving this intake
+   */
+  archive_reason?: string;
 }
 
 export interface QuestionnairePdfVersion {
@@ -584,20 +600,22 @@ declare module '@base44/sdk' {
   }
   
   interface FunctionNameRegistry {
-    "generateAIContent": true;
+    "archiveRecoveryRecords": true;
     "generateAIContentOpenAI": true;
+    "generateAIContent": true;
+    "queryDraftRecoveryRecords": true;
     "manageQuestionnairePdfVersions": true;
-    "retryProQuestionnaireIntakeSubmission": true;
     "repairProQuestionnaireIntakeSubmission": true;
+    "retryProQuestionnaireIntakeSubmission": true;
     "sendToZapier": true;
-    "validateQuestionText": true;
     "submitProQuestionnaireFallback": true;
+    "validateQuestionText": true;
     "verifyDraftRecoveryAccess": true;
     "_shared/base44Agent": true;
     "_shared/proSubmissionRepair": true;
     "retryProQuestionnaireIntakeSubmission/entry": true;
-    "submitProQuestionnaireFallback/entry": true;
     "sendToZapier/entry": true;
+    "submitProQuestionnaireFallback/entry": true;
   }
   
   interface AgentNameRegistry {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,9 @@ import { ChevronDown, ChevronUp, Loader2, Stethoscope, Wrench, RefreshCw } from 
 import { toast } from 'sonner';
 import AdminQuestionnairePdfSection from '@/components/admin/AdminQuestionnairePdfSection';
 import { getIntakePdfPayload } from '@/lib/questionnairePdfVersions';
+import { getRecoveryRecord, listRecoveryRecords } from '@/lib/draftRecoveryApi';
+
+const RECOVERY_PAGE_SIZE = 25;
 
 const statusStyles = {
   received_intake: 'brand-status-badge brand-status-badge--warning',
@@ -136,10 +139,42 @@ function AiRepairSection({ intake }) {
 }
 
 function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, aiRunning, recoveryGrant }) {
-  const diagnostics = parseJson(intake.diagnostics_json);
-  const retryError = parseJson(intake.retry_error_json);
-  const pdfPayload = getIntakePdfPayload(intake);
-  const rawResponses = parseJson(intake.raw_responses_json);
+  const [detailedIntake, setDetailedIntake] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const [detailVersion, setDetailVersion] = useState(0);
+  const activeIntake = detailedIntake ? { ...intake, ...detailedIntake } : intake;
+  const diagnostics = parseJson(activeIntake.diagnostics_json);
+  const retryError = parseJson(activeIntake.retry_error_json);
+  const pdfPayload = getIntakePdfPayload(activeIntake);
+  const rawResponses = parseJson(activeIntake.raw_responses_json);
+
+  useEffect(() => {
+    if (!expanded) return undefined;
+    let active = true;
+
+    const loadDetails = async () => {
+      setDetailLoading(true);
+      setDetailError('');
+      try {
+        const data = await getRecoveryRecord({
+          recoveryGrant,
+          recordType: 'intake',
+          recordId: intake.id
+        });
+        if (active) setDetailedIntake(data.record);
+      } catch (error) {
+        if (active) setDetailError(error?.message || 'Unable to load this intake.');
+      } finally {
+        if (active) setDetailLoading(false);
+      }
+    };
+
+    loadDetails();
+    return () => {
+      active = false;
+    };
+  }, [expanded, intake.id, recoveryGrant, detailVersion]);
 
   return (
     <Card className={`brand-record-card ${expanded ? 'brand-record-card--expanded' : ''}`}>
@@ -181,13 +216,24 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
         </CardContent>
       </button>
 
-      {expanded && (
+      {expanded && detailLoading && (
+        <div className="brand-expanded-panel flex items-center gap-2 p-4 text-sm text-slate-600">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          Loading the selected intake details…
+        </div>
+      )}
+
+      {expanded && !detailLoading && detailError && (
+        <div className="brand-expanded-panel p-4 text-sm text-red-700" role="alert">{detailError}</div>
+      )}
+
+      {expanded && !detailLoading && !detailError && (
         <div className="brand-expanded-panel p-4 space-y-4">
           <div className="grid gap-3 md:grid-cols-2 text-sm">
-            <p><span className="font-medium">Retry Count:</span> {intake.retry_count ?? 0}</p>
-            <p><span className="font-medium">Last Retry:</span> {formatDate(intake.last_retry_at)}</p>
-            <p><span className="font-medium">Intake Reason:</span> {intake.intake_reason || '—'}</p>
-            <p><span className="font-medium">Fallback Failure:</span> {intake.fallback_failure_kind || '—'}</p>
+            <p><span className="font-medium">Retry Count:</span> {activeIntake.retry_count ?? 0}</p>
+            <p><span className="font-medium">Last Retry:</span> {formatDate(activeIntake.last_retry_at)}</p>
+            <p><span className="font-medium">Intake Reason:</span> {activeIntake.intake_reason || '—'}</p>
+            <p><span className="font-medium">Fallback Failure:</span> {activeIntake.fallback_failure_kind || '—'}</p>
           </div>
 
           <div className="rounded-lg border bg-white p-3 text-sm space-y-1">
@@ -199,17 +245,17 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
           </div>
 
           {/* AI Repair status panel */}
-          <AiRepairSection intake={intake} />
+          <AiRepairSection intake={activeIntake} />
 
           <AdminQuestionnairePdfSection
             sourceType="intake"
-            sourceId={intake.id}
-            sessionId={intake.questionnaire_session_id}
+            sourceId={activeIntake.id}
+            sessionId={activeIntake.questionnaire_session_id}
             payload={pdfPayload}
             fallbackResponses={rawResponses}
-            businessName={intake.business_name}
-            domain={intake.business_domain}
-            submissionDate={intake.created_at_server || intake.created_at_client || intake.created_date}
+            businessName={activeIntake.business_name}
+            domain={activeIntake.business_domain}
+            submissionDate={activeIntake.created_at_server || activeIntake.created_at_client || activeIntake.created_date}
             recoveryGrant={recoveryGrant}
             disabled={retrying || Boolean(aiRunning)}
           />
@@ -221,7 +267,10 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
               {/* Existing retry */}
               <Button
                 size="sm"
-                onClick={() => onRetry(intake)}
+                onClick={async () => {
+                  await onRetry(activeIntake);
+                  setDetailVersion((version) => version + 1);
+                }}
                 disabled={retrying || aiRunning}
                 className="brand-button-primary gap-2"
               >
@@ -234,7 +283,10 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
                 variant="outline"
                 className="brand-button-secondary gap-2"
                 disabled={retrying || aiRunning}
-                onClick={() => onAiAction(intake, 'diagnose_only')}
+                onClick={async () => {
+                  await onAiAction(activeIntake, 'diagnose_only');
+                  setDetailVersion((version) => version + 1);
+                }}
                 title="Runs deterministic structure validation only. Does not call the AI agent or create a submission."
               >
                 {aiRunning === 'diagnose_only' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Stethoscope className="w-3 h-3" />}
@@ -247,7 +299,10 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
                 variant="outline"
                 className="brand-button-secondary gap-2"
                 disabled={retrying || aiRunning}
-                onClick={() => onAiAction(intake, 'repair_only')}
+                onClick={async () => {
+                  await onAiAction(activeIntake, 'repair_only');
+                  setDetailVersion((version) => version + 1);
+                }}
               >
                 {aiRunning === 'repair_only' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
                 AI Repair Only
@@ -258,7 +313,10 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
                 size="sm"
                 className="brand-button-dark gap-2"
                 disabled={retrying || aiRunning}
-                onClick={() => onAiAction(intake, 'repair_and_retry')}
+                onClick={async () => {
+                  await onAiAction(activeIntake, 'repair_and_retry');
+                  setDetailVersion((version) => version + 1);
+                }}
                 title="This will attempt to create a final ProFormSubmission if repair succeeds"
               >
                 {aiRunning === 'repair_and_retry' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
@@ -271,10 +329,10 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
           <details className="rounded-lg border bg-white p-3 text-xs">
             <summary className="cursor-pointer font-medium text-slate-800">Admin raw JSON</summary>
             <pre className="mt-3 overflow-auto max-h-80 whitespace-pre-wrap break-words text-slate-700">{JSON.stringify({
-              id: intake.id,
-              questionnaire_session_id: intake.questionnaire_session_id,
-              status: intake.status,
-              linked_submission_id: intake.linked_submission_id,
+              id: activeIntake.id,
+              questionnaire_session_id: activeIntake.questionnaire_session_id,
+              status: activeIntake.status,
+              linked_submission_id: activeIntake.linked_submission_id,
               diagnostics,
               retry_error: retryError
             }, null, 2)}</pre>
@@ -289,32 +347,43 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('received_intake');
+  const [archiveState, setArchiveState] = useState('active');
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [hasAnyRecords, setHasAnyRecords] = useState(false);
   const [expandedId, setExpandedId] = useState('');
   const [retryingId, setRetryingId] = useState('');
   // aiRunningId: { id: string, mode: string } | null
   const [aiRunning, setAiRunning] = useState(null);
 
-  const loadRecords = async () => {
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    return () => window.clearTimeout(timeoutId);
+  }, [search]);
+
+  const loadRecords = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await base44.entities.ProFormSubmissionIntake.list();
-      const sorted = [...(Array.isArray(data) ? data : [])].sort((a, b) => {
-        const aTime = new Date(a.created_at_server || a.created_date || 0).getTime();
-        const bTime = new Date(b.created_at_server || b.created_date || 0).getTime();
-        return bTime - aTime;
+      const data = await listRecoveryRecords({
+        recoveryGrant,
+        recordType: 'intake',
+        page,
+        pageSize: RECOVERY_PAGE_SIZE,
+        status: statusFilter,
+        archiveState,
+        search: debouncedSearch
       });
-      setRecords(sorted);
+      setRecords(Array.isArray(data.records) ? data.records : []);
+      setHasMore(Boolean(data.hasMore));
+      setHasAnyRecords(Boolean(data.hasAnyRecords));
     } finally {
       setLoading(false);
     }
-  };
+  }, [archiveState, debouncedSearch, page, recoveryGrant, statusFilter]);
 
-  useEffect(() => { loadRecords(); }, []);
-
-  const filtered = useMemo(() => {
-    if (statusFilter === 'all') return records;
-    return records.filter((record) => record.status === statusFilter);
-  }, [records, statusFilter]);
+  useEffect(() => { loadRecords(); }, [loadRecords]);
 
   const handleRetry = async (intake) => {
     try {
@@ -373,7 +442,7 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
 
   // Keep the fallback recovery tools available when intake records exist,
   // without showing an empty administrative section during normal operation.
-  if (loading || records.length === 0) return null;
+  if ((loading && records.length === 0) || !hasAnyRecords) return null;
 
   return (
     <div className="space-y-4">
@@ -384,8 +453,12 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
           <p className="draft-recovery-brand__section-copy">Review captured fallbacks and retry submissions that did not complete normally.</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="max-w-xs">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <div className="grid gap-3 md:grid-cols-[220px_220px_1fr]">
+            <Select value={statusFilter} onValueChange={(value) => {
+              setStatusFilter(value);
+              setPage(1);
+              setExpandedId('');
+            }}>
               <SelectTrigger>
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
@@ -396,13 +469,40 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
                 <SelectItem value="retry_success">retry_success</SelectItem>
               </SelectContent>
             </Select>
+
+            <Select value={archiveState} onValueChange={(value) => {
+              setArchiveState(value);
+              setPage(1);
+              setExpandedId('');
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Record set" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active Records</SelectItem>
+                <SelectItem value="archived">Archived Records</SelectItem>
+                <SelectItem value="all">All Records</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <input
+              type="search"
+              className="h-10 rounded-md border bg-white px-3 text-sm"
+              placeholder="Search intake business, domain, email, or session ID"
+              value={search}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setPage(1);
+                setExpandedId('');
+              }}
+            />
           </div>
 
-          {filtered.length === 0 ? (
+          {records.length === 0 ? (
             <div className="text-sm text-slate-600">No intake records found for this status.</div>
           ) : (
             <div className="space-y-4">
-              {filtered.map((intake) => (
+              {records.map((intake) => (
                 <IntakeRow
                   key={intake.id}
                   intake={intake}
@@ -415,6 +515,33 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
                   recoveryGrant={recoveryGrant}
                 />
               ))}
+              <div className="flex items-center justify-between gap-3 pt-1" aria-label="Intake pagination">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="brand-button-secondary"
+                  disabled={page === 1 || loading}
+                  onClick={() => {
+                    setPage((current) => Math.max(1, current - 1));
+                    setExpandedId('');
+                  }}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-slate-600">Page {page}</span>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="brand-button-secondary"
+                  disabled={!hasMore || loading}
+                  onClick={() => {
+                    setPage((current) => current + 1);
+                    setExpandedId('');
+                  }}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>

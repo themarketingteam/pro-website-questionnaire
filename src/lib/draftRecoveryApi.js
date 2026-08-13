@@ -1,0 +1,48 @@
+import { base44 } from '@/api/base44Client';
+
+const getResponseData = (response) => response?.data ?? response;
+
+const invokeRecoveryQuery = async (payload) => {
+  const response = await base44.functions.invoke('queryDraftRecoveryRecords', payload);
+  const data = getResponseData(response);
+
+  if (!data?.success) {
+    throw new Error(data?.error || 'Unable to load recovery records.');
+  }
+
+  return data;
+};
+
+export const listRecoveryRecords = ({
+  recoveryGrant,
+  recordType,
+  page = 1,
+  pageSize = 25,
+  status = 'all',
+  archiveState = 'active',
+  search = '',
+}) => invokeRecoveryQuery({
+  action: 'list',
+  recoveryGrant,
+  recordType,
+  page,
+  pageSize,
+  status,
+  archiveState,
+  search,
+});
+
+export const getRecoveryRecord = ({ recoveryGrant, recordType, recordId }) => invokeRecoveryQuery({
+  action: 'get',
+  recoveryGrant,
+  recordType,
+  recordId,
+});
+
+export const updateRecoveryDraft = ({ recoveryGrant, recordId, updates }) => invokeRecoveryQuery({
+  action: 'update',
+  recoveryGrant,
+  recordType: 'draft',
+  recordId,
+  updates,
+});

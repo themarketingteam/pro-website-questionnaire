@@ -122,6 +122,15 @@
       "type": "boolean",
       "default": false,
       "description": "True if the AI-repaired payload was accepted and used in a submission attempt for this draft"
+    },
+    "archived_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this draft was moved out of the active recovery dataset"
+    },
+    "archive_reason": {
+      "type": "string",
+      "description": "Policy or administrator reason for archiving this draft"
     }
   },
   "required": [

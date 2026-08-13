@@ -21,6 +21,13 @@ import { transformResponsesToPayload } from '@/components/pro-form/submissionPay
 import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
 import { SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import mspSuccessDigitalLogoDataUrl from '@/assets/mspSuccessDigitalLogo';
+import {
+  getRecoveryRecord,
+  listRecoveryRecords,
+  updateRecoveryDraft
+} from '@/lib/draftRecoveryApi';
+
+const RECOVERY_PAGE_SIZE = 25;
 
 const safeJsonParse = (value, fallback = {}) => {
   try {
@@ -101,21 +108,51 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
   const [aiRunning, setAiRunning] = useState(null);
   const [localDraft, setLocalDraft] = useState(draft);
   const [editing, setEditing] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const [detailVersion, setDetailVersion] = useState(0);
 
   const isWorking = retrying || !!aiRunning;
 
   // Keep localDraft in sync when parent reloads (but not while editing to avoid clobbering)
   React.useEffect(() => { if (!editing) setLocalDraft(draft); }, [draft, editing]);
 
-  const parsedResponses = safeJsonParse(draft.responses_json, {});
+  useEffect(() => {
+    if (!expanded) return undefined;
+    let active = true;
+
+    const loadDetails = async () => {
+      setDetailLoading(true);
+      setDetailError('');
+      try {
+        const data = await getRecoveryRecord({
+          recoveryGrant,
+          recordType: 'draft',
+          recordId: draft.id
+        });
+        if (active) setLocalDraft((current) => ({ ...current, ...data.record }));
+      } catch (error) {
+        if (active) setDetailError(error?.message || 'Unable to load this draft.');
+      } finally {
+        if (active) setDetailLoading(false);
+      }
+    };
+
+    loadDetails();
+    return () => {
+      active = false;
+    };
+  }, [expanded, draft.id, recoveryGrant, detailVersion]);
+
+  const parsedResponses = safeJsonParse(localDraft.responses_json, {});
 
   // Build the final submission payload exactly as it would be sent to ProFormSubmission.create()
   // Step 1: transform raw responses → raw payload
   // Step 2: run through repairProSubmissionPayload (same as the real submit path)
   const { finalSubmissionPayload, repairWarnings } = useMemo(() => {
     try {
-      const businessName = draft.business_name || '';
-      const domain = draft.domain || '';
+      const businessName = localDraft.business_name || '';
+      const domain = localDraft.domain || '';
       const rawPayload = transformResponsesToPayload(
         parsedResponses,
         businessName,
@@ -130,7 +167,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
         repairWarnings: []
       };
     }
-  }, [parsedResponses, draft.business_name, draft.domain]);
+  }, [parsedResponses, localDraft.business_name, localDraft.domain]);
 
   const handleRetry = async (e) => {
     e.stopPropagation();
@@ -154,6 +191,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
             : `Submission succeeded for ${localDraft.business_name || localDraft.session_id}`
         );
         onRetrySuccess?.();
+        setDetailVersion((version) => version + 1);
       } else {
         const errMsg = result.data?.error?.message || result.data?.error || 'Unknown error';
         toast.error(`Retry failed: ${errMsg}`);
@@ -193,6 +231,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
           toast.success(`${modeLabels[mode]} completed`);
         }
         onRetrySuccess?.();
+        setDetailVersion((version) => version + 1);
       } else {
         const errMsg = data?.error?.message || data?.errors?.[0] || `${modeLabels[mode]} failed`;
         toast.error(errMsg);
@@ -293,7 +332,18 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
         </CardContent>
       </button>
 
-      {expanded && (
+      {expanded && detailLoading && (
+        <div className="brand-expanded-panel flex items-center gap-2 p-4 text-sm text-slate-600">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+          Loading the selected draft details…
+        </div>
+      )}
+
+      {expanded && !detailLoading && detailError && (
+        <div className="brand-expanded-panel p-4 text-sm text-red-700" role="alert">{detailError}</div>
+      )}
+
+      {expanded && !detailLoading && !detailError && (
         <div className="brand-expanded-panel p-4 space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2 text-sm">
@@ -319,6 +369,14 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
             <DraftEditPanel
               draft={localDraft}
               computedPayload={finalSubmissionPayload}
+              saveDraft={async (updates) => {
+                const data = await updateRecoveryDraft({
+                  recoveryGrant,
+                  recordId: localDraft.id,
+                  updates
+                });
+                return data.record;
+              }}
               onSaved={(updated) => {
                 setLocalDraft(prev => ({ ...prev, ...updated }));
                 setEditing(false);
@@ -480,11 +538,21 @@ export default function ProFormDraftRecovery() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [archiveState, setArchiveState] = useState('active');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [expandedId, setExpandedId] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [duplicateSessionIds, setDuplicateSessionIds] = useState(new Set());
 
   const reloadDrafts = () => setRefreshKey((k) => k + 1);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    return () => window.clearTimeout(timeoutId);
+  }, [search]);
 
   useEffect(() => {
     let mounted = true;
@@ -494,17 +562,20 @@ export default function ProFormDraftRecovery() {
       setError('');
 
       try {
-        const data = await base44.entities.ProFormDraft.list();
-
-        if (!mounted) return;
-
-        const sorted = [...(Array.isArray(data) ? data : [])].sort((a, b) => {
-          const aTime = new Date(a.last_saved_at || a.created_date || 0).getTime();
-          const bTime = new Date(b.last_saved_at || b.created_date || 0).getTime();
-          return bTime - aTime;
+        const data = await listRecoveryRecords({
+          recoveryGrant,
+          recordType: 'draft',
+          page,
+          pageSize: RECOVERY_PAGE_SIZE,
+          status: statusFilter,
+          archiveState,
+          search: debouncedSearch
         });
 
-        setDrafts(sorted);
+        if (!mounted) return;
+        setDrafts(Array.isArray(data.records) ? data.records : []);
+        setHasMore(Boolean(data.hasMore));
+        setDuplicateSessionIds(new Set(Array.isArray(data.duplicateSessionIds) ? data.duplicateSessionIds : []));
       } catch (loadError) {
         if (!mounted) return;
         setError(loadError?.message || 'Failed to load drafts.');
@@ -519,42 +590,10 @@ export default function ProFormDraftRecovery() {
     return () => {
       mounted = false;
     };
-  }, [refreshKey]);
+  }, [archiveState, debouncedSearch, page, recoveryGrant, refreshKey, statusFilter]);
 
-  const duplicateSessionIds = useMemo(() => {
-    const sessionCounts = drafts.reduce((acc, draft) => {
-      if (!draft.session_id) return acc;
-      acc[draft.session_id] = (acc[draft.session_id] || 0) + 1;
-      return acc;
-    }, {});
-
-    const duplicates = new Set();
-    Object.entries(sessionCounts).forEach(([sessionId, count]) => {
-      if (count > 1) duplicates.add(sessionId);
-    });
-
-    return duplicates;
-  }, [drafts]);
-
-  const filteredDrafts = useMemo(() => {
-    const query = search.trim().toLowerCase();
-
-    return drafts.filter((draft) => {
-      const matchesStatus = statusFilter === 'all' || draft.status === statusFilter;
-      const haystack = [
-        draft.business_name,
-        draft.domain,
-        draft.user_email,
-        draft.session_id
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-
-      const matchesSearch = !query || haystack.includes(query);
-      return matchesStatus && matchesSearch;
-    });
-  }, [drafts, search, statusFilter]);
+  const firstVisibleRecord = drafts.length > 0 ? ((page - 1) * RECOVERY_PAGE_SIZE) + 1 : 0;
+  const lastVisibleRecord = drafts.length > 0 ? firstVisibleRecord + drafts.length - 1 : 0;
 
   return (
     <main className="draft-recovery-brand draft-recovery-brand-page">
@@ -585,8 +624,12 @@ export default function ProFormDraftRecovery() {
               <CardTitle className="brand-heading brand-section-title">Draft Filters</CardTitle>
               <p className="draft-recovery-brand__section-copy">Narrow the records by workflow status or client details.</p>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-[220px_1fr]">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <CardContent className="grid gap-4 md:grid-cols-[220px_220px_1fr]">
+              <Select value={statusFilter} onValueChange={(value) => {
+                setStatusFilter(value);
+                setPage(1);
+                setExpandedId('');
+              }}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
@@ -599,10 +642,29 @@ export default function ProFormDraftRecovery() {
                 </SelectContent>
               </Select>
 
+              <Select value={archiveState} onValueChange={(value) => {
+                setArchiveState(value);
+                setPage(1);
+                setExpandedId('');
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Record set" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active Records</SelectItem>
+                  <SelectItem value="archived">Archived Records</SelectItem>
+                  <SelectItem value="all">All Records</SelectItem>
+                </SelectContent>
+              </Select>
+
               <Input
                 placeholder="Search by business name, domain, user email, or session ID"
                 value={search}
-                onChange={(event) => setSearch(event.target.value)}
+                onChange={(event) => {
+                  setSearch(event.target.value);
+                  setPage(1);
+                  setExpandedId('');
+                }}
               />
             </CardContent>
           </Card>
@@ -612,7 +674,11 @@ export default function ProFormDraftRecovery() {
           <section className="space-y-4" aria-labelledby="draft-records-title">
             <div className="draft-recovery-brand__list-heading">
               <h2 id="draft-records-title">Questionnaire Drafts</h2>
-              <p>{filteredDrafts.length} matching {filteredDrafts.length === 1 ? 'record' : 'records'}</p>
+              <p>
+                {drafts.length > 0
+                  ? `Showing ${firstVisibleRecord}–${lastVisibleRecord} · Page ${page}`
+                  : `Page ${page}`}
+              </p>
             </div>
             {error && (
               <Card className="border-red-200 bg-red-50">
@@ -624,22 +690,51 @@ export default function ProFormDraftRecovery() {
               <Card className="brand-loading-card">
                 <CardContent className="p-6 text-slate-600">Loading drafts...</CardContent>
               </Card>
-            ) : filteredDrafts.length === 0 ? (
+            ) : drafts.length === 0 ? (
               <Card className="brand-loading-card">
                 <CardContent className="p-6 text-slate-600">No matching drafts found.</CardContent>
               </Card>
             ) : (
-              filteredDrafts.map((draft) => (
-                <DraftRow
-                  key={draft.id}
-                  draft={draft}
-                  expanded={expandedId === draft.id}
-                  onToggle={() => setExpandedId(expandedId === draft.id ? '' : draft.id)}
-                  hasDuplicateSession={duplicateSessionIds.has(draft.session_id)}
-                  onRetrySuccess={reloadDrafts}
-                  recoveryGrant={recoveryGrant}
-                />
-              ))
+              <>
+                {drafts.map((draft) => (
+                  <DraftRow
+                    key={draft.id}
+                    draft={draft}
+                    expanded={expandedId === draft.id}
+                    onToggle={() => setExpandedId(expandedId === draft.id ? '' : draft.id)}
+                    hasDuplicateSession={duplicateSessionIds.has(draft.session_id)}
+                    onRetrySuccess={reloadDrafts}
+                    recoveryGrant={recoveryGrant}
+                  />
+                ))}
+                <div className="flex items-center justify-between gap-3 pt-1" aria-label="Draft pagination">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="brand-button-secondary"
+                    disabled={page === 1 || loading}
+                    onClick={() => {
+                      setPage((current) => Math.max(1, current - 1));
+                      setExpandedId('');
+                    }}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm text-white">Page {page}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="brand-button-secondary"
+                    disabled={!hasMore || loading}
+                    onClick={() => {
+                      setPage((current) => current + 1);
+                      setExpandedId('');
+                    }}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </>
             )}
           </section>
         </div>

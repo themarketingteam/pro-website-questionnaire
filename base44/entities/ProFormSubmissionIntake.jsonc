@@ -125,6 +125,15 @@
     "ai_repair_source": {
       "type": "string",
       "description": "Source context that triggered the AI repair (e.g. admin_manual, scheduled_job, retry_hook)"
+    },
+    "archived_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this intake was moved out of the active recovery dataset"
+    },
+    "archive_reason": {
+      "type": "string",
+      "description": "Policy or administrator reason for archiving this intake"
     }
   },
   "required": [
