@@ -371,6 +371,10 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
     }
   };
 
+  // Keep the fallback recovery tools available when intake records exist,
+  // without showing an empty administrative section during normal operation.
+  if (loading || records.length === 0) return null;
+
   return (
     <div className="space-y-4">
       <Card className="brand-panel">
@@ -394,9 +398,7 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
             </Select>
           </div>
 
-          {loading ? (
-            <div className="text-sm text-slate-600">Loading intake records...</div>
-          ) : filtered.length === 0 ? (
+          {filtered.length === 0 ? (
             <div className="text-sm text-slate-600">No intake records found for this status.</div>
           ) : (
             <div className="space-y-4">

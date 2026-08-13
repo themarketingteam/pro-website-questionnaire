@@ -27,6 +27,15 @@ describe('public draft recovery actions', () => {
     expect(screen.getByText('Draft Filters')).toHaveClass('brand-heading');
   });
 
+  it('hides fallback intake recovery when no intake records exist', async () => {
+    renderRecoveryPage();
+
+    await waitFor(() => {
+      expect(base44.entities.ProFormSubmissionIntake.list).toHaveBeenCalled();
+    });
+    expect(screen.queryByText('Questionnaire Intake Recovery')).not.toBeInTheDocument();
+  });
+
   it('passes the verified recovery grant to Retry and AI Repair + Retry', async () => {
     base44.entities.ProFormDraft.list.mockResolvedValue([{
       id: 'draft-public-1',
@@ -92,6 +101,7 @@ describe('public draft recovery actions', () => {
 
     renderRecoveryPage();
     fireEvent.click(await screen.findByText('Public Intake Client'));
+    expect(screen.getByText('Questionnaire Intake Recovery')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /download pdf/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /retry submission/i }));
 
