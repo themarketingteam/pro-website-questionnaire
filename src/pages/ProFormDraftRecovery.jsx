@@ -504,8 +504,17 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
           </div>
 
           {repairWarnings.length > 0 && (
-            <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
-              <span className="font-semibold">Deterministic repair warnings:</span> {repairWarnings.join(', ')}
+            <div
+              className="brand-repair-warning"
+              role="status"
+              aria-label="Deterministic repair warnings"
+            >
+              <span className="brand-repair-warning__label">Deterministic repair warnings</span>
+              <span className="brand-repair-warning__items">
+                {repairWarnings.map((warning) => (
+                  <code className="brand-repair-warning__item" key={warning}>{warning}</code>
+                ))}
+              </span>
             </div>
           )}
 

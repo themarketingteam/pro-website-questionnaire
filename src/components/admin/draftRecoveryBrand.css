@@ -326,6 +326,46 @@
   background: var(--msp-blue-900);
 }
 
+.draft-recovery-brand .brand-repair-warning {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 0.8rem;
+  border: 1px solid #bdbdff;
+  border-radius: 0.65rem;
+  background: linear-gradient(135deg, #f0f0ff 0%, #fafaff 100%);
+  box-shadow: inset 4px 0 0 var(--msp-blue-500);
+  padding: 0.8rem 1rem;
+  color: var(--msp-blue-900);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.draft-recovery-brand .brand-repair-warning__label {
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.draft-recovery-brand .brand-repair-warning__items {
+  display: flex;
+  flex: 1 1 32rem;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.draft-recovery-brand .brand-repair-warning__item {
+  border: 1px solid #cacaef;
+  border-radius: 0.4rem;
+  background: #ffffff;
+  padding: 0.2rem 0.45rem;
+  color: var(--msp-blue-600);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
 .draft-recovery-brand :is(input, select, textarea, [role='combobox']) {
   border-color: #cacaef;
   color: var(--msp-blue-900);
