@@ -135,9 +135,16 @@ export default async function (req: Request): Promise<Response> {
     const versions = await base44.asServiceRole.entities.QuestionnairePdfVersion.filter(
       { source_type: sourceType, source_id: sourceId },
       '-version_number',
-      1
+      action === 'list' ? 100 : 1
     );
     const latest = Array.isArray(versions) && versions.length > 0 ? versions[0] : null;
+
+    if (action === 'list') {
+      return jsonResponse({
+        success: true,
+        versions: Array.isArray(versions) ? versions.map(publicVersion) : []
+      });
+    }
 
     if (action === 'latest') {
       return jsonResponse({ success: true, version: publicVersion(latest) });

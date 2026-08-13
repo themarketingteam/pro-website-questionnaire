@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 import { ChevronDown, ChevronUp, Loader2, Stethoscope, Wrench, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import AdminQuestionnairePdfButton from '@/components/admin/AdminQuestionnairePdfButton';
+import AdminQuestionnairePdfSection from '@/components/admin/AdminQuestionnairePdfSection';
 import { getIntakePdfPayload } from '@/lib/questionnairePdfVersions';
 
 const statusStyles = {
@@ -201,23 +201,23 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
           {/* AI Repair status panel */}
           <AiRepairSection intake={intake} />
 
+          <AdminQuestionnairePdfSection
+            sourceType="intake"
+            sourceId={intake.id}
+            sessionId={intake.questionnaire_session_id}
+            payload={pdfPayload}
+            fallbackResponses={rawResponses}
+            businessName={intake.business_name}
+            domain={intake.business_domain}
+            submissionDate={intake.created_at_server || intake.created_at_client || intake.created_date}
+            recoveryGrant={recoveryGrant}
+            disabled={retrying || Boolean(aiRunning)}
+          />
+
           {/* Action buttons */}
           <div className="space-y-2">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</p>
             <div className="flex flex-wrap gap-2">
-              <AdminQuestionnairePdfButton
-                sourceType="intake"
-                sourceId={intake.id}
-                sessionId={intake.questionnaire_session_id}
-                payload={pdfPayload}
-                fallbackResponses={rawResponses}
-                businessName={intake.business_name}
-                domain={intake.business_domain}
-                submissionDate={intake.created_at_server || intake.created_at_client || intake.created_date}
-                recoveryGrant={recoveryGrant}
-                disabled={retrying || Boolean(aiRunning)}
-              />
-
               {/* Existing retry */}
               <Button
                 size="sm"

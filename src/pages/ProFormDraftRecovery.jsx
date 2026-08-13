@@ -15,7 +15,7 @@ import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Wrench, Pencil,
 import DraftEditPanel from '@/components/admin/DraftEditPanel';
 import { toast } from 'sonner';
 import QuestionnaireIntakeRecovery from '@/components/admin/QuestionnaireIntakeRecovery';
-import AdminQuestionnairePdfButton from '@/components/admin/AdminQuestionnairePdfButton';
+import AdminQuestionnairePdfSection from '@/components/admin/AdminQuestionnairePdfSection';
 import { useDraftRecoveryAccess } from '@/components/admin/DraftRecoveryPasswordGate';
 import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
 import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
@@ -327,22 +327,22 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
             />
           ) : null}
 
+          <AdminQuestionnairePdfSection
+            sourceType="draft"
+            sourceId={localDraft.id}
+            sessionId={localDraft.session_id}
+            payload={activeFinalPayload}
+            fallbackResponses={parsedResponses}
+            businessName={localDraft.business_name}
+            domain={localDraft.domain}
+            submissionDate={localDraft.submitted_at || localDraft.last_saved_at}
+            recoveryGrant={recoveryGrant}
+            disabled={isWorking}
+          />
+
           <div className="space-y-2">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</p>
             <div className="flex flex-wrap gap-2">
-              <AdminQuestionnairePdfButton
-                sourceType="draft"
-                sourceId={localDraft.id}
-                sessionId={localDraft.session_id}
-                payload={activeFinalPayload}
-                fallbackResponses={parsedResponses}
-                businessName={localDraft.business_name}
-                domain={localDraft.domain}
-                submissionDate={localDraft.submitted_at || localDraft.last_saved_at}
-                recoveryGrant={recoveryGrant}
-                disabled={isWorking}
-              />
-
               {/* Edit Draft — always available */}
               {!editing && (
                 <Button
