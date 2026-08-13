@@ -8,10 +8,11 @@ import { normalizePersistedState, normalizePersistedStateV3 } from './normalizat
 const migrations = {
   2: (state) => normalizePersistedState(state),
   3: (state) => normalizePersistedStateV3(state),
+  4: (state) => normalizePersistedStateV3(state),
 };
 
 // This transform runs on EVERY rehydrate (not just migrations), ensuring
-// corrupted or stale v3 states are always sanitized before entering Redux.
+// corrupted or stale states are always sanitized before entering Redux.
 const normalizationTransform = createTransform(
   // outbound (before persist) — no-op
   (inboundState) => inboundState,
@@ -31,7 +32,7 @@ const normalizationTransform = createTransform(
 
 const persistConfig = {
   key: 'pro-questionnaire-root',
-  version: 3,
+  version: 4,
   storage,
   whitelist: ['responses', 'validationStatus', 'touchedQuestions', 'expandedQuestions', 'textValidationMeta'],
   migrate: createMigrate(migrations, { debug: false }),

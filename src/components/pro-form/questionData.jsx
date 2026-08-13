@@ -272,13 +272,13 @@ export const QUESTIONS = [
     section: "About Your Business",
     title: "What specific IT services and solutions do you provide?",
     why: "Your service selections directly determine which service pages are generated, how your navigation is structured, and which SEO opportunities are prioritized. This ensures the site focuses on what you actually sell and positions you correctly in the market.",
-    guidance: "Select the core services that represent your active offerings—not every service you've ever provided. Choose the areas where you have meaningful expertise or where you want to grow. You must choose between 3 and 15 items, and the combined total with Q4 and Q5 must fall between 8 and 20.",
+    guidance: "Select each parent service page you want included, then choose only the services your organization actually offers under that parent. Every selected parent must include at least one service. Parent pages do not count toward the limit; choose between 3 and 15 listed or custom services, and keep the combined total with Q4 and Q5 within the displayed range.",
     type: "checkbox",
     options: SERVICE_OPTIONS,
     showOther: true,
     limits: { min: 3, max: 15 },
     isSpanQuestion: true,
-    examples: { selections: ["Managed IT Services / Help Desk", "Cybersecurity & Threat Protection", "Microsoft 365 / Cloud Management"], other: "IT Compliance Consulting (HIPAA, SOC 2)" }
+    examples: { selections: ["Managed IT Services", "Managed IT", "Co-Managed IT", "Cybersecurity Services", "Cybersecurity"], other: "IT Compliance Consulting (HIPAA, SOC 2)" }
   },
   {
     id: "4",

@@ -1,3 +1,6 @@
+import { SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
+import { normalizeServiceSelectionsForPayload } from '@/lib/serviceSelectionModel';
+
 const isPlainObject = (value) => (
   value !== null && typeof value === 'object' && !Array.isArray(value)
 );
@@ -44,7 +47,10 @@ export const questionnaireResponsesFromSubmissionPayload = (payload) => {
     '2': yesNo(meetTheTeam.generate_page === true),
     '2.1': asString(meetTheTeam.team_introduction),
     '2.2': teamPhoto,
-    '3': asArray(userdata.service_offerings),
+    '3': normalizeServiceSelectionsForPayload(
+      asArray(userdata.service_offerings),
+      SERVICE_OPTIONS_GROUPED
+    ),
     '3_other': asString(userdata.service_offerings_other),
     '4': asArray(userdata.target_industries),
     '4_other': asString(userdata.target_industries_other),

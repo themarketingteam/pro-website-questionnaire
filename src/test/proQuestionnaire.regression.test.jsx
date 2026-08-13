@@ -208,7 +208,12 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
           '1': 'yes',
           '1.1': 'Needs better answer',
           '2': 'no',
-          '3': ['Managed IT'],
+          '3': [
+            'PARENT:Managed IT Services',
+            'Managed IT',
+            'Co-Managed IT',
+            'On-Site Support'
+          ],
           '4': ['Healthcare / Medical'],
           '5': [{ label: 'Chicago, IL', name: 'Chicago, IL' }],
           '6': 'Company description',
@@ -266,7 +271,12 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
           '1': 'yes',
           '1.1': 'Short bad answer',
           '2': 'no',
-          '3': ['Managed IT'],
+          '3': [
+            'PARENT:Managed IT Services',
+            'Managed IT',
+            'Co-Managed IT',
+            'On-Site Support'
+          ],
           '4': ['Healthcare / Medical'],
           '5': [{ label: 'Chicago, IL', name: 'Chicago, IL' }],
           '6': 'Company description',

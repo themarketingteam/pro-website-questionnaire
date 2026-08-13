@@ -73,6 +73,10 @@ describe('proResponseNormalizers', () => {
       '3': [{ value: 'CATEGORY:Security' }, { label: 'Help Desk' }]
     }, 'Acme', 'acme.com', { Security: ['Firewall Management'] });
 
-    expect(payload.userdata.service_offerings).toEqual(['Firewall Management', 'Help Desk']);
+    expect(payload.userdata.service_offerings).toEqual([
+      'Security',
+      'Firewall Management',
+      'Help Desk'
+    ]);
   });
 });

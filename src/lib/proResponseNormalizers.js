@@ -1,3 +1,5 @@
+import { normalizeServiceSelectionsForPayload } from '@/lib/serviceSelectionModel';
+
 let lastNormalizationWarnings = [];
 
 const resetWarnings = () => {
@@ -219,37 +221,7 @@ export const normalizeGeographicAreas = (value) => {
 
 export const normalizeServiceSelections = (value, serviceOptionsGrouped = {}) => {
   const selections = normalizeStringSelectionList(value);
-  const expanded = [];
-
-  selections.forEach((selection) => {
-    if (selection.startsWith('CATEGORY:')) {
-      const categoryName = selection.replace('CATEGORY:', '').trim();
-      const categoryServices = Array.isArray(serviceOptionsGrouped?.[categoryName])
-        ? serviceOptionsGrouped[categoryName]
-        : [];
-
-      if (categoryServices.length > 0) {
-        expanded.push(...categoryServices);
-      } else {
-        expanded.push(selection);
-      }
-
-      return;
-    }
-
-    expanded.push(selection);
-  });
-
-  const seen = new Set();
-
-  return expanded
-    .map((item) => asTrimmedString(item))
-    .filter(Boolean)
-    .filter((item) => {
-      if (seen.has(item)) return false;
-      seen.add(item);
-      return true;
-    });
+  return normalizeServiceSelectionsForPayload(selections, serviceOptionsGrouped);
 };
 
 export const asPlainObject = (value) => (isPlainObject(value) ? value : {});

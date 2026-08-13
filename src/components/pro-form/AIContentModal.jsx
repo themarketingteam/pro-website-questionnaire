@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { base44 } from '@/api/base44Client';
 import { Sparkles, Loader2, CheckCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
+import { normalizeServiceSelectionsForPayload } from '@/lib/serviceSelectionModel';
 
 export default function AIContentModal({ 
   open, 
@@ -58,7 +60,10 @@ export default function AIContentModal({
       return {
         businessName: credentials.businessName || 'the business',
         responses: {
-          service_offerings: responses['3'] || [],
+          service_offerings: normalizeServiceSelectionsForPayload(
+            responses['3'],
+            SERVICE_OPTIONS_GROUPED
+          ),
           target_industries: responses['4'] || [],
           additional_pages_list: responses['1.1'] || '',
           company_description: responses['6'] || '',

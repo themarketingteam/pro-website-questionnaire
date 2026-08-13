@@ -132,9 +132,39 @@ describe('submission payload normalizers', () => {
     }, 'Acme', 'acme.com', { Security: ['Firewall Management'] });
 
     expect(payload.metadata.business_name).toBe('Acme');
-    expect(payload.userdata.service_offerings).toEqual(['Firewall Management', 'Help Desk']);
+    expect(payload.userdata.service_offerings).toEqual([
+      'Security',
+      'Firewall Management',
+      'Help Desk'
+    ]);
     expect(payload.userdata.target_industries).toEqual(['Healthcare']);
     expect(payload.userdata.service_guarantee).toBe(true);
+  });
+
+  it('emits each parent followed by only its selected children and keeps Other separate', () => {
+    const payload = transformResponsesToPayload({
+      '3': [
+        'PARENT:Managed IT Services',
+        'Managed IT',
+        'PARENT:Cybersecurity Services',
+        'Cybersecurity'
+      ],
+      '3_other': ['Fractional CIO']
+    }, 'Acme', 'acme.com', {
+      'Managed IT Services': ['Managed IT', 'Co-Managed IT'],
+      'Cybersecurity Services': ['Cybersecurity', 'Penetration Testing']
+    });
+
+    expect(payload.userdata.service_offerings).toEqual([
+      'Managed IT Services',
+      'Managed IT',
+      'Cybersecurity Services',
+      'Cybersecurity'
+    ]);
+    expect(payload.userdata.service_offerings).not.toContain('Co-Managed IT');
+    expect(payload.userdata.service_offerings).not.toContain('Penetration Testing');
+    expect(payload.userdata.service_offerings.join('|')).not.toMatch(/PARENT:|CATEGORY:/);
+    expect(payload.userdata.service_offerings_other).toBe('Fractional CIO');
   });
 
   it('fails validation when required metadata is missing', () => {

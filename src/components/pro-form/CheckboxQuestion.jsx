@@ -1,5 +1,9 @@
-import React from 'react';
 import { Check } from 'lucide-react';
+import {
+  analyzeServiceSelections,
+  canonicalizeServiceSelectionState,
+  serviceParentSelection
+} from '@/lib/serviceSelectionModel';
 
 export default function CheckboxQuestion({ 
   options, 
@@ -15,60 +19,52 @@ export default function CheckboxQuestion({
   allowCategorySelection = false,
   externalDisabled = false
 }) {
-  const [showModal, setShowModal] = React.useState(false);
-  const [modalCategory, setModalCategory] = React.useState('');
-  const [shownModals, setShownModals] = React.useState(new Set());
-  
   // Use multi-other when there's a max limit
   const multiOther = showOther && max;
   const multiOtherMax = max || 10;
+  const serviceSelectionState = allowCategorySelection && groupedOptions
+    ? analyzeServiceSelections(value, groupedOptions)
+    : null;
+  const currentValue = serviceSelectionState?.canonicalSelections || value;
   
   const handleToggle = (option) => {
-    const newValue = value.includes(option)
-      ? value.filter(v => v !== option)
-      : [...value, option];
+    const newValue = currentValue.includes(option)
+      ? currentValue.filter(v => v !== option)
+      : [...currentValue, option];
     
     // Enforce max limit
-    if (max && newValue.length > max) return;
+    if (!currentValue.includes(option) && max && totalSelections >= max) return;
     
-    onChange(newValue);
+    onChange(
+      allowCategorySelection && groupedOptions
+        ? canonicalizeServiceSelectionState(newValue, groupedOptions)
+        : newValue
+    );
   };
 
   const handleCategoryToggle = (categoryName) => {
-    const categoryPrefix = `CATEGORY:${categoryName}`;
-    const categoryOptions = groupedOptions[categoryName];
+    const categoryPrefix = serviceParentSelection(categoryName);
+    const categoryOptions = groupedOptions[categoryName] || [];
+    const categoryIsSelected = isCategorySelected(categoryName);
     
-    // Check if category is currently selected
-    const isCategorySelected = value.includes(categoryPrefix);
-    
-    if (isCategorySelected) {
-      // Deselect category
-      onChange(value.filter(v => v !== categoryPrefix));
+    if (categoryIsSelected) {
+      onChange(currentValue.filter(
+        (selection) => selection !== categoryPrefix && !categoryOptions.includes(selection)
+      ));
     } else {
-      // Show modal only if not shown before for this category
-      if (!shownModals.has(categoryName)) {
-        setModalCategory(categoryName);
-        setShowModal(true);
-        setShownModals(prev => new Set([...prev, categoryName]));
-      }
-      
-      // Select category and remove any individual selections from that category
-      const newValue = value.filter(v => !categoryOptions.includes(v));
-      newValue.push(categoryPrefix);
-      
-      // Enforce max limit
-      if (max && newValue.length > max) return;
-      
-      onChange(newValue);
+      onChange(canonicalizeServiceSelectionState(
+        [...currentValue, categoryPrefix],
+        groupedOptions
+      ));
     }
   };
 
   const isCategorySelected = (categoryName) => {
-    return value.includes(`CATEGORY:${categoryName}`);
+    return serviceSelectionState?.selectedParents.has(categoryName) || false;
   };
 
   const isIndividualDisabled = (categoryName) => {
-    return isCategorySelected(categoryName);
+    return allowCategorySelection && !isCategorySelected(categoryName);
   };
 
   // Count other entries for max calculation
@@ -76,12 +72,15 @@ export default function CheckboxQuestion({
     ? (Array.isArray(otherValue) ? otherValue.filter(v => v.trim()).length : 0)
     : (otherValue?.trim() ? 1 : 0);
 
-  const totalSelections = value.length + otherEntriesCount;
+  const mainSelectionsCount = serviceSelectionState
+    ? serviceSelectionState.countedChildSelections
+    : currentValue.length;
+  const totalSelections = mainSelectionsCount + otherEntriesCount;
 
   const isDisabled = (option) => {
-    if (externalDisabled && !value.includes(option)) return true;
+    if (externalDisabled && !currentValue.includes(option)) return true;
     if (!max) return false;
-    return totalSelections >= max && !value.includes(option);
+    return totalSelections >= max && !currentValue.includes(option);
   };
 
   const canAddMoreOther = !externalDisabled && (!max || totalSelections < max);
@@ -93,8 +92,9 @@ export default function CheckboxQuestion({
           totalSelections < (min || 0) ? 'text-[#F29100]' : 
           totalSelections > (max || Infinity) ? 'text-red-600' : 'text-[#566C75]'
         }`}>
-          {totalSelections} / {max || '∞'} selections
+          {totalSelections} / {max || '∞'} {allowCategorySelection ? 'service selections' : 'selections'}
           {min && ` (minimum ${min})`}
+          {allowCategorySelection && ' — parent pages do not count'}
         </span>
       )}
       
@@ -111,9 +111,11 @@ export default function CheckboxQuestion({
                 <h4 className="text-xs font-semibold text-[#566C75] uppercase tracking-wide mb-3">{groupName}</h4>
                 
                 {allowCategorySelection && (
-                  <div 
+                  <button
+                    type="button"
                     onClick={() => handleCategoryToggle(groupName)}
-                    className={`flex items-center gap-3 p-4 border-2 rounded-lg cursor-pointer transition-all mb-3 ${
+                    aria-pressed={categorySelected}
+                    className={`flex w-full items-center gap-3 p-4 border-2 rounded-lg text-left transition-all mb-3 ${
                       categorySelected
                         ? 'border-[#90C944] bg-[#90C944] ring-2 ring-[#90C944]/30'
                         : 'border-[#C1C6C8] hover:border-[#90C944] hover:bg-[#F0F8E8]'
@@ -131,19 +133,29 @@ export default function CheckboxQuestion({
                     }`}>
                       {groupName}
                     </span>
-                  </div>
+                  </button>
                 )}
+
+                {allowCategorySelection && categorySelected &&
+                  !categoryOptionsHaveSelection(groupOptions, currentValue) && (
+                    <p className="mb-3 text-xs font-medium text-[#D37E00]">
+                      Select at least one service under this parent page.
+                    </p>
+                  )}
                 
                 <div className={columns === 3 ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2' : 'grid grid-cols-1 sm:grid-cols-2 gap-2'}>
                   {groupOptions.map((option) => {
                     const optionDisabled = isDisabled(option) || individualOptionsDisabled;
                     
                     return (
-                      <div 
+                      <button
+                        type="button"
                         key={option}
                         onClick={() => !optionDisabled && handleToggle(option)}
-                        className={`flex items-center gap-3 p-3 min-h-[44px] border rounded cursor-pointer transition-all ${
-                          value.includes(option)
+                        disabled={optionDisabled}
+                        aria-pressed={currentValue.includes(option)}
+                        className={`flex items-center gap-3 p-3 min-h-[44px] border rounded text-left transition-all ${
+                          currentValue.includes(option)
                             ? 'border-[#1C82DE] bg-[#E8F3FC] ring-2 ring-[#1C82DE]/20'
                             : optionDisabled
                             ? 'border-[#E8EBED] bg-[#E8EBED] cursor-not-allowed opacity-50'
@@ -151,18 +163,18 @@ export default function CheckboxQuestion({
                         }`}
                       >
                         <div className={`w-5 h-5 flex-shrink-0 rounded border-2 flex items-center justify-center transition-all ${
-                          value.includes(option) 
+                          currentValue.includes(option)
                             ? 'border-[#1C82DE] bg-[#1C82DE]' 
                             : 'border-[#A9AAAC]'
                         }`}>
-                          {value.includes(option) && <Check className="w-3 h-3 text-white" />}
+                          {currentValue.includes(option) && <Check className="w-3 h-3 text-white" />}
                         </div>
                         <span className={`select-none text-sm ${
-                          value.includes(option) ? 'text-[#1C82DE] font-medium' : 'text-[#1E3950]'
+                          currentValue.includes(option) ? 'text-[#1C82DE] font-medium' : 'text-[#1E3950]'
                         }`}>
                           {option}
                         </span>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -173,11 +185,14 @@ export default function CheckboxQuestion({
       ) : (
         <div className={columns === 3 ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5' : 'grid grid-cols-1 sm:grid-cols-2 gap-2.5'}>
           {options.map((option) => (
-            <div 
+            <button
+              type="button"
               key={option}
               onClick={() => !isDisabled(option) && handleToggle(option)}
-              className={`flex items-center gap-3 p-4 min-h-[44px] border rounded cursor-pointer transition-all ${
-                value.includes(option)
+              disabled={isDisabled(option)}
+              aria-pressed={currentValue.includes(option)}
+              className={`flex items-center gap-3 p-4 min-h-[44px] border rounded text-left transition-all ${
+                currentValue.includes(option)
                   ? 'border-[#1C82DE] bg-[#E8F3FC] ring-2 ring-[#1C82DE]/20'
                   : isDisabled(option)
                   ? 'border-[#E8EBED] bg-[#E8EBED] cursor-not-allowed opacity-50'
@@ -185,18 +200,18 @@ export default function CheckboxQuestion({
               }`}
             >
               <div className={`w-5 h-5 flex-shrink-0 rounded border-2 flex items-center justify-center transition-all ${
-                value.includes(option) 
+                currentValue.includes(option)
                   ? 'border-[#1C82DE] bg-[#1C82DE]' 
                   : 'border-[#A9AAAC]'
               }`}>
-                {value.includes(option) && <Check className="w-3 h-3 text-white" />}
+                {currentValue.includes(option) && <Check className="w-3 h-3 text-white" />}
               </div>
               <span className={`select-none text-sm ${
-                value.includes(option) ? 'text-[#1C82DE] font-medium' : 'text-[#1E3950]'
+                currentValue.includes(option) ? 'text-[#1C82DE] font-medium' : 'text-[#1E3950]'
               }`}>
                 {option}
               </span>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -271,28 +286,10 @@ export default function CheckboxQuestion({
         </div>
       )}
       
-      {showModal && (
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
-            <h3 className="text-xl font-bold text-[#122947] mb-4">Category Selection</h3>
-            <p className="text-[#1E3950] leading-relaxed mb-4">
-              This selection will create a single page on your new website called: <strong>{modalCategory}</strong>.
-            </p>
-            <p className="text-[#1E3950] leading-relaxed mb-4">
-              ALL SUB SERVICES will be listed on this page as services your organization offers.
-            </p>
-            <p className="text-[#1E3950] leading-relaxed mb-6">
-              <strong>If you do not offer one of these services in the sub category</strong> please deselect the <strong>"{modalCategory}"</strong> option for this category. You can then proceed to select the sub category options your organization serves.
-            </p>
-            <button
-              onClick={() => setShowModal(false)}
-              className="w-full px-6 py-3 bg-[#1C82DE] hover:bg-[#075DA7] text-white rounded-lg font-medium transition-colors"
-            >
-              Got it
-            </button>
-          </div>
-        </div>
-      )}
       </div>
       );
       }
+
+function categoryOptionsHaveSelection(groupOptions, value) {
+  return groupOptions.some((option) => value.includes(option));
+}

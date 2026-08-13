@@ -379,12 +379,22 @@ describe('submission payload transformation shape safety', () => {
   });
 
   it('normalizeServiceSelections handles strings and objects', () => {
-    expect(normalizeServiceSelections('Managed IT Services', groupedServices)).toEqual(['Managed IT Services']);
-    expect(normalizeServiceSelections([{ label: 'Endpoint Protection' }], groupedServices)).toEqual(['Endpoint Protection']);
+    expect(normalizeServiceSelections('Managed IT Services', groupedServices)).toEqual([
+      'Core Services',
+      'Managed IT Services'
+    ]);
+    expect(normalizeServiceSelections([{ label: 'Endpoint Protection' }], groupedServices)).toEqual([
+      'Security',
+      'Endpoint Protection'
+    ]);
   });
 
-  it('normalizeServiceSelections expands CATEGORY values', () => {
-    expect(normalizeServiceSelections(['CATEGORY:Core Services'], groupedServices)).toEqual(['Managed IT Services', 'Help Desk']);
+  it('normalizeServiceSelections preserves a legacy CATEGORY parent and all of its children', () => {
+    expect(normalizeServiceSelections(['CATEGORY:Core Services'], groupedServices)).toEqual([
+      'Core Services',
+      'Managed IT Services',
+      'Help Desk'
+    ]);
   });
 
   it('normalizeIndustrySelections returns arrays', () => {

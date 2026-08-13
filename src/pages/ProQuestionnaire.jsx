@@ -64,6 +64,10 @@ import {
   writeDraftFailureBackup
 } from '@/lib/draftPersistence';
 import { safeLocalStorageSet, safeNowIso } from '@/lib/browserSafety';
+import {
+  countSelectedServiceChildren,
+  getServiceParentsWithoutChildren
+} from '@/lib/serviceSelectionModel';
 
 const DeferredSectionLoader = () => (
   <div className="flex items-center justify-center py-6">
@@ -123,7 +127,10 @@ export default function ProQuestionnaire() {
   const otherServicesCount = Array.isArray(otherServices) 
     ? otherServices.filter(v => v?.trim()).length 
     : (otherServices?.trim() ? 1 : 0);
-  const servicesCount = (responses['3'] || []).length + otherServicesCount;
+  const servicesCount = countSelectedServiceChildren(
+    responses['3'],
+    SERVICE_OPTIONS_GROUPED
+  ) + otherServicesCount;
   const industriesCount = (responses['4'] || []).length + (responses['4_other'] ? 1 : 0);
   const regionsCount = Array.isArray(responses['5']) ? responses['5'].length : 0;
   const totalSelections = servicesCount + industriesCount + regionsCount;
@@ -804,10 +811,16 @@ export default function ProQuestionnaire() {
             ? otherValue.filter(v => v?.trim()).length 
             : (otherValue.trim() ? 1 : 0);
         }
-        const totalCount = selections.length + otherCount;
+        const totalCount = questionId === '3'
+          ? countSelectedServiceChildren(selections, SERVICE_OPTIONS_GROUPED) + otherCount
+          : selections.length + otherCount;
         const min = question.limits?.min || 0;
         const max = question.limits?.max || Infinity;
-        newStatus = (totalCount >= min && totalCount <= max) ? 'complete' : 'incomplete';
+        const allSelectedParentsHaveChildren = questionId !== '3'
+          || getServiceParentsWithoutChildren(selections, SERVICE_OPTIONS_GROUPED).length === 0;
+        newStatus = totalCount >= min && totalCount <= max && allSelectedParentsHaveChildren
+          ? 'complete'
+          : 'incomplete';
         break;
       }
 
@@ -1021,7 +1034,7 @@ export default function ProQuestionnaire() {
 
     const hasPassingStatus = status === 'complete' || status === 'needs_work';
 
-    if (!hasActiveRequiredChildren && hasPassingStatus) {
+    if (questionId !== '3' && !hasActiveRequiredChildren && hasPassingStatus) {
       return true;
     }
 
@@ -1103,10 +1116,14 @@ export default function ProQuestionnaire() {
             otherCount = 1;
           }
         }
-        const totalCount = selections.length + otherCount;
+        const totalCount = questionId === '3'
+          ? countSelectedServiceChildren(selections, SERVICE_OPTIONS_GROUPED) + otherCount
+          : selections.length + otherCount;
         const min = question.limits?.min || 0;
         const max = question.limits?.max || Infinity;
-        return totalCount >= min && totalCount <= max;
+        const allSelectedParentsHaveChildren = questionId !== '3'
+          || getServiceParentsWithoutChildren(selections, SERVICE_OPTIONS_GROUPED).length === 0;
+        return totalCount >= min && totalCount <= max && allSelectedParentsHaveChildren;
       }
       
       case 'radio': {

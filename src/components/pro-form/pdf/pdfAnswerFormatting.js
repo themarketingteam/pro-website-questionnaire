@@ -1,3 +1,5 @@
+import { formatServiceSelectionLabel } from '@/lib/serviceSelectionModel';
+
 const isObject = (value) => value !== null && typeof value === 'object';
 
 const cleanText = (value) => {
@@ -236,6 +238,11 @@ const formatLocations = (answer, allResponses) => {
     .join('\n');
 };
 
+const formatServiceSelections = (answer) => asItems(answer)
+  .map(formatServiceSelectionLabel)
+  .filter(Boolean)
+  .join('\n');
+
 const formatCertification = (item) => {
   if (!isObject(item) || Array.isArray(item)) return formatGenericValue(item);
 
@@ -387,7 +394,9 @@ export const formatAnswerForPdf = (
   const normalizedQuestionId = cleanText(questionId);
   let mainAnswer = '';
 
-  if (normalizedQuestionId === '5') {
+  if (normalizedQuestionId === '3') {
+    mainAnswer = formatServiceSelections(answer);
+  } else if (normalizedQuestionId === '5') {
     mainAnswer = formatLocations(answer, allResponses);
   } else if (normalizedQuestionId === '12.1') {
     mainAnswer = formatCertifications(answer);

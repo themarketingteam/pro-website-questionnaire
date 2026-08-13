@@ -1,5 +1,6 @@
-import { QUESTIONS } from '@/components/pro-form/questionData';
+import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import { getAllQuestionIds, getQuestionById } from '@/components/pro-form/questionUtils';
+import { canonicalizeServiceSelectionState } from '@/lib/serviceSelectionModel';
 
 function uniqArray(arr) {
   return Array.from(new Set(arr || []));
@@ -131,14 +132,26 @@ export function normalizePersistedState(state) {
 
       case 'checkbox': {
         const opts = new Set(getOptions(id));
+        const serviceParentNames = id === '3'
+          ? new Set(Object.keys(SERVICE_OPTIONS_GROUPED))
+          : new Set();
         const arr = Array.isArray(val) ? val.slice() : [];
         const keep = [];
         arr.forEach((v) => {
           if (typeof v !== 'string') return;
-          if (id === '3' && v.startsWith('CATEGORY:')) { keep.push(v); return; }
+          if (id === '3' && (v.startsWith('CATEGORY:') || v.startsWith('PARENT:'))) {
+            keep.push(v);
+            return;
+          }
+          if (id === '3' && serviceParentNames.has(v)) {
+            keep.push(v);
+            return;
+          }
           if (opts.has(v)) keep.push(v);
         });
-        next.responses[id] = uniqArray(keep);
+        next.responses[id] = id === '3'
+          ? canonicalizeServiceSelectionState(keep, SERVICE_OPTIONS_GROUPED)
+          : uniqArray(keep);
         // _other may be string or array; normalize to array of non-empty strings when max is set in UI else keep string
         // Here, just coerce array types safely if exists
         const otherKey = `${id}_other`;

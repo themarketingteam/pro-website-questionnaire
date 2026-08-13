@@ -53,7 +53,7 @@ describe('questionnaire PDF version payloads', () => {
       '1': 'yes',
       '1.1': 'Fast local support.',
       '2': 'no',
-      '3': ['Managed IT'],
+      '3': ['Managed IT Services', 'Managed IT'],
       '3_other': 'Apple support',
       '5_primary': 0,
       '6': 'A managed service provider.',
@@ -66,6 +66,23 @@ describe('questionnaire PDF version payloads', () => {
       '25.1': 'Use the new logo.'
     });
     expect(responses['5'][0].geographic_area_meta.label).toBe('Chicago, IL');
+  });
+
+  it('migrates legacy service categories when rebuilding a PDF snapshot', () => {
+    const responses = questionnaireResponsesFromSubmissionPayload({
+      userdata: {
+        service_offerings: ['CATEGORY:Managed IT Services']
+      }
+    });
+
+    expect(responses['3']).toEqual([
+      'Managed IT Services',
+      'Managed IT',
+      'Co-Managed IT',
+      'Remote Monitoring & Management (RMM)',
+      'IT Asset Management',
+      'On-Site Support'
+    ]);
   });
 
   it('uses the stored draft payload and the applied intake repair as their active sources', () => {

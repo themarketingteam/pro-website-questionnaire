@@ -25,6 +25,13 @@ describe('formatAnswerForPdf', () => {
       .toBe('Managed IT\nCloud Services\nCybersecurity');
   });
 
+  it('shows service parent labels without exposing internal markers', () => {
+    expect(formatAnswerForPdf('3', [
+      'PARENT:Managed IT Services',
+      'Managed IT'
+    ])).toBe('Managed IT Services\nManaged IT');
+  });
+
   it('appends an Other value on a new line', () => {
     expect(formatAnswerForPdf('3', ['Managed IT'], 'Fractional CIO'))
       .toBe('Managed IT\nOther: Fractional CIO');

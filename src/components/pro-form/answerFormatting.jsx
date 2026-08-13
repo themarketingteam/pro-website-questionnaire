@@ -1,3 +1,5 @@
+import { formatServiceSelectionLabel } from '@/lib/serviceSelectionModel';
+
 const isEmpty = (value) => {
   if (value == null) return true;
   if (typeof value === 'string') return value.trim().length === 0;
@@ -129,6 +131,8 @@ export const formatAnswerForDisplay = (
         .map((item, index) => formatLocation(item, index, allResponses))
         .filter(Boolean)
         .join('; ');
+    } else if (questionId === '3') {
+      mainAnswer = answer.map(formatServiceSelectionLabel).filter(Boolean).join(', ');
     } else if (questionId === '12.1') {
       mainAnswer = answer.map(formatCertification).filter(Boolean).join('; ');
     } else if (questionId === '14.1') {

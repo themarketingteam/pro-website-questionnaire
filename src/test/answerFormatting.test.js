@@ -2,6 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { formatAnswerForDisplay } from '@/components/pro-form/answerFormatting';
 
 describe('formatAnswerForDisplay', () => {
+  it('shows service parent labels without exposing internal markers', () => {
+    const result = formatAnswerForDisplay('3', [
+      'PARENT:Managed IT Services',
+      'Managed IT'
+    ]);
+
+    expect(result).toBe('Managed IT Services, Managed IT');
+    expect(result).not.toContain('PARENT:');
+  });
+
   it('formats geographic location objects without object coercion', () => {
     const result = formatAnswerForDisplay(
       '5',
