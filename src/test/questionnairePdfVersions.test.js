@@ -4,8 +4,10 @@ import {
   getDraftPdfPayload,
   getIntakePdfPayload,
   hashQuestionnairePdfSnapshot,
-  questionnaireResponsesFromSubmissionPayload
+  questionnaireResponsesFromSubmissionPayload,
+  stableQuestionnairePdfSnapshot
 } from '@/lib/questionnairePdfVersions';
+import { QUESTIONNAIRE_PDF_TEMPLATE_REVISION } from '@/components/pro-form/pdf/questionnairePdfTheme';
 
 const payload = {
   metadata: {
@@ -43,6 +45,18 @@ const payload = {
     primary_cta: 'Schedule a Consultation',
     additional_notes: 'Use the new logo.'
   }
+};
+
+const legacyStableValue = (value) => {
+  if (Array.isArray(value)) return value.map(legacyStableValue);
+  if (value === null || typeof value !== 'object') return value;
+
+  return Object.keys(value)
+    .sort()
+    .reduce((result, key) => {
+      result[key] = legacyStableValue(value[key]);
+      return result;
+    }, {});
 };
 
 describe('questionnaire PDF version payloads', () => {
@@ -117,5 +131,21 @@ describe('questionnaire PDF version payloads', () => {
       .resolves.toBe(await hashQuestionnairePdfSnapshot(snapshot));
     await expect(hashQuestionnairePdfSnapshot(changedSnapshot))
       .resolves.not.toBe(await hashQuestionnairePdfSnapshot(snapshot));
+  });
+
+  it('includes the template revision in the stable fingerprint', async () => {
+    const snapshot = buildQuestionnairePdfSnapshot({ payload });
+    const serialized = stableQuestionnairePdfSnapshot(snapshot);
+    const legacySerialized = JSON.stringify(legacyStableValue(snapshot));
+    const legacyDigest = await globalThis.crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(legacySerialized)
+    );
+    const legacyHash = [...new Uint8Array(legacyDigest)]
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('');
+
+    expect(serialized).toContain(`\"templateRevision\":\"${QUESTIONNAIRE_PDF_TEMPLATE_REVISION}\"`);
+    await expect(hashQuestionnairePdfSnapshot(snapshot)).resolves.not.toBe(legacyHash);
   });
 });

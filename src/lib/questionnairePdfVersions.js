@@ -1,4 +1,5 @@
 import { SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
+import { QUESTIONNAIRE_PDF_TEMPLATE_REVISION } from '@/components/pro-form/pdf/questionnairePdfTheme';
 import { normalizeServiceSelectionsForPayload } from '@/lib/serviceSelectionModel';
 
 const isPlainObject = (value) => (
@@ -145,7 +146,10 @@ const stableValue = (value) => {
 };
 
 export const stableQuestionnairePdfSnapshot = (snapshot) => (
-  JSON.stringify(stableValue(snapshot))
+  JSON.stringify(stableValue({
+    snapshot,
+    templateRevision: QUESTIONNAIRE_PDF_TEMPLATE_REVISION
+  }))
 );
 
 export const hashQuestionnairePdfSnapshot = async (snapshot) => {

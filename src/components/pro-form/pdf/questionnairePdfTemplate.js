@@ -1,7 +1,7 @@
 import { escapeHtml } from '../answerFormatting';
 import { QUESTIONNAIRE_PDF_THEME } from './questionnairePdfTheme';
 
-const { colors, layout, page } = QUESTIONNAIRE_PDF_THEME;
+const { colors, header, layout, page, typography } = QUESTIONNAIRE_PDF_THEME;
 
 const preserveLineBreaks = (value) => escapeHtml(value).replace(/\r?\n/g, '<br />');
 
@@ -59,54 +59,54 @@ export const buildQuestionnairePdfHtml = (model, { logoUrl } = {}) => {
 
       .questionnaire-pdf-header {
         position: relative;
-        height: 288.5pt;
+        height: ${header.heightPt}pt;
         margin: 0 ${page.horizontalMarginPt}pt;
       }
 
       .questionnaire-pdf-logo {
         position: absolute;
-        top: 87.36pt;
-        left: 6.72pt;
+        top: ${header.logoTopPt}pt;
+        left: ${header.logoLeftPt}pt;
         display: block;
-        width: 187.68pt;
-        height: 39.36pt;
-        object-fit: contain;
+        width: ${header.logoWidthPt}pt;
+        height: ${header.logoHeightPt}pt;
+        object-fit: fill;
       }
 
       .questionnaire-pdf-title {
         position: absolute;
-        top: 139.5pt;
+        top: ${header.titleTopPt}pt;
         left: 0;
         margin: 0;
         color: ${colors.purple};
-        font-size: 24pt;
+        font-size: ${typography.titleSizePt}pt;
         font-weight: 700;
-        line-height: 29.5pt;
+        line-height: ${typography.titleLineHeightPt}pt;
         letter-spacing: -0.5pt;
       }
 
       .questionnaire-pdf-service-label {
         position: absolute;
-        top: 208pt;
+        top: ${header.serviceLabelTopPt}pt;
         left: 0;
         margin: 0;
         color: ${colors.bodyText};
-        font-size: 8.5pt;
+        font-size: ${typography.serviceLabelSizePt}pt;
         font-weight: 400;
-        line-height: 11pt;
+        line-height: ${typography.serviceLabelLineHeightPt}pt;
       }
 
       .questionnaire-pdf-header-divider {
         position: absolute;
+        top: ${header.dividerTopPt}pt;
         right: 0;
-        bottom: 0;
         left: 0;
-        height: 1pt;
+        height: ${header.dividerHeightPt}pt;
         background: ${colors.divider};
       }
 
       .questionnaire-pdf-content {
-        margin: 9pt ${page.horizontalMarginPt}pt 118pt;
+        margin: ${layout.contentTopGapPt}pt ${page.horizontalMarginPt}pt 122.5pt;
       }
 
       .questionnaire-pdf-section-bar {
@@ -114,17 +114,21 @@ export const buildQuestionnairePdfHtml = (model, { logoUrl } = {}) => {
         align-items: center;
         width: 100%;
         height: ${layout.sectionBarHeightPt}pt;
-        padding: 0 8pt;
+        padding: 0 ${layout.sectionBarPaddingPt}pt;
         background: ${colors.purple};
         color: ${colors.white};
-        font-size: 8pt;
+        font-size: ${typography.sectionLabelSizePt}pt;
         font-weight: 700;
-        line-height: 1;
+        line-height: ${typography.sectionLabelLineHeightPt}pt;
       }
 
       .questionnaire-pdf-business-rows,
       .questionnaire-pdf-question-rows {
-        margin-top: 16pt;
+        margin-top: ${layout.businessRowsGapPt}pt;
+      }
+
+      .questionnaire-pdf-question-rows {
+        margin-top: ${layout.questionRowsGapPt}pt;
       }
 
       .questionnaire-pdf-business-row {
@@ -139,34 +143,38 @@ export const buildQuestionnairePdfHtml = (model, { logoUrl } = {}) => {
         display: flex;
         align-items: center;
         min-width: 0;
-        padding: 7pt 10pt;
+        padding: 7pt ${layout.cellHorizontalPaddingPt}pt;
         overflow-wrap: anywhere;
       }
 
       .questionnaire-pdf-business-label {
-        border-bottom: 0.5pt solid ${colors.divider};
+        border-bottom: 0.5pt solid ${colors.businessDivider};
         background: ${colors.lavender};
         color: ${colors.labelText};
-        font-size: 9pt;
+        font-size: ${typography.businessLabelSizePt}pt;
         font-weight: 700;
-        line-height: 11pt;
+        line-height: ${typography.businessLabelLineHeightPt}pt;
       }
 
       .questionnaire-pdf-business-value {
         background: ${colors.white};
         color: ${colors.bodyText};
-        font-size: 8pt;
+        font-size: ${typography.answerSizePt}pt;
         font-weight: 400;
-        line-height: 11pt;
+        line-height: ${typography.answerLineHeightPt}pt;
         white-space: pre-wrap;
       }
 
       .questionnaire-pdf-section {
-        margin-top: 16pt;
+        margin-top: ${layout.secondSectionGapPt}pt;
       }
 
       .questionnaire-pdf-section--1 {
-        margin-top: 20pt;
+        margin-top: ${layout.firstSectionGapPt}pt;
+      }
+
+      .questionnaire-pdf-section--3 {
+        margin-top: ${layout.thirdSectionGapPt}pt;
       }
 
       .questionnaire-pdf-row {
@@ -181,11 +189,26 @@ export const buildQuestionnairePdfHtml = (model, { logoUrl } = {}) => {
         margin-top: ${layout.rowGapPt}pt;
       }
 
+      .questionnaire-pdf-row--child + .questionnaire-pdf-row {
+        margin-top: ${layout.rowGapAfterChildPt}pt;
+      }
+
       .questionnaire-pdf-row--child {
-        grid-template-columns: calc(50% - 3pt) calc(50% + 3pt);
-        width: calc(100% - ${layout.childIndentPt}pt);
+        position: relative;
+        grid-template-columns: 1fr 1fr;
+        width: calc(100% - ${layout.childIndentPt + layout.childRightInsetPt}pt);
         margin-left: ${layout.childIndentPt}pt;
-        border-left: ${layout.childAccentWidthPt}pt solid ${colors.purple};
+      }
+
+      .questionnaire-pdf-row--child::before {
+        position: absolute;
+        z-index: 1;
+        top: 0;
+        bottom: 0;
+        left: -${layout.childAccentWidthPt / 2}pt;
+        width: ${layout.childAccentWidthPt}pt;
+        background: ${colors.purple};
+        content: '';
       }
 
       .questionnaire-pdf-question-cell,
@@ -195,17 +218,17 @@ export const buildQuestionnairePdfHtml = (model, { logoUrl } = {}) => {
       }
 
       .questionnaire-pdf-question-cell {
-        padding: 8pt 10pt 9pt;
+        padding: 6.6pt ${layout.cellHorizontalPaddingPt}pt 8pt;
         background: ${colors.lavender};
       }
 
       .questionnaire-pdf-answer-cell {
-        padding: 8pt 10pt 9pt;
+        padding: 6.6pt ${layout.cellHorizontalPaddingPt}pt 8pt;
         background: ${colors.white};
         color: ${colors.bodyText};
-        font-size: 8pt;
+        font-size: ${typography.answerSizePt}pt;
         font-weight: 400;
-        line-height: 11pt;
+        line-height: ${typography.answerLineHeightPt}pt;
         overflow-wrap: anywhere;
         word-break: break-word;
         white-space: pre-wrap;
@@ -214,27 +237,32 @@ export const buildQuestionnairePdfHtml = (model, { logoUrl } = {}) => {
       .questionnaire-pdf-question-number {
         margin: 0 0 8pt;
         color: ${colors.accentPurple};
-        font-size: 7pt;
+        font-size: ${typography.questionNumberSizePt}pt;
         font-weight: 700;
-        line-height: 9pt;
+        line-height: ${typography.questionNumberLineHeightPt}pt;
       }
 
       .questionnaire-pdf-question-title {
         margin: 0;
         color: ${colors.bodyText};
-        font-size: 8pt;
+        font-size: ${typography.questionTitleSizePt}pt;
         font-weight: 700;
-        line-height: 10.5pt;
+        line-height: ${typography.questionTitleLineHeightPt}pt;
+      }
+
+      .questionnaire-pdf-row--child .questionnaire-pdf-question-cell,
+      .questionnaire-pdf-row--child .questionnaire-pdf-answer-cell {
+        padding-top: 6.4pt;
       }
 
       .questionnaire-pdf-row--child .questionnaire-pdf-question-number {
-        font-size: 6.5pt;
-        line-height: 8pt;
+        font-size: ${typography.childNumberSizePt}pt;
+        line-height: ${typography.childNumberLineHeightPt}pt;
       }
 
       .questionnaire-pdf-row--child .questionnaire-pdf-question-title {
-        font-size: 7.5pt;
-        line-height: 10pt;
+        font-size: ${typography.childTitleSizePt}pt;
+        line-height: ${typography.childTitleLineHeightPt}pt;
       }
     </style>
     <article class="questionnaire-pdf-document" data-questionnaire-pdf-document>

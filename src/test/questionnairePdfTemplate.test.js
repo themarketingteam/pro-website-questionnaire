@@ -84,18 +84,34 @@ describe('questionnaire PDF DOM template', () => {
     ]);
   });
 
-  it('uses the reference header, two-column layout, minimum heights, and local logo', () => {
+  it('uses the exact reference geometry, typography, colors, and local logo', () => {
     const html = buildQuestionnairePdfHtml(makeModel(), {
       logoUrl: '/assets/msp-success-digital-logo.svg'
     });
 
     expect(html).toContain('width: 612pt');
     expect(html).toContain('min-height: 4356pt');
+    expect(html).toContain('margin: 9pt 39.6pt 122.5pt');
+    expect(html).toContain('height: 288.5pt');
+    expect(html).toContain('top: 89.45pt');
+    expect(html).toContain('left: 9.05pt');
+    expect(html).toContain('width: 183.6pt');
+    expect(html).toContain('height: 35.3pt');
+    expect(html).toContain('font-size: 27pt');
+    expect(html).toContain('font-size: 10.5pt');
+    expect(html).toContain('font-size: 9pt');
+    expect(html).toContain('font-size: 8.5pt');
+    expect(html).toContain('font-size: 9.5pt');
     expect(html).toContain('grid-template-columns: 1fr 2fr');
     expect(html).toContain('grid-template-columns: 1fr 1fr');
+    expect(html).toContain('width: calc(100% - 21.6pt)');
+    expect(html).toContain('margin-left: 16.2pt');
     expect(html).toContain('background: #6464FF');
     expect(html).toContain('background: #ECECFF');
-    expect(html).toContain('border-left: 3pt solid #6464FF');
+    expect(html).toContain('border-bottom: 0.5pt solid #E2E2E9');
+    expect(html).toContain('width: 2.25pt');
+    expect(html).toContain('margin-top: 17.1pt');
+    expect(html).toContain('margin-top: 16.1pt');
     expect(html).toContain('--questionnaire-row-min-height: 175pt');
     expect(html).toContain('src="/assets/msp-success-digital-logo.svg"');
     expect(html).toContain('<span>Website Content</span><br /><span>Questionnaire</span>');
@@ -209,7 +225,7 @@ describe('generatePDF browser rendering contract', () => {
     expect(canvasOptions.scale).toBeGreaterThanOrEqual(1.8);
     expect(pdfOptions.unit).toBe('pt');
     expect(pdfOptions.format[0]).toBe(612);
-    expect(pdfOptions.format[1]).toBeCloseTo(4356, 0);
+    expect(pdfOptions.format[1]).toBe(4356);
     expect(addImageMock).toHaveBeenCalledTimes(1);
     expect(saveMock).toHaveBeenCalledWith(result.filename);
     expect(trackClarityEventMock).toHaveBeenCalledWith(

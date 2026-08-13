@@ -143,4 +143,82 @@ describe('AdminQuestionnairePdfButton', () => {
       })
     );
   });
+
+  it('replaces a legacy-template PDF once, then reuses the unchanged current revision', async () => {
+    const snapshot = buildQuestionnairePdfSnapshot({ payload });
+    const currentHash = await hashQuestionnairePdfSnapshot(snapshot);
+    const generatedFile = new File(['current-template'], 'SavedMSP.pdf', {
+      type: 'application/pdf'
+    });
+    let latestCalls = 0;
+
+    createQuestionnairePdfFileMock.mockResolvedValue({
+      success: true,
+      filename: generatedFile.name,
+      file: generatedFile
+    });
+    base44.integrations.Core.UploadFile.mockResolvedValue({
+      file_url: 'https://files.example/current.pdf'
+    });
+    globalThis.fetch.mockResolvedValue({
+      ok: true,
+      blob: async () => new Blob(['current-template'], { type: 'application/pdf' })
+    });
+    base44.functions.invoke.mockImplementation(async (_name, body) => {
+      if (body.action === 'latest') {
+        latestCalls += 1;
+        return {
+          data: {
+            success: true,
+            version: latestCalls === 1
+              ? {
+                payload_hash: 'legacy-payload-only-hash',
+                file_url: 'https://files.example/legacy.pdf',
+                file_name: 'Legacy.pdf',
+                version_number: 2
+              }
+              : {
+                payload_hash: currentHash,
+                file_url: 'https://files.example/current.pdf',
+                file_name: generatedFile.name,
+                version_number: 3
+              }
+          }
+        };
+      }
+
+      return {
+        data: {
+          success: true,
+          created: true,
+          version: {
+            payload_hash: body.payloadHash,
+            file_url: body.fileUrl,
+            file_name: body.fileName,
+            version_number: 3
+          }
+        }
+      };
+    });
+
+    render(<AdminQuestionnairePdfButton {...defaultProps} />);
+    const button = screen.getByRole('button', { name: /download pdf/i });
+    await userEvent.click(button);
+
+    await waitFor(() => {
+      expect(toastSuccessMock).toHaveBeenCalledWith('PDF version 3 saved and downloaded.');
+    });
+    await userEvent.click(button);
+
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith('https://files.example/current.pdf');
+      expect(toastSuccessMock).toHaveBeenCalledWith(`PDF downloaded: ${generatedFile.name}`);
+    });
+    expect(createQuestionnairePdfFileMock).toHaveBeenCalledTimes(1);
+    expect(base44.integrations.Core.UploadFile).toHaveBeenCalledTimes(1);
+    expect(base44.functions.invoke).toHaveBeenCalledWith(
+      'manageQuestionnairePdfVersions',
+      expect.objectContaining({ action: 'save', payloadHash: currentHash })
+    );
+  });
 });

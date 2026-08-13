@@ -105,7 +105,7 @@ const renderQuestionnairePdf = async (
     }
 
     const pageWidthPt = QUESTIONNAIRE_PDF_THEME.page.widthPt;
-    const pageHeightPt = (canvas.height * pageWidthPt) / canvas.width;
+    const pageHeightPt = (heightPx * pageWidthPt) / widthPx;
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'pt',
