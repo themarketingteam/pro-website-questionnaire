@@ -32,9 +32,12 @@ const ProtectedGrant = () => {
 
 describe('DraftRecoveryPasswordGate', () => {
   it('does not mount protected content before password verification', async () => {
-    renderGate();
+    const { container } = renderGate();
 
     expect(await screen.findByLabelText('Password')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Kaseya MSP Success' })).toHaveAttribute('width', '411');
+    expect(container.querySelector('main')).toHaveClass('draft-recovery-brand', 'draft-recovery-gate');
+    expect(screen.getByRole('button', { name: 'Unlock draft recovery' })).toHaveClass('brand-button-primary');
     expect(screen.queryByText('Protected draft recovery')).not.toBeInTheDocument();
   });
 

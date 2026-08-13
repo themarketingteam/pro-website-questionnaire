@@ -4,6 +4,13 @@ import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import mspSuccessDigitalLogoDataUrl from '@/assets/mspSuccessDigitalLogo';
+import '@fontsource/plus-jakarta-sans/700.css';
+import '@fontsource/figtree/300.css';
+import '@fontsource/figtree/400.css';
+import '@fontsource/figtree/500.css';
+import '@fontsource/figtree/600.css';
+import './draftRecoveryBrand.css';
 
 const STORAGE_KEY = 'pro_draft_recovery_access_v1';
 
@@ -133,24 +140,43 @@ export default function DraftRecoveryPasswordGate({ children }) {
 
   if (accessState === 'checking') {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6" aria-live="polite">
-        <div className="flex items-center gap-3 text-sm font-medium text-slate-600">
+      <div className="draft-recovery-brand draft-recovery-gate" aria-live="polite">
+        <div className="draft-recovery-gate__checking text-sm">
+          <span className="draft-recovery-brand__logo-plate draft-recovery-gate__logo">
+            <img
+              src={mspSuccessDigitalLogoDataUrl}
+              alt="Kaseya MSP Success"
+              className="draft-recovery-brand__logo"
+              width="411"
+              height="79"
+            />
+          </span>
           <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-          Verifying access…
+          <span>Verifying access…</span>
         </div>
       </div>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-      <Card className="w-full max-w-md shadow-sm">
+    <main className="draft-recovery-brand draft-recovery-gate">
+      <Card className="draft-recovery-gate__card">
         <CardHeader className="space-y-4 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-700">
+          <span className="draft-recovery-brand__logo-plate draft-recovery-gate__logo">
+            <img
+              src={mspSuccessDigitalLogoDataUrl}
+              alt="Kaseya MSP Success"
+              className="draft-recovery-brand__logo"
+              width="411"
+              height="79"
+            />
+          </span>
+          <div className="draft-recovery-gate__icon mx-auto flex h-12 w-12 items-center justify-center rounded-full">
             <LockKeyhole className="h-6 w-6" aria-hidden="true" />
           </div>
           <div className="space-y-2">
-            <CardTitle className="text-2xl text-slate-900">Draft Recovery Access</CardTitle>
+            <p className="draft-recovery-brand__section-kicker">Admin support workspace</p>
+            <CardTitle className="brand-heading text-2xl text-slate-900">Draft Recovery Access</CardTitle>
             <p className="text-sm leading-6 text-slate-600">
               Enter the admin password to open draft recovery. Access remains available in this browser for seven days.
             </p>
@@ -179,7 +205,7 @@ export default function DraftRecoveryPasswordGate({ children }) {
                 {error}
               </p>
             ) : null}
-            <Button type="submit" className="w-full" disabled={submitting || !password}>
+            <Button type="submit" className="brand-button-primary w-full" disabled={submitting || !password}>
               {submitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               ) : (

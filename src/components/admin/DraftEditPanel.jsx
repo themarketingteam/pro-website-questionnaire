@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -97,7 +97,7 @@ export default function DraftEditPanel({ draft, computedPayload, onSaved, onCanc
   };
 
   return (
-    <div className="space-y-5 rounded-lg border border-blue-200 bg-blue-50/40 p-4">
+    <div className="brand-edit-panel space-y-5 rounded-lg border p-4">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-blue-900">Edit Draft</p>
         <Button type="button" variant="ghost" size="sm" onClick={onCancel} className="h-7 px-2">
@@ -174,7 +174,7 @@ export default function DraftEditPanel({ draft, computedPayload, onSaved, onCanc
         <Button
           type="button"
           size="sm"
-          className="gap-2 bg-blue-700 hover:bg-blue-800 text-white"
+          className="brand-button-primary gap-2"
           onClick={handleSave}
           disabled={saving || !!jsonError}
         >

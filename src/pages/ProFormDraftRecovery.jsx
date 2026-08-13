@@ -20,6 +20,7 @@ import { useDraftRecoveryAccess } from '@/components/admin/DraftRecoveryPassword
 import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
 import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
 import { SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
+import mspSuccessDigitalLogoDataUrl from '@/assets/mspSuccessDigitalLogo';
 
 const safeJsonParse = (value, fallback = {}) => {
   try {
@@ -67,7 +68,7 @@ function DraftAiRepairSection({ draft }) {
   };
 
   return (
-    <div className="space-y-2 rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 text-sm">
+    <div className="brand-ai-panel space-y-2 rounded-lg border p-3 text-sm">
       <p className="font-semibold text-indigo-900">AI Repair Result</p>
       {draft.ai_repair_status && (
         <p><span className="font-medium">Status:</span>{' '}
@@ -242,11 +243,11 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
 
 
   return (
-    <Card className="overflow-hidden">
+    <Card className={`brand-record-card ${expanded ? 'brand-record-card--expanded' : ''}`}>
       <button
         type="button"
         onClick={onToggle}
-        className="w-full text-left hover:bg-slate-50 transition-colors"
+        className="brand-record-trigger w-full text-left transition-colors"
       >
         <CardContent className="p-4">
           <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_auto_1fr_1fr_1fr] items-start">
@@ -293,7 +294,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
       </button>
 
       {expanded && (
-        <div className="border-t bg-slate-50/60 p-4 space-y-4">
+        <div className="brand-expanded-panel p-4 space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2 text-sm">
               <p><span className="font-medium">Business Name:</span> {localDraft.business_name || '—'}</p>
@@ -342,7 +343,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
 
           <div className="space-y-4">
             <section aria-label="Actions" className="space-y-2">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</p>
+              <p className="brand-action-label text-xs uppercase">Actions</p>
               <div className="flex flex-wrap gap-2">
                 {/* Edit Draft — always available */}
                 {!editing && (
@@ -350,7 +351,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="gap-2 border-slate-300 text-slate-700 hover:bg-slate-100"
+                    className="brand-button-secondary gap-2"
                     onClick={(e) => { e.stopPropagation(); setEditing(true); }}
                     disabled={isWorking}
                   >
@@ -365,7 +366,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                   size="sm"
                   onClick={handleRetry}
                   disabled={isWorking}
-                  className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                  className="brand-button-primary gap-2"
                 >
                   {retrying ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                   {retrying ? 'Retrying...' : 'Retry Submission'}
@@ -373,15 +374,15 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
               </div>
             </section>
 
-            <section aria-label="AI Actions" className="space-y-2 border-t border-slate-200 pt-4">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">AI Actions</p>
+            <section aria-label="AI Actions" className="brand-action-divider space-y-2 border-t pt-4">
+              <p className="brand-action-label text-xs uppercase">AI Actions</p>
               <div className="flex flex-wrap gap-2">
                 {/* AI Diagnose — runs diagnostics only, no changes, no submission */}
                 <Button
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
+                  className="brand-button-secondary gap-2"
                   disabled={isWorking}
                   onClick={(e) => handleAiAction(e, 'diagnose_only')}
                   title="Runs structure validation only. Does not change the draft or create a submission."
@@ -395,7 +396,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                   type="button"
                   size="sm"
                   variant="outline"
-                  className="gap-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                  className="brand-button-secondary gap-2"
                   disabled={isWorking}
                   onClick={(e) => handleAiAction(e, 'repair_only')}
                   title="Diagnoses and repairs the draft payload. Does NOT create a final submission."
@@ -408,7 +409,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                 <Button
                   type="button"
                   size="sm"
-                  className="gap-2 bg-indigo-700 hover:bg-indigo-800 text-white"
+                  className="brand-button-dark gap-2"
                   disabled={isWorking}
                   onClick={(e) => handleAiAction(e, 'repair_and_retry')}
                   title="Diagnoses, repairs, then attempts to create a final ProFormSubmission."
@@ -421,22 +422,22 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
               <p className="text-xs text-slate-400">Repair + Retry will attempt to create a final ProFormSubmission if repair succeeds.</p>
             </section>
 
-            <section aria-label="Data Copy Options (JSON)" className="space-y-2 border-t border-slate-200 pt-4">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Data Copy Options (JSON)</p>
+            <section aria-label="Data Copy Options (JSON)" className="brand-action-divider space-y-2 border-t pt-4">
+              <p className="brand-action-label text-xs uppercase">Data Copy Options (JSON)</p>
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={copySubmissionPayload} className="gap-2" disabled={isWorking}>
+                <Button type="button" variant="outline" size="sm" onClick={copySubmissionPayload} className="brand-button-secondary gap-2" disabled={isWorking}>
                   <Copy className="w-3 h-3" /> Endpoint Payload
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={copyRawResponses} className="gap-2" disabled={isWorking}>
+                <Button type="button" variant="outline" size="sm" onClick={copyRawResponses} className="brand-button-secondary gap-2" disabled={isWorking}>
                   <Copy className="w-3 h-3" /> Raw Draft
                 </Button>
                 {localDraft.ai_repaired_payload_json && (
-                  <Button type="button" variant="outline" size="sm" onClick={copyAiRepairedPayload} className="gap-2 border-indigo-200 text-indigo-700">
+                  <Button type="button" variant="outline" size="sm" onClick={copyAiRepairedPayload} className="brand-button-secondary gap-2">
                     <Copy className="w-3 h-3" /> Copy AI Repaired Payload
                   </Button>
                 )}
                 {localDraft.ai_repair_report_json && (
-                  <Button type="button" variant="outline" size="sm" onClick={copyAiReport} className="gap-2 border-indigo-200 text-indigo-700">
+                  <Button type="button" variant="outline" size="sm" onClick={copyAiReport} className="brand-button-secondary gap-2">
                     <Copy className="w-3 h-3" /> Copy AI Report
                   </Button>
                 )}
@@ -463,7 +464,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
               )}
               <span className="text-xs text-slate-500">(used by Retry Submission)</span>
             </div>
-            <pre className="bg-slate-950 text-slate-100 rounded-lg p-4 text-xs overflow-auto max-h-[40rem] whitespace-pre-wrap break-words">
+            <pre className="brand-json-panel rounded-lg p-4 text-xs overflow-auto max-h-[40rem] whitespace-pre-wrap break-words">
               {JSON.stringify(activeFinalPayload, null, 2)}
             </pre>
           </div>
@@ -556,71 +557,93 @@ export default function ProFormDraftRecovery() {
   }, [drafts, search, statusFilter]);
 
   return (
-    <div className="min-h-screen bg-slate-50 p-4 md:p-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Pro Form Draft Recovery</h1>
-          <p className="text-slate-600 mt-1">Review recent questionnaire drafts and copy recovery data for support.</p>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Filters</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-[220px_1fr]">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="submit_attempted">Submit Attempted</SelectItem>
-                <SelectItem value="submit_failed">Submit Failed</SelectItem>
-                <SelectItem value="submitted">Submitted</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Input
-              placeholder="Search by business name, domain, user email, or session ID"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
+    <main className="draft-recovery-brand draft-recovery-brand-page">
+      <div className="draft-recovery-brand__shell space-y-6">
+        <header className="draft-recovery-brand__hero">
+          <span className="draft-recovery-brand__logo-plate">
+            <img
+              src={mspSuccessDigitalLogoDataUrl}
+              alt="Kaseya MSP Success"
+              className="draft-recovery-brand__logo"
+              width="411"
+              height="79"
             />
-          </CardContent>
-        </Card>
+          </span>
+          <div>
+            <p className="draft-recovery-brand__eyebrow">Admin support workspace</p>
+            <h1>Pro Form Draft Recovery</h1>
+            <p className="draft-recovery-brand__hero-copy">
+              Review questionnaire drafts, recover failed submissions, and manage saved client PDFs.
+            </p>
+          </div>
+        </header>
 
-        <QuestionnaireIntakeRecovery recoveryGrant={recoveryGrant} />
+        <div className="draft-recovery-brand__content">
+          <Card className="brand-panel">
+            <CardHeader className="brand-section-header">
+              <p className="draft-recovery-brand__section-kicker">Find a questionnaire</p>
+              <CardTitle className="brand-heading brand-section-title">Draft Filters</CardTitle>
+              <p className="draft-recovery-brand__section-copy">Narrow the records by workflow status or client details.</p>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-[220px_1fr]">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="submit_attempted">Submit Attempted</SelectItem>
+                  <SelectItem value="submit_failed">Submit Failed</SelectItem>
+                  <SelectItem value="submitted">Submitted</SelectItem>
+                </SelectContent>
+              </Select>
 
-        <div className="space-y-4">
-          {error && (
-            <Card className="border-red-200 bg-red-50">
-              <CardContent className="p-6 text-red-700">{error}</CardContent>
-            </Card>
-          )}
-
-          {loading ? (
-            <Card>
-              <CardContent className="p-6 text-slate-600">Loading drafts...</CardContent>
-            </Card>
-          ) : filteredDrafts.length === 0 ? (
-            <Card>
-              <CardContent className="p-6 text-slate-600">No matching drafts found.</CardContent>
-            </Card>
-          ) : (
-            filteredDrafts.map((draft) => (
-              <DraftRow
-                key={draft.id}
-                draft={draft}
-                expanded={expandedId === draft.id}
-                onToggle={() => setExpandedId(expandedId === draft.id ? '' : draft.id)}
-                hasDuplicateSession={duplicateSessionIds.has(draft.session_id)}
-                onRetrySuccess={reloadDrafts}
-                recoveryGrant={recoveryGrant}
+              <Input
+                placeholder="Search by business name, domain, user email, or session ID"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
               />
-            ))
-          )}
+            </CardContent>
+          </Card>
+
+          <QuestionnaireIntakeRecovery recoveryGrant={recoveryGrant} />
+
+          <section className="space-y-4" aria-labelledby="draft-records-title">
+            <div className="draft-recovery-brand__list-heading">
+              <h2 id="draft-records-title">Questionnaire Drafts</h2>
+              <p>{filteredDrafts.length} matching {filteredDrafts.length === 1 ? 'record' : 'records'}</p>
+            </div>
+            {error && (
+              <Card className="border-red-200 bg-red-50">
+                <CardContent className="p-6 text-red-700">{error}</CardContent>
+              </Card>
+            )}
+
+            {loading ? (
+              <Card className="brand-loading-card">
+                <CardContent className="p-6 text-slate-600">Loading drafts...</CardContent>
+              </Card>
+            ) : filteredDrafts.length === 0 ? (
+              <Card className="brand-loading-card">
+                <CardContent className="p-6 text-slate-600">No matching drafts found.</CardContent>
+              </Card>
+            ) : (
+              filteredDrafts.map((draft) => (
+                <DraftRow
+                  key={draft.id}
+                  draft={draft}
+                  expanded={expandedId === draft.id}
+                  onToggle={() => setExpandedId(expandedId === draft.id ? '' : draft.id)}
+                  hasDuplicateSession={duplicateSessionIds.has(draft.session_id)}
+                  onRetrySuccess={reloadDrafts}
+                  recoveryGrant={recoveryGrant}
+                />
+              ))
+            )}
+          </section>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

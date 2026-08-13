@@ -231,11 +231,11 @@ export default function AdminQuestionnairePdfSection({
   return (
     <section
       aria-label="Questionnaire PDFs"
-      className="rounded-lg border border-emerald-200 bg-emerald-50/40 p-3 space-y-3"
+      className="brand-pdf-panel rounded-lg border p-3 space-y-3"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">PDF Downloads</p>
+          <p className="brand-action-label text-xs uppercase">PDF Downloads</p>
           <p className="mt-1 text-xs text-slate-600" aria-live="polite">
             {isLoadingVersions ? 'Checking saved PDFs…' : selectedSummary}
           </p>
@@ -246,7 +246,7 @@ export default function AdminQuestionnairePdfSection({
             type="button"
             size="sm"
             variant="outline"
-            className="gap-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+            className="brand-button-primary gap-2"
             onClick={handleDownload}
             disabled={disabled || isGenerating || isLoadingVersions || !sourceId}
           >
@@ -260,7 +260,7 @@ export default function AdminQuestionnairePdfSection({
             type="button"
             size="sm"
             variant="outline"
-            className="gap-2 border-slate-300 text-slate-700 hover:bg-white"
+            className="brand-button-secondary gap-2"
             onClick={(event) => {
               event.stopPropagation();
               setIsHistoryOpen((open) => !open);
@@ -283,7 +283,7 @@ export default function AdminQuestionnairePdfSection({
           </label>
           <select
             id={`pdf-version-${sourceType}-${sourceId}`}
-            className="h-9 w-full rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            className="h-9 w-full rounded-md border bg-white px-3 text-sm text-slate-900 shadow-sm focus:outline-none"
             value={selectedVersionId}
             onChange={(event) => setSelectedVersionId(event.target.value)}
             disabled={isLoadingVersions || isGenerating}

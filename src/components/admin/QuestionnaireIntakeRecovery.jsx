@@ -56,7 +56,7 @@ function AiRepairSection({ intake }) {
   if (!intake.ai_repair_status && !report) return null;
 
   return (
-    <div className="space-y-3 rounded-lg border border-indigo-200 bg-indigo-50/50 p-3">
+    <div className="brand-ai-panel space-y-3 rounded-lg border p-3">
       <p className="text-sm font-semibold text-indigo-900">AI Repair Status</p>
 
       <div className="grid gap-2 md:grid-cols-2 text-sm">
@@ -142,8 +142,8 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
   const rawResponses = parseJson(intake.raw_responses_json);
 
   return (
-    <Card className="overflow-hidden">
-      <button type="button" onClick={onToggle} className="w-full text-left hover:bg-slate-50 transition-colors">
+    <Card className={`brand-record-card ${expanded ? 'brand-record-card--expanded' : ''}`}>
+      <button type="button" onClick={onToggle} className="brand-record-trigger w-full text-left transition-colors">
         <CardContent className="p-4">
           <div className="grid gap-3 md:grid-cols-[1.1fr_1fr_1.1fr_auto_1fr_1fr] items-start">
             <div>
@@ -182,7 +182,7 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
       </button>
 
       {expanded && (
-        <div className="border-t bg-slate-50/70 p-4 space-y-4">
+        <div className="brand-expanded-panel p-4 space-y-4">
           <div className="grid gap-3 md:grid-cols-2 text-sm">
             <p><span className="font-medium">Retry Count:</span> {intake.retry_count ?? 0}</p>
             <p><span className="font-medium">Last Retry:</span> {formatDate(intake.last_retry_at)}</p>
@@ -216,14 +216,14 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
 
           {/* Action buttons */}
           <div className="space-y-2">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</p>
+            <p className="brand-action-label text-xs uppercase">Actions</p>
             <div className="flex flex-wrap gap-2">
               {/* Existing retry */}
               <Button
                 size="sm"
                 onClick={() => onRetry(intake)}
                 disabled={retrying || aiRunning}
-                className="gap-2"
+                className="brand-button-primary gap-2"
               >
                 {retrying ? <><Loader2 className="w-3 h-3 animate-spin" /> Retrying...</> : <><RefreshCw className="w-3 h-3" /> Retry Submission</>}
               </Button>
@@ -232,7 +232,7 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
               <Button
                 size="sm"
                 variant="outline"
-                className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
+                className="brand-button-secondary gap-2"
                 disabled={retrying || aiRunning}
                 onClick={() => onAiAction(intake, 'diagnose_only')}
                 title="Runs deterministic structure validation only. Does not call the AI agent or create a submission."
@@ -245,7 +245,7 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
               <Button
                 size="sm"
                 variant="outline"
-                className="gap-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                className="brand-button-secondary gap-2"
                 disabled={retrying || aiRunning}
                 onClick={() => onAiAction(intake, 'repair_only')}
               >
@@ -256,7 +256,7 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
               {/* AI Repair + Retry — clearly labeled as creates submission */}
               <Button
                 size="sm"
-                className="gap-2 bg-indigo-700 hover:bg-indigo-800 text-white"
+                className="brand-button-dark gap-2"
                 disabled={retrying || aiRunning}
                 onClick={() => onAiAction(intake, 'repair_and_retry')}
                 title="This will attempt to create a final ProFormSubmission if repair succeeds"
@@ -373,9 +373,11 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Questionnaire Intake Recovery</CardTitle>
+      <Card className="brand-panel">
+        <CardHeader className="brand-section-header">
+          <p className="draft-recovery-brand__section-kicker">Failed submission intake</p>
+          <CardTitle className="brand-heading brand-section-title">Questionnaire Intake Recovery</CardTitle>
+          <p className="draft-recovery-brand__section-copy">Review captured fallbacks and retry submissions that did not complete normally.</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="max-w-xs">

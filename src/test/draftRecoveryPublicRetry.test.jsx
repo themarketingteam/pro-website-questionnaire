@@ -18,6 +18,15 @@ describe('public draft recovery actions', () => {
     base44.entities.ProFormSubmissionIntake.list.mockResolvedValue([]);
   });
 
+  it('renders the branded recovery workspace shell', async () => {
+    const { container } = renderRecoveryPage();
+
+    expect(await screen.findByRole('heading', { name: 'Pro Form Draft Recovery' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Kaseya MSP Success' })).toHaveAttribute('width', '411');
+    expect(container.querySelector('main')).toHaveClass('draft-recovery-brand', 'draft-recovery-brand-page');
+    expect(screen.getByText('Draft Filters')).toHaveClass('brand-heading');
+  });
+
   it('passes the verified recovery grant to Retry and AI Repair + Retry', async () => {
     base44.entities.ProFormDraft.list.mockResolvedValue([{
       id: 'draft-public-1',
