@@ -38,6 +38,14 @@ describe('public draft recovery actions', () => {
     renderRecoveryPage();
     fireEvent.click(await screen.findByText('Public Recovery Client'));
     expect(screen.getByRole('button', { name: /download pdf/i })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Actions' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'AI Actions' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Data Copy Options (JSON)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Diagnose' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Repair Only' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Repair + Retry' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Endpoint Payload' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Raw Draft' })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole('button', { name: /retry submission/i }));
 
     await waitFor(() => {
@@ -50,7 +58,7 @@ describe('public draft recovery actions', () => {
       );
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /ai repair \+ retry/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Repair + Retry' }));
 
     await waitFor(() => {
       expect(base44.functions.invoke).toHaveBeenCalledWith(

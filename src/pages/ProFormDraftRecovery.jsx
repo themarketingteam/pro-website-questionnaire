@@ -340,99 +340,108 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
             disabled={isWorking}
           />
 
-          <div className="space-y-2">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</p>
-            <div className="flex flex-wrap gap-2">
-              {/* Edit Draft — always available */}
-              {!editing && (
+          <div className="space-y-4">
+            <section aria-label="Actions" className="space-y-2">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</p>
+              <div className="flex flex-wrap gap-2">
+                {/* Edit Draft — always available */}
+                {!editing && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 border-slate-300 text-slate-700 hover:bg-slate-100"
+                    onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+                    disabled={isWorking}
+                  >
+                    <Pencil className="w-3 h-3" />
+                    Edit Draft
+                  </Button>
+                )}
+
+                {/* Retry Submission — all statuses (draft may also need direct submit) */}
                 <Button
                   type="button"
-                  variant="outline"
                   size="sm"
-                  className="gap-2 border-slate-300 text-slate-700 hover:bg-slate-100"
-                  onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+                  onClick={handleRetry}
                   disabled={isWorking}
+                  className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
                 >
-                  <Pencil className="w-3 h-3" />
-                  Edit Draft
+                  {retrying ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                  {retrying ? 'Retrying...' : 'Retry Submission'}
                 </Button>
-              )}
+              </div>
+            </section>
 
-              {/* Retry Submission — all statuses (draft may also need direct submit) */}
-              <Button
-                type="button"
-                size="sm"
-                onClick={handleRetry}
-                disabled={isWorking}
-                className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {retrying ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
-                {retrying ? 'Retrying...' : 'Retry Submission'}
-              </Button>
-
-              {/* AI Diagnose — runs diagnostics only, no changes, no submission */}
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
-                disabled={isWorking}
-                onClick={(e) => handleAiAction(e, 'diagnose_only')}
-                title="Runs structure validation only. Does not change the draft or create a submission."
-              >
-                {aiRunning === 'diagnose_only' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Stethoscope className="w-3 h-3" />}
-                {aiRunning === 'diagnose_only' ? 'Diagnosing...' : 'AI Diagnose'}
-              </Button>
-
-              {/* AI Repair Only — repairs and saves to draft, does NOT create submission */}
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="gap-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-                disabled={isWorking}
-                onClick={(e) => handleAiAction(e, 'repair_only')}
-                title="Diagnoses and repairs the draft payload. Does NOT create a final submission."
-              >
-                {aiRunning === 'repair_only' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
-                {aiRunning === 'repair_only' ? 'Repairing...' : 'AI Repair Only'}
-              </Button>
-
-              {/* AI Repair + Retry — diagnose, repair, then create submission */}
-              <Button
-                type="button"
-                size="sm"
-                className="gap-2 bg-indigo-700 hover:bg-indigo-800 text-white"
-                disabled={isWorking}
-                onClick={(e) => handleAiAction(e, 'repair_and_retry')}
-                title="Diagnoses, repairs, then attempts to create a final ProFormSubmission."
-              >
-                {aiRunning === 'repair_and_retry' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
-                {aiRunning === 'repair_and_retry' ? 'Running...' : 'AI Repair + Retry ⚡'}
-              </Button>
-            </div>
-
-            <p className="text-xs text-slate-400">⚡ AI Repair + Retry will attempt to create a final ProFormSubmission if repair succeeds.</p>
-
-            {/* Copy utilities */}
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button type="button" variant="outline" size="sm" onClick={copySubmissionPayload} className="gap-2" disabled={isWorking}>
-                <Copy className="w-3 h-3" /> Copy Endpoint Payload
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={copyRawResponses} className="gap-2" disabled={isWorking}>
-                <Copy className="w-3 h-3" /> Copy Raw Draft Data
-              </Button>
-              {localDraft.ai_repaired_payload_json && (
-                <Button type="button" variant="outline" size="sm" onClick={copyAiRepairedPayload} className="gap-2 border-indigo-200 text-indigo-700">
-                  <Copy className="w-3 h-3" /> Copy AI Repaired Payload
+            <section aria-label="AI Actions" className="space-y-2 border-t border-slate-200 pt-4">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">AI Actions</p>
+              <div className="flex flex-wrap gap-2">
+                {/* AI Diagnose — runs diagnostics only, no changes, no submission */}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-2 border-blue-300 text-blue-700 hover:bg-blue-50"
+                  disabled={isWorking}
+                  onClick={(e) => handleAiAction(e, 'diagnose_only')}
+                  title="Runs structure validation only. Does not change the draft or create a submission."
+                >
+                  {aiRunning === 'diagnose_only' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Stethoscope className="w-3 h-3" />}
+                  {aiRunning === 'diagnose_only' ? 'Diagnosing...' : 'Diagnose'}
                 </Button>
-              )}
-              {localDraft.ai_repair_report_json && (
-                <Button type="button" variant="outline" size="sm" onClick={copyAiReport} className="gap-2 border-indigo-200 text-indigo-700">
-                  <Copy className="w-3 h-3" /> Copy AI Report
+
+                {/* AI Repair Only — repairs and saves to draft, does NOT create submission */}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="gap-2 border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                  disabled={isWorking}
+                  onClick={(e) => handleAiAction(e, 'repair_only')}
+                  title="Diagnoses and repairs the draft payload. Does NOT create a final submission."
+                >
+                  {aiRunning === 'repair_only' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
+                  {aiRunning === 'repair_only' ? 'Repairing...' : 'Repair Only'}
                 </Button>
-              )}
-            </div>
+
+                {/* AI Repair + Retry — diagnose, repair, then create submission */}
+                <Button
+                  type="button"
+                  size="sm"
+                  className="gap-2 bg-indigo-700 hover:bg-indigo-800 text-white"
+                  disabled={isWorking}
+                  onClick={(e) => handleAiAction(e, 'repair_and_retry')}
+                  title="Diagnoses, repairs, then attempts to create a final ProFormSubmission."
+                >
+                  {aiRunning === 'repair_and_retry' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
+                  {aiRunning === 'repair_and_retry' ? 'Running...' : 'Repair + Retry'}
+                </Button>
+              </div>
+
+              <p className="text-xs text-slate-400">Repair + Retry will attempt to create a final ProFormSubmission if repair succeeds.</p>
+            </section>
+
+            <section aria-label="Data Copy Options (JSON)" className="space-y-2 border-t border-slate-200 pt-4">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Data Copy Options (JSON)</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={copySubmissionPayload} className="gap-2" disabled={isWorking}>
+                  <Copy className="w-3 h-3" /> Endpoint Payload
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={copyRawResponses} className="gap-2" disabled={isWorking}>
+                  <Copy className="w-3 h-3" /> Raw Draft
+                </Button>
+                {localDraft.ai_repaired_payload_json && (
+                  <Button type="button" variant="outline" size="sm" onClick={copyAiRepairedPayload} className="gap-2 border-indigo-200 text-indigo-700">
+                    <Copy className="w-3 h-3" /> Copy AI Repaired Payload
+                  </Button>
+                )}
+                {localDraft.ai_repair_report_json && (
+                  <Button type="button" variant="outline" size="sm" onClick={copyAiReport} className="gap-2 border-indigo-200 text-indigo-700">
+                    <Copy className="w-3 h-3" /> Copy AI Report
+                  </Button>
+                )}
+              </div>
+            </section>
           </div>
 
           {repairWarnings.length > 0 && (
