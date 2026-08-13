@@ -56,14 +56,19 @@ const buildFilename = (businessName, now) => {
   return `${condensedName}_KaseyaWebsite_ContentQuestionnaire_Responses_${dateString}.pdf`;
 };
 
-export const generatePDF = async (formData, businessName, domain) => {
+const renderQuestionnairePdf = async (
+  formData,
+  businessName,
+  domain,
+  { submissionDate } = {}
+) => {
   const now = new Date();
   const filename = buildFilename(businessName, now);
   const model = buildQuestionnairePdfModel({
     formData,
     businessName,
     domain,
-    submissionDate: now
+    submissionDate: submissionDate || now
   });
   const container = createQuestionnairePdfContainer({
     model,
@@ -119,6 +124,45 @@ export const generatePDF = async (formData, businessName, domain) => {
       undefined,
       'FAST'
     );
+    return { pdf, filename };
+  } finally {
+    container.remove();
+  }
+};
+
+export const createQuestionnairePdfFile = async (
+  formData,
+  businessName,
+  domain,
+  options = {}
+) => {
+  try {
+    const { pdf, filename } = await renderQuestionnairePdf(
+      formData,
+      businessName,
+      domain,
+      options
+    );
+    const blob = pdf.output('blob');
+
+    if (!(blob instanceof Blob) || blob.size === 0) {
+      throw new Error('PDF generation produced an empty file.');
+    }
+
+    return {
+      success: true,
+      filename,
+      file: new File([blob], filename, { type: 'application/pdf' })
+    };
+  } catch (error) {
+    console.error('[Questionnaire PDF] generation failed:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'PDF generation failed.' };
+  }
+};
+
+export const generatePDF = async (formData, businessName, domain) => {
+  try {
+    const { pdf, filename } = await renderQuestionnairePdf(formData, businessName, domain);
     pdf.save(filename);
 
     trackClarityEvent('pro_questionnaire_pdf_downloaded', {
@@ -129,8 +173,6 @@ export const generatePDF = async (formData, businessName, domain) => {
   } catch (error) {
     console.error('[Questionnaire PDF] generation failed:', error);
     return { success: false, error: error instanceof Error ? error.message : 'PDF generation failed.' };
-  } finally {
-    container.remove();
   }
 };
 

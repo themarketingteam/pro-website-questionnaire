@@ -37,6 +37,7 @@ describe('public draft recovery actions', () => {
 
     renderRecoveryPage();
     fireEvent.click(await screen.findByText('Public Recovery Client'));
+    expect(screen.getByRole('button', { name: /download pdf/i })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole('button', { name: /retry submission/i }));
 
     await waitFor(() => {
@@ -74,6 +75,7 @@ describe('public draft recovery actions', () => {
 
     renderRecoveryPage();
     fireEvent.click(await screen.findByText('Public Intake Client'));
+    expect(screen.getByRole('button', { name: /download pdf/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /retry submission/i }));
 
     await waitFor(() => {

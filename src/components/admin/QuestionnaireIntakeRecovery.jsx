@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,10 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select';
-import { ChevronDown, ChevronUp, Loader2, Copy, Stethoscope, Wrench, RefreshCw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2, Stethoscope, Wrench, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import AdminQuestionnairePdfButton from '@/components/admin/AdminQuestionnairePdfButton';
+import { getIntakePdfPayload } from '@/lib/questionnairePdfVersions';
 
 const statusStyles = {
   received_intake: 'bg-amber-100 text-amber-800',
@@ -43,15 +45,6 @@ const parseJson = (value) => {
     return JSON.parse(value);
   } catch {
     return null;
-  }
-};
-
-const copyText = async (text, label) => {
-  try {
-    await navigator.clipboard.writeText(text);
-    toast.success(`${label} copied`);
-  } catch {
-    toast.error('Copy failed');
   }
 };
 
@@ -142,9 +135,11 @@ function AiRepairSection({ intake }) {
   );
 }
 
-function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, aiRunning }) {
+function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, aiRunning, recoveryGrant }) {
   const diagnostics = parseJson(intake.diagnostics_json);
   const retryError = parseJson(intake.retry_error_json);
+  const pdfPayload = getIntakePdfPayload(intake);
+  const rawResponses = parseJson(intake.raw_responses_json);
 
   return (
     <Card className="overflow-hidden">
@@ -210,6 +205,19 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
           <div className="space-y-2">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</p>
             <div className="flex flex-wrap gap-2">
+              <AdminQuestionnairePdfButton
+                sourceType="intake"
+                sourceId={intake.id}
+                sessionId={intake.questionnaire_session_id}
+                payload={pdfPayload}
+                fallbackResponses={rawResponses}
+                businessName={intake.business_name}
+                domain={intake.business_domain}
+                submissionDate={intake.created_at_server || intake.created_at_client || intake.created_date}
+                recoveryGrant={recoveryGrant}
+                disabled={retrying || Boolean(aiRunning)}
+              />
+
               {/* Existing retry */}
               <Button
                 size="sm"
@@ -400,6 +408,7 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
                   retrying={retryingId === intake.id}
                   onAiAction={handleAiAction}
                   aiRunning={aiRunning?.id === intake.id ? aiRunning.mode : null}
+                  recoveryGrant={recoveryGrant}
                 />
               ))}
             </div>

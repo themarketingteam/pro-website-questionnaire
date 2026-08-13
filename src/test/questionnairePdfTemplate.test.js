@@ -9,16 +9,19 @@ const {
   addImageMock,
   html2canvasMock,
   jsPdfConstructorMock,
+  outputMock,
   saveMock,
   toDataUrlMock,
   trackClarityEventMock
 } = vi.hoisted(() => {
   const addImage = vi.fn();
+  const output = vi.fn(() => new Blob(['questionnaire-pdf'], { type: 'application/pdf' }));
   const save = vi.fn();
   const toDataUrl = vi.fn(() => 'data:image/png;base64,questionnaire');
   const constructor = vi.fn(function jsPdfConstructor(options) {
     this.options = options;
     this.addImage = addImage;
+    this.output = output;
     this.save = save;
   });
 
@@ -26,6 +29,7 @@ const {
     addImageMock: addImage,
     html2canvasMock: vi.fn(),
     jsPdfConstructorMock: constructor,
+    outputMock: output,
     saveMock: save,
     toDataUrlMock: toDataUrl,
     trackClarityEventMock: vi.fn()
@@ -36,7 +40,10 @@ vi.mock('html2canvas', () => ({ default: html2canvasMock }));
 vi.mock('jspdf', () => ({ jsPDF: jsPdfConstructorMock }));
 vi.mock('@/lib/clarity', () => ({ trackClarityEvent: trackClarityEventMock }));
 
-import { generatePDF } from '@/components/pro-form/PDFGenerator';
+import {
+  createQuestionnairePdfFile,
+  generatePDF
+} from '@/components/pro-form/PDFGenerator';
 
 const makeModel = (formData = {}) => buildQuestionnairePdfModel({
   formData,
@@ -148,6 +155,8 @@ describe('generatePDF browser rendering contract', () => {
     addImageMock.mockReset();
     html2canvasMock.mockReset();
     jsPdfConstructorMock.mockClear();
+    outputMock.mockReset();
+    outputMock.mockReturnValue(new Blob(['questionnaire-pdf'], { type: 'application/pdf' }));
     saveMock.mockReset();
     toDataUrlMock.mockClear();
     trackClarityEventMock.mockReset();
@@ -243,5 +252,23 @@ describe('generatePDF browser rendering contract', () => {
 
     expect(html2canvasMock).toHaveBeenCalledTimes(2);
     expect(document.querySelectorAll('[data-questionnaire-pdf-render-root]')).toHaveLength(0);
+  });
+
+  it('creates a reusable PDF file without triggering an immediate client download', async () => {
+    const result = await createQuestionnairePdfFile(
+      { '6': 'Stored admin response' },
+      'Stored MSP',
+      'stored.example',
+      { submissionDate: '2026-08-01T12:00:00.000Z' }
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.file).toBeInstanceOf(File);
+    expect(result.file.type).toBe('application/pdf');
+    expect(result.file.name).toBe(result.filename);
+    expect(outputMock).toHaveBeenCalledWith('blob');
+    expect(saveMock).not.toHaveBeenCalled();
+    expect(trackClarityEventMock).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-questionnaire-pdf-render-root]')).toBeNull();
   });
 });
