@@ -3,7 +3,7 @@
   --msp-blue-850: #12124d;
   --msp-blue-600: #3131cc;
   --msp-blue-500: #3d3dff;
-  --msp-blue-300: #8b8bff;
+  --msp-accent-tan: #d8c9ae;
   --msp-teal-400: #11f6c8;
   --msp-blue-050: #f6f6ff;
   --msp-blue-100: #ededff;
@@ -77,7 +77,7 @@
 
 .draft-recovery-brand__eyebrow {
   margin: 0 0 0.45rem;
-  color: var(--msp-teal-400);
+  color: var(--msp-accent-tan);
   font-size: 0.75rem;
 }
 
@@ -89,7 +89,7 @@
 }
 
 .draft-recovery-brand__product-label {
-  color: var(--msp-blue-300);
+  color: var(--msp-accent-tan);
 }
 
 .draft-recovery-brand__hero-copy {
