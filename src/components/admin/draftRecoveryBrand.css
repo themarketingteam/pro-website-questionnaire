@@ -617,6 +617,11 @@
 @media (max-width: 51.999rem) {
   .draft-recovery-brand__hero {
     padding-top: 4.25rem;
+    transition: padding-top 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .draft-recovery-brand-page:has(.brand-admin-nav--open) .draft-recovery-brand__hero {
+    padding-top: 10.5rem;
   }
 }
 
@@ -627,7 +632,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .draft-recovery-brand .brand-record-card {
+  .draft-recovery-brand .brand-record-card,
+  .draft-recovery-brand__hero {
     transition: none;
   }
 }
