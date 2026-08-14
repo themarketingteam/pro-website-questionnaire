@@ -276,7 +276,7 @@ export default function AdminSubmitIntake() {
           </span>
           <div>
             <p className="draft-recovery-brand__eyebrow">Admin support workspace</p>
-            <h1>Admin Intake Submission</h1>
+            <h1>Pro | Admin Intake Submission</h1>
             <p className="draft-recovery-brand__hero-copy">
               Review, repair, and submit a final questionnaire payload through the protected admin workflow.
             </p>

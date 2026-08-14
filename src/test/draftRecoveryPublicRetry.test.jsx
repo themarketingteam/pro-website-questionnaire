@@ -57,7 +57,7 @@ describe('public draft recovery actions', () => {
   it('renders the branded recovery workspace shell', async () => {
     const { container } = renderRecoveryPage();
 
-    expect(await screen.findByRole('heading', { name: 'Pro Form Draft Recovery' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Pro | Form Draft Recovery' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Kaseya MSP Success' })).toHaveAttribute('width', '411');
     expect(container.querySelector('main')).toHaveClass('draft-recovery-brand', 'draft-recovery-brand-page');
     expect(screen.getByText('Draft Filters')).toHaveClass('brand-heading');

@@ -620,7 +620,7 @@ export default function ProFormDraftRecovery() {
           </span>
           <div>
             <p className="draft-recovery-brand__eyebrow">Admin support workspace</p>
-            <h1>Pro Form Draft Recovery</h1>
+            <h1>Pro | Form Draft Recovery</h1>
             <p className="draft-recovery-brand__hero-copy">
               Review questionnaire drafts, recover failed submissions, and manage saved client PDFs.
             </p>
