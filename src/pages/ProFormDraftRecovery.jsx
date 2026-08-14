@@ -54,6 +54,12 @@ const formatDate = (value) => {
   return date.toLocaleString();
 };
 
+const formatRefreshTime = (value) => value?.toLocaleTimeString([], {
+  hour: 'numeric',
+  minute: '2-digit',
+  second: '2-digit'
+}) || '—';
+
 const parseJson = (value) => {
   try {
     if (!value) return null;
@@ -555,6 +561,7 @@ export default function ProFormDraftRecovery() {
   const [hasMore, setHasMore] = useState(false);
   const [expandedId, setExpandedId] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState(null);
   const [duplicateSessionIds, setDuplicateSessionIds] = useState(new Set());
 
   const reloadDrafts = () => setRefreshKey((k) => k + 1);
@@ -596,6 +603,7 @@ export default function ProFormDraftRecovery() {
         setDrafts(Array.isArray(data.records) ? data.records : []);
         setHasMore(Boolean(data.hasMore));
         setDuplicateSessionIds(new Set(Array.isArray(data.duplicateSessionIds) ? data.duplicateSessionIds : []));
+        setLastRefreshedAt(new Date());
       } catch (loadError) {
         if (!mounted) return;
         setError(loadError?.message || 'Failed to load drafts.');
@@ -698,6 +706,10 @@ export default function ProFormDraftRecovery() {
                 <RefreshCw aria-hidden="true" />
                 Refresh
               </Button>
+
+              <p className="brand-filter-last-updated" role="status" aria-live="polite">
+                Last updated {formatRefreshTime(lastRefreshedAt)}
+              </p>
             </CardContent>
           </Card>
 

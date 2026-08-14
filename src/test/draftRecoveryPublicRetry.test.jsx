@@ -63,6 +63,10 @@ describe('public draft recovery actions', () => {
     expect(container.querySelector('main')).toHaveClass('draft-recovery-brand', 'draft-recovery-brand-page');
     expect(screen.getByText('Draft Filters')).toHaveClass('brand-heading');
     expect(screen.getByRole('button', { name: 'Refresh' })).toHaveClass('brand-filter-refresh');
+    await waitFor(() => {
+      expect(container.querySelector('.brand-filter-last-updated')).not.toHaveTextContent('—');
+    });
+    expect(container.querySelector('.brand-filter-last-updated')).toHaveAttribute('aria-live', 'polite');
   });
 
   it('clears search and restores the default filters when Refresh is selected', async () => {
