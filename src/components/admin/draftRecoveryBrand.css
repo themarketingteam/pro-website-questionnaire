@@ -445,7 +445,7 @@
 .draft-recovery-brand .brand-status-badge--submitted,
 .draft-recovery-brand .brand-status-badge--submitted:hover {
   border-color: #b8a787;
-  background: var(--msp-accent-tan);
+  background: rgba(216, 201, 174, 0.75);
   color: var(--msp-blue-900);
 }
 
