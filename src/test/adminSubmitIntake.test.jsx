@@ -17,6 +17,7 @@ describe('AdminSubmitIntake', () => {
     const { container } = renderPage();
 
     expect(screen.getByRole('heading', { name: 'Pro | Admin Intake Submission' })).toBeInTheDocument();
+    expect(screen.getByText('Pro', { selector: '.draft-recovery-brand__product-label' })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Kaseya MSP Success' })).toHaveAttribute('width', '411');
     expect(container.querySelector('main')).toHaveClass('draft-recovery-brand', 'draft-recovery-brand-page');
     expect(screen.getByRole('navigation', { name: 'Admin workspace' })).toBeInTheDocument();

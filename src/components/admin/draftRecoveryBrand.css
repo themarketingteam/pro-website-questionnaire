@@ -87,6 +87,10 @@
   line-height: 1.04;
 }
 
+.draft-recovery-brand__product-label {
+  color: var(--msp-blue-500);
+}
+
 .draft-recovery-brand__hero-copy {
   max-width: 44rem;
   margin: 0.65rem 0 0;
