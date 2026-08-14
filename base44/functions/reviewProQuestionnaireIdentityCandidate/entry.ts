@@ -95,7 +95,13 @@ Deno.serve(async (req) => {
       reviewed_by: reviewedBy,
       reviewed_at: reviewedAt
     });
-    return jsonResponse({ success: true, decision: 'rejected', field, record });
+    return jsonResponse({
+      success: true,
+      decision: 'rejected',
+      field,
+      recordId: record.id,
+      attemptId: attempt.id
+    });
   }
 
   const candidate = field === 'business_name'
@@ -134,7 +140,7 @@ Deno.serve(async (req) => {
     updates.userdata_json = JSON.stringify(updatedPayload.userdata || {});
   }
 
-  const updatedRecord = await base44.asServiceRole.entities[config.entityName].update(record.id, updates);
+  await base44.asServiceRole.entities[config.entityName].update(record.id, updates);
   let priorAppliedFields: any[] = [];
   try {
     const parsedAppliedFields = JSON.parse(attempt.applied_fields_json || '[]');
@@ -153,5 +159,11 @@ Deno.serve(async (req) => {
     reviewed_at: reviewedAt
   });
 
-  return jsonResponse({ success: true, decision: 'applied', field, record: updatedRecord });
+  return jsonResponse({
+    success: true,
+    decision: 'applied',
+    field,
+    recordId: record.id,
+    attemptId: attempt.id
+  });
 });

@@ -208,6 +208,10 @@ describe('identity recovery backend safety contracts', () => {
     resolve(process.cwd(), 'base44/functions/scheduleProQuestionnaireIdentityRecovery/entry.ts'),
     'utf8'
   );
+  const reviewSource = readFileSync(
+    resolve(process.cwd(), 'base44/functions/reviewProQuestionnaireIdentityCandidate/entry.ts'),
+    'utf8'
+  );
 
   it('keeps Diagnose read-only and invokes identity analysis for all modes', () => {
     expect(repairSource).toContain("const apply = mode !== 'diagnose_only'");
@@ -237,5 +241,12 @@ describe('identity recovery backend safety contracts', () => {
     expect(repairSource).toContain('sourceRecordChanged: false');
     expect(resolverSource).toContain('nonDiagnostic && !providerFailure');
     expect(resolverSource).toContain('effectiveApply && !providerFailure');
+  });
+
+  it('does not return the complete recovery record from review decisions', () => {
+    expect(reviewSource).toContain('recordId: record.id');
+    expect(reviewSource).toContain('attemptId: attempt.id');
+    expect(reviewSource).not.toContain('field, record });');
+    expect(reviewSource).not.toContain('record: updatedRecord');
   });
 });
