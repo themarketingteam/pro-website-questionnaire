@@ -20,8 +20,12 @@ describe('AdminSubmitIntake', () => {
     expect(screen.getByRole('img', { name: 'Kaseya MSP Success' })).toHaveAttribute('width', '411');
     expect(container.querySelector('main')).toHaveClass('draft-recovery-brand', 'draft-recovery-brand-page');
     expect(screen.getByRole('navigation', { name: 'Admin workspace' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open admin navigation' })).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getByRole('link', { name: 'Draft Recovery' })).toHaveAttribute('href', '/admin/draft-recovery');
-    expect(screen.getByRole('link', { name: 'Submit Intake' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Express Form Recovery' })).toHaveAttribute(
+      'href',
+      'https://expressform.tmtwebsiteresources.xyz/admin/draft-recovery',
+    );
     expect(base44.auth.me).not.toHaveBeenCalled();
   });
 
