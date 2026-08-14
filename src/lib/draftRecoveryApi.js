@@ -46,3 +46,24 @@ export const updateRecoveryDraft = ({ recoveryGrant, recordId, updates }) => inv
   recordId,
   updates,
 });
+
+export const reviewIdentityCandidate = async ({
+  recoveryGrant,
+  attemptId,
+  field,
+  decision,
+  expectedFingerprint,
+}) => {
+  const response = await base44.functions.invoke('reviewProQuestionnaireIdentityCandidate', {
+    recoveryGrant,
+    attemptId,
+    field,
+    decision,
+    expectedFingerprint,
+  });
+  const data = getResponseData(response);
+  if (!data?.success) {
+    throw new Error(data?.error || 'Unable to review the identity candidate.');
+  }
+  return data;
+};

@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import AdminQuestionnairePdfSection from '@/components/admin/AdminQuestionnairePdfSection';
 import { getIntakePdfPayload } from '@/lib/questionnairePdfVersions';
 import { getRecoveryRecord, listRecoveryRecords } from '@/lib/draftRecoveryApi';
+import IdentityResolutionPanel from '@/components/admin/IdentityResolutionPanel';
 
 const RECOVERY_PAGE_SIZE = 25;
 
@@ -51,7 +52,7 @@ const parseJson = (value) => {
   }
 };
 
-function AiRepairSection({ intake }) {
+function AiRepairSection({ intake, recoveryGrant, disabled, onReviewed }) {
   const report = parseJson(intake.ai_repair_report_json);
   const repairError = parseJson(intake.ai_repair_error_json);
   const retryResult = parseJson(intake.ai_repair_retry_result_json);
@@ -126,6 +127,14 @@ function AiRepairSection({ intake }) {
         </div>
       )}
 
+      <IdentityResolutionPanel
+        resolution={report?.identity_resolution}
+        recoveryGrant={recoveryGrant}
+        currentBusinessName={intake.business_name}
+        disabled={disabled}
+        onReviewed={onReviewed}
+      />
+
       {intake.ai_repair_report_json && (
         <details className="text-xs">
           <summary className="cursor-pointer text-indigo-700 font-medium">Raw AI report JSON</summary>
@@ -140,10 +149,17 @@ function AiRepairSection({ intake }) {
 
 function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, aiRunning, recoveryGrant }) {
   const [detailedIntake, setDetailedIntake] = useState(null);
+  const [transientReport, setTransientReport] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
   const [detailVersion, setDetailVersion] = useState(0);
-  const activeIntake = detailedIntake ? { ...intake, ...detailedIntake } : intake;
+  const persistedIntake = detailedIntake ? { ...intake, ...detailedIntake } : intake;
+  const activeIntake = transientReport ? {
+    ...persistedIntake,
+    ai_repair_status: 'diagnosed',
+    ai_repair_report_json: JSON.stringify(transientReport),
+    ai_repair_error_json: ''
+  } : persistedIntake;
   const diagnostics = parseJson(activeIntake.diagnostics_json);
   const retryError = parseJson(activeIntake.retry_error_json);
   const pdfPayload = getIntakePdfPayload(activeIntake);
@@ -245,7 +261,15 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
           </div>
 
           {/* AI Repair status panel */}
-          <AiRepairSection intake={activeIntake} />
+          <AiRepairSection
+            intake={activeIntake}
+            recoveryGrant={recoveryGrant}
+            disabled={retrying || Boolean(aiRunning)}
+            onReviewed={() => {
+              setTransientReport(null);
+              setDetailVersion((version) => version + 1);
+            }}
+          />
 
           <AdminQuestionnairePdfSection
             sourceType="intake"
@@ -277,20 +301,20 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
                 {retrying ? <><Loader2 className="w-3 h-3 animate-spin" /> Retrying...</> : <><RefreshCw className="w-3 h-3" /> Retry Submission</>}
               </Button>
 
-              {/* Diagnose Structure — deterministic only, no AI agent, no submission */}
+              {/* Diagnose identity and structure without changing the source record or submitting */}
               <Button
                 size="sm"
                 variant="outline"
                 className="brand-button-secondary gap-2"
                 disabled={retrying || aiRunning}
                 onClick={async () => {
-                  await onAiAction(activeIntake, 'diagnose_only');
-                  setDetailVersion((version) => version + 1);
+                  const data = await onAiAction(activeIntake, 'diagnose_only');
+                  if (data?.report) setTransientReport(data.report);
                 }}
-                title="Runs deterministic structure validation only. Does not call the AI agent or create a submission."
+                title="Analyzes structure and missing identity fields without changing the record or creating a submission."
               >
                 {aiRunning === 'diagnose_only' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Stethoscope className="w-3 h-3" />}
-                Diagnose Structure
+                Diagnose
               </Button>
 
               {/* AI Repair Only */}
@@ -300,12 +324,13 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
                 className="brand-button-secondary gap-2"
                 disabled={retrying || aiRunning}
                 onClick={async () => {
+                  setTransientReport(null);
                   await onAiAction(activeIntake, 'repair_only');
                   setDetailVersion((version) => version + 1);
                 }}
               >
                 {aiRunning === 'repair_only' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
-                AI Repair Only
+                Repair Only
               </Button>
 
               {/* AI Repair + Retry — clearly labeled as creates submission */}
@@ -314,16 +339,17 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
                 className="brand-button-dark gap-2"
                 disabled={retrying || aiRunning}
                 onClick={async () => {
+                  setTransientReport(null);
                   await onAiAction(activeIntake, 'repair_and_retry');
                   setDetailVersion((version) => version + 1);
                 }}
                 title="This will attempt to create a final ProFormSubmission if repair succeeds"
               >
                 {aiRunning === 'repair_and_retry' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
-                AI Repair + Retry ⚡
+                Repair + Retry ⚡
               </Button>
             </div>
-            <p className="text-xs text-slate-400">⚡ AI Repair + Retry will create a final ProFormSubmission if repair succeeds.</p>
+            <p className="text-xs text-slate-400">⚡ Repair + Retry will create a final ProFormSubmission only if repair and validation succeed.</p>
           </div>
 
           <details className="rounded-lg border bg-white p-3 text-xs">
@@ -413,7 +439,7 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
     // Keep row expanded while running
     setExpandedId(intake.id);
     try {
-      const modeLabels = { diagnose_only: 'Diagnose Structure', repair_only: 'AI Repair Only', repair_and_retry: 'AI Repair + Retry' };
+      const modeLabels = { diagnose_only: 'Diagnose', repair_only: 'Repair Only', repair_and_retry: 'Repair + Retry' };
       const response = await base44.functions.invoke('repairProQuestionnaireIntakeSubmission', {
         intakeId: intake.id,
         questionnaireSessionId: intake.questionnaire_session_id,
@@ -425,7 +451,7 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
       const data = response?.data;
       if (data?.success) {
         if (data?.linkedSubmissionId) {
-          toast.success(`AI Repair + Retry succeeded — Submission: ${data.linkedSubmissionId}`);
+          toast.success(`Repair + Retry succeeded — Submission: ${data.linkedSubmissionId}`);
         } else {
           toast.success(`${modeLabels[mode]} completed`);
         }
@@ -433,8 +459,10 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
         toast.error(data?.error?.message || data?.errors?.[0] || `${modeLabels[mode]} failed`);
       }
       await loadRecords();
+      return data;
     } catch (err) {
       toast.error(err?.response?.data?.error?.message || err?.response?.data?.error || err?.message || 'AI action failed');
+      return null;
     } finally {
       setAiRunning(null);
     }

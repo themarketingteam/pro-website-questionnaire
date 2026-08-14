@@ -1,0 +1,26 @@
+{
+  "name": "scheduleProQuestionnaireIdentityRecovery",
+  "entry": "entry.ts",
+  "automations": [
+    {
+      "type": "scheduled",
+      "name": "weekday_identity_recovery_cdt",
+      "description": "Runs at 09:00 UTC and proceeds only when it is 04:00 America/Chicago.",
+      "function_args": { "policy_id": "pro-identity-recovery-v1" },
+      "is_active": true,
+      "schedule_mode": "recurring",
+      "schedule_type": "cron",
+      "cron_expression": "0 9 * * 1-5"
+    },
+    {
+      "type": "scheduled",
+      "name": "weekday_identity_recovery_cst",
+      "description": "Runs at 10:00 UTC and proceeds only when it is 04:00 America/Chicago.",
+      "function_args": { "policy_id": "pro-identity-recovery-v1" },
+      "is_active": true,
+      "schedule_mode": "recurring",
+      "schedule_type": "cron",
+      "cron_expression": "0 10 * * 1-5"
+    }
+  ]
+}

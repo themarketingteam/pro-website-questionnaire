@@ -22,4 +22,22 @@ describe('Base44 app parameters on the custom domain', () => {
     expect(appParams.appId).toBe('6925fec3678942d22522b010');
     expect(appParams.serverUrl).toBe('https://base44.app');
   });
+
+  it('ignores and clears stale editor function versions on a custom domain', async () => {
+    localStorage.setItem('base44_functions_version', 'stale-preview-version');
+    window.history.replaceState({}, '', '/?functions_version=another-stale-version');
+
+    const { appParams } = await import('@/lib/app-params');
+
+    expect(appParams.functionsVersion).toBeNull();
+    expect(localStorage.getItem('base44_functions_version')).toBeNull();
+  });
+
+  it('allows version pinning only on Base44-owned preview hosts', async () => {
+    const { shouldUseFunctionsVersion } = await import('@/lib/app-params');
+
+    expect(shouldUseFunctionsVersion('app.base44.com')).toBe(true);
+    expect(shouldUseFunctionsVersion('pro-website-questionnaire-2522b010.base44.app')).toBe(true);
+    expect(shouldUseFunctionsVersion('proform.tmtwebsiteresources.xyz')).toBe(false);
+  });
 });

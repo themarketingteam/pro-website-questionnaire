@@ -1,0 +1,28 @@
+{
+  "name": "ProFormIdentityResolutionRun",
+  "type": "object",
+  "properties": {
+    "started_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": "string", "format": "date-time" },
+    "central_date": { "type": "string" },
+    "active_window": { "type": "boolean", "default": false },
+    "shadow_mode": { "type": "boolean", "default": true },
+    "eligible_count": { "type": "number", "default": 0 },
+    "attempted_count": { "type": "number", "default": 0 },
+    "auto_eligible_count": { "type": "number", "default": 0 },
+    "applied_count": { "type": "number", "default": 0 },
+    "needs_review_count": { "type": "number", "default": 0 },
+    "provider_failure_count": { "type": "number", "default": 0 },
+    "stale_abort_count": { "type": "number", "default": 0 },
+    "backlog_count": { "type": "number", "default": 0 },
+    "duration_ms": { "type": "number", "default": 0 },
+    "errors_json": { "type": "string" }
+  },
+  "required": ["started_at", "central_date"],
+  "rls": {
+    "create": { "user_condition": { "role": "admin" } },
+    "read": { "user_condition": { "role": "admin" } },
+    "update": { "user_condition": { "role": "admin" } },
+    "delete": { "user_condition": { "role": "admin" } }
+  }
+}

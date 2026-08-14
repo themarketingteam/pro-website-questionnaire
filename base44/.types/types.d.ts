@@ -123,6 +123,26 @@ export interface ProFormDraft {
    */
   ai_repair_applied?: boolean;
   /**
+   * Latest identity-resolution state without changing the draft workflow status
+   */
+  identity_resolution_status?: string;
+  /**
+   * Latest ProFormIdentityResolutionAttempt record for this draft
+   */
+  identity_resolution_latest_attempt_id?: string;
+  /**
+   * Resolver-versioned fingerprint used for stale-write and duplicate-attempt protection
+   */
+  identity_resolution_fingerprint?: string;
+  /**
+   * Most recent non-diagnostic identity-resolution attempt
+   */
+  last_identity_resolution_at?: string;
+  /**
+   * Number of non-diagnostic identity-resolution attempts
+   */
+  identity_resolution_attempt_count?: number;
+  /**
    * When this draft was moved out of the active recovery dataset
    */
   archived_at?: string;
@@ -538,6 +558,26 @@ export interface ProFormSubmissionIntake {
    */
   ai_repair_source?: string;
   /**
+   * Latest identity-resolution state without changing the intake workflow status
+   */
+  identity_resolution_status?: string;
+  /**
+   * Latest ProFormIdentityResolutionAttempt record for this intake
+   */
+  identity_resolution_latest_attempt_id?: string;
+  /**
+   * Resolver-versioned fingerprint used for stale-write and duplicate-attempt protection
+   */
+  identity_resolution_fingerprint?: string;
+  /**
+   * Most recent non-diagnostic identity-resolution attempt
+   */
+  last_identity_resolution_at?: string;
+  /**
+   * Number of non-diagnostic identity-resolution attempts
+   */
+  identity_resolution_attempt_count?: number;
+  /**
    * When this intake was moved out of the active recovery dataset
    */
   archived_at?: string;
@@ -590,6 +630,66 @@ export interface QuestionnairePdfVersion {
   generated_at: string;
 }
 
+export interface ProFormIdentityResolutionAttempt {
+  record_type: "draft" | "intake";
+  record_id: string;
+  session_id?: string;
+  trigger: "admin_diagnose" | "admin_repair" | "admin_repair_retry" | "scheduled";
+  apply_requested?: boolean;
+  payload_fingerprint: string;
+  resolver_version: string;
+  status?: "completed" | "needs_review" | "provider_error" | "stale" | "applied" | "rejected";
+  actor_mode?: string;
+  business_name_original?: string;
+  business_name_candidate?: string;
+  business_name_confidence?: number;
+  business_name_state?: string;
+  business_name_evidence_json?: string;
+  business_name_review_decision?: string;
+  domain_original?: string;
+  domain_candidate?: string;
+  domain_confidence?: number;
+  domain_state?: string;
+  domain_evidence_json?: string;
+  domain_review_decision?: string;
+  primary_location?: string;
+  search_query?: string;
+  search_query_hash?: string;
+  search_urls_json?: string;
+  provider?: string;
+  errors_json?: string;
+  applied_fields_json?: string;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  completed_at?: string;
+}
+
+export interface ProFormIdentityResolutionRun {
+  started_at: string;
+  completed_at?: string;
+  central_date: string;
+  active_window?: boolean;
+  shadow_mode?: boolean;
+  eligible_count?: number;
+  attempted_count?: number;
+  auto_eligible_count?: number;
+  applied_count?: number;
+  needs_review_count?: number;
+  provider_failure_count?: number;
+  stale_abort_count?: number;
+  backlog_count?: number;
+  duration_ms?: number;
+  errors_json?: string;
+}
+
+export interface ProFormIdentitySearchCache {
+  query_hash: string;
+  query?: string;
+  provider: string;
+  organic_results_json?: string;
+  expires_at: string;
+}
+
 declare module '@base44/sdk' {
   interface EntityTypeRegistry {
     "ProFormDraft": ProFormDraft;
@@ -597,16 +697,22 @@ declare module '@base44/sdk' {
     "ProFormSubmission": ProFormSubmission;
     "ProFormSubmissionIntake": ProFormSubmissionIntake;
     "QuestionnairePdfVersion": QuestionnairePdfVersion;
+    "ProFormIdentityResolutionAttempt": ProFormIdentityResolutionAttempt;
+    "ProFormIdentityResolutionRun": ProFormIdentityResolutionRun;
+    "ProFormIdentitySearchCache": ProFormIdentitySearchCache;
   }
   
   interface FunctionNameRegistry {
     "archiveRecoveryRecords": true;
-    "generateAIContentOpenAI": true;
+    "scheduleProQuestionnaireIdentityRecovery": true;
     "generateAIContent": true;
-    "queryDraftRecoveryRecords": true;
+    "generateAIContentOpenAI": true;
     "manageQuestionnairePdfVersions": true;
+    "queryDraftRecoveryRecords": true;
     "repairProQuestionnaireIntakeSubmission": true;
+    "resolveProQuestionnaireIdentity": true;
     "retryProQuestionnaireIntakeSubmission": true;
+    "reviewProQuestionnaireIdentityCandidate": true;
     "sendToZapier": true;
     "submitProQuestionnaireFallback": true;
     "validateQuestionText": true;
@@ -614,8 +720,8 @@ declare module '@base44/sdk' {
     "_shared/base44Agent": true;
     "_shared/proSubmissionRepair": true;
     "retryProQuestionnaireIntakeSubmission/entry": true;
-    "sendToZapier/entry": true;
     "submitProQuestionnaireFallback/entry": true;
+    "sendToZapier/entry": true;
   }
   
   interface AgentNameRegistry {

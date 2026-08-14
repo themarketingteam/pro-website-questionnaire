@@ -27,6 +27,7 @@ import {
   updateRecoveryDraft
 } from '@/lib/draftRecoveryApi';
 import AdminWorkspaceNav from '@/components/admin/AdminWorkspaceNav';
+import IdentityResolutionPanel from '@/components/admin/IdentityResolutionPanel';
 
 const RECOVERY_PAGE_SIZE = 25;
 const RECOVERY_ARCHIVE_STATE_KEY = 'pro-draft-recovery-archive-state';
@@ -79,7 +80,7 @@ const parseJson = (value) => {
   } catch { return null; }
 };
 
-function DraftAiRepairSection({ draft }) {
+function DraftAiRepairSection({ draft, recoveryGrant, disabled, onReviewed }) {
   const report = parseJson(draft.ai_repair_report_json);
   const repairError = parseJson(draft.ai_repair_error_json);
 
@@ -116,6 +117,13 @@ function DraftAiRepairSection({ draft }) {
       {repairError && (
         <p className="text-red-700 text-xs">{repairError.message || JSON.stringify(repairError)}</p>
       )}
+      <IdentityResolutionPanel
+        resolution={report?.identity_resolution}
+        recoveryGrant={recoveryGrant}
+        currentBusinessName={draft.business_name}
+        disabled={disabled}
+        onReviewed={onReviewed}
+      />
     </div>
   );
 }
@@ -229,9 +237,9 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
     e.stopPropagation();
     setAiRunning(mode);
     const modeLabels = {
-      diagnose_only: 'AI Diagnose',
-      repair_only: 'AI Repair Only',
-      repair_and_retry: 'AI Repair + Retry'
+      diagnose_only: 'Diagnose',
+      repair_only: 'Repair Only',
+      repair_and_retry: 'Repair + Retry'
     };
     try {
       const result = await base44.functions.invoke('repairProQuestionnaireIntakeSubmission', {
@@ -244,13 +252,22 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
       const data = result?.data;
       if (data?.success) {
         if (data?.linkedSubmissionId) {
-          toast.success(`AI Repair + Retry succeeded — Submission: ${data.linkedSubmissionId}`);
+          toast.success(`Repair + Retry succeeded — Submission: ${data.linkedSubmissionId}`);
         } else if (mode === 'repair_and_retry' && data?.zapierSent) {
-          toast.success('AI Repair + Retry delivered the validated payload');
+          toast.success('Repair + Retry delivered the validated payload');
         } else {
           toast.success(`${modeLabels[mode]} completed`);
         }
-        setDetailVersion((version) => version + 1);
+        if (mode === 'diagnose_only' && data?.report) {
+          setLocalDraft((current) => ({
+            ...current,
+            ai_repair_status: 'diagnosed',
+            ai_repair_report_json: JSON.stringify(data.report),
+            ai_repair_error_json: ''
+          }));
+        } else {
+          setDetailVersion((version) => version + 1);
+        }
       } else {
         const errMsg = data?.error?.message || data?.errors?.[0] || `${modeLabels[mode]} failed`;
         toast.error(errMsg);
@@ -468,7 +485,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
             <section aria-label="AI Actions" className="brand-action-divider space-y-2 border-t pt-4">
               <p className="brand-action-label text-xs uppercase">AI Actions</p>
               <div className="flex flex-wrap gap-2">
-                {/* AI Diagnose — runs diagnostics only, no changes, no submission */}
+                {/* Diagnose — identity and structure analysis, no source-record changes or submission */}
                 <Button
                   type="button"
                   size="sm"
@@ -476,7 +493,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                   className="brand-button-secondary gap-2"
                   disabled={isWorking}
                   onClick={(e) => handleAiAction(e, 'diagnose_only')}
-                  title="Runs structure validation only. Does not change the draft or create a submission."
+                  title="Analyzes structure and missing identity fields without changing the draft or creating a submission."
                 >
                   {aiRunning === 'diagnose_only' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Stethoscope className="w-3 h-3" />}
                   {aiRunning === 'diagnose_only' ? 'Diagnosing...' : 'Diagnose'}
@@ -560,7 +577,12 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
           )}
 
           {/* AI Repair status panel */}
-          <DraftAiRepairSection draft={localDraft} />
+          <DraftAiRepairSection
+            draft={localDraft}
+            recoveryGrant={recoveryGrant}
+            disabled={isWorking}
+            onReviewed={() => setDetailVersion((version) => version + 1)}
+          />
 
           <div className="space-y-2">
             <div className="flex items-center gap-2 flex-wrap">

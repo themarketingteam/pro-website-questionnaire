@@ -126,6 +126,28 @@
       "type": "string",
       "description": "Source context that triggered the AI repair (e.g. admin_manual, scheduled_job, retry_hook)"
     },
+    "identity_resolution_status": {
+      "type": "string",
+      "description": "Latest identity-resolution state without changing the intake workflow status"
+    },
+    "identity_resolution_latest_attempt_id": {
+      "type": "string",
+      "description": "Latest ProFormIdentityResolutionAttempt record for this intake"
+    },
+    "identity_resolution_fingerprint": {
+      "type": "string",
+      "description": "Resolver-versioned fingerprint used for stale-write and duplicate-attempt protection"
+    },
+    "last_identity_resolution_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Most recent non-diagnostic identity-resolution attempt"
+    },
+    "identity_resolution_attempt_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of non-diagnostic identity-resolution attempts"
+    },
     "archived_at": {
       "type": "string",
       "format": "date-time",

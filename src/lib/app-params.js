@@ -19,6 +19,13 @@ const toSnakeCase = (str) => {
 	return str.replace(/([A-Z])/g, '_$1').toLowerCase();
 }
 
+export const shouldUseFunctionsVersion = (hostname = '') => {
+	const normalized = String(hostname || '').trim().toLowerCase();
+	return normalized === 'app.base44.com'
+		|| normalized === 'base44.app'
+		|| normalized.endsWith('.base44.app');
+};
+
 const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl = false } = {}) => {
 	if (isNode) {
 		return defaultValue;
@@ -49,6 +56,16 @@ const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl =
 }
 
 const getAppParams = () => {
+	const functionsVersion = (() => {
+		if (isNode) return null;
+		if (!shouldUseFunctionsVersion(window.location.hostname)) {
+			// A version captured while using the Base44 editor must never pin the
+			// public custom domain to an older backend-function deployment.
+			storage.removeItem('base44_functions_version');
+			return null;
+		}
+		return getAppParamValue('functions_version');
+	})();
 	return {
 		appId: getAppParamValue("app_id", {
 			defaultValue: import.meta.env.VITE_BASE44_APP_ID || DEFAULT_BASE44_APP_ID
@@ -58,7 +75,7 @@ const getAppParams = () => {
 		}),
 		token: getAppParamValue("access_token", { removeFromUrl: true }),
 		fromUrl: getAppParamValue("from_url", { defaultValue: window.location.href }),
-		functionsVersion: getAppParamValue("functions_version"),
+		functionsVersion,
 	}
 }
 

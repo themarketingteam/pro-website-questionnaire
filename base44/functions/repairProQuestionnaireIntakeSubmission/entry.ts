@@ -1,6 +1,8 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { isMissingIdentityValue } from '../../shared/proIdentityResolution.ts';
+import { createIdentityResolverInternalGrant } from '../../shared/draftRecoveryAuthorization.ts';
 
-// ─── Inline helpers (no cross-file imports in Base44 Deno) ───────────────────
+// ─── Local repair helpers ────────────────────────────────────────────────────
 
 const isPlainObject = (v) => {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
@@ -242,6 +244,11 @@ function sanitizeRepairReport(report) {
   };
 }
 
+const mergeIdentityResolution = (report: any, identityResolution: any) => ({
+  ...sanitizeRepairReport(report),
+  ...(identityResolution ? { identity_resolution: identityResolution } : {})
+});
+
 const STRING_ARRAY_FIELDS = ['service_offerings','target_industries','pricing_packaging','company_goals','website_objectives','client_challenges','client_outcomes'];
 const OBJECT_ARRAY_FIELDS = ['geographic_areas','certifications_partnerships','service_guarantee_items'];
 const SCALAR_STRING_FIELDS = ['service_offerings_other','target_industries_other','delivery_model','delivery_model_other','pricing_packaging_other','differentiation','company_goals_other','brand_tone','brand_tone_other','sales_process','client_acquisition','client_acquisition_other','website_objectives_other','client_size','client_challenges_other','client_frustrations','client_outcomes_other','value_description','ideal_client','avoided_clients','primary_cta','primary_cta_other','additional_notes','company_description'];
@@ -264,10 +271,10 @@ function repairSubmissionPayloadServer(payload, context = {}) {
 
   const trustedName = typeof context.businessName === 'string' ? context.businessName.trim() : '';
   const trustedDomain = typeof context.businessDomain === 'string' ? context.businessDomain.trim() : '';
-  if (!p.metadata.business_name && trustedName) { track('metadata.business_name', 'missing', 'string', 'filled from trusted context'); p.metadata.business_name = trustedName; }
-  if (!p.metadata.businessDomain && !p.metadata.business_domain && trustedDomain) { track('metadata.businessDomain', 'missing', 'string', 'filled from trusted context'); p.metadata.businessDomain = trustedDomain; }
+  if (isMissingIdentityValue(p.metadata.business_name) && !isMissingIdentityValue(trustedName)) { track('metadata.business_name', 'missing', 'string', 'filled from trusted context'); p.metadata.business_name = trustedName; }
+  if (isMissingIdentityValue(p.metadata.businessDomain) && isMissingIdentityValue(p.metadata.business_domain) && !isMissingIdentityValue(trustedDomain)) { track('metadata.businessDomain', 'missing', 'string', 'filled from trusted context'); p.metadata.businessDomain = trustedDomain; }
   // Map business_domain → businessDomain
-  if (!p.metadata.businessDomain && p.metadata.business_domain) { p.metadata.businessDomain = p.metadata.business_domain; }
+  if (isMissingIdentityValue(p.metadata.businessDomain) && !isMissingIdentityValue(p.metadata.business_domain)) { p.metadata.businessDomain = p.metadata.business_domain; }
   if (!p.metadata.service_type) { p.metadata.service_type = 'pro'; warnings.push('service_type defaulted to pro'); }
   if (!p.metadata.submission_datetime) { p.metadata.submission_datetime = new Date().toISOString(); warnings.push('submission_datetime set to now'); }
 
@@ -360,8 +367,8 @@ function repairSubmissionPayloadServer(payload, context = {}) {
   cleaned = truncateStrings(cleaned, 5000);
   cleaned = stripUndefined(cleaned);
 
-  if (!String(cleaned?.metadata?.business_name || '').trim()) errors.push('metadata.business_name is required');
-  if (!String(cleaned?.metadata?.businessDomain || '').trim()) errors.push('metadata.businessDomain is required');
+  if (isMissingIdentityValue(cleaned?.metadata?.business_name)) errors.push('metadata.business_name is required');
+  if (isMissingIdentityValue(cleaned?.metadata?.businessDomain)) errors.push('metadata.businessDomain is required');
 
   return { payload: cleaned, ok: errors.length === 0, errors, warnings, changedPaths };
 }
@@ -371,8 +378,8 @@ function validateSubmissionPayloadServer(payload) {
   if (!isPlainObject(payload)) { errors.push('payload must be an object'); return { ok: false, errors }; }
   if (!isPlainObject(payload.metadata)) errors.push('metadata must be an object');
   if (!isPlainObject(payload.userdata)) errors.push('userdata must be an object');
-  if (!String(payload?.metadata?.business_name || '').trim()) errors.push('metadata.business_name is required');
-  if (!String(payload?.metadata?.businessDomain || '').trim()) errors.push('metadata.businessDomain is required');
+  if (isMissingIdentityValue(payload?.metadata?.business_name)) errors.push('metadata.business_name is required');
+  if (isMissingIdentityValue(payload?.metadata?.businessDomain)) errors.push('metadata.businessDomain is required');
   if (!isPlainObject(payload?.userdata?.additional_pages_list)) errors.push('userdata.additional_pages_list must be an object');
   const required = ['service_offerings','target_industries','geographic_areas','pricing_packaging','company_goals','certifications_partnerships','service_guarantee_items','website_objectives','client_challenges','client_outcomes'];
   for (const f of required) { if (!Array.isArray(payload?.userdata?.[f])) errors.push(`userdata.${f} must be an array`); }
@@ -595,6 +602,53 @@ async function runRepairPipeline({
   };
 }
 
+async function invokeIdentityResolver(base44: any, recordType: string, recordId: string, mode: string) {
+  const trigger = mode === 'diagnose_only'
+    ? 'admin_diagnose'
+    : (mode === 'repair_and_retry' ? 'admin_repair_retry' : 'admin_repair');
+  try {
+    const apply = mode !== 'diagnose_only';
+    const internalGrant = await createIdentityResolverInternalGrant({ recordType, recordId, trigger, apply });
+    const response = await base44.asServiceRole.functions.invoke('resolveProQuestionnaireIdentity', {
+      recordType,
+      recordId,
+      trigger,
+      apply,
+      internalGrant
+    });
+    const data = response?.data ?? response;
+    if (data?.success && data?.identityResolution) return data.identityResolution;
+    return {
+      status: 'provider_error',
+      trigger,
+      errors: [data?.error || 'identity_resolver_failed']
+    };
+  } catch (error) {
+    const caught = error as any;
+    return {
+      status: 'provider_error',
+      trigger,
+      errors: [caught?.response?.data?.error || caught?.message || 'identity_resolver_failed']
+    };
+  }
+}
+
+function buildReadOnlyDiagnosis(rawPayload: any, context: any, identityResolution: any) {
+  const detResult = repairSubmissionPayloadServer(rawPayload, context);
+  const detValidation = validateSubmissionPayloadServer(detResult.payload);
+  return mergeIdentityResolution({
+    decision: (detResult.ok && detValidation.ok) ? 'no_repair_needed' : 'needs_human_review',
+    confidence: (detResult.ok && detValidation.ok) ? 0.95 : 0.5,
+    should_retry_submission: false,
+    diagnosis: detValidation.ok
+      ? 'Payload is structurally valid after deterministic analysis.'
+      : `Validation errors: ${detValidation.errors.join('; ')}`,
+    repair_summary: detResult.warnings,
+    changed_paths: detResult.changedPaths,
+    warnings: [...detResult.warnings, ...detValidation.errors]
+  }, identityResolution);
+}
+
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line no-undef
@@ -627,7 +681,7 @@ Deno.serve(async (req) => {
     // ── DRAFT MODE (never creates ProFormSubmission) ───────────────────────────
     if (draftId && !intakeId && !questionnaireSessionId) {
       const draftList = await base44.asServiceRole.entities.ProFormDraft.filter({ id: draftId });
-      const draft = Array.isArray(draftList) && draftList.length > 0 ? draftList[0] : null;
+      let draft = Array.isArray(draftList) && draftList.length > 0 ? draftList[0] : null;
       if (!draft) return Response.json({ success: false, error: { message: 'Draft not found' } }, { status: 404 });
 
       if (mode === 'repair_and_retry' && draft.final_submission_id && !forceRetry) {
@@ -641,6 +695,22 @@ Deno.serve(async (req) => {
             message: 'This draft already has a final submission. AI Repair + Retry was not run. Use Retry Submission only when the existing payload must be delivered again.'
           }
         }, { status: 409 });
+      }
+
+      const identityResolution = await invokeIdentityResolver(base44, 'draft', draft.id, mode);
+      if (mode !== 'diagnose_only' && identityResolution?.status === 'provider_error') {
+        return Response.json({
+          success: false,
+          draftMode: true,
+          submissionCreated: false,
+          sourceRecordChanged: false,
+          identityResolution,
+          error: { message: 'Identity recovery provider failed. Nothing was changed or submitted; review the provider error and try again.' }
+        }, { status: 503 });
+      }
+      if (mode !== 'diagnose_only' && identityResolution?.applied) {
+        const refreshedDrafts = await base44.asServiceRole.entities.ProFormDraft.filter({ id: draftId });
+        draft = Array.isArray(refreshedDrafts) && refreshedDrafts.length > 0 ? refreshedDrafts[0] : draft;
       }
 
       // Build candidate payload
@@ -660,6 +730,18 @@ Deno.serve(async (req) => {
       }
 
       const context = { businessName: draft.business_name, businessDomain: draft.domain };
+      if (mode === 'diagnose_only') {
+        const report = buildReadOnlyDiagnosis(rawPayload, context, identityResolution);
+        return Response.json({
+          success: true,
+          mode: 'diagnose_only',
+          draftMode: true,
+          submissionCreated: false,
+          report,
+          identityResolution
+        });
+      }
+
       const repairResult = await runRepairPipeline({
         base44,
         rawPayload,
@@ -671,12 +753,22 @@ Deno.serve(async (req) => {
         allowRetry: false
       });
 
+      repairResult.report = mergeIdentityResolution(repairResult.report, identityResolution);
+
       const updateData = {
         ai_repair_status: repairResult.ok ? 'completed' : 'needs_human_review',
         last_ai_repair_at: now,
         ai_repair_report_json: JSON.stringify(repairResult.report),
         ai_repaired_payload_json: repairResult.payload ? JSON.stringify(repairResult.payload) : '',
-        ai_repair_error_json: repairResult.ok ? '' : JSON.stringify(repairResult.errors)
+        ai_repair_error_json: repairResult.ok ? '' : JSON.stringify(repairResult.errors),
+        ai_repair_applied: Boolean(repairResult.ok && repairResult.payload),
+        ...(repairResult.ok && repairResult.payload ? {
+          mapped_payload_json: JSON.stringify(repairResult.payload),
+          metadata_json: JSON.stringify(repairResult.payload.metadata || {}),
+          userdata_json: JSON.stringify(repairResult.payload.userdata || {}),
+          business_name: repairResult.payload.metadata?.business_name || draft.business_name || '',
+          domain: repairResult.payload.metadata?.businessDomain || draft.domain || ''
+        } : {})
       };
       await base44.asServiceRole.entities.ProFormDraft.update(draft.id, updateData);
 
@@ -743,39 +835,39 @@ Deno.serve(async (req) => {
       ? await base44.asServiceRole.entities.ProFormSubmissionIntake.filter({ id: intakeId })
       : await base44.asServiceRole.entities.ProFormSubmissionIntake.filter({ questionnaire_session_id: questionnaireSessionId });
 
-    const intake = Array.isArray(intakeList) && intakeList.length > 0
+    let intake = Array.isArray(intakeList) && intakeList.length > 0
       ? [...intakeList].sort((a, b) => new Date(b.created_at_server || b.created_date || 0).getTime() - new Date(a.created_at_server || a.created_date || 0).getTime())[0]
       : null;
 
     if (!intake) return Response.json({ success: false, error: { message: 'Intake record not found' } }, { status: 404 });
 
     // Guard: already submitted (linked_submission_id set)
-    if (intake.linked_submission_id && !forceRetry) {
-      const earlyParsed = safeJsonParse(intake.transformed_payload_json);
-      const earlyPayload = earlyParsed.ok && isPlainObject(earlyParsed.value) ? earlyParsed.value : null;
-      const zapierResult = earlyPayload ? await sendToZapierSafe(earlyPayload) : { ok: false, error: 'no submission payload was available' };
-      if (!zapierResult.ok) {
-        const detail = zapierResult.error || (zapierResult.status ? `HTTP ${zapierResult.status}` : 'unknown error');
-        return Response.json({
-          success: false,
-          alreadySubmitted: true,
-          linkedSubmissionId: intake.linked_submission_id,
-          intakeId: intake.id,
-          zapierSent: false,
-          zapierStatus: zapierResult.status ?? null,
-          zapierEndpoint: ZAPIER_WEBHOOK_URL,
-          error: { message: `Zapier delivery failed: ${detail}` }
-        });
-      }
+    if (mode === 'repair_and_retry' && intake.linked_submission_id && !forceRetry) {
       return Response.json({
-        success: true,
+        success: false,
         alreadySubmitted: true,
         linkedSubmissionId: intake.linked_submission_id,
         intakeId: intake.id,
-        zapierSent: true,
-        zapierStatus: zapierResult.status,
-        zapierEndpoint: ZAPIER_WEBHOOK_URL
-      });
+        submissionCreated: false,
+        zapierSent: false,
+        error: { message: 'This intake already has a linked final submission. Nothing was retried or redelivered.' }
+      }, { status: 409 });
+    }
+
+    const identityResolution = await invokeIdentityResolver(base44, 'intake', intake.id, mode);
+    if (mode !== 'diagnose_only' && identityResolution?.status === 'provider_error') {
+      return Response.json({
+        success: false,
+        intakeId: intake.id,
+        submissionCreated: false,
+        sourceRecordChanged: false,
+        identityResolution,
+        error: { message: 'Identity recovery provider failed. Nothing was changed or submitted; review the provider error and try again.' }
+      }, { status: 503 });
+    }
+    if (mode !== 'diagnose_only' && identityResolution?.applied) {
+      const refreshedIntakes = await base44.asServiceRole.entities.ProFormSubmissionIntake.filter({ id: intake.id });
+      intake = Array.isArray(refreshedIntakes) && refreshedIntakes.length > 0 ? refreshedIntakes[0] : intake;
     }
 
     // FIX 2: Keep raw string for AI prompt even if parsing fails
@@ -796,25 +888,16 @@ Deno.serve(async (req) => {
       ai_repair_source: 'admin_manual'
     };
 
-    // diagnose_only: deterministic structure check only, no AI agent, no submission
+    // diagnose_only: read-only identity and deterministic structure analysis.
     if (mode === 'diagnose_only') {
-      const detResult = repairSubmissionPayloadServer(rawPayload, context);
-      const detValidation = validateSubmissionPayloadServer(detResult.payload);
-      const report = sanitizeRepairReport({
-        decision: (detResult.ok && detValidation.ok) ? 'no_repair_needed' : 'needs_human_review',
-        confidence: (detResult.ok && detValidation.ok) ? 0.95 : 0.5,
-        should_retry_submission: false,
-        diagnosis: detValidation.ok ? 'Payload is structurally valid after deterministic repair.' : `Validation errors: ${detValidation.errors.join('; ')}`,
-        repair_summary: detResult.warnings,
-        changed_paths: detResult.changedPaths,
-        warnings: [...detResult.warnings, ...detValidation.errors]
+      const report = buildReadOnlyDiagnosis(rawPayload, context, identityResolution);
+      return Response.json({
+        success: true,
+        mode: 'diagnose_only',
+        report,
+        identityResolution,
+        intakeId: intake.id
       });
-      await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
-        ...baseUpdate,
-        ai_repair_status: 'diagnosed',
-        ai_repair_report_json: JSON.stringify(report)
-      });
-      return Response.json({ success: true, mode: 'diagnose_only', report, intakeId: intake.id });
     }
 
     // repair_only or repair_and_retry
@@ -832,6 +915,7 @@ Deno.serve(async (req) => {
       sessionId: intake.questionnaire_session_id,
       allowRetry: mode === 'repair_and_retry'
     });
+    repairResult.report = mergeIdentityResolution(repairResult.report, identityResolution);
 
     if (!repairResult.ok) {
       await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
@@ -850,6 +934,10 @@ Deno.serve(async (req) => {
         ai_repair_status: 'repair_ready',
         ai_repair_report_json: JSON.stringify(repairResult.report),
         ai_repaired_payload_json: JSON.stringify(repairResult.payload),
+        transformed_payload_json: JSON.stringify(repairResult.payload),
+        business_name: repairResult.payload.metadata?.business_name || intake.business_name || '',
+        business_domain: repairResult.payload.metadata?.businessDomain || intake.business_domain || '',
+        ai_repair_applied: true,
         ai_repair_error_json: ''
       });
       return Response.json({ success: true, mode: 'repair_only', repairSource: repairResult.source, report: repairResult.report, intakeId: intake.id });
@@ -875,33 +963,18 @@ Deno.serve(async (req) => {
           ai_repair_status: 'retry_success',
           ai_repair_report_json: JSON.stringify(repairResult.report),
           ai_repaired_payload_json: JSON.stringify(repairResult.payload),
-          ai_repair_retry_attempted: true,
+          ai_repair_retry_attempted: false,
           ai_repair_retry_result_json: JSON.stringify({ linkedSubmissionId: existing.id, source: 'existing_found_by_session_id' })
         });
-        const zapierResult = await sendToZapierSafe(repairResult.payload);
-        if (!zapierResult.ok) {
-          const detail = zapierResult.error || (zapierResult.status ? `HTTP ${zapierResult.status}` : 'unknown error');
-          return Response.json({
-            success: false,
-            alreadySubmitted: true,
-            linkedSubmissionId: existing.id,
-            intakeId: intake.id,
-            mode: 'repair_and_retry',
-            zapierSent: false,
-            zapierStatus: zapierResult.status ?? null,
-            zapierEndpoint: ZAPIER_WEBHOOK_URL,
-            error: { message: `Zapier delivery failed: ${detail}` }
-          });
-        }
         return Response.json({
           success: true,
           alreadySubmitted: true,
           linkedSubmissionId: existing.id,
           intakeId: intake.id,
           mode: 'repair_and_retry',
-          zapierSent: true,
-          zapierStatus: zapierResult.status,
-          zapierEndpoint: ZAPIER_WEBHOOK_URL
+          submissionCreated: false,
+          zapierSent: false,
+          message: 'An existing final submission was linked. Nothing was retried or redelivered.'
         });
       }
     }

@@ -224,7 +224,7 @@ describe('public draft recovery actions', () => {
     expect(base44.entities.ProFormDraft.list).not.toHaveBeenCalled();
   });
 
-  it('passes the verified recovery grant to Retry and AI Repair + Retry', async () => {
+  it('passes the verified recovery grant to Retry and Repair + Retry', async () => {
     draftRecords = [{
       id: 'draft-public-1',
       session_id: 'session-public-1',
@@ -279,7 +279,7 @@ describe('public draft recovery actions', () => {
     });
   });
 
-  it('passes the verified recovery grant to intake Retry and AI Repair + Retry', async () => {
+  it('passes the verified recovery grant to intake Retry and Repair + Retry', async () => {
     intakeRecords = [{
       id: 'intake-public-1',
       questionnaire_session_id: 'session-public-2',
@@ -304,7 +304,7 @@ describe('public draft recovery actions', () => {
       );
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /ai repair \+ retry/i }));
+    fireEvent.click(screen.getByRole('button', { name: /repair \+ retry/i }));
 
     await waitFor(() => {
       expect(base44.functions.invoke).toHaveBeenCalledWith(
