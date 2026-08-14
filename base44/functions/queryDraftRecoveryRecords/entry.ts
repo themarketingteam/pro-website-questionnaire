@@ -12,7 +12,7 @@ const RECORD_CONFIG = {
   draft: {
     entityName: 'ProFormDraft',
     sort: '-last_saved_at',
-    statuses: new Set(['draft', 'submit_attempted', 'submit_failed', 'submitted']),
+    statuses: new Set(['draft', 'submit_attempted', 'submit_failed', 'received_intake', 'submitted']),
     searchFields: ['business_name', 'domain', 'user_email', 'session_id'],
     summaryFields: [
       'id',
@@ -23,6 +23,7 @@ const RECORD_CONFIG = {
       'last_saved_at',
       'created_date',
       'last_changed_question_id',
+      'progress_percent',
       'session_id',
       'archived_at',
       'archive_reason'

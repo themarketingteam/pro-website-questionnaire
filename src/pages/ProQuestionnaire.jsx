@@ -48,7 +48,6 @@ import {
   REQUIRE_AI_TEXT_VALIDATION_FOR_SUBMISSION,
   hasNonEmptyTextValue
 } from '@/components/pro-form/validationPolicy';
-import { serializeError } from '@/components/pro-form/submissionPayload';
 import { submitProQuestionnaire } from '@/lib/proQuestionnaireSubmit';
 import {
   identifyClarityUser,
@@ -56,14 +55,8 @@ import {
   trackClarityEvent,
   getSafeAnswerMetadata
 } from '@/lib/clarity';
-import { getOrCreateQuestionnaireSessionId } from '@/lib/sessionId';
 import { buildDraftEventRecord } from '@/lib/draftEvents';
-import {
-  createFindExistingDraftBySessionId,
-  createSaveDraftSnapshot,
-  writeDraftFailureBackup
-} from '@/lib/draftPersistence';
-import { safeLocalStorageSet, safeNowIso } from '@/lib/browserSafety';
+import { useSecureQuestionnaireDraft } from '@/lib/useSecureQuestionnaireDraft';
 import {
   countSelectedServiceChildren,
   getServiceParentsWithoutChildren
@@ -101,17 +94,12 @@ export default function ProQuestionnaire() {
   const [validatingQuestions, setValidatingQuestions] = useState([]);
   const [hasTrackedStart, setHasTrackedStart] = useState(false);
   const trackedTypingQuestionsRef = useRef(new Set());
-  const draftSaveTimeoutRef = useRef(null);
   const draftTextEventTimeoutsRef = useRef({});
-  const draftRecordIdRef = useRef('');
   const isTestMode = import.meta.env.MODE === 'test';
-  const draftSaveDelayMs = isTestMode ? 0 : 600;
   const draftTextEventDelayMs = isTestMode ? 0 : 1000;
   const expandLinkedQuestionDelayMs = isTestMode ? 0 : 500;
   const clearAllReloadDelayMs = isTestMode ? 0 : 100;
   const hasFinalSubmittedRef = useRef(false);
-  const lastChangedQuestionIdRef = useRef('');
-  const [questionnaireSessionId] = useState(() => getOrCreateQuestionnaireSessionId());
 
   // Extract URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -121,6 +109,31 @@ export default function ProQuestionnaire() {
     .replace(/^https?:\/\//i, '')
     .replace(/^www\./i, '')
     .replace(/\/+$/, '');
+
+  const {
+    isDraftReady,
+    draftSaveState,
+    lastSavedAt,
+    questionnaireSessionId,
+    restoredQuestionId,
+    queueDraftSave,
+    saveDraftNow,
+    createDraftEvent: persistDraftEvent
+  } = useSecureQuestionnaireDraft({
+    base44,
+    dispatch,
+    responses,
+    validationStatus,
+    touchedQuestions,
+    expandedQuestions,
+    textValidationMeta,
+    credentials,
+    businessNameParam,
+    domainParam,
+    serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
+    totalQuestionCount: getAllQuestionIds(QUESTIONS).length,
+    isTestMode
+  });
 
   // Calculate span totals for Q3-Q5
   const otherServices = responses['3_other'];
@@ -174,6 +187,17 @@ export default function ProQuestionnaire() {
   }, []);
 
   useEffect(() => {
+    if (!isDraftReady || !restoredQuestionId) return undefined;
+    const timeoutId = setTimeout(() => {
+      const restoredQuestion = document.getElementById(`question-${restoredQuestionId}`);
+      if (typeof restoredQuestion?.scrollIntoView === 'function') {
+        restoredQuestion.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, isTestMode ? 0 : 250);
+    return () => clearTimeout(timeoutId);
+  }, [isDraftReady, restoredQuestionId, isTestMode]);
+
+  useEffect(() => {
     const safeDomain = domainParam || credentials.domain || 'unknown';
     const safeBusinessName = businessNameParam || credentials.businessName || '';
 
@@ -204,52 +228,16 @@ export default function ProQuestionnaire() {
     credentials.userId
   ]);
 
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      try {
-        const backup = {
-          session_id: questionnaireSessionId,
-          responses,
-          validationStatus,
-          touchedQuestions,
-          expandedQuestions,
-          savedAt: safeNowIso()
-        };
-
-        safeLocalStorageSet(
-          `pro_questionnaire_local_backup_${questionnaireSessionId}`,
-          backup
-        );
-      } catch {
-        // no-op
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-
-      if (draftSaveTimeoutRef.current) {
-        clearTimeout(draftSaveTimeoutRef.current);
-        draftSaveTimeoutRef.current = null;
-      }
-
-      Object.values(draftTextEventTimeoutsRef.current).forEach((timeoutId) => {
-        clearTimeout(timeoutId);
-      });
-      draftTextEventTimeoutsRef.current = {};
-    };
-  }, [
-    questionnaireSessionId,
-    responses,
-    validationStatus,
-    touchedQuestions,
-    expandedQuestions
-  ]);
+  useEffect(() => () => {
+    Object.values(draftTextEventTimeoutsRef.current).forEach((timeoutId) => {
+      clearTimeout(timeoutId);
+    });
+    draftTextEventTimeoutsRef.current = {};
+  }, []);
 
   // Initialize expanded questions on mount
   useEffect(() => {
+    if (!isDraftReady) return;
     try {
       // Only initialize if not already initialized
       if (Object.keys(expandedQuestions).length === 0) {
@@ -325,110 +313,7 @@ export default function ProQuestionnaire() {
       console.error('Error in initialization useEffect:', error);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const findExistingDraftBySessionId = useCallback(
-    createFindExistingDraftBySessionId({ draftRecordIdRef }),
-    []
-  );
-
-  const saveDraftSnapshot = useCallback(
-    createSaveDraftSnapshot({
-      entities: base44.entities,
-      draftRecordIdRef,
-      findExistingDraftBySessionId
-    }),
-    [findExistingDraftBySessionId]
-  );
-
-  const saveDraftNow = useCallback(async ({
-    status = 'draft',
-    submitError = '',
-    finalSubmissionId = '',
-    responsesSnapshot = responses,
-    validationStatusSnapshot = validationStatus,
-    touchedQuestionsSnapshot = touchedQuestions,
-    expandedQuestionsSnapshot = expandedQuestions
-  } = {}) => {
-    return saveDraftSnapshot({
-      sessionId: questionnaireSessionId,
-      responses: responsesSnapshot,
-      validationStatus: validationStatusSnapshot,
-      touchedQuestions: touchedQuestionsSnapshot,
-      expandedQuestions: expandedQuestionsSnapshot,
-      credentials,
-      businessNameParam,
-      domainParam,
-      serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
-      currentQuestionId: lastChangedQuestionIdRef.current || '',
-      lastChangedQuestionId: lastChangedQuestionIdRef.current || '',
-      status,
-      submitError,
-      finalSubmissionId
-    });
-  }, [
-    saveDraftSnapshot,
-    questionnaireSessionId,
-    responses,
-    validationStatus,
-    touchedQuestions,
-    expandedQuestions,
-    credentials,
-    businessNameParam,
-    domainParam
-  ]);
-
-  const queueDraftSave = useCallback((changedQuestionId, nextResponses = responses) => {
-    if (hasFinalSubmittedRef.current) return;
-
-    lastChangedQuestionIdRef.current = changedQuestionId;
-
-    if (draftSaveTimeoutRef.current) {
-      clearTimeout(draftSaveTimeoutRef.current);
-    }
-
-    draftSaveTimeoutRef.current = setTimeout(async () => {
-      if (hasFinalSubmittedRef.current) return;
-
-      try {
-        await saveDraftSnapshot({
-          sessionId: questionnaireSessionId,
-          responses: nextResponses,
-          validationStatus,
-          touchedQuestions,
-          expandedQuestions,
-          credentials,
-          businessNameParam,
-          domainParam,
-          serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
-          currentQuestionId: changedQuestionId,
-          lastChangedQuestionId: changedQuestionId,
-          status: 'draft'
-        });
-      } catch (error) {
-        console.error('Draft autosave failed:', serializeError(error));
-        writeDraftFailureBackup({
-          questionnaireSessionId,
-          responses: nextResponses,
-          validationStatus,
-          touchedQuestions,
-          expandedQuestions,
-          error: serializeError(error)
-        });
-      }
-    }, draftSaveDelayMs);
-  }, [
-    questionnaireSessionId,
-    responses,
-    validationStatus,
-    touchedQuestions,
-    expandedQuestions,
-    credentials,
-    businessNameParam,
-    domainParam,
-    saveDraftSnapshot,
-    draftSaveDelayMs
-  ]);
+  }, [isDraftReady]);
 
   const createDraftEvent = useCallback(async ({
     eventType,
@@ -449,7 +334,12 @@ export default function ProQuestionnaire() {
         userId: credentials.userId || ''
       });
 
-      await base44.entities.ProFormDraftEvent.create(record);
+      await persistDraftEvent({
+        eventType,
+        questionId,
+        value,
+        eventRecord: record
+      });
     } catch (error) {
       console.error('Failed to create draft event:', {
         message: error?.message || String(error)
@@ -461,7 +351,8 @@ export default function ProQuestionnaire() {
     credentials.businessName,
     credentials.domain,
     credentials.userId,
-    domainParam
+    domainParam,
+    persistDraftEvent
   ]);
 
   const queueDraftEvent = useCallback(({
@@ -501,8 +392,10 @@ export default function ProQuestionnaire() {
   // Helper: dispatch only when status meaningfully changes
   const setValidationStatusIfChanged = (qid, next, snapshot) => {
     const prev = (snapshot ?? validationStatus)?.[qid] ?? '';
-    if (prev === next) return false;
+    // Always commit the latest computed status. Event handlers can briefly hold
+    // an older render snapshot while rapid edits are being flushed.
     dispatch(setValidationStatus({ questionId: qid, status: next }));
+    if (prev === next) return false;
     try { if (devDiagEnabled && devDiagEnabled()) trackValidationDispatch(qid, next); } catch {}
     return true;
   };
@@ -619,9 +512,38 @@ export default function ProQuestionnaire() {
       }
     }
 
-    // Prepare merged snapshot for validation logic
+    // Prepare the exact answer snapshot and explicit deletions for durable persistence.
+    const isExplicitlyEmpty = (
+      value === null
+      || typeof value === 'undefined'
+      || (typeof value === 'string' && value.trim() === '')
+      || (Array.isArray(value) && value.length === 0)
+      || (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0)
+    );
     const newResponses = { ...responses, [questionId]: value };
-    queueDraftSave(questionId, newResponses);
+    const relatedDeletedKeys = [];
+    if (isExplicitlyEmpty) {
+      relatedDeletedKeys.push(questionId);
+      delete newResponses[questionId];
+    }
+    if (q?.type === 'yes_no' && value === 'no') {
+      (q.conditionalChildren || []).forEach((child) => {
+        [child.id, `${child.id}_other`, `${child.id}_primary`].forEach((key) => {
+          relatedDeletedKeys.push(key);
+          delete newResponses[key];
+        });
+      });
+    }
+    const isTypingField = q?.type === 'text' || q?.type === 'textarea';
+    queueDraftSave(
+      [questionId, ...relatedDeletedKeys],
+      newResponses,
+      {
+        deletedKeys: relatedDeletedKeys,
+        currentQuestionId: questionId,
+        delayMs: isTypingField ? 650 : 120
+      }
+    );
     const eventQuestion = getQuestionById(QUESTIONS, questionId);
     let eventType = 'answer_changed';
 
@@ -901,13 +823,26 @@ export default function ProQuestionnaire() {
   };
 
   const resetQuestion = (questionId) => {
+    const deletedKeys = [questionId, `${questionId}_other`, `${questionId}_primary`];
+    const nextResponses = { ...responses };
+    deletedKeys.forEach((key) => delete nextResponses[key]);
     dispatch(deleteResponse(questionId));
     setShowAutoSave(prev => prev + 1);
     dispatch(setValidationStatus({ questionId, status: 'incomplete' }));
+    queueDraftSave(deletedKeys, nextResponses, {
+      deletedKeys,
+      currentQuestionId: questionId,
+      delayMs: 0,
+      source: 'explicit_question_clear'
+    });
   };
 
   const toggleQuestion = (questionId) => {
     const isCurrentlyExpanded = expandedQuestions[questionId];
+    const nextExpandedQuestions = {
+      ...expandedQuestions,
+      [questionId]: !isCurrentlyExpanded
+    };
     dispatch(setExpandedQuestion({ questionId, expanded: !isCurrentlyExpanded }));
     
     // On expand: do NOT auto-touch optional children or any textarea
@@ -947,8 +882,15 @@ export default function ProQuestionnaire() {
     if (question?.conditionalChildren && isCurrentlyExpanded) {
       question.conditionalChildren.forEach(child => {
         dispatch(setExpandedQuestion({ questionId: child.id, expanded: false }));
+        nextExpandedQuestions[child.id] = false;
       });
     }
+    queueDraftSave([], responses, {
+      expandedQuestions: nextExpandedQuestions,
+      currentQuestionId: questionId,
+      delayMs: 120,
+      source: 'question_position_changed'
+    });
   };
 
   const expandAll = () => {
@@ -962,6 +904,11 @@ export default function ProQuestionnaire() {
       }
     });
     dispatch(setAllExpanded(expanded));
+    queueDraftSave([], responses, {
+      expandedQuestions: expanded,
+      delayMs: 120,
+      source: 'question_position_changed'
+    });
   };
 
   const collapseAll = () => {
@@ -975,13 +922,19 @@ export default function ProQuestionnaire() {
       }
     });
     dispatch(setAllExpanded(collapsed));
+    queueDraftSave([], responses, {
+      expandedQuestions: collapsed,
+      delayMs: 120,
+      source: 'question_position_changed'
+    });
   };
 
   const clearAll = () => {
     setShowClearAllModal(true);
   };
 
-  const handleConfirmClearAll = () => {
+  const handleConfirmClearAll = async () => {
+    const deletedKeys = Object.keys(responses);
     dispatch(resetForm());
     
     // Collapse all questions
@@ -995,13 +948,29 @@ export default function ProQuestionnaire() {
       }
     });
     dispatch(setAllExpanded(collapsed));
+    queueDraftSave(deletedKeys, {}, {
+      deletedKeys,
+      expandedQuestions: collapsed,
+      delayMs: 0,
+      source: 'explicit_clear_all'
+    });
 
-    setShowClearAllModal(false);
-    toast.success('All responses cleared');
-
-    // Scroll to top and refresh
-    window.scrollTo(0, 0);
-    setTimeout(() => window.location.reload(), clearAllReloadDelayMs);
+    try {
+      await saveDraftNow({
+        responsesSnapshot: {},
+        validationStatusSnapshot: {},
+        touchedQuestionsSnapshot: {},
+        expandedQuestionsSnapshot: collapsed,
+        required: true,
+        source: 'explicit_clear_all'
+      });
+      setShowClearAllModal(false);
+      toast.success('All responses cleared');
+      window.scrollTo(0, 0);
+      setTimeout(() => window.location.reload(), clearAllReloadDelayMs);
+    } catch {
+      toast.error('The answers could not be cleared on the server. Please try again.');
+    }
   };
 
   const isQuestionComplete = (questionId) => {
@@ -1446,11 +1415,6 @@ export default function ProQuestionnaire() {
     finalSubmitInFlightRef.current = true;
     setIsSubmitting(true);
 
-    if (draftSaveTimeoutRef.current) {
-      clearTimeout(draftSaveTimeoutRef.current);
-      draftSaveTimeoutRef.current = null;
-    }
-
     try {
       const result = await submitProQuestionnaire({
         businessName,
@@ -1609,21 +1573,13 @@ export default function ProQuestionnaire() {
               onAdd={(location) => {
                 const current = responses[question.id] || [];
                 const newLocations = [...current, location];
-                dispatch(setResponse({ questionId: question.id, value: newLocations }));
-                setShowAutoSave(s => s + 1);
-
-                // Update validation status
-                const min = question.limits?.min || 1;
-                const max = question.limits?.max || 5;
-                const newStatus = (newLocations.length >= min && newLocations.length <= max) ? 'complete' : 'incomplete';
-                dispatch(setValidationStatus({ questionId: question.id, status: newStatus }));
+                updateResponse(question.id, newLocations);
               }}
               onUpdate={(index, updatedLocation) => {
                 const current = responses[question.id] || [];
                 const newLocations = [...current];
                 newLocations[index] = updatedLocation;
-                dispatch(setResponse({ questionId: question.id, value: newLocations }));
-                setShowAutoSave(s => s + 1);
+                updateResponse(question.id, newLocations);
               }}
               onRemove={(index) => {
                 const current = responses[question.id] || [];
@@ -1635,19 +1591,11 @@ export default function ProQuestionnaire() {
                   primaryIndex = primaryIndex - 1;
                 }
                 const newLocations = current.filter((_, i) => i !== index);
-                dispatch(setResponse({ questionId: question.id, value: newLocations }));
-                dispatch(setResponse({ questionId: '5_primary', value: primaryIndex }));
-                setShowAutoSave(s => s + 1);
-
-                // Update validation status
-                const min = question.limits?.min || 1;
-                const max = question.limits?.max || 5;
-                const newStatus = (newLocations.length >= min && newLocations.length <= max) ? 'complete' : 'incomplete';
-                dispatch(setValidationStatus({ questionId: question.id, status: newStatus }));
+                updateResponse(question.id, newLocations);
+                updateResponse('5_primary', primaryIndex);
               }}
               onSetPrimary={(index) => {
-                dispatch(setResponse({ questionId: '5_primary', value: index }));
-                setShowAutoSave(s => s + 1);
+                updateResponse('5_primary', index);
               }}
               maxLocations={question.limits?.max || 5}
               externalDisabled={isSpanLimitReached}
@@ -1764,6 +1712,22 @@ export default function ProQuestionnaire() {
       </div>
     );
   };
+
+  if (!isDraftReady) {
+    return (
+      <ErrorBoundary>
+        <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+          <FormHeader />
+          <main className="min-h-[50vh] flex items-center justify-center px-6" aria-live="polite">
+            <div className="flex items-center gap-3 text-[#122947] font-semibold">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              Restoring your saved questionnaire…
+            </div>
+          </main>
+        </div>
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>
@@ -1968,7 +1932,11 @@ export default function ProQuestionnaire() {
               </div>
               </main>
 
-      <AutoSaveIndicator show={showAutoSave} />
+      <AutoSaveIndicator
+        show={showAutoSave}
+        status={draftSaveState}
+        lastSavedAt={lastSavedAt}
+      />
       <Suspense fallback={null}>
         <ReduxDataValidator />
       </Suspense>

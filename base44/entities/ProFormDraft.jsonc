@@ -6,6 +6,38 @@
       "type": "string",
       "description": "Stable questionnaire session ID"
     },
+    "access_token_hash": {
+      "type": "string",
+      "description": "SHA-256 hash of the anonymous draft capability; the token itself is never stored"
+    },
+    "access_version": {
+      "type": "number",
+      "default": 1,
+      "description": "Version of the anonymous draft access contract"
+    },
+    "history_baseline_json": {
+      "type": "string",
+      "description": "Server-side baseline used to deterministically replay append-only draft mutations"
+    },
+    "history_started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When versioned server-side draft history was enabled"
+    },
+    "save_revision": {
+      "type": "number",
+      "default": 0,
+      "description": "Latest materialized draft revision"
+    },
+    "latest_client_sequences_json": {
+      "type": "string",
+      "description": "Highest accepted sequence per anonymous client instance"
+    },
+    "progress_percent": {
+      "type": "number",
+      "default": 0,
+      "description": "Questionnaire completion progress at the latest durable save"
+    },
     "business_name": {
       "type": "string",
       "description": "Business name associated with the draft"
@@ -98,6 +130,10 @@
       "type": "string",
       "description": "Linked final submission ID"
     },
+    "intake_id": {
+      "type": "string",
+      "description": "Linked durable fallback intake ID when final submission creation did not complete"
+    },
     "ai_repair_status": {
       "type": "string",
       "description": "Current AI repair lifecycle status for this draft (e.g. pending, running, completed, failed, skipped)"
@@ -157,5 +193,11 @@
   },
   "required": [
     "session_id"
-  ]
+  ],
+  "rls": {
+    "create": { "user_condition": { "role": "admin" } },
+    "read": { "user_condition": { "role": "admin" } },
+    "update": { "user_condition": { "role": "admin" } },
+    "delete": { "user_condition": { "role": "admin" } }
+  }
 }

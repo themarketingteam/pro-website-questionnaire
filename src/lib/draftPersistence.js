@@ -2,9 +2,127 @@ import { transformResponsesToPayload } from '@/components/pro-form/submissionPay
 import {
   safeGetUserAgent,
   safeJsonStringify,
+  safeLocalStorageGet,
   safeLocalStorageSet,
   safeNowIso
 } from '@/lib/browserSafety';
+
+const SAVE_FUNCTION = 'syncProQuestionnaireDraft';
+const MAX_ATTEMPTS = 3;
+
+const getTimerApi = () => (typeof window !== 'undefined' ? window : globalThis);
+const delay = (ms) => new Promise((resolve) => getTimerApi().setTimeout(resolve, ms));
+
+const isRetryable = (error) => {
+  const status = Number(error?.status || error?.response?.status || 0);
+  if ([408, 425, 429, 500, 502, 503, 504].includes(status)) return true;
+  const message = String(error?.message || '').toLowerCase();
+  return !status || /network|timeout|timed out|failed to fetch|load failed|offline/.test(message);
+};
+
+const invokeDraftFunction = async (functions, payload, { attempts = MAX_ATTEMPTS } = {}) => {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      const response = await functions.invoke(SAVE_FUNCTION, payload);
+      if (!response?.data?.success) {
+        const error = new Error(response?.data?.error || 'Draft persistence failed.');
+        error.status = response?.status || 500;
+        throw error;
+      }
+      return response.data;
+    } catch (error) {
+      lastError = error;
+      if (attempt >= attempts || !isRetryable(error)) throw error;
+      const baseDelay = import.meta.env.MODE === 'test' ? 0 : 250 * (2 ** (attempt - 1));
+      await delay(baseDelay + (import.meta.env.MODE === 'test' ? 0 : Math.floor(Math.random() * 120)));
+    }
+  }
+  throw lastError || new Error('Draft persistence failed.');
+};
+
+export const bootstrapServerDraft = async ({
+  functions,
+  resumeCredential,
+  legacySessionId,
+  credentials
+}) => invokeDraftFunction(functions, {
+  action: 'bootstrap',
+  resumeCredential,
+  legacySessionId,
+  credentials: sanitizeCredentialsForDraft(credentials)
+});
+
+export const saveServerDraftMutation = async ({
+  functions,
+  resumeCredential,
+  clientInstanceId,
+  mutationId,
+  clientSequence,
+  baseRevision,
+  responses,
+  changedKeys,
+  deletedKeys,
+  validationStatus,
+  touchedQuestions,
+  expandedQuestions,
+  credentials,
+  currentQuestionId,
+  lastChangedQuestionId,
+  progressPercent,
+  status = 'draft',
+  submitError = '',
+  finalSubmissionId = '',
+  intakeId = '',
+  mappedPayload,
+  source = 'autosave'
+}) => invokeDraftFunction(functions, {
+  action: 'save',
+  resumeCredential,
+  clientInstanceId,
+  mutationId,
+  clientSequence,
+  baseRevision,
+  clientChangedAt: safeNowIso(),
+  responses,
+  changedKeys,
+  deletedKeys,
+  validationStatus,
+  touchedQuestions,
+  expandedQuestions,
+  credentials: sanitizeCredentialsForDraft(credentials),
+  currentQuestionId,
+  lastChangedQuestionId,
+  progressPercent,
+  status,
+  submitError,
+  finalSubmissionId,
+  intakeId,
+  mappedPayload,
+  source
+});
+
+export const createSecureDraftEvent = async ({
+  functions,
+  resumeCredential,
+  event
+}) => invokeDraftFunction(functions, {
+  action: 'event',
+  resumeCredential,
+  event
+}, { attempts: 2 });
+
+export const getDraftLocalBackup = (sessionId) => {
+  if (!sessionId) return null;
+  const raw = safeLocalStorageGet(`pro_questionnaire_local_backup_${sessionId}`);
+  if (!raw) return null;
+  try {
+    const backup = JSON.parse(raw);
+    return backup && typeof backup === 'object' ? backup : null;
+  } catch {
+    return null;
+  }
+};
 
 export const safeJsonStringifyDraft = (value) => safeJsonStringify(value, '{}');
 
@@ -131,6 +249,9 @@ export const writeDraftFailureBackup = ({
   validationStatus,
   touchedQuestions,
   expandedQuestions,
+  changedKeys = [],
+  deletedKeys = [],
+  baseRevision = 0,
   error
 }) => {
   try {
@@ -142,6 +263,9 @@ export const writeDraftFailureBackup = ({
         validationStatus,
         touchedQuestions,
         expandedQuestions,
+        changedKeys,
+        deletedKeys,
+        baseRevision,
         error,
         savedAt: safeNowIso()
       }

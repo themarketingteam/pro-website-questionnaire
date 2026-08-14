@@ -55,6 +55,12 @@ const draftRecoveryFromBase64Url = (value) => {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 };
 
+const draftRecoveryToBase64Url = (bytes) => {
+  let binary = '';
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+};
+
 const importDraftRecoverySigningKey = (secret) => crypto.subtle.importKey(
   'raw',
   draftRecoveryEncoder.encode(secret),
@@ -78,6 +84,10 @@ const verifyDraftRecoveryGrant = async (token) => {
   if (!encodedPayload || !encodedSignature || extraParts.length > 0) return false;
 
   try {
+    if (
+      draftRecoveryToBase64Url(draftRecoveryFromBase64Url(encodedPayload)) !== encodedPayload ||
+      draftRecoveryToBase64Url(draftRecoveryFromBase64Url(encodedSignature)) !== encodedSignature
+    ) return false;
     const signingKey = await importDraftRecoverySigningKey(configuredPassword);
     const signatureIsValid = await crypto.subtle.verify(
       'HMAC',

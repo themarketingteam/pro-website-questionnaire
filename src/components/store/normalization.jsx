@@ -297,9 +297,8 @@ export function normalizePersistedStateV3(state) {
         if (!isRequired && childType === 'textarea') {
           const empty = !childVal || (typeof childVal === 'string' && childVal.trim().length === 0);
           if (empty) {
-            // Keep neutral and collapsed by default
+            // Keep neutral without discarding an explicitly restored open state.
             if (child.id in next.validationStatus) next.validationStatus[child.id] = '';
-            next.expandedQuestions[child.id] = false;
             if (child.id in next.touchedQuestions) delete next.touchedQuestions[child.id];
           }
         }
@@ -320,7 +319,6 @@ export function normalizePersistedStateV3(state) {
       const empty = !val || (typeof val === 'string' && val.trim().length === 0);
       if (empty) {
         if (childId in next.validationStatus) next.validationStatus[childId] = '';
-        next.expandedQuestions[childId] = false;
         if (childId in next.touchedQuestions) delete next.touchedQuestions[childId];
       }
     }

@@ -28,6 +28,47 @@ vi.mock('@/components/pro-form/PDFGenerator', () => ({
 
 const setupUser = () => userEvent.setup({ pointerEventsCheck: 0 });
 
+const secureDraftMockResponse = (payload = {}) => {
+  if (payload.action === 'bootstrap') {
+    return {
+      status: 200,
+      data: {
+        success: true,
+        resumeCredential: 'session_test_1234567890.abcdefghijklmnopqrstuvwxyzABCDEFGH',
+        draft: {
+          draftId: 'draft-1',
+          sessionId: 'session_test_1234567890',
+          revision: 0,
+          responses: {},
+          validationStatus: {},
+          touchedQuestions: {},
+          expandedQuestions: {},
+          credentials: {},
+          status: 'draft',
+          currentQuestionId: '',
+          lastSavedAt: new Date().toISOString()
+        }
+      }
+    };
+  }
+  return {
+    status: 200,
+    data: {
+      success: true,
+      draft: {
+        draftId: 'draft-1',
+        sessionId: 'session_test_1234567890',
+        revision: Number(payload.clientSequence || 1),
+        responses: payload.responses || {},
+        status: payload.status || 'draft',
+        finalSubmissionId: payload.finalSubmissionId || '',
+        intakeId: payload.intakeId || '',
+        lastSavedAt: new Date().toISOString()
+      }
+    }
+  };
+};
+
 
 let base44;
 beforeAll(async () => {
@@ -195,7 +236,8 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     const user = setupUser();
 
     const invoke = base44.functions.invoke;
-    invoke.mockImplementation(async (name) => {
+    invoke.mockImplementation(async (name, payload) => {
+      if (name === 'syncProQuestionnaireDraft') return secureDraftMockResponse(payload);
       if (name === 'validateQuestionText') {
         return { status: 200, data: { status: 'incomplete' } };
       }
@@ -258,7 +300,8 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     const user = setupUser();
 
     const invoke = base44.functions.invoke;
-    invoke.mockImplementation(async (name) => {
+    invoke.mockImplementation(async (name, payload) => {
+      if (name === 'syncProQuestionnaireDraft') return secureDraftMockResponse(payload);
       if (name === 'validateQuestionText') {
         throw new Error('network down');
       }
@@ -343,15 +386,12 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     expect(base44.functions.invoke.mock.calls.filter(c => c[0] === 'validateQuestionText')).toHaveLength(0);
   });
 
-  it('writes a recoverable local backup when the database save fails', async () => {
-    const user = setupUser();
-    const createMock = base44.entities.ProFormSubmission.create;
-    createMock.mockRejectedValueOnce(new Error('db down'));
-
+  it('writes a recoverable local backup when the database draft save fails', async () => {
     const invoke = base44.functions.invoke;
-    invoke.mockImplementation(async (name) => {
-      if (name === 'validateQuestionText') {
-        return { status: 200, data: { status: 'complete' } };
+    invoke.mockImplementation(async (name, payload) => {
+      if (name === 'syncProQuestionnaireDraft') {
+        if (payload?.action === 'bootstrap') return secureDraftMockResponse(payload);
+        throw Object.assign(new Error('draft database unavailable'), { status: 503 });
       }
       return { status: 200, data: {} };
     });
@@ -370,21 +410,22 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
           '1': 'complete','2': 'complete','3': 'complete','4': 'complete','5': 'complete','6': 'complete','7': 'complete','8': 'complete','9': 'complete','10': 'complete','11': 'complete','12': 'complete','13': 'complete','14': 'complete','15': 'complete','16': 'complete','17': 'complete','18': 'complete','19': 'complete','20': 'complete','21': 'complete','22': 'complete','23': 'complete','24': 'complete','25': 'complete'
         },
         touchedQuestions: {},
-        expandedQuestions: {},
+        expandedQuestions: { '6': true },
         credentials: {},
         textValidationMeta: {}
       },
     };
 
     renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
-
-    await user.click(await screen.findByRole('button', { name: /submit questionnaire/i }));
-    await user.click(await screen.findByRole('button', { name: /confirm & submit/i }));
+    const question = await screen.findByTestId('question-wrapper-6');
+    fireEvent.change(within(question).getByRole('textbox'), {
+      target: { value: 'Company description updated' }
+    });
 
     await waitFor(() => {
-      const backupKey = Object.keys(localStorage).find((key) => key.startsWith('failed_pro_submission_'));
+      const backupKey = Object.keys(localStorage).find((key) => key.startsWith('pro_questionnaire_local_backup_'));
       expect(backupKey).toBeTruthy();
-      expect(localStorage.getItem(backupKey)).toContain('Company description');
+      expect(localStorage.getItem(backupKey)).toContain('Company description updated');
     });
   });
 
@@ -402,7 +443,8 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     createMock.mockResolvedValueOnce({ id: 'saved-ok' });
 
     const invoke = base44.functions.invoke;
-    invoke.mockImplementation(async (name) => {
+    invoke.mockImplementation(async (name, payload) => {
+      if (name === 'syncProQuestionnaireDraft') return secureDraftMockResponse(payload);
       if (name === 'validateQuestionText') {
         return { status: 200, data: { status: 'complete' } };
       }
@@ -432,13 +474,12 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
       },
     };
 
-    const submittedResponses = preloaded.form.responses;
     const submissionPath = window.location.pathname;
     const { store } = renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
 
-    fireEvent.click(
-      await screen.findByRole('button', { name: /submit questionnaire/i })
-    );
+    const submitButton = await screen.findByRole('button', { name: /submit questionnaire/i });
+    const submittedResponses = structuredClone(store.getState().form.responses);
+    fireEvent.click(submitButton);
     fireEvent.click(
       await screen.findByRole('button', { name: /confirm & submit/i })
     );
@@ -573,9 +614,9 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     expect(team.taggedPeople[0].y).toBe(0);
     expect(certs).toHaveLength(1);
     expect(guarantees).toHaveLength(1);
-    expect(geographic[0].geographic_area_meta.lat).toBe(0);
-    expect(geographic[0].geographic_area_meta.lon).toBe(0);
-    expect(geographic[1].geographic_area_meta.lat).toBeNull();
-    expect(geographic[1].geographic_area_meta.lon).toBeNull();
+    expect(geographic[0].geographic_area_meta.lat).toBe('0');
+    expect(geographic[0].geographic_area_meta.lon).toBe('0');
+    expect(geographic[1].geographic_area_meta.lat).toBe('');
+    expect(geographic[1].geographic_area_meta.lon).toBe('');
   });
 });

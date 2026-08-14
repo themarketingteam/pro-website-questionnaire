@@ -20,6 +20,49 @@ vi.mock('@/api/base44Client', () => {
       },
       functions: {
         invoke: vi.fn(async (name, payload) => {
+          if (name === 'syncProQuestionnaireDraft') {
+            const resumeCredential = 'session_test_1234567890.abcdefghijklmnopqrstuvwxyzABCDEFGH';
+            if (payload?.action === 'bootstrap') {
+              return {
+                data: {
+                  success: true,
+                  resumeCredential,
+                  draft: {
+                    draftId: 'draft-1',
+                    sessionId: 'session_test_1234567890',
+                    revision: 0,
+                    responses: {},
+                    validationStatus: {},
+                    touchedQuestions: {},
+                    expandedQuestions: {},
+                    credentials: {},
+                    status: 'draft',
+                    currentQuestionId: '',
+                    lastSavedAt: new Date().toISOString()
+                  }
+                }
+              };
+            }
+            if (payload?.action === 'save') {
+              return {
+                data: {
+                  success: true,
+                  draft: {
+                    draftId: 'draft-1',
+                    sessionId: 'session_test_1234567890',
+                    revision: Number(payload?.clientSequence || 1),
+                    responses: payload?.responses || {},
+                    status: payload?.status || 'draft',
+                    finalSubmissionId: payload?.finalSubmissionId || '',
+                    intakeId: payload?.intakeId || '',
+                    lastSavedAt: new Date().toISOString()
+                  }
+                }
+              };
+            }
+            return { data: { success: true } };
+          }
+
           if (name === 'sendToZapier') {
             return { data: { success: true } };
           }

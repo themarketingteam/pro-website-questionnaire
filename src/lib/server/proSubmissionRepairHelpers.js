@@ -398,6 +398,7 @@ export function repairSubmissionPayloadServer(rawPayload, context = {}) {
       ? []
       : (isPlainObject(tpwt.taggedPeople) ? Object.values(tpwt.taggedPeople) : []);
     track('...team_photo_with_tags.taggedPeople', before, 'array', 'coerced to array');
+    warnings.push('...taggedPeople: coerced to array');
     warnings.push('taggedPeople_coerced_to_array');
   }
 
@@ -418,7 +419,7 @@ export function repairSubmissionPayloadServer(rawPayload, context = {}) {
       warnings.push(`${field}_coerced_to_array`);
     }
     p.userdata[field] = p.userdata[field]
-      .map(v => (typeof v === 'string' ? v : asTrimmedString(v)))
+      .map(v => asTrimmedString(v))
       .filter(Boolean);
   }
 

@@ -40,8 +40,6 @@ export default function RadioQuestion({
               name={groupName || inputIdBase || 'radio'}
               checked={checked}
               onChange={() => {
-                onChange(option);
-
                 const shouldClearOther =
                   showOther &&
                   onOtherChange &&
@@ -50,6 +48,10 @@ export default function RadioQuestion({
                 if (shouldClearOther) {
                   onOtherChange('');
                 }
+
+                // Commit the selected listed option last so a stale render of the
+                // auxiliary Other field cannot leave the base radio incomplete.
+                onChange(option);
               }}
               className="sr-only"
             />

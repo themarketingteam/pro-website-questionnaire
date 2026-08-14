@@ -22,6 +22,14 @@
           "type": "string",
           "default": "pro",
           "description": "The service tier (pro, essentials, etc.)"
+        },
+        "questionnaire_session_id": {
+          "type": "string",
+          "description": "Stable non-sensitive session ID of the source questionnaire draft"
+        },
+        "source_draft_id": {
+          "type": "string",
+          "description": "Server-side ProFormDraft record linked to this submission"
         }
       }
     },

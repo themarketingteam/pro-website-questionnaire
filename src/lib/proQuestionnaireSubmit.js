@@ -8,7 +8,6 @@ import {
   createProFormSubmissionWithFallback,
   serializeSubmitError
 } from '@/lib/proSubmissionResilience';
-import { buildDraftEventRecord } from '@/lib/draftEvents';
 import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
 import { getSubmitDebugFailureMode, shouldSimulateSubmitFailure } from '@/lib/submitDebugFlags';
 import {
@@ -282,31 +281,18 @@ export const submitProQuestionnaire = async ({
   const recordSubmitStage = async (stage, details = {}) => {
     const safeDetails = sanitizeStageDetails(details);
 
-    try {
-      const eventRecord = buildDraftEventRecord({
-        sessionId: questionnaireSessionId,
-        eventType: 'submit_stage',
-        questionId: stage,
-        questionType: 'submit_stage',
-        value: {
-          stage,
-          timestamp: safeNowIso(),
-          questionnaireSessionId,
-          businessName: businessName || '',
-          domain: resolvedDomain,
-          failureKind: safeDetails.failureKind || '',
-          usedFallback: Boolean(safeDetails.usedFallback),
-          ...safeDetails
-        },
-        businessName,
-        domain: resolvedDomain,
-        userId: credentials?.userId || credentials?.id || ''
-      });
-
-      await base44.entities.ProFormDraftEvent.create(eventRecord);
-    } catch {
-      // no-op
-    }
+    await createDraftEventSafe({
+      createDraftEvent,
+      eventType: 'submit_stage',
+      questionId: stage,
+      value: {
+        stage,
+        timestamp: safeNowIso(),
+        failureKind: safeDetails.failureKind || '',
+        usedFallback: Boolean(safeDetails.usedFallback),
+        ...safeDetails
+      }
+    });
 
     try {
       trackClarityEvent(`pro_questionnaire_${stage}`, {
@@ -333,17 +319,43 @@ export const submitProQuestionnaire = async ({
     }
   });
 
-  await safeDraftSave({
-    saveDraftNow,
-    questionnaireSessionId,
-    responsesSnapshot: responseSnapshot,
-    validationStatusSnapshot: validationStatus,
-    touchedQuestionsSnapshot: touchedQuestions,
-    expandedQuestionsSnapshot: expandedQuestions,
-    options: {
-      status: 'submit_attempted'
-    }
-  });
+  let activeDraftId = '';
+  try {
+    const durableDraft = await saveDraftNow({
+      status: 'submit_attempted',
+      responsesSnapshot: responseSnapshot,
+      validationStatusSnapshot: validationStatus,
+      touchedQuestionsSnapshot: touchedQuestions,
+      expandedQuestionsSnapshot: expandedQuestions,
+      required: true,
+      source: 'final_submission_barrier'
+    });
+    activeDraftId = durableDraft?.draftId || durableDraft?.id || '';
+    if (!activeDraftId) throw new Error('The database did not confirm the final draft save.');
+  } catch (error) {
+    const serializedError = serializeSubmitError(error);
+    throw new SubmitFlowError({
+      userMessage: `Your answers are still on this page, but the database did not confirm the final save. Please try again before submitting. Recovery code: ${recoveryCode}`,
+      recoveryCode,
+      failureKind: serializedError.failureKind,
+      stage: 'final_draft_save_failed',
+      serializedError
+    });
+  }
+
+  const persistDurableOutcome = async ({ submission, intakeId = '', receivedViaIntake = false }) => {
+    return saveDraftNow({
+      status: receivedViaIntake ? 'received_intake' : 'submitted',
+      finalSubmissionId: receivedViaIntake ? '' : (submission?.id || ''),
+      intakeId: receivedViaIntake ? intakeId : '',
+      responsesSnapshot: responseSnapshot,
+      validationStatusSnapshot: validationStatus,
+      touchedQuestionsSnapshot: touchedQuestions,
+      expandedQuestionsSnapshot: expandedQuestions,
+      required: true,
+      source: receivedViaIntake ? 'durable_intake_link' : 'durable_submission_link'
+    });
+  };
 
   let transformedPayload;
 
@@ -363,6 +375,11 @@ export const submitProQuestionnaire = async ({
       domain,
       serviceOptionsGrouped
     );
+    transformedPayload.metadata = {
+      ...(transformedPayload.metadata || {}),
+      questionnaire_session_id: questionnaireSessionId,
+      source_draft_id: activeDraftId
+    };
     await recordSubmitStage('payload_transform_success', {
       payloadSizeChars: safePayloadSize(transformedPayload)
     });
@@ -419,11 +436,16 @@ export const submitProQuestionnaire = async ({
       transformFailed: true,
       transformError: serializedError,
       questionnaireSessionId,
-      draftId: null,
+      draftId: activeDraftId,
       submitContext
     });
 
     if (fallbackResult?.ok) {
+      await persistDurableOutcome({
+        submission: fallbackResult.submission,
+        intakeId: fallbackResult.intakeId || '',
+        receivedViaIntake: Boolean(fallbackResult.receivedViaIntake)
+      });
       await recordSubmitStage('fallback_success', { usedFallback: true });
       await recordSubmitStage('submit_success', { usedFallback: true });
       if (typeof onFinalSubmitSuccess === 'function') {
@@ -568,11 +590,16 @@ export const submitProQuestionnaire = async ({
       validationFailed: true,
       validationError: serializedError,
       questionnaireSessionId,
-      draftId: null,
+      draftId: activeDraftId,
       submitContext
     });
 
     if (fallbackResult?.ok) {
+      await persistDurableOutcome({
+        submission: fallbackResult.submission,
+        intakeId: fallbackResult.intakeId || '',
+        receivedViaIntake: Boolean(fallbackResult.receivedViaIntake)
+      });
       await recordSubmitStage('fallback_success', { usedFallback: true });
       await recordSubmitStage('submit_success', { usedFallback: true });
       if (typeof onFinalSubmitSuccess === 'function') {
@@ -631,7 +658,7 @@ export const submitProQuestionnaire = async ({
       timeoutMs: 15000,
       responseSnapshot,
       questionnaireSessionId,
-      draftId: null,
+      draftId: activeDraftId,
       submitContext,
       debugFailureMode: submitDebugMode
     }
@@ -723,17 +750,10 @@ export const submitProQuestionnaire = async ({
     });
   }
 
-  await safeDraftSave({
-    saveDraftNow,
-    questionnaireSessionId,
-    responsesSnapshot: responseSnapshot,
-    validationStatusSnapshot: validationStatus,
-    touchedQuestionsSnapshot: touchedQuestions,
-    expandedQuestionsSnapshot: expandedQuestions,
-    options: {
-      status: 'submitted',
-      finalSubmissionId: savedSubmission?.id || ''
-    }
+  await persistDurableOutcome({
+    submission: savedSubmission,
+    intakeId,
+    receivedViaIntake
   });
 
   await createDraftEventSafe({

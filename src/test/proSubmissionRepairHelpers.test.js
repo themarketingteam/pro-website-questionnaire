@@ -16,7 +16,7 @@ import {
   sanitizeRepairReport,
   isPlainObject,
   asTrimmedString,
-} from '../src/lib/server/proSubmissionRepairHelpers.js';
+} from '../lib/server/proSubmissionRepairHelpers.js';
 
 // ---------------------------------------------------------------------------
 // Minimal valid payload factory
