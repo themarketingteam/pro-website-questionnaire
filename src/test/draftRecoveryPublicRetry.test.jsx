@@ -100,7 +100,7 @@ describe('public draft recovery actions', () => {
 
     expect(await screen.findByText('Draft Status Client')).toBeInTheDocument();
     expect(screen.getByText('draft')).toHaveClass('brand-status-badge', 'brand-status-badge--neutral');
-    expect(screen.getByText('submitted')).toHaveClass('brand-status-badge', 'brand-status-badge--success');
+    expect(screen.getByText('submitted')).toHaveClass('brand-status-badge', 'brand-status-badge--submitted');
   });
 
   it('requests server-filtered draft pages without using direct entity list reads', async () => {

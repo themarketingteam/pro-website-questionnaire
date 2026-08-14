@@ -44,7 +44,7 @@ const statusStyles = {
   draft: 'brand-status-badge brand-status-badge--neutral',
   submit_attempted: 'brand-status-badge brand-status-badge--warning',
   submit_failed: 'brand-status-badge brand-status-badge--danger',
-  submitted: 'brand-status-badge brand-status-badge--success'
+  submitted: 'brand-status-badge brand-status-badge--submitted'
 };
 
 const formatDate = (value) => {

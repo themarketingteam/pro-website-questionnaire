@@ -428,6 +428,13 @@
   color: #14532d;
 }
 
+.draft-recovery-brand .brand-status-badge--submitted,
+.draft-recovery-brand .brand-status-badge--submitted:hover {
+  border-color: #b8a787;
+  background: var(--msp-accent-tan);
+  color: var(--msp-blue-900);
+}
+
 .draft-recovery-brand .brand-status-badge--warning {
   border-color: #fcd34d;
   background: #fef3c7;
