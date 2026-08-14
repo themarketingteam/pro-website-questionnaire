@@ -3,6 +3,7 @@
   --msp-blue-850: #12124d;
   --msp-blue-600: #3131cc;
   --msp-blue-500: #3d3dff;
+  --msp-blue-300: #8b8bff;
   --msp-teal-400: #11f6c8;
   --msp-blue-050: #f6f6ff;
   --msp-blue-100: #ededff;
@@ -88,7 +89,7 @@
 }
 
 .draft-recovery-brand__product-label {
-  color: var(--msp-blue-500);
+  color: var(--msp-blue-300);
 }
 
 .draft-recovery-brand__hero-copy {
