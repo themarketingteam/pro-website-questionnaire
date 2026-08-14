@@ -252,7 +252,14 @@ describe('public draft recovery actions', () => {
     expect(screen.getByRole('button', { name: 'Repair + Retry' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Endpoint Payload' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Raw Draft' })).toBeInTheDocument();
-    expect(screen.getByText('Manually edited — mapped_payload_json')).toHaveClass('brand-payload-badge');
+    const payloadPanel = screen.getByRole('region', { name: 'Final Submission Payload' });
+    expect(payloadPanel).toHaveClass('brand-payload-card');
+    expect(screen.getByText('mapped_payload_json')).toBeInTheDocument();
+    expect(screen.getByLabelText('Final submission payload JSON')).toHaveClass('brand-payload-card__json');
+    expect(payloadPanel.querySelector('.brand-payload-card__source')).toBeInTheDocument();
+    const repairWarningRow = screen.getByRole('status', { name: 'Deterministic repair warnings' });
+    expect(repairWarningRow).toHaveClass('brand-payload-card__warnings');
+    expect(payloadPanel).toContainElement(repairWarningRow);
     fireEvent.click(await screen.findByRole('button', { name: /retry submission/i }));
 
     await waitFor(() => {

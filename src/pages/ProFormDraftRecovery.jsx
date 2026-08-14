@@ -17,7 +17,7 @@ import { toast } from 'sonner';
 import QuestionnaireIntakeRecovery from '@/components/admin/QuestionnaireIntakeRecovery';
 import AdminQuestionnairePdfSection from '@/components/admin/AdminQuestionnairePdfSection';
 import { useDraftRecoveryAccess } from '@/components/admin/DraftRecoveryPasswordGate';
-import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
+import { transformResponsesToPayload, validateSubmissionPayload } from '@/components/pro-form/submissionPayload';
 import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
 import { SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import mspSuccessDigitalLogoDataUrl from '@/assets/mspSuccessDigitalLogo';
@@ -293,6 +293,10 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
   }, [localDraft.mapped_payload_json, finalSubmissionPayload]);
 
   const isMappedPayloadOverride = !!localDraft.mapped_payload_json;
+  const payloadValidation = useMemo(
+    () => validateSubmissionPayload(activeFinalPayload),
+    [activeFinalPayload]
+  );
 
   const copySubmissionPayload = async () => {
     await navigator.clipboard.writeText(JSON.stringify(activeFinalPayload, null, 2));
@@ -561,21 +565,6 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
             </section>
           </div>
 
-          {repairWarnings.length > 0 && (
-            <div
-              className="brand-repair-warning"
-              role="status"
-              aria-label="Deterministic repair warnings"
-            >
-              <span className="brand-repair-warning__label">Deterministic repair warnings</span>
-              <span className="brand-repair-warning__items">
-                {repairWarnings.map((warning) => (
-                  <code className="brand-repair-warning__item" key={warning}>{warning}</code>
-                ))}
-              </span>
-            </div>
-          )}
-
           {/* AI Repair status panel */}
           <DraftAiRepairSection
             draft={localDraft}
@@ -584,20 +573,52 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
             onReviewed={() => setDetailVersion((version) => version + 1)}
           />
 
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-semibold text-slate-700">Final Submission Payload</p>
-              {isMappedPayloadOverride ? (
-                <Badge className="brand-payload-badge text-xs">Manually edited — mapped_payload_json</Badge>
-              ) : (
-                <Badge className="brand-payload-badge brand-payload-badge--computed text-xs">Computed from responses_json</Badge>
-              )}
-              <span className="text-xs text-slate-500">(used by Retry Submission)</span>
+          <section className="brand-payload-card" aria-label="Final Submission Payload">
+            <div className="brand-payload-card__header">
+              <h3 className="brand-payload-card__title">Final Submission Payload</h3>
+              <span
+                className={`brand-payload-card__status ${payloadValidation.ok
+                  ? 'brand-payload-card__status--valid'
+                  : 'brand-payload-card__status--review'}`}
+                role="status"
+              >
+                {payloadValidation.ok ? 'valid' : 'needs review'}
+              </span>
             </div>
-            <pre className="brand-json-panel rounded-lg p-4 text-xs overflow-auto max-h-[40rem] whitespace-pre-wrap break-words">
+
+            <div className="brand-payload-card__source">
+              <p>
+                <span className="brand-payload-card__meta-label">Source:</span>{' '}
+                <code>{isMappedPayloadOverride ? 'mapped_payload_json' : 'responses_json'}</code>
+                <span className="brand-payload-card__source-detail">
+                  {isMappedPayloadOverride ? ' · manually edited' : ' · computed and normalized'}
+                </span>
+              </p>
+              <span className="brand-payload-card__usage">Used by Retry Submission</span>
+            </div>
+
+            {repairWarnings.length > 0 && (
+              <div
+                className="brand-payload-card__warnings"
+                role="status"
+                aria-label="Deterministic repair warnings"
+              >
+                <span className="brand-payload-card__meta-label">Deterministic repair warnings:</span>
+                <span className="brand-payload-card__warning-items">
+                  {repairWarnings.map((warning) => (
+                    <code className="brand-payload-card__warning" key={warning}>{warning}</code>
+                  ))}
+                </span>
+              </div>
+            )}
+
+            <pre
+              className="brand-payload-card__json"
+              aria-label="Final submission payload JSON"
+            >
               {JSON.stringify(activeFinalPayload, null, 2)}
             </pre>
-          </div>
+          </section>
         </div>
       )}
     </Card>
