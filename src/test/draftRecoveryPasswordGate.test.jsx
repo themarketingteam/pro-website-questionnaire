@@ -37,7 +37,7 @@ describe('DraftRecoveryPasswordGate', () => {
     expect(await screen.findByLabelText('Password')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Kaseya MSP Success' })).toHaveAttribute('width', '411');
     expect(container.querySelector('main')).toHaveClass('draft-recovery-brand', 'draft-recovery-gate');
-    expect(screen.getByRole('button', { name: 'Unlock draft recovery' })).toHaveClass('brand-button-primary');
+    expect(screen.getByRole('button', { name: 'Unlock admin workspace' })).toHaveClass('brand-button-primary');
     expect(screen.queryByText('Protected draft recovery')).not.toBeInTheDocument();
   });
 
@@ -51,7 +51,7 @@ describe('DraftRecoveryPasswordGate', () => {
     fireEvent.change(await screen.findByLabelText('Password'), {
       target: { value: 'correct horse battery staple' }
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Unlock draft recovery' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock admin workspace' }));
 
     expect(await screen.findByText('Protected draft recovery')).toBeInTheDocument();
     expect(base44.functions.invoke).toHaveBeenCalledWith('verifyDraftRecoveryAccess', {
@@ -72,7 +72,7 @@ describe('DraftRecoveryPasswordGate', () => {
     fireEvent.change(await screen.findByLabelText('Password'), {
       target: { value: 'wrong-password' }
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Unlock draft recovery' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock admin workspace' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Incorrect password.');
     expect(screen.queryByText('Protected draft recovery')).not.toBeInTheDocument();
@@ -110,5 +110,41 @@ describe('DraftRecoveryPasswordGate', () => {
     );
 
     expect(await screen.findByText('Recovery grant: saved-grant')).toBeInTheDocument();
+  });
+
+  it('reuses one verified grant across different admin pages', async () => {
+    const expiresAt = Date.now() + (7 * 24 * 60 * 60 * 1000);
+    base44.functions.invoke.mockResolvedValueOnce({
+      data: { authorized: true, token: 'shared-admin-grant', expiresAt }
+    });
+
+    const firstPage = render(
+      <DraftRecoveryPasswordGate>
+        <div>Submit Intake Admin Page</div>
+      </DraftRecoveryPasswordGate>
+    );
+
+    fireEvent.change(await screen.findByLabelText('Password'), {
+      target: { value: 'shared-admin-password' }
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock admin workspace' }));
+    expect(await screen.findByText('Submit Intake Admin Page')).toBeInTheDocument();
+    firstPage.unmount();
+
+    base44.functions.invoke.mockResolvedValueOnce({
+      data: { authorized: true, expiresAt }
+    });
+
+    render(
+      <DraftRecoveryPasswordGate>
+        <div>Draft Recovery Admin Page</div>
+      </DraftRecoveryPasswordGate>
+    );
+
+    expect(await screen.findByText('Draft Recovery Admin Page')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Password')).not.toBeInTheDocument();
+    expect(base44.functions.invoke).toHaveBeenLastCalledWith('verifyDraftRecoveryAccess', {
+      token: 'shared-admin-grant'
+    });
   });
 });

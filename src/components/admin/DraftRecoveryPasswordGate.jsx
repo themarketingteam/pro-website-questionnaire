@@ -12,11 +12,14 @@ import '@fontsource/figtree/500.css';
 import '@fontsource/figtree/600.css';
 import './draftRecoveryBrand.css';
 
+// Keep the original storage key so existing seven-day admin grants remain valid.
 const STORAGE_KEY = 'pro_draft_recovery_access_v1';
 
-export const DraftRecoveryAccessContext = createContext({ recoveryGrant: '' });
+export const AdminAccessContext = createContext({ adminGrant: '', recoveryGrant: '' });
+export const DraftRecoveryAccessContext = AdminAccessContext;
 
-export const useDraftRecoveryAccess = () => useContext(DraftRecoveryAccessContext);
+export const useAdminAccess = () => useContext(AdminAccessContext);
+export const useDraftRecoveryAccess = useAdminAccess;
 
 const readSavedGrant = () => {
   try {
@@ -132,9 +135,9 @@ export default function DraftRecoveryPasswordGate({ children }) {
 
   if (accessState === 'authorized') {
     return (
-      <DraftRecoveryAccessContext.Provider value={{ recoveryGrant }}>
+      <AdminAccessContext.Provider value={{ adminGrant: recoveryGrant, recoveryGrant }}>
         {children}
-      </DraftRecoveryAccessContext.Provider>
+      </AdminAccessContext.Provider>
     );
   }
 
@@ -176,9 +179,9 @@ export default function DraftRecoveryPasswordGate({ children }) {
           </div>
           <div className="space-y-2">
             <p className="draft-recovery-brand__section-kicker">Admin support workspace</p>
-            <CardTitle className="brand-heading text-2xl text-slate-900">Draft Recovery Access</CardTitle>
+            <CardTitle className="brand-heading text-2xl text-slate-900">Admin Workspace Access</CardTitle>
             <p className="text-sm leading-6 text-slate-600">
-              Enter the admin password to open draft recovery. Access remains available in this browser for seven days.
+              Enter the admin password to open the protected admin tools. Access remains available across admin pages in this browser for seven days.
             </p>
           </div>
         </CardHeader>
@@ -211,7 +214,7 @@ export default function DraftRecoveryPasswordGate({ children }) {
               ) : (
                 <KeyRound className="h-4 w-4" aria-hidden="true" />
               )}
-              {submitting ? 'Verifying…' : 'Unlock draft recovery'}
+              {submitting ? 'Verifying…' : 'Unlock admin workspace'}
             </Button>
           </form>
         </CardContent>

@@ -26,6 +26,7 @@ import {
   listRecoveryRecords,
   updateRecoveryDraft
 } from '@/lib/draftRecoveryApi';
+import AdminWorkspaceNav from '@/components/admin/AdminWorkspaceNav';
 
 const RECOVERY_PAGE_SIZE = 25;
 
@@ -623,6 +624,7 @@ export default function ProFormDraftRecovery() {
             <p className="draft-recovery-brand__hero-copy">
               Review questionnaire drafts, recover failed submissions, and manage saved client PDFs.
             </p>
+            <AdminWorkspaceNav />
           </div>
         </header>
 

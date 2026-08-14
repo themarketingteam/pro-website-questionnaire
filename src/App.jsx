@@ -112,13 +112,13 @@ const AuthenticatedApp = () => {
         />
       ))}
       <Route path="/admin/submit-intake" element={
-        <AdminOnly>
+        <DraftRecoveryPasswordGate>
           <LayoutWrapper currentPageName={"admin/submit-intake"}>
             <AdminSubmitIntake />
           </LayoutWrapper>
-        </AdminOnly>
+        </DraftRecoveryPasswordGate>
       } />
-      {/* Password-only access is verified server-side by a Base44 function. */}
+      {/* Shared password-only access is verified server-side by a Base44 function. */}
       <Route path="/admin/draft-recovery" element={
         <DraftRecoveryPasswordGate>
           <LayoutWrapper currentPageName={"admin/draft-recovery"}>

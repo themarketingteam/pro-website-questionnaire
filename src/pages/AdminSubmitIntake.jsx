@@ -1,12 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, CheckCircle2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Loader2, CheckCircle2, Pencil, Save, Send, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { validateSubmissionPayload } from '@/components/pro-form/submissionPayload';
 import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
 import { sendZapierSafe } from '@/lib/proQuestionnaireSubmit';
+import { useAdminAccess } from '@/components/admin/DraftRecoveryPasswordGate';
+import AdminWorkspaceNav from '@/components/admin/AdminWorkspaceNav';
+import mspSuccessDigitalLogoDataUrl from '@/assets/mspSuccessDigitalLogo';
 
 // Default payload template (editable)
 const initialPayload = {
@@ -140,9 +144,7 @@ const initialPayload = {
 };
 
 export default function AdminSubmitIntake() {
-  const [loadingAuth, setLoadingAuth] = useState(true);
-  const [authed, setAuthed] = useState(false);
-  const [user, setUser] = useState(null);
+  const { adminGrant } = useAdminAccess();
   const [submitting, setSubmitting] = useState(false);
   const [submittedId, setSubmittedId] = useState(null);
   const [payload, setPayload] = useState(initialPayload);
@@ -150,20 +152,6 @@ export default function AdminSubmitIntake() {
   const [rawJson, setRawJson] = useState(JSON.stringify(initialPayload, null, 2));
   const [saveError, setSaveError] = useState("");
   const [originalBeforeEdit, setOriginalBeforeEdit] = useState(initialPayload);
-
-  useEffect(() => {
-    (async () => {
-      const isAuthed = await base44.auth.isAuthenticated();
-      setAuthed(isAuthed);
-      if (isAuthed) {
-        const me = await base44.auth.me();
-        setUser(me);
-      }
-      setLoadingAuth(false);
-    })();
-  }, []);
-
-
 
   // JSON parsing helpers to auto-fix common issues
   const normalizeSmartQuotes = (s) => s.replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"');
@@ -217,6 +205,12 @@ export default function AdminSubmitIntake() {
 
   const handleSubmit = async () => {
     try {
+      if (!adminGrant) {
+        setSaveError('Admin access is required before submitting an intake payload.');
+        toast.error('Admin access is required.');
+        return;
+      }
+
       setSubmitting(true);
       setSaveError('');
 
@@ -267,60 +261,90 @@ export default function AdminSubmitIntake() {
     }
   };
 
-  if (loadingAuth) {
-    return (
-      <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin" /></div>
-    );
-  }
-
-  if (!authed) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 text-center">
-        <p className="text-slate-700">Please sign in to submit the intake payload.</p>
-        <Button onClick={() => base44.auth.redirectToLogin(window.location.pathname)}>Sign in</Button>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-4">
-      <h1 className="text-2xl font-bold">Admin Intake Submission</h1>
-      <p className="text-sm text-slate-600">Signed in as {user?.email || 'user'}</p>
-
-      <div className="p-4 bg-slate-50 border rounded overflow-auto max-h-96 text-xs">
-        {editing ? (
-          <Textarea
-            value={rawJson}
-            onChange={(e) => setRawJson(e.target.value)}
-            className="font-mono text-xs min-h-[320px]"
-            rows={16}
-          />
-        ) : (
-          <pre>{JSON.stringify(payload, null, 2)}</pre>
-        )}
-      </div>
-      {saveError && (
-        <div className="text-red-600 text-xs mt-2">{saveError}</div>
-      )}
-
-      <div className="flex items-center gap-3 flex-wrap">
-        <Button onClick={handleSubmit} disabled={submitting} className="gap-2">
-          {submitting ? (<><Loader2 className="w-4 h-4 animate-spin"/> Submitting...</>) : 'Submit Now'}
-        </Button>
-        {!editing ? (
-          <Button variant="outline" onClick={handleEdit}>Edit JSON</Button>
-        ) : (
-          <>
-            <Button onClick={handleSaveJson} className="gap-2">Save JSON</Button>
-            <Button variant="outline" onClick={handleCancelEdit}>Cancel</Button>
-          </>
-        )}
-        {submittedId && (
-          <div className="flex items-center gap-1 text-green-700 text-sm">
-            <CheckCircle2 className="w-4 h-4"/> Submitted (id: {submittedId})
+    <main className="draft-recovery-brand draft-recovery-brand-page">
+      <div className="draft-recovery-brand__shell">
+        <header className="draft-recovery-brand__hero">
+          <span className="draft-recovery-brand__logo-plate">
+            <img
+              src={mspSuccessDigitalLogoDataUrl}
+              alt="Kaseya MSP Success"
+              className="draft-recovery-brand__logo"
+              width="411"
+              height="79"
+            />
+          </span>
+          <div>
+            <p className="draft-recovery-brand__eyebrow">Admin support workspace</p>
+            <h1>Admin Intake Submission</h1>
+            <p className="draft-recovery-brand__hero-copy">
+              Review, repair, and submit a final questionnaire payload through the protected admin workflow.
+            </p>
+            <AdminWorkspaceNav />
           </div>
-        )}
+        </header>
+
+        <div className="draft-recovery-brand__content">
+          <Card className="brand-panel">
+            <CardHeader className="brand-section-header">
+              <p className="draft-recovery-brand__section-kicker">Controlled submission tool</p>
+              <CardTitle className="brand-heading brand-section-title">Final Submission Payload</CardTitle>
+              <p className="draft-recovery-brand__section-copy">
+                Inspect the payload before submitting it. Use Edit JSON to make a controlled correction.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-5 p-5 md:p-6">
+              <div className="brand-json-panel max-h-[34rem] overflow-auto rounded-lg p-4 text-xs">
+                {editing ? (
+                  <Textarea
+                    value={rawJson}
+                    onChange={(event) => setRawJson(event.target.value)}
+                    className="min-h-[28rem] border-indigo-400 bg-white font-mono text-xs text-slate-900"
+                    rows={20}
+                    aria-label="Submission payload JSON"
+                  />
+                ) : (
+                  <pre className="whitespace-pre-wrap break-words">{JSON.stringify(payload, null, 2)}</pre>
+                )}
+              </div>
+
+              {saveError && (
+                <div className="brand-admin-error rounded-lg border p-3 text-sm" role="alert">{saveError}</div>
+              )}
+
+              <div className="brand-admin-actions flex flex-wrap items-center gap-3 border-t pt-5">
+                <Button onClick={handleSubmit} disabled={submitting || editing} className="brand-button-primary gap-2">
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  {submitting ? 'Submitting…' : 'Submit Now'}
+                </Button>
+                {!editing ? (
+                  <Button variant="outline" onClick={handleEdit} className="brand-button-secondary gap-2">
+                    <Pencil className="h-4 w-4" />
+                    Edit JSON
+                  </Button>
+                ) : (
+                  <>
+                    <Button onClick={handleSaveJson} className="brand-button-primary gap-2">
+                      <Save className="h-4 w-4" />
+                      Save JSON
+                    </Button>
+                    <Button variant="outline" onClick={handleCancelEdit} className="brand-button-secondary gap-2">
+                      <X className="h-4 w-4" />
+                      Cancel
+                    </Button>
+                  </>
+                )}
+                {submittedId && (
+                  <div className="brand-admin-success flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium" role="status">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Submitted (id: {submittedId})
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-    </div>
+    </main>
   );
 }

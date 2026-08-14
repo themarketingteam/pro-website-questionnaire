@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { DraftRecoveryAccessContext } from '@/components/admin/DraftRecoveryPasswordGate';
 import ProFormDraftRecovery from '@/pages/ProFormDraftRecovery';
@@ -7,9 +8,11 @@ import ProFormDraftRecovery from '@/pages/ProFormDraftRecovery';
 const recoveryGrant = 'signed-public-recovery-grant';
 
 const renderRecoveryPage = () => render(
-  <DraftRecoveryAccessContext.Provider value={{ recoveryGrant }}>
-    <ProFormDraftRecovery />
-  </DraftRecoveryAccessContext.Provider>
+  <MemoryRouter initialEntries={['/admin/draft-recovery']}>
+    <DraftRecoveryAccessContext.Provider value={{ recoveryGrant }}>
+      <ProFormDraftRecovery />
+    </DraftRecoveryAccessContext.Provider>
+  </MemoryRouter>
 );
 
 describe('public draft recovery actions', () => {
