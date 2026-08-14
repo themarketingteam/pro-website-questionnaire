@@ -115,6 +115,30 @@ const verifyGrant = async (token: string, secret: string) => {
 
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const buildArchiveCondition = (archiveState: string) => {
+  if (archiveState === 'active') {
+    return {
+      $or: [
+        { archived_at: { $exists: false } },
+        { archived_at: null },
+        { archived_at: '' }
+      ]
+    };
+  }
+
+  if (archiveState === 'archived') {
+    return {
+      $and: [
+        { archived_at: { $exists: true } },
+        { archived_at: { $ne: null } },
+        { archived_at: { $ne: '' } }
+      ]
+    };
+  }
+
+  return null;
+};
+
 const buildListQuery = (
   config: typeof RECORD_CONFIG[keyof typeof RECORD_CONFIG],
   status: string,
@@ -124,8 +148,8 @@ const buildListQuery = (
   const conditions: Record<string, unknown>[] = [];
 
   if (status !== 'all') conditions.push({ status });
-  if (archiveState === 'active') conditions.push({ archived_at: { $exists: false } });
-  if (archiveState === 'archived') conditions.push({ archived_at: { $exists: true } });
+  const archiveCondition = buildArchiveCondition(archiveState);
+  if (archiveCondition) conditions.push(archiveCondition);
 
   if (search) {
     const regex = `(?i)${escapeRegex(search)}`;
@@ -220,8 +244,8 @@ Deno.serve(async (req) => {
           const duplicateConditions: Record<string, unknown>[] = [
             { session_id: { $in: sessionIds } }
           ];
-          if (archiveState === 'active') duplicateConditions.push({ archived_at: { $exists: false } });
-          if (archiveState === 'archived') duplicateConditions.push({ archived_at: { $exists: true } });
+          const duplicateArchiveCondition = buildArchiveCondition(archiveState);
+          if (duplicateArchiveCondition) duplicateConditions.push(duplicateArchiveCondition);
           const duplicateQuery = duplicateConditions.length === 1
             ? duplicateConditions[0]
             : { $and: duplicateConditions };

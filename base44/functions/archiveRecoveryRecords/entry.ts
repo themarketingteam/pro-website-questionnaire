@@ -12,6 +12,14 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) => Response.j
   }
 });
 
+const unarchivedCondition = {
+  $or: [
+    { archived_at: { $exists: false } },
+    { archived_at: null },
+    { archived_at: '' }
+  ]
+};
+
 const archiveUntilComplete = async (
   entity: any,
   query: Record<string, unknown>,
@@ -70,14 +78,14 @@ Deno.serve(async (req) => {
   try {
     const draftQuery = {
       $and: [
-        { archived_at: { $exists: false } },
+        unarchivedCondition,
         { status: 'submitted' },
         { last_saved_at: { $lt: cutoff, $ne: '' } }
       ]
     };
     const intakeQuery = {
       $and: [
-        { archived_at: { $exists: false } },
+        unarchivedCondition,
         { status: { $in: ['submitted', 'retry_success', 'abandoned'] } },
         {
           $or: [

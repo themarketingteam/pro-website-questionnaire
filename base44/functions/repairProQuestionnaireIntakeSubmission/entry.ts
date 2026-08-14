@@ -630,6 +630,19 @@ Deno.serve(async (req) => {
       const draft = Array.isArray(draftList) && draftList.length > 0 ? draftList[0] : null;
       if (!draft) return Response.json({ success: false, error: { message: 'Draft not found' } }, { status: 404 });
 
+      if (mode === 'repair_and_retry' && draft.final_submission_id && !forceRetry) {
+        return Response.json({
+          success: false,
+          alreadySubmitted: true,
+          draftMode: true,
+          submissionCreated: false,
+          linkedSubmissionId: draft.final_submission_id,
+          error: {
+            message: 'This draft already has a final submission. AI Repair + Retry was not run. Use Retry Submission only when the existing payload must be delivered again.'
+          }
+        }, { status: 409 });
+      }
+
       // Build candidate payload
       let rawPayload = null;
       let rawPayloadRawString = draft.mapped_payload_json || '';
@@ -667,16 +680,30 @@ Deno.serve(async (req) => {
       };
       await base44.asServiceRole.entities.ProFormDraft.update(draft.id, updateData);
 
-      // For repair_and_retry, always fire the payload to Zapier — every button press.
-      // Zapier deduplicates on its end, so repeated sends are safe.
+      // Never retry with the original payload when repair fails or times out. A
+      // retry is safe only when the repair pipeline produced a validated payload.
       let zapierSent = false;
       let zapierResult = null;
       if (mode === 'repair_and_retry') {
-        const zapPayload = repairResult.payload || rawPayload;
-        if (zapPayload) {
-          zapierResult = await sendToZapierSafe(zapPayload);
-          zapierSent = zapierResult.ok;
+        if (!repairResult.ok || !repairResult.payload) {
+          return Response.json({
+            success: false,
+            draftMode: true,
+            submissionCreated: false,
+            repairSource: repairResult.source,
+            repairOk: false,
+            zapierSent: false,
+            report: repairResult.report,
+            hasRepairedPayload: false,
+            errors: repairResult.errors,
+            error: {
+              message: 'AI repair did not produce a validated payload. Nothing was retried and the draft remains available for review.'
+            }
+          }, { status: 422 });
         }
+
+        zapierResult = await sendToZapierSafe(repairResult.payload);
+        zapierSent = zapierResult.ok;
       }
 
       if (mode === 'repair_and_retry' && !zapierSent) {

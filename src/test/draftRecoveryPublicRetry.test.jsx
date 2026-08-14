@@ -134,6 +134,37 @@ describe('public draft recovery actions', () => {
     expect(screen.getByText('submitted')).toHaveClass('brand-status-badge', 'brand-status-badge--submitted');
   });
 
+  it('keeps archived drafts visibly preserved and prevents duplicate AI retry', async () => {
+    sessionStorage.setItem('pro-draft-recovery-archive-state', 'all');
+    draftRecords = [{
+      id: 'archived-draft-1',
+      session_id: 'archived-session-1',
+      business_name: 'Archived Client',
+      domain: 'archived.example',
+      status: 'submitted',
+      final_submission_id: 'existing-submission-1',
+      archived_at: '2026-08-14T18:49:22.000Z',
+      archive_reason: 'historical_record',
+      responses_json: '{}',
+    }];
+
+    renderRecoveryPage();
+
+    expect(await screen.findByText('Archived Client')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Record set filter' })).toHaveTextContent('All Records');
+    expect(screen.getByText('archived')).toHaveClass('brand-status-badge--archived');
+
+    fireEvent.click(screen.getByText('Archived Client'));
+    expect(await screen.findByRole('note')).toHaveTextContent('preserved and has not been deleted');
+    expect(screen.getByText(/Archived At:/)).toBeInTheDocument();
+    expect(screen.getByText((_, element) => (
+      element?.tagName === 'P'
+      && element.textContent.includes('Archive Reason:')
+      && element.textContent.includes('historical_record')
+    ))).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Already Submitted' })).toBeDisabled();
+  });
+
   it('requests server-filtered draft pages without using direct entity list reads', async () => {
     base44.functions.invoke.mockImplementation(async (name, payload = {}) => {
       if (name !== 'queryDraftRecoveryRecords') return { data: { success: true } };

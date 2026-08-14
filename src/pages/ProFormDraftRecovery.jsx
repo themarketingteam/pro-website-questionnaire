@@ -29,6 +29,17 @@ import {
 import AdminWorkspaceNav from '@/components/admin/AdminWorkspaceNav';
 
 const RECOVERY_PAGE_SIZE = 25;
+const RECOVERY_ARCHIVE_STATE_KEY = 'pro-draft-recovery-archive-state';
+const VALID_ARCHIVE_STATES = new Set(['active', 'archived', 'all']);
+
+const getInitialArchiveState = () => {
+  try {
+    const storedState = window.sessionStorage.getItem(RECOVERY_ARCHIVE_STATE_KEY);
+    return VALID_ARCHIVE_STATES.has(storedState) ? storedState : 'active';
+  } catch {
+    return 'active';
+  }
+};
 
 const safeJsonParse = (value, fallback = {}) => {
   try {
@@ -234,10 +245,11 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
       if (data?.success) {
         if (data?.linkedSubmissionId) {
           toast.success(`AI Repair + Retry succeeded — Submission: ${data.linkedSubmissionId}`);
+        } else if (mode === 'repair_and_retry' && data?.zapierSent) {
+          toast.success('AI Repair + Retry delivered the validated payload');
         } else {
           toast.success(`${modeLabels[mode]} completed`);
         }
-        onRetrySuccess?.();
         setDetailVersion((version) => version + 1);
       } else {
         const errMsg = data?.error?.message || data?.errors?.[0] || `${modeLabels[mode]} failed`;
@@ -309,6 +321,11 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
               <Badge className={statusStyles[draft.status] || statusStyles.draft}>
                 {draft.status || 'draft'}
               </Badge>
+              {draft.archived_at && (
+                <Badge className="brand-status-badge brand-status-badge--archived">
+                  archived
+                </Badge>
+              )}
               {hasDuplicateSession && (
                 <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50 flex items-center gap-1 w-fit">
                   <AlertTriangle className="w-3 h-3" />
@@ -352,6 +369,13 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
 
       {expanded && !detailLoading && !detailError && (
         <div className="brand-expanded-panel p-4 space-y-4">
+          {localDraft.archived_at && (
+            <div className="brand-archive-notice rounded-lg border p-3 text-sm" role="note">
+              <p className="font-semibold">Archived recovery record</p>
+              <p>This record is preserved and has not been deleted. It remains available when the record filter is set to Archived Records or All Records.</p>
+            </div>
+          )}
+
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2 text-sm">
               <p><span className="font-medium">Business Name:</span> {localDraft.business_name || '—'}</p>
@@ -368,6 +392,8 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
               <p><span className="font-medium">Last Changed At:</span> {formatDate(localDraft.last_changed_at)}</p>
               <p><span className="font-medium">Save Error:</span> {localDraft.save_error || '—'}</p>
               <p><span className="font-medium">Submit Error:</span> {localDraft.submit_error || '—'}</p>
+              <p><span className="font-medium">Archived At:</span> {formatDate(localDraft.archived_at)}</p>
+              <p><span className="font-medium">Archive Reason:</span> {localDraft.archive_reason || '—'}</p>
             </div>
           </div>
 
@@ -475,16 +501,24 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                   type="button"
                   size="sm"
                   className="brand-button-dark gap-2"
-                  disabled={isWorking}
+                  disabled={isWorking || Boolean(localDraft.final_submission_id)}
                   onClick={(e) => handleAiAction(e, 'repair_and_retry')}
-                  title="Diagnoses, repairs, then attempts to create a final ProFormSubmission."
+                  title={localDraft.final_submission_id
+                    ? 'A final submission already exists. Use Retry Submission only if it must be delivered again.'
+                    : 'Diagnoses and repairs the draft, then delivers only a validated payload.'}
                 >
                   {aiRunning === 'repair_and_retry' ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wrench className="w-3 h-3" />}
-                  {aiRunning === 'repair_and_retry' ? 'Running...' : 'Repair + Retry'}
+                  {aiRunning === 'repair_and_retry'
+                    ? 'Running...'
+                    : (localDraft.final_submission_id ? 'Already Submitted' : 'Repair + Retry')}
                 </Button>
               </div>
 
-              <p className="text-xs text-slate-400">Repair + Retry will attempt to create a final ProFormSubmission if repair succeeds.</p>
+              <p className="text-xs text-slate-400">
+                {localDraft.final_submission_id
+                  ? 'A final submission is already linked. AI Repair + Retry is disabled to prevent accidental duplicate delivery.'
+                  : 'Repair + Retry sends only a successfully repaired and validated payload. Failed or timed-out repairs are never submitted.'}
+              </p>
             </section>
 
             <section aria-label="Data Copy Options (JSON)" className="brand-action-divider space-y-2 border-t pt-4">
@@ -554,7 +588,7 @@ export default function ProFormDraftRecovery() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [archiveState, setArchiveState] = useState('active');
+  const [archiveState, setArchiveState] = useState(getInitialArchiveState);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -580,6 +614,14 @@ export default function ProFormDraftRecovery() {
     const timeoutId = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
     return () => window.clearTimeout(timeoutId);
   }, [search]);
+
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(RECOVERY_ARCHIVE_STATE_KEY, archiveState);
+    } catch {
+      // The recovery page still functions when browser storage is unavailable.
+    }
+  }, [archiveState]);
 
   useEffect(() => {
     let mounted = true;

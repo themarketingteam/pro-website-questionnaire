@@ -493,6 +493,19 @@
   color: #1e3a8a;
 }
 
+.draft-recovery-brand .brand-status-badge--archived,
+.draft-recovery-brand .brand-status-badge--archived:hover {
+  border-color: #a5a5bd;
+  background: #e7e7f0;
+  color: var(--msp-blue-900);
+}
+
+.draft-recovery-brand .brand-archive-notice {
+  border-color: rgba(216, 201, 174, 0.9);
+  background: rgba(216, 201, 174, 0.28);
+  color: var(--msp-blue-900);
+}
+
 .draft-recovery-brand .brand-button-primary {
   border-color: var(--msp-blue-500);
   background: var(--msp-blue-500);
