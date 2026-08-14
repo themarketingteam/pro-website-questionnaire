@@ -559,6 +559,16 @@ export default function ProFormDraftRecovery() {
 
   const reloadDrafts = () => setRefreshKey((k) => k + 1);
 
+  const resetFilters = () => {
+    setStatusFilter('all');
+    setArchiveState('active');
+    setSearch('');
+    setDebouncedSearch('');
+    setPage(1);
+    setExpandedId('');
+    reloadDrafts();
+  };
+
   useEffect(() => {
     const timeoutId = window.setTimeout(() => setDebouncedSearch(search.trim()), 350);
     return () => window.clearTimeout(timeoutId);
@@ -635,13 +645,13 @@ export default function ProFormDraftRecovery() {
               <CardTitle className="brand-heading brand-section-title">Draft Filters</CardTitle>
               <p className="draft-recovery-brand__section-copy">Narrow the records by workflow status or client details.</p>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-[220px_220px_1fr]">
+            <CardContent className="brand-filter-controls">
               <Select value={statusFilter} onValueChange={(value) => {
                 setStatusFilter(value);
                 setPage(1);
                 setExpandedId('');
               }}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="Status filter">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -658,7 +668,7 @@ export default function ProFormDraftRecovery() {
                 setPage(1);
                 setExpandedId('');
               }}>
-                <SelectTrigger>
+                <SelectTrigger aria-label="Record set filter">
                   <SelectValue placeholder="Record set" />
                 </SelectTrigger>
                 <SelectContent>
@@ -669,6 +679,7 @@ export default function ProFormDraftRecovery() {
               </Select>
 
               <Input
+                className="brand-filter-search"
                 placeholder="Search by business name, domain, user email, or session ID"
                 value={search}
                 onChange={(event) => {
@@ -677,6 +688,16 @@ export default function ProFormDraftRecovery() {
                   setExpandedId('');
                 }}
               />
+
+              <Button
+                type="button"
+                variant="outline"
+                className="brand-button-secondary brand-filter-refresh"
+                onClick={resetFilters}
+              >
+                <RefreshCw aria-hidden="true" />
+                Refresh
+              </Button>
             </CardContent>
           </Card>
 

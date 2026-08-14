@@ -62,6 +62,33 @@ describe('public draft recovery actions', () => {
     expect(screen.getByRole('img', { name: 'Kaseya MSP Success' })).toHaveAttribute('width', '411');
     expect(container.querySelector('main')).toHaveClass('draft-recovery-brand', 'draft-recovery-brand-page');
     expect(screen.getByText('Draft Filters')).toHaveClass('brand-heading');
+    expect(screen.getByRole('button', { name: 'Refresh' })).toHaveClass('brand-filter-refresh');
+  });
+
+  it('clears search and restores the default filters when Refresh is selected', async () => {
+    renderRecoveryPage();
+
+    const searchInput = screen.getByPlaceholderText('Search by business name, domain, user email, or session ID');
+    fireEvent.change(searchInput, { target: { value: 'filtered client' } });
+
+    expect(searchInput).toHaveValue('filtered client');
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    expect(searchInput).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: 'Status filter' })).toHaveTextContent('All Statuses');
+    expect(screen.getByRole('combobox', { name: 'Record set filter' })).toHaveTextContent('Active Records');
+    await waitFor(() => {
+      expect(base44.functions.invoke).toHaveBeenCalledWith(
+        'queryDraftRecoveryRecords',
+        expect.objectContaining({
+          recordType: 'draft',
+          page: 1,
+          status: 'all',
+          archiveState: 'active',
+          search: '',
+        }),
+      );
+    });
   });
 
   it('hides fallback intake recovery when no intake records exist', async () => {
