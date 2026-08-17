@@ -14,6 +14,7 @@ import AdminSubmitIntake from './pages/AdminSubmitIntake';
 import ProFormDraftRecovery from './pages/ProFormDraftRecovery';
 import QuestionnaireIntakeRecoveryPage from './pages/QuestionnaireIntakeRecovery';
 import DraftRecoveryPasswordGate from '@/components/admin/DraftRecoveryPasswordGate';
+import DocumentTitle from '@/lib/DocumentTitle';
 
 const ADMIN_EMAILS = ['benjamin.hines8@gmail.com'];
 
@@ -145,6 +146,7 @@ function App() {
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
         <Router>
+          <DocumentTitle />
           <NavigationTracker />
           <AuthenticatedApp />
         </Router>

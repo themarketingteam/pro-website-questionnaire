@@ -7,10 +7,8 @@ export default function ThankYou() {
   const urlParams = new URLSearchParams(window.location.search);
   const businessName = urlParams.get('businessName') || 'your business';
 
-  // Set document title and favicon
+  // Set the favicon. The route-aware document title is managed centrally.
   useEffect(() => {
-    document.title = "Thank You - Kaseya";
-    
     const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
     link.type = 'image/png';
     link.rel = 'icon';
