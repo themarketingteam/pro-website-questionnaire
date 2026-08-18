@@ -47,6 +47,25 @@ export const updateRecoveryDraft = ({ recoveryGrant, recordId, updates }) => inv
   updates,
 });
 
+export const changeRecoveryRecordLifecycle = async ({
+  recoveryGrant,
+  recordType,
+  recordId,
+  action,
+  reason = '',
+}) => {
+  const response = await base44.functions.invoke('manageRecoveryRecordLifecycle', {
+    recoveryGrant,
+    recordType,
+    recordId,
+    action,
+    reason,
+  });
+  const data = getResponseData(response);
+  if (!data?.success) throw new Error(data?.error || 'Unable to change the recovery record state.');
+  return data;
+};
+
 export const reviewIdentityCandidate = async ({
   recoveryGrant,
   attemptId,

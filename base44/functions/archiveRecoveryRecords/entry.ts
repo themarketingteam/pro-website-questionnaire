@@ -1,8 +1,15 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
+import {
+  latestMeaningfulActivity,
+  RETENTION_DAYS,
+  RETENTION_POLICY_VERSION,
+  retentionUntilFor,
+  validIso
+} from "./recoveryRetention.ts";
 
-const POLICY_ID = 'recovery-retention-v1';
-const ARCHIVE_AFTER_DAYS = 365;
-const MAX_UPDATE_PASSES = 20;
+export const POLICY_ID = 'recovery-retention-v2';
+const MAX_RECORDS_PER_ENTITY = 5000;
+const UPDATE_BATCH_SIZE = 100;
 
 const jsonResponse = (body: Record<string, unknown>, status = 200) => Response.json(body, {
   status,
@@ -20,37 +27,70 @@ const unarchivedCondition = {
   ]
 };
 
-const archiveUntilComplete = async (
-  entity: any,
-  query: Record<string, unknown>,
-  archivedAt: string,
-  reason: string
-) => {
-  let archived = 0;
-  let hasMore = true;
-  let pass = 0;
+const retainedCondition = {
+  $or: [
+    { soft_deleted_at: { $exists: false } },
+    { soft_deleted_at: null },
+    { soft_deleted_at: '' }
+  ]
+};
 
-  while (hasMore && pass < MAX_UPDATE_PASSES) {
-    const result = await entity.updateMany(query, {
-      $set: {
-        archived_at: archivedAt,
+const chunk = <T>(values: T[], size: number) => {
+  const batches: T[][] = [];
+  for (let index = 0; index < values.length; index += size) batches.push(values.slice(index, index + size));
+  return batches;
+};
+
+const processEntity = async ({ entity, activityFields, now, reason }: {
+  entity: any;
+  activityFields: string[];
+  now: Date;
+  reason: string;
+}) => {
+  const records = await entity.filter(
+    { $and: [unarchivedCondition, retainedCondition] },
+    'created_date',
+    MAX_RECORDS_PER_ENTITY
+  );
+  const safeRecords = Array.isArray(records) ? records : [];
+  const updates = safeRecords.map((record) => {
+    const activityAt = latestMeaningfulActivity(record, activityFields);
+    const retentionUntil = retentionUntilFor(activityAt);
+    const shouldArchive = Date.parse(retentionUntil) <= now.getTime();
+    const update = {
+      id: record.id,
+      retention_policy_version: RETENTION_POLICY_VERSION,
+      retention_started_at: activityAt,
+      retention_until: retentionUntil,
+      ...(shouldArchive ? {
+        archived_at: now.toISOString(),
         archive_reason: reason
-      }
-    });
-    archived += Number(result?.updated) || 0;
-    hasMore = Boolean(result?.has_more);
-    pass += 1;
+      } : {})
+    };
+    const unchanged = record.retention_policy_version === update.retention_policy_version
+      && validIso(record.retention_started_at) === update.retention_started_at
+      && validIso(record.retention_until) === update.retention_until
+      && (!shouldArchive || Boolean(record.archived_at));
+    return unchanged ? null : update;
+  }).filter(Boolean);
+
+  for (const batch of chunk(updates, UPDATE_BATCH_SIZE)) {
+    if (batch.length > 0) await entity.bulkUpdate(batch);
   }
 
-  return { archived, hasMore, passes: pass };
+  const archived = updates.filter((update) => Boolean(update.archived_at)).length;
+  return {
+    scanned: safeRecords.length,
+    updated: updates.length,
+    archived,
+    hasMore: safeRecords.length === MAX_RECORDS_PER_ENTITY
+  };
 };
 
 // This job is intentionally archival-only. It never permanently deletes records.
 // eslint-disable-next-line no-undef
 Deno.serve(async (req) => {
-  if (req.method !== 'POST') {
-    return jsonResponse({ success: false, error: 'Method not allowed.' }, 405);
-  }
+  if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed.' }, 405);
 
   const body = await req.json().catch(() => ({}));
   const args = body?.args && typeof body.args === 'object' ? body.args : {};
@@ -65,67 +105,72 @@ Deno.serve(async (req) => {
     isAdmin = false;
   }
 
-  if (!isAdmin && !isScheduledPolicyRun) {
-    return jsonResponse({ success: false, error: 'Unauthorized.' }, 401);
-  }
+  if (!isAdmin && !isScheduledPolicyRun) return jsonResponse({ success: false, error: 'Unauthorized.' }, 401);
 
   const now = new Date();
-  const cutoff = new Date(now.getTime() - ARCHIVE_AFTER_DAYS * 24 * 60 * 60 * 1000).toISOString();
-  const archivedAt = now.toISOString();
-  const reason = `scheduled_terminal_record_${ARCHIVE_AFTER_DAYS}d`;
-  const serviceEntities = base44.asServiceRole.entities;
+  const reason = `scheduled_inactive_record_${RETENTION_DAYS}d`;
+  const entities = base44.asServiceRole.entities;
 
   try {
-    const draftQuery = {
-      $and: [
-        unarchivedCondition,
-        { status: 'submitted' },
-        { last_saved_at: { $lt: cutoff, $ne: '' } }
-      ]
-    };
-    const intakeQuery = {
-      $and: [
-        unarchivedCondition,
-        { status: { $in: ['submitted', 'retry_success', 'abandoned'] } },
-        {
-          $or: [
-            { created_at_server: { $lt: cutoff, $ne: '' } },
-            {
-              $and: [
-                { created_at_server: { $in: ['', null] } },
-                { created_date: { $lt: cutoff } }
-              ]
-            }
-          ]
-        }
-      ]
-    };
-
-    const [drafts, intakes] = await Promise.all([
-      archiveUntilComplete(serviceEntities.ProFormDraft, draftQuery, archivedAt, reason),
-      archiveUntilComplete(serviceEntities.ProFormSubmissionIntake, intakeQuery, archivedAt, reason)
+    const [drafts, intakes, submissions] = await Promise.all([
+      processEntity({
+        entity: entities.ProFormDraft,
+        activityFields: [
+          'last_saved_at',
+          'last_changed_at',
+          'submit_attempted_at',
+          'submitted_at',
+          'last_ai_repair_at',
+          'last_identity_resolution_at',
+          'created_date'
+        ],
+        now,
+        reason
+      }),
+      processEntity({
+        entity: entities.ProFormSubmissionIntake,
+        activityFields: [
+          'last_retry_at',
+          'last_ai_repair_at',
+          'last_identity_resolution_at',
+          'created_at_server',
+          'created_date'
+        ],
+        now,
+        reason
+      }),
+      processEntity({
+        entity: entities.ProFormSubmission,
+        activityFields: ['metadata.submission_datetime', 'created_date'],
+        now,
+        reason
+      })
     ]);
 
-    console.log('[Recovery retention] archive run complete', {
-      cutoff,
-      drafts: drafts.archived,
-      intakes: intakes.archived,
-      draftHasMore: drafts.hasMore,
-      intakeHasMore: intakes.hasMore
+    console.log('[Recovery retention] archival run complete', {
+      policyId: POLICY_ID,
+      drafts: { scanned: drafts.scanned, archived: drafts.archived },
+      intakes: { scanned: intakes.scanned, archived: intakes.archived },
+      submissions: { scanned: submissions.scanned, archived: submissions.archived },
+      hasMore: drafts.hasMore || intakes.hasMore || submissions.hasMore
     });
 
     return jsonResponse({
       success: true,
       policyId: POLICY_ID,
-      archiveAfterDays: ARCHIVE_AFTER_DAYS,
-      cutoff,
-      archivedAt,
+      retentionPolicyVersion: RETENTION_POLICY_VERSION,
+      archiveAfterDays: RETENTION_DAYS,
+      archivedAt: now.toISOString(),
       drafts,
       intakes,
+      submissions,
       permanentDeletionEnabled: false
     });
   } catch (error) {
-    console.error('[Recovery retention] archive run failed:', error);
+    console.error('[Recovery retention] archival run failed', {
+      name: error instanceof Error ? error.name : 'Error',
+      message: error instanceof Error ? error.message.slice(0, 300) : 'Unknown error'
+    });
     return jsonResponse({ success: false, error: 'Recovery archival failed.' }, 500);
   }
 });

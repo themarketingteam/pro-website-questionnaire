@@ -189,6 +189,37 @@
     "archive_reason": {
       "type": "string",
       "description": "Policy or administrator reason for archiving this draft"
+    },
+    "retention_policy_version": {
+      "type": "string",
+      "description": "Versioned retention policy applied to this draft"
+    },
+    "retention_started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Most recent meaningful activity used to calculate the minimum retention period"
+    },
+    "retention_until": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Earliest date this record may leave the active recovery dataset"
+    },
+    "soft_deleted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When an administrator moved this draft to Deleted Records without erasing it"
+    },
+    "soft_deleted_by": {
+      "type": "string",
+      "description": "Audited administrator or recovery-grant actor that soft-deleted this draft"
+    },
+    "soft_delete_reason": {
+      "type": "string",
+      "description": "Administrator-supplied reason for soft deletion"
+    },
+    "retention_restore_source_id": {
+      "type": "string",
+      "description": "Original record ID when this draft was restored from an independent backup"
     }
   },
   "required": [
@@ -198,6 +229,6 @@
     "create": { "user_condition": { "role": "admin" } },
     "read": { "user_condition": { "role": "admin" } },
     "update": { "user_condition": { "role": "admin" } },
-    "delete": { "user_condition": { "role": "admin" } }
+    "delete": false
   }
 }

@@ -1,0 +1,25 @@
+{
+  "name": "ProFormRetentionRun",
+  "type": "object",
+  "properties": {
+    "trigger": { "type": "string" },
+    "status": { "type": "string" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "completed_at": { "type": "string", "format": "date-time" },
+    "records_scanned": { "type": "number" },
+    "records_stored": { "type": "number" },
+    "records_skipped": { "type": "number" },
+    "assets_stored": { "type": "number" },
+    "provider_failures": { "type": "number" },
+    "remaining_backlog": { "type": "number" },
+    "duration_ms": { "type": "number" },
+    "error_code": { "type": "string" }
+  },
+  "required": ["trigger", "status", "started_at"],
+  "rls": {
+    "create": { "user_condition": { "role": "admin" } },
+    "read": { "user_condition": { "role": "admin" } },
+    "update": { "user_condition": { "role": "admin" } },
+    "delete": false
+  }
+}

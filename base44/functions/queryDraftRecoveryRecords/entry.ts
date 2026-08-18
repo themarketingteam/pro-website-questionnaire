@@ -6,6 +6,8 @@ const GRANT_VERSION = 1;
 const GRANT_TTL_SECONDS = 7 * 24 * 60 * 60;
 const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 50;
+const RETENTION_DAYS = 1095;
+const RETENTION_POLICY_VERSION = 'three-year-active-v1';
 const encoder = new TextEncoder();
 
 const RECORD_CONFIG = {
@@ -25,8 +27,13 @@ const RECORD_CONFIG = {
       'last_changed_question_id',
       'progress_percent',
       'session_id',
+      'final_submission_id',
       'archived_at',
-      'archive_reason'
+      'archive_reason',
+      'retention_until',
+      'soft_deleted_at',
+      'soft_deleted_by',
+      'soft_delete_reason'
     ]
   },
   intake: {
@@ -47,7 +54,30 @@ const RECORD_CONFIG = {
       'linked_submission_id',
       'ai_repair_status',
       'archived_at',
-      'archive_reason'
+      'archive_reason',
+      'retention_until',
+      'soft_deleted_at',
+      'soft_deleted_by',
+      'soft_delete_reason'
+    ]
+  },
+  submission: {
+    entityName: 'ProFormSubmission',
+    sort: '-created_date',
+    statuses: new Set(['submitted']),
+    searchFields: ['metadata.business_name', 'metadata.businessDomain', 'metadata.questionnaire_session_id', 'created_by'],
+    summaryFields: [
+      'id',
+      'metadata',
+      'created_date',
+      'updated_date',
+      'created_by',
+      'archived_at',
+      'archive_reason',
+      'retention_until',
+      'soft_deleted_at',
+      'soft_deleted_by',
+      'soft_delete_reason'
     ]
   }
 } as const;
@@ -117,12 +147,25 @@ const verifyGrant = async (token: string, secret: string) => {
 const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const buildArchiveCondition = (archiveState: string) => {
+  const notSoftDeleted = {
+    $or: [
+      { soft_deleted_at: { $exists: false } },
+      { soft_deleted_at: null },
+      { soft_deleted_at: '' }
+    ]
+  };
+
   if (archiveState === 'active') {
     return {
-      $or: [
-        { archived_at: { $exists: false } },
-        { archived_at: null },
-        { archived_at: '' }
+      $and: [
+        notSoftDeleted,
+        {
+          $or: [
+            { archived_at: { $exists: false } },
+            { archived_at: null },
+            { archived_at: '' }
+          ]
+        }
       ]
     };
   }
@@ -130,12 +173,25 @@ const buildArchiveCondition = (archiveState: string) => {
   if (archiveState === 'archived') {
     return {
       $and: [
+        notSoftDeleted,
         { archived_at: { $exists: true } },
         { archived_at: { $ne: null } },
         { archived_at: { $ne: '' } }
       ]
     };
   }
+
+  if (archiveState === 'deleted') {
+    return {
+      $and: [
+        { soft_deleted_at: { $exists: true } },
+        { soft_deleted_at: { $ne: null } },
+        { soft_deleted_at: { $ne: '' } }
+      ]
+    };
+  }
+
+  if (archiveState === 'all') return null;
 
   return null;
 };
@@ -148,7 +204,27 @@ const buildListQuery = (
 ) => {
   const conditions: Record<string, unknown>[] = [];
 
-  if (status !== 'all') conditions.push({ status });
+  if (status !== 'all' && config.entityName !== 'ProFormSubmission') conditions.push({ status });
+  if (config.entityName === 'ProFormSubmission') {
+    conditions.push({
+      $and: [
+        {
+          $or: [
+            { 'metadata.source_draft_id': { $exists: false } },
+            { 'metadata.source_draft_id': null },
+            { 'metadata.source_draft_id': '' }
+          ]
+        },
+        {
+          $or: [
+            { 'metadata.source_intake_id': { $exists: false } },
+            { 'metadata.source_intake_id': null },
+            { 'metadata.source_intake_id': '' }
+          ]
+        }
+      ]
+    });
+  }
   const archiveCondition = buildArchiveCondition(archiveState);
   if (archiveCondition) conditions.push(archiveCondition);
 
@@ -223,7 +299,7 @@ Deno.serve(async (req) => {
       if (status !== 'all' && !config.statuses.has(status)) {
         return jsonResponse({ success: false, error: 'Unsupported status filter.' }, 400);
       }
-      if (!['active', 'archived', 'all'].includes(archiveState)) {
+      if (!['active', 'archived', 'deleted', 'all'].includes(archiveState)) {
         return jsonResponse({ success: false, error: 'Unsupported archive filter.' }, 400);
       }
 
@@ -234,12 +310,31 @@ Deno.serve(async (req) => {
         ? await entity.filter(query, config.sort, requestedLimit, skip, [...config.summaryFields])
         : await entity.list(config.sort, requestedLimit, skip, [...config.summaryFields]);
       const safeRecords = Array.isArray(records) ? records : [];
-      const pageRecords = safeRecords.slice(0, pageSize);
+      let pageRecords = safeRecords.slice(0, pageSize);
       const hasMore = safeRecords.length > pageSize;
-      const anyRecords = await entity.list(config.sort, 1, 0, ['id']);
+      const anyRecords = query
+        ? await entity.filter(query, config.sort, 1, 0, ['id'])
+        : await entity.list(config.sort, 1, 0, ['id']);
       let duplicateSessionIds: string[] = [];
 
       if (recordType === 'draft') {
+        const linkedIds = [...new Set(pageRecords.map((record) => record.final_submission_id).filter(Boolean))];
+        if (linkedIds.length > 0) {
+          const linkedSubmissions = await base44.asServiceRole.entities.ProFormSubmission.filter(
+            { id: { $in: linkedIds } },
+            '-created_date',
+            linkedIds.length,
+            0,
+            ['id']
+          );
+          const existingIds = new Set((Array.isArray(linkedSubmissions) ? linkedSubmissions : []).map((record) => record.id));
+          pageRecords = pageRecords.map((record) => ({
+            ...record,
+            link_integrity_status: record.final_submission_id && !existingIds.has(record.final_submission_id)
+              ? 'missing_submission'
+              : 'ok'
+          }));
+        }
         const sessionIds = [...new Set(pageRecords.map((record) => record.session_id).filter(Boolean))];
         if (sessionIds.length > 0) {
           const duplicateConditions: Record<string, unknown>[] = [
@@ -285,6 +380,10 @@ Deno.serve(async (req) => {
 
     if (action === 'get') {
       const record = await entity.get(recordId);
+      if (recordType === 'draft' && record?.final_submission_id) {
+        const linked = await base44.asServiceRole.entities.ProFormSubmission.get(record.final_submission_id).catch(() => null);
+        record.link_integrity_status = linked ? 'ok' : 'missing_submission';
+      }
       return record
         ? jsonResponse({ success: true, record })
         : jsonResponse({ success: false, error: 'Recovery record not found.' }, 404);
@@ -301,7 +400,12 @@ Deno.serve(async (req) => {
         business_name: cleanText(updates.business_name, 300),
         domain: cleanText(updates.domain, 500),
         user_email: cleanText(updates.user_email, 320),
-        mapped_payload_json: mappedPayload
+        mapped_payload_json: mappedPayload,
+        archived_at: '',
+        archive_reason: '',
+        retention_policy_version: RETENTION_POLICY_VERSION,
+        retention_started_at: new Date().toISOString(),
+        retention_until: new Date(Date.now() + RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString()
       });
       return jsonResponse({ success: true, record: updated });
     }

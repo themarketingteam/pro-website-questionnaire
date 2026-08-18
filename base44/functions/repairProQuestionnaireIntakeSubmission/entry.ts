@@ -958,6 +958,7 @@ Deno.serve(async (req) => {
     if (intake.questionnaire_session_id && repairResult.payload?.metadata) {
       repairResult.payload.metadata.questionnaire_session_id = intake.questionnaire_session_id;
     }
+    if (repairResult.payload?.metadata) repairResult.payload.metadata.source_intake_id = intake.id;
 
     // Check for existing submission by session ID (even if linked_submission_id not set)
     if (intake.questionnaire_session_id && !forceRetry) {

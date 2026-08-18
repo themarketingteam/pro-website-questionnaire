@@ -1,0 +1,16 @@
+{
+  "name": "backupProQuestionnaireRetention",
+  "entry": "entry.ts",
+  "automations": [
+    {
+      "type": "scheduled",
+      "name": "daily_pro_questionnaire_retention_backup",
+      "description": "Incrementally backs up retained questionnaire records and files to encrypted S3 storage.",
+      "function_args": { "policy_id": "pro-retention-s3-v1" },
+      "is_active": false,
+      "schedule_mode": "recurring",
+      "schedule_type": "cron",
+      "cron_expression": "30 8 * * *"
+    }
+  ]
+}

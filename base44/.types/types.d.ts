@@ -7,6 +7,34 @@ export interface ProFormDraft {
    */
   session_id: string;
   /**
+   * SHA-256 hash of the anonymous draft capability; the token itself is never stored
+   */
+  access_token_hash?: string;
+  /**
+   * Version of the anonymous draft access contract
+   */
+  access_version?: number;
+  /**
+   * Server-side baseline used to deterministically replay append-only draft mutations
+   */
+  history_baseline_json?: string;
+  /**
+   * When versioned server-side draft history was enabled
+   */
+  history_started_at?: string;
+  /**
+   * Latest materialized draft revision
+   */
+  save_revision?: number;
+  /**
+   * Highest accepted sequence per anonymous client instance
+   */
+  latest_client_sequences_json?: string;
+  /**
+   * Questionnaire completion progress at the latest durable save
+   */
+  progress_percent?: number;
+  /**
    * Business name associated with the draft
    */
   business_name?: string;
@@ -99,6 +127,10 @@ export interface ProFormDraft {
    */
   final_submission_id?: string;
   /**
+   * Linked durable fallback intake ID when final submission creation did not complete
+   */
+  intake_id?: string;
+  /**
    * Current AI repair lifecycle status for this draft (e.g. pending, running, completed, failed, skipped)
    */
   ai_repair_status?: string;
@@ -150,6 +182,34 @@ export interface ProFormDraft {
    * Policy or administrator reason for archiving this draft
    */
   archive_reason?: string;
+  /**
+   * Versioned retention policy applied to this draft
+   */
+  retention_policy_version?: string;
+  /**
+   * Most recent meaningful activity used to calculate the minimum retention period
+   */
+  retention_started_at?: string;
+  /**
+   * Earliest date this record may leave the active recovery dataset
+   */
+  retention_until?: string;
+  /**
+   * When an administrator moved this draft to Deleted Records without erasing it
+   */
+  soft_deleted_at?: string;
+  /**
+   * Audited administrator or recovery-grant actor that soft-deleted this draft
+   */
+  soft_deleted_by?: string;
+  /**
+   * Administrator-supplied reason for soft deletion
+   */
+  soft_delete_reason?: string;
+  /**
+   * Original record ID when this draft was restored from an independent backup
+   */
+  retention_restore_source_id?: string;
 }
 
 export interface ProFormDraftEvent {
@@ -221,6 +281,18 @@ export interface ProFormSubmission {
      * The service tier (pro, essentials, etc.)
      */
     service_type?: string;
+    /**
+     * Stable non-sensitive session ID of the source questionnaire draft
+     */
+    questionnaire_session_id?: string;
+    /**
+     * Server-side ProFormDraft record linked to this submission
+     */
+    source_draft_id?: string;
+    /**
+     * Server-side fallback intake linked to this submission
+     */
+    source_intake_id?: string;
   };
   userdata: {
     /**
@@ -488,6 +560,42 @@ export interface ProFormSubmission {
      */
     additional_notes?: string;
   };
+  /**
+   * When this final submission moved out of the active recovery dataset
+   */
+  archived_at?: string;
+  /**
+   * Policy or administrator reason for archiving this final submission
+   */
+  archive_reason?: string;
+  /**
+   * Versioned retention policy applied to this final submission
+   */
+  retention_policy_version?: string;
+  /**
+   * Most recent meaningful activity used to calculate the minimum retention period
+   */
+  retention_started_at?: string;
+  /**
+   * Earliest date this record may leave the active recovery dataset
+   */
+  retention_until?: string;
+  /**
+   * When an administrator moved this submission to Deleted Records without erasing it
+   */
+  soft_deleted_at?: string;
+  /**
+   * Audited administrator or recovery-grant actor that soft-deleted this submission
+   */
+  soft_deleted_by?: string;
+  /**
+   * Administrator-supplied reason for soft deletion
+   */
+  soft_delete_reason?: string;
+  /**
+   * Original record ID when this submission was reconstructed from an independent backup
+   */
+  retention_restore_source_id?: string;
 }
 
 export interface ProFormSubmissionIntake {
@@ -585,6 +693,34 @@ export interface ProFormSubmissionIntake {
    * Policy or administrator reason for archiving this intake
    */
   archive_reason?: string;
+  /**
+   * Versioned retention policy applied to this intake
+   */
+  retention_policy_version?: string;
+  /**
+   * Most recent meaningful activity used to calculate the minimum retention period
+   */
+  retention_started_at?: string;
+  /**
+   * Earliest date this record may leave the active recovery dataset
+   */
+  retention_until?: string;
+  /**
+   * When an administrator moved this intake to Deleted Records without erasing it
+   */
+  soft_deleted_at?: string;
+  /**
+   * Audited administrator or recovery-grant actor that soft-deleted this intake
+   */
+  soft_deleted_by?: string;
+  /**
+   * Administrator-supplied reason for soft deletion
+   */
+  soft_delete_reason?: string;
+  /**
+   * Original record ID when this intake was restored from an independent backup
+   */
+  retention_restore_source_id?: string;
 }
 
 export interface QuestionnairePdfVersion {
@@ -628,6 +764,65 @@ export interface QuestionnairePdfVersion {
    * When this PDF version was generated
    */
   generated_at: string;
+}
+
+export interface ProFormDraftRevision {
+  /**
+   * Linked ProFormDraft record ID
+   */
+  draft_id: string;
+  /**
+   * Stable non-sensitive questionnaire session ID
+   */
+  session_id: string;
+  /**
+   * Idempotency key generated by the questionnaire client
+   */
+  mutation_id: string;
+  /**
+   * Anonymous browser-instance identifier used only for save ordering
+   */
+  client_instance_id: string;
+  /**
+   * Monotonic save sequence within a client instance
+   */
+  client_sequence: number;
+  /**
+   * Materialized revision visible to the client before this mutation
+   */
+  base_revision?: number;
+  /**
+   * Answer keys explicitly set by this mutation
+   */
+  changed_keys_json?: string;
+  /**
+   * Answer keys explicitly deleted by this mutation
+   */
+  deleted_keys_json?: string;
+  /**
+   * Sanitized answer and questionnaire-state changes for deterministic replay
+   */
+  changes_json?: string;
+  /**
+   * Sanitized post-mutation snapshot retained for administrator recovery
+   */
+  result_snapshot_json?: string;
+  /**
+   * Requested lifecycle status for this save
+   */
+  status?: string;
+  /**
+   * Authoritative server receipt time
+   */
+  server_received_at: string;
+  /**
+   * Bounded client change timestamp for diagnostics
+   */
+  client_changed_at?: string;
+  /**
+   * Save trigger such as autosave, final_barrier, or explicit_clear
+   */
+  source?: string;
 }
 
 export interface ProFormIdentityResolutionAttempt {
@@ -690,6 +885,59 @@ export interface ProFormIdentitySearchCache {
   expires_at: string;
 }
 
+export interface ProFormRecoveryLifecycleEvent {
+  record_type: "draft" | "intake" | "submission";
+  record_id: string;
+  action: "soft_delete" | "restore" | "archive" | "reactivate";
+  actor_mode?: string;
+  actor_identifier?: string;
+  reason?: string;
+  occurred_at: string;
+  previous_state_json?: string;
+}
+
+export interface ProFormRetentionBackupManifest {
+  source_entity: string;
+  source_record_id: string;
+  source_updated_at?: string;
+  record_fingerprint: string;
+  object_checksum?: string;
+  object_key: string;
+  object_version_id?: string;
+  object_etag?: string;
+  kms_key_id?: string;
+  asset_manifest_json?: string;
+  backup_status: "stored" | "verified" | "failed";
+  backed_up_at: string;
+  verified_at?: string;
+  verification_error?: string;
+}
+
+export interface ProFormRetentionCheckpoint {
+  checkpoint_key: string;
+  watermarks_json?: string;
+  last_started_at?: string;
+  last_completed_at?: string;
+  last_status?: string;
+  remaining_backlog?: number;
+  last_error?: string;
+}
+
+export interface ProFormRetentionRun {
+  trigger: string;
+  status: string;
+  started_at: string;
+  completed_at?: string;
+  records_scanned?: number;
+  records_stored?: number;
+  records_skipped?: number;
+  assets_stored?: number;
+  provider_failures?: number;
+  remaining_backlog?: number;
+  duration_ms?: number;
+  error_code?: string;
+}
+
 declare module '@base44/sdk' {
   interface EntityTypeRegistry {
     "ProFormDraft": ProFormDraft;
@@ -697,24 +945,34 @@ declare module '@base44/sdk' {
     "ProFormSubmission": ProFormSubmission;
     "ProFormSubmissionIntake": ProFormSubmissionIntake;
     "QuestionnairePdfVersion": QuestionnairePdfVersion;
+    "ProFormDraftRevision": ProFormDraftRevision;
     "ProFormIdentityResolutionAttempt": ProFormIdentityResolutionAttempt;
     "ProFormIdentityResolutionRun": ProFormIdentityResolutionRun;
     "ProFormIdentitySearchCache": ProFormIdentitySearchCache;
+    "ProFormRecoveryLifecycleEvent": ProFormRecoveryLifecycleEvent;
+    "ProFormRetentionBackupManifest": ProFormRetentionBackupManifest;
+    "ProFormRetentionCheckpoint": ProFormRetentionCheckpoint;
+    "ProFormRetentionRun": ProFormRetentionRun;
   }
   
   interface FunctionNameRegistry {
     "archiveRecoveryRecords": true;
+    "backupProQuestionnaireRetention": true;
+    "restoreProQuestionnaireRetentionBackup": true;
     "scheduleProQuestionnaireIdentityRecovery": true;
-    "generateAIContent": true;
+    "verifyProQuestionnaireRetentionBackup": true;
     "generateAIContentOpenAI": true;
+    "generateAIContent": true;
     "manageQuestionnairePdfVersions": true;
+    "manageRecoveryRecordLifecycle": true;
     "queryDraftRecoveryRecords": true;
     "repairProQuestionnaireIntakeSubmission": true;
     "resolveProQuestionnaireIdentity": true;
     "retryProQuestionnaireIntakeSubmission": true;
     "reviewProQuestionnaireIdentityCandidate": true;
-    "sendToZapier": true;
+    "syncProQuestionnaireDraft": true;
     "submitProQuestionnaireFallback": true;
+    "sendToZapier": true;
     "validateQuestionText": true;
     "verifyDraftRecoveryAccess": true;
     "_shared/base44Agent": true;

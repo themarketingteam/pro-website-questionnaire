@@ -18,13 +18,17 @@ const renderRecoveryPage = () => render(
 describe('public draft recovery actions', () => {
   let draftRecords;
   let intakeRecords;
+  let submissionRecords;
 
   beforeEach(() => {
     draftRecords = [];
     intakeRecords = [];
+    submissionRecords = [];
     base44.functions.invoke.mockImplementation(async (name, payload = {}) => {
       if (name === 'queryDraftRecoveryRecords') {
-        const source = payload.recordType === 'intake' ? intakeRecords : draftRecords;
+        const source = payload.recordType === 'intake'
+          ? intakeRecords
+          : (payload.recordType === 'submission' ? submissionRecords : draftRecords);
         if (payload.action === 'get') {
           return {
             data: {
@@ -79,7 +83,7 @@ describe('public draft recovery actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
 
     expect(searchInput).toHaveValue('');
-    expect(screen.getByRole('combobox', { name: 'Status filter' })).toHaveTextContent('All Statuses');
+    expect(screen.getByRole('combobox', { name: 'Draft status filter' })).toHaveTextContent('All Draft Statuses');
     expect(screen.getByRole('combobox', { name: 'Record set filter' })).toHaveTextContent('Active Records');
     await waitFor(() => {
       expect(base44.functions.invoke).toHaveBeenCalledWith(
@@ -111,6 +115,37 @@ describe('public draft recovery actions', () => {
     });
     expect(base44.entities.ProFormSubmissionIntake.list).not.toHaveBeenCalled();
     expect(screen.queryByText('Questionnaire Intake Recovery')).not.toBeInTheDocument();
+  });
+
+  it('shows protected standalone final submissions without fabricating draft records', async () => {
+    submissionRecords = [{
+      id: 'historical-submission-1',
+      metadata: {
+        business_name: 'Historical Client',
+        businessDomain: 'historical.example',
+        submission_datetime: '2025-11-25T12:00:00.000Z',
+      },
+      userdata: { company_description: 'Stored final answer' },
+      created_date: '2025-11-25T12:00:00.000Z',
+      retention_until: '2028-11-24T12:00:00.000Z',
+    }];
+
+    renderRecoveryPage();
+
+    expect(await screen.findByText('Historical Client')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Historical Client'));
+    expect(await screen.findByRole('region', { name: 'Stored Final Submission Payload' })).toHaveTextContent('Stored Final Submission Payload');
+    expect(screen.getAllByText('historical.example').length).toBeGreaterThan(0);
+    expect(base44.functions.invoke).toHaveBeenCalledWith(
+      'queryDraftRecoveryRecords',
+      expect.objectContaining({
+        action: 'list',
+        recordType: 'submission',
+        pageSize: 25,
+        recoveryGrant,
+      }),
+    );
+    expect(base44.entities.ProFormSubmission.list).not.toHaveBeenCalled();
   });
 
   it('uses explicit high-contrast styling for draft and submitted status badges', async () => {
@@ -151,7 +186,7 @@ describe('public draft recovery actions', () => {
     renderRecoveryPage();
 
     expect(await screen.findByText('Archived Client')).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'Record set filter' })).toHaveTextContent('All Records');
+    expect(screen.getByRole('combobox', { name: 'Record set filter' })).toHaveTextContent('All Retained Records');
     expect(screen.getByText('archived')).toHaveClass('brand-status-badge--archived');
 
     fireEvent.click(screen.getByText('Archived Client'));
@@ -168,7 +203,7 @@ describe('public draft recovery actions', () => {
   it('requests server-filtered draft pages without using direct entity list reads', async () => {
     base44.functions.invoke.mockImplementation(async (name, payload = {}) => {
       if (name !== 'queryDraftRecoveryRecords') return { data: { success: true } };
-      if (payload.recordType === 'intake') {
+      if (payload.recordType === 'intake' || payload.recordType === 'submission') {
         return { data: { success: true, records: [], hasMore: false, hasAnyRecords: false } };
       }
 

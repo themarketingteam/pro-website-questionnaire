@@ -82,6 +82,12 @@ function getQ(id) {
 describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    base44.functions.invoke.mockImplementation(async (name, payload = {}) => {
+      if (name === 'syncProQuestionnaireDraft') return secureDraftMockResponse(payload);
+      if (name === 'sendToZapier') return { status: 200, data: { success: true } };
+      if (name === 'validateQuestionText') return { status: 200, data: { status: 'complete' } };
+      return { status: 200, data: { success: true } };
+    });
     localStorage.clear();
     window.history.replaceState({}, '', '/');
     base44.entities.ProFormDraft.filter.mockResolvedValue([]);
@@ -279,10 +285,12 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
           '24': 'Schedule a Consultation',
           '25': 'no'
         },
-        validationStatus: {
-          '1': 'complete','2': 'complete','3': 'complete','4': 'complete','5': 'complete','7': 'complete','8': 'complete','10': 'complete','11': 'complete','12': 'complete','14': 'complete','16': 'complete','18': 'complete','20': 'complete','23': 'complete','24': 'complete','25': 'complete'
-        },
-        touchedQuestions: {},
+        validationStatus: Object.fromEntries(
+          Array.from({ length: 25 }, (_, index) => [String(index + 1), 'complete'])
+        ),
+        touchedQuestions: Object.fromEntries(
+          Array.from({ length: 25 }, (_, index) => [String(index + 1), true])
+        ),
         expandedQuestions: { '1': true },
         credentials: {},
         textValidationMeta: {}

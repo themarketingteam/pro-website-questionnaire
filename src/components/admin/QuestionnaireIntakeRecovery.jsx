@@ -16,6 +16,7 @@ import AdminQuestionnairePdfSection from '@/components/admin/AdminQuestionnaireP
 import { getIntakePdfPayload } from '@/lib/questionnairePdfVersions';
 import { getRecoveryRecord, listRecoveryRecords } from '@/lib/draftRecoveryApi';
 import IdentityResolutionPanel from '@/components/admin/IdentityResolutionPanel';
+import RecoveryLifecycleActions from '@/components/admin/RecoveryLifecycleActions';
 
 const RECOVERY_PAGE_SIZE = 25;
 
@@ -147,7 +148,7 @@ function AiRepairSection({ intake, recoveryGrant, disabled, onReviewed }) {
   );
 }
 
-function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, aiRunning, recoveryGrant }) {
+function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, aiRunning, recoveryGrant, onLifecycleChanged }) {
   const [detailedIntake, setDetailedIntake] = useState(null);
   const [transientReport, setTransientReport] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -216,6 +217,8 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
                   AI: {intake.ai_repair_status}
                 </Badge>
               )}
+              {intake.archived_at && <Badge className="brand-status-badge brand-status-badge--archived">archived</Badge>}
+              {intake.soft_deleted_at && <Badge className="brand-status-badge brand-status-badge--danger">deleted</Badge>}
             </div>
             <div>
               <p className="text-sm text-slate-500">Primary Failure</p>
@@ -245,6 +248,13 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
 
       {expanded && !detailLoading && !detailError && (
         <div className="brand-expanded-panel p-4 space-y-4">
+          {activeIntake.soft_deleted_at && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+              <p className="font-semibold">Deleted Records</p>
+              <p>This intake remains retained and can be restored.</p>
+              <p className="mt-1">Reason: {activeIntake.soft_delete_reason || '—'}</p>
+            </div>
+          )}
           <div className="grid gap-3 md:grid-cols-2 text-sm">
             <p><span className="font-medium">Retry Count:</span> {activeIntake.retry_count ?? 0}</p>
             <p><span className="font-medium">Last Retry:</span> {formatDate(activeIntake.last_retry_at)}</p>
@@ -300,6 +310,14 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
               >
                 {retrying ? <><Loader2 className="w-3 h-3 animate-spin" /> Retrying...</> : <><RefreshCw className="w-3 h-3" /> Retry Submission</>}
               </Button>
+
+              <RecoveryLifecycleActions
+                recordType="intake"
+                record={activeIntake}
+                recoveryGrant={recoveryGrant}
+                disabled={retrying || Boolean(aiRunning)}
+                onChanged={onLifecycleChanged}
+              />
 
               {/* Diagnose identity and structure without changing the source record or submitting */}
               <Button
@@ -509,7 +527,8 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
               <SelectContent>
                 <SelectItem value="active">Active Records</SelectItem>
                 <SelectItem value="archived">Archived Records</SelectItem>
-                <SelectItem value="all">All Records</SelectItem>
+                <SelectItem value="deleted">Deleted Records</SelectItem>
+                <SelectItem value="all">All Retained Records</SelectItem>
               </SelectContent>
             </Select>
 
@@ -541,6 +560,10 @@ export default function QuestionnaireIntakeRecovery({ recoveryGrant = '' }) {
                   onAiAction={handleAiAction}
                   aiRunning={aiRunning?.id === intake.id ? aiRunning.mode : null}
                   recoveryGrant={recoveryGrant}
+                  onLifecycleChanged={async () => {
+                    setExpandedId('');
+                    await loadRecords();
+                  }}
                 />
               ))}
               <div className="flex items-center justify-between gap-3 pt-1" aria-label="Intake pagination">

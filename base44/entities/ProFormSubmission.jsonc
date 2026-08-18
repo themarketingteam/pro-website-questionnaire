@@ -30,6 +30,10 @@
         "source_draft_id": {
           "type": "string",
           "description": "Server-side ProFormDraft record linked to this submission"
+        },
+        "source_intake_id": {
+          "type": "string",
+          "description": "Server-side fallback intake linked to this submission"
         }
       }
     },
@@ -349,6 +353,46 @@
           "description": "Q25.1: Additional notes or instructions (only if Q25 is yes)"
         }
       }
+    },
+    "archived_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this final submission moved out of the active recovery dataset"
+    },
+    "archive_reason": {
+      "type": "string",
+      "description": "Policy or administrator reason for archiving this final submission"
+    },
+    "retention_policy_version": {
+      "type": "string",
+      "description": "Versioned retention policy applied to this final submission"
+    },
+    "retention_started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Most recent meaningful activity used to calculate the minimum retention period"
+    },
+    "retention_until": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Earliest date this record may leave the active recovery dataset"
+    },
+    "soft_deleted_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When an administrator moved this submission to Deleted Records without erasing it"
+    },
+    "soft_deleted_by": {
+      "type": "string",
+      "description": "Audited administrator or recovery-grant actor that soft-deleted this submission"
+    },
+    "soft_delete_reason": {
+      "type": "string",
+      "description": "Administrator-supplied reason for soft deletion"
+    },
+    "retention_restore_source_id": {
+      "type": "string",
+      "description": "Original record ID when this submission was reconstructed from an independent backup"
     }
   },
   "required": [
@@ -369,30 +413,7 @@
         }
       ]
     },
-    "update": {
-      "$or": [
-        {
-          "created_by": "{{user.email}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
-    "delete": {
-      "$or": [
-        {
-          "created_by": "{{user.email}}"
-        },
-        {
-          "user_condition": {
-            "role": "admin"
-          }
-        }
-      ]
-    },
-    "write": {}
+    "update": { "user_condition": { "role": "admin" } },
+    "delete": false
   }
 }

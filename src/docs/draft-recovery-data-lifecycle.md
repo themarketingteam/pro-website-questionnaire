@@ -2,7 +2,7 @@
 
 ## Admin reads
 
-The draft-recovery page reads `ProFormDraft` and `ProFormSubmissionIntake` through the protected `queryDraftRecoveryRecords` backend function.
+The draft-recovery page reads `ProFormDraft`, `ProFormSubmissionIntake`, and standalone `ProFormSubmission` records through the protected `queryDraftRecoveryRecords` backend function.
 
 - List requests are filtered and paginated on the server.
 - The UI requests 25 records per page; the backend enforces a maximum of 50.
@@ -15,10 +15,30 @@ The draft-recovery page reads `ProFormDraft` and `ProFormSubmissionIntake` throu
 
 The `archiveRecoveryRecords` automation runs daily at `07:15 UTC`.
 
-- Submitted drafts are archived after 365 days using `last_saved_at`.
-- Submitted, successfully retried, or abandoned intake records are archived after 365 days using their server creation date.
+- Drafts, fallback intakes, and final submissions remain active for at least 1,095 days after their latest meaningful server-side activity.
+- After 1,095 days of inactivity, records are archived indefinitely.
 - Archiving sets `archived_at` and `archive_reason`; it does not delete the source record.
 - Archived records remain available through the recovery page's **Archived Records** filter.
-- Permanent deletion is intentionally disabled until the business approves a separate deletion period and recovery process.
+- Administrators use reversible soft deletion. Entity-level permanent deletion is disabled for retained questionnaire data.
+- A resumed, authorized draft is reactivated and receives a new 1,095-day active-retention window.
+- Standalone final submissions are available on the recovery page alongside drafts and fallback intakes.
+- Independent encrypted S3 backups remain disabled until the required bucket secrets pass readiness checks and the initial full backup completes.
 
-The policy is deliberately limited to terminal records. Active drafts and pending or failed intake records are never archived by the scheduled job.
+The policy never automatically deletes records. Soft-deleted records remain retained and restorable.
+
+## Independent backup
+
+`backupProQuestionnaireRetention` incrementally writes immutable, fingerprinted record envelopes and referenced PDF/image/file binaries to the configured company S3 bucket. Each object uses SSE-KMS and receives a SHA-256 integrity hash. `verifyProQuestionnaireRetentionBackup` validates record and binary hashes; `restoreProQuestionnaireRetentionBackup` defaults to a dry run and refuses to overwrite an existing or newer database record.
+
+The daily `08:30 UTC` schedule is intentionally inactive until all six secrets are configured and an administrator completes and reconciles the initial full backup:
+
+- `RETENTION_S3_BUCKET`
+- `RETENTION_S3_REGION`
+- `RETENTION_S3_PREFIX`
+- `RETENTION_AWS_ACCESS_KEY_ID`
+- `RETENTION_AWS_SECRET_ACCESS_KEY`
+- `RETENTION_S3_KMS_KEY_ID`
+
+The bucket must have versioning and Block Public Access enabled. Its policy must deny non-TLS requests, and its lifecycle must retain every backup version for at least 1,095 days. The IAM principal must be limited to the configured prefix, the configured KMS key, and only the object/list/version operations used by backup verification and recovery.
+
+Backup logs contain record identifiers and counters only; they never contain questionnaire answers, AWS credentials, or binary contents. A failed or incomplete backup does not alter the source database record.

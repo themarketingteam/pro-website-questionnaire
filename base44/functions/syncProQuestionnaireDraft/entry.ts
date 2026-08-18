@@ -6,6 +6,8 @@ const MAX_STRING_LENGTH = 180_000;
 const MAX_ARRAY_ITEMS = 250;
 const MAX_DEPTH = 10;
 const ACCESS_VERSION = 1;
+const RETENTION_DAYS = 1095;
+const RETENTION_POLICY_VERSION = 'three-year-active-v1';
 const encoder = new TextEncoder();
 
 type JsonRecord = Record<string, unknown>;
@@ -21,6 +23,10 @@ const jsonResponse = (body: JsonRecord, status = 200) => Response.json(body, {
 const cleanText = (value: unknown, maxLength = 500) => (
   typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
 );
+
+const retentionUntilFrom = (value: string) => new Date(
+  Date.parse(value) + RETENTION_DAYS * 24 * 60 * 60 * 1000
+).toISOString();
 
 const safeParse = (value: unknown, fallback: unknown) => {
   if (typeof value !== 'string' || !value) return fallback;
@@ -161,6 +167,9 @@ const authorizeDraft = async (entity: any, credentialValue: unknown) => {
   if (!credential) return { error: 'A valid draft recovery credential is required.', status: 401 };
   const draft = await findLatestDraft(entity, credential.sessionId);
   if (!draft?.id || !draft.access_token_hash) return { error: 'Draft recovery credential was not recognized.', status: 401 };
+  if (cleanText(draft.soft_deleted_at, 100)) {
+    return { error: 'This questionnaire draft was removed by an administrator.', status: 410 };
+  }
   const suppliedHash = await hashToken(credential.secret);
   if (!constantTimeEqual(String(draft.access_token_hash), suppliedHash)) {
     return { error: 'Draft recovery credential was not recognized.', status: 401 };
@@ -319,9 +328,30 @@ const materializeDraft = async (base44: any, draft: any, rebuilt: any, lifecycle
     last_saved_at: now,
     save_revision: rebuilt.revision,
     latest_client_sequences_json: safeStringify(rebuilt.sequences),
-    progress_percent: snapshot.progressPercent || 0
+    progress_percent: snapshot.progressPercent || 0,
+    retention_policy_version: RETENTION_POLICY_VERSION,
+    retention_started_at: now,
+    retention_until: retentionUntilFrom(now),
+    archived_at: '',
+    archive_reason: ''
   };
-  return base44.asServiceRole.entities.ProFormDraft.update(draft.id, update);
+  const updated = await base44.asServiceRole.entities.ProFormDraft.update(draft.id, update);
+  if (cleanText(draft.archived_at, 100)) {
+    await base44.asServiceRole.entities.ProFormRecoveryLifecycleEvent.create({
+      record_type: 'draft',
+      record_id: draft.id,
+      action: 'reactivate',
+      actor_mode: 'draft_resume_credential',
+      actor_identifier: '',
+      reason: 'Authorized client activity resumed the archived draft.',
+      occurred_at: now,
+      previous_state_json: safeStringify({
+        archived_at: draft.archived_at,
+        archive_reason: draft.archive_reason
+      })
+    }).catch(() => null);
+  }
+  return updated;
 };
 
 const publicDraft = (draft: any, rebuilt: any) => ({
@@ -379,7 +409,15 @@ const createDraft = async (base44: any, sessionId: string, accessHash: string, c
     mapped_payload_json: '{}',
     draft_metadata_json: safeStringify({ app: 'pro_questionnaire', source: 'secure_server_draft_v1' }),
     last_changed_at: now,
-    last_saved_at: now
+    last_saved_at: now,
+    retention_policy_version: RETENTION_POLICY_VERSION,
+    retention_started_at: now,
+    retention_until: retentionUntilFrom(now),
+    archived_at: '',
+    archive_reason: '',
+    soft_deleted_at: '',
+    soft_deleted_by: '',
+    soft_delete_reason: ''
   });
 };
 
@@ -416,7 +454,7 @@ Deno.serve(async (req) => {
         const legacySessionId = cleanText(body?.legacySessionId, 120);
         if (isSessionId(legacySessionId)) {
           const legacyDraft = await findLatestDraft(draftEntity, legacySessionId);
-          if (legacyDraft?.id && !legacyDraft.access_token_hash) draft = legacyDraft;
+          if (legacyDraft?.id && !legacyDraft.access_token_hash && !cleanText(legacyDraft.soft_deleted_at, 100)) draft = legacyDraft;
         }
 
         const sessionId = draft?.session_id || crypto.randomUUID();

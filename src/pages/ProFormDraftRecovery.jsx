@@ -28,10 +28,12 @@ import {
 } from '@/lib/draftRecoveryApi';
 import AdminWorkspaceNav from '@/components/admin/AdminWorkspaceNav';
 import IdentityResolutionPanel from '@/components/admin/IdentityResolutionPanel';
+import StandaloneSubmissionRecovery from '@/components/admin/StandaloneSubmissionRecovery';
+import RecoveryLifecycleActions from '@/components/admin/RecoveryLifecycleActions';
 
 const RECOVERY_PAGE_SIZE = 25;
 const RECOVERY_ARCHIVE_STATE_KEY = 'pro-draft-recovery-archive-state';
-const VALID_ARCHIVE_STATES = new Set(['active', 'archived', 'all']);
+const VALID_ARCHIVE_STATES = new Set(['active', 'archived', 'deleted', 'all']);
 
 const getInitialArchiveState = () => {
   try {
@@ -347,6 +349,16 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                   archived
                 </Badge>
               )}
+              {draft.soft_deleted_at && (
+                <Badge className="brand-status-badge brand-status-badge--danger">
+                  deleted
+                </Badge>
+              )}
+              {draft.link_integrity_status === 'missing_submission' && (
+                <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
+                  linked submission missing
+                </Badge>
+              )}
               {hasDuplicateSession && (
                 <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50 flex items-center gap-1 w-fit">
                   <AlertTriangle className="w-3 h-3" />
@@ -396,6 +408,19 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
               <p>This record is preserved and has not been deleted. It remains available when the record filter is set to Archived Records or All Records.</p>
             </div>
           )}
+          {localDraft.soft_deleted_at && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="note">
+              <p className="font-semibold">Deleted Records</p>
+              <p>This is a reversible soft deletion. The questionnaire and its history remain retained.</p>
+              <p className="mt-1">Reason: {localDraft.soft_delete_reason || '—'}</p>
+            </div>
+          )}
+          {localDraft.link_integrity_status === 'missing_submission' && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" role="alert">
+              <p className="font-semibold">Linked final submission is unavailable</p>
+              <p>The complete draft payload remains retained here and can still be copied or downloaded as a PDF.</p>
+            </div>
+          )}
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2 text-sm">
@@ -415,6 +440,8 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
               <p><span className="font-medium">Submit Error:</span> {localDraft.submit_error || '—'}</p>
               <p><span className="font-medium">Archived At:</span> {formatDate(localDraft.archived_at)}</p>
               <p><span className="font-medium">Archive Reason:</span> {localDraft.archive_reason || '—'}</p>
+              <p><span className="font-medium">Retention Active Until:</span> {formatDate(localDraft.retention_until)}</p>
+              <p><span className="font-medium">Soft Deleted At:</span> {formatDate(localDraft.soft_deleted_at)}</p>
             </div>
           </div>
 
@@ -483,6 +510,16 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                   {retrying ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
                   {retrying ? 'Retrying...' : 'Retry Submission'}
                 </Button>
+                <RecoveryLifecycleActions
+                  recordType="draft"
+                  record={localDraft}
+                  recoveryGrant={recoveryGrant}
+                  disabled={isWorking}
+                  onChanged={() => {
+                    setEditing(false);
+                    onRetrySuccess?.();
+                  }}
+                />
               </div>
             </section>
 
@@ -744,11 +781,11 @@ export default function ProFormDraftRecovery() {
                 setPage(1);
                 setExpandedId('');
               }}>
-                <SelectTrigger aria-label="Status filter">
+                <SelectTrigger aria-label="Draft status filter">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="all">All Draft Statuses</SelectItem>
                   <SelectItem value="draft">Draft</SelectItem>
                   <SelectItem value="submit_attempted">Submit Attempted</SelectItem>
                   <SelectItem value="submit_failed">Submit Failed</SelectItem>
@@ -767,7 +804,8 @@ export default function ProFormDraftRecovery() {
                 <SelectContent>
                   <SelectItem value="active">Active Records</SelectItem>
                   <SelectItem value="archived">Archived Records</SelectItem>
-                  <SelectItem value="all">All Records</SelectItem>
+                  <SelectItem value="deleted">Deleted Records</SelectItem>
+                  <SelectItem value="all">All Retained Records</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -799,6 +837,13 @@ export default function ProFormDraftRecovery() {
           </Card>
 
           <QuestionnaireIntakeRecovery recoveryGrant={recoveryGrant} />
+
+          <StandaloneSubmissionRecovery
+            recoveryGrant={recoveryGrant}
+            archiveState={archiveState}
+            search={debouncedSearch}
+            refreshKey={refreshKey}
+          />
 
           <section className="space-y-4" aria-labelledby="draft-records-title">
             <div className="draft-recovery-brand__list-heading">

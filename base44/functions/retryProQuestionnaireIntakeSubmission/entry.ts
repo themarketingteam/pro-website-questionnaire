@@ -290,7 +290,11 @@ Deno.serve(async (req) => {
 
       // Stamp session_id onto payload metadata for deduplication
       if (sessionId) {
-        draftPayload.metadata = { ...metadata, questionnaire_session_id: sessionId };
+        draftPayload.metadata = {
+          ...metadata,
+          questionnaire_session_id: sessionId,
+          source_draft_id: draftId
+        };
       }
 
       const submission = await base44.asServiceRole.entities.ProFormSubmission.create(draftPayload);
@@ -393,6 +397,11 @@ Deno.serve(async (req) => {
     }
 
     try {
+      transformedPayload.metadata = {
+        ...(transformedPayload.metadata || {}),
+        questionnaire_session_id: intake.questionnaire_session_id || questionnaireSessionId || '',
+        source_intake_id: intake.id
+      };
       const submission = await base44.asServiceRole.entities.ProFormSubmission.create(transformedPayload);
       await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
         status: 'retry_success',

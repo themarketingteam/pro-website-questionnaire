@@ -1,0 +1,20 @@
+{
+  "name": "ProFormRetentionCheckpoint",
+  "type": "object",
+  "properties": {
+    "checkpoint_key": { "type": "string" },
+    "watermarks_json": { "type": "string" },
+    "last_started_at": { "type": "string", "format": "date-time" },
+    "last_completed_at": { "type": "string", "format": "date-time" },
+    "last_status": { "type": "string" },
+    "remaining_backlog": { "type": "number" },
+    "last_error": { "type": "string" }
+  },
+  "required": ["checkpoint_key"],
+  "rls": {
+    "create": { "user_condition": { "role": "admin" } },
+    "read": { "user_condition": { "role": "admin" } },
+    "update": { "user_condition": { "role": "admin" } },
+    "delete": false
+  }
+}

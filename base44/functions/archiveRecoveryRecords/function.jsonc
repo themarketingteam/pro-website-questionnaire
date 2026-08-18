@@ -5,9 +5,9 @@
     {
       "type": "scheduled",
       "name": "daily_recovery_record_archive",
-      "description": "Archives submitted recovery records older than 365 days without permanently deleting data.",
+      "description": "Archives recovery records after 1,095 days of inactivity without permanently deleting data.",
       "function_args": {
-        "policy_id": "recovery-retention-v1"
+        "policy_id": "recovery-retention-v2"
       },
       "is_active": true,
       "schedule_mode": "recurring",
