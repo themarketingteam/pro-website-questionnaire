@@ -1,0 +1,149 @@
+{
+  "type": "object",
+  "name": "ProFormIdentityResolutionAttempt",
+  "properties": {
+    "record_type": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "intake"
+      ]
+    },
+    "record_id": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "trigger": {
+      "type": "string",
+      "enum": [
+        "admin_diagnose",
+        "admin_repair",
+        "admin_repair_retry",
+        "scheduled"
+      ]
+    },
+    "apply_requested": {
+      "type": "boolean",
+      "default": false
+    },
+    "payload_fingerprint": {
+      "type": "string"
+    },
+    "resolver_version": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "needs_review",
+        "provider_error",
+        "stale",
+        "applied",
+        "rejected"
+      ]
+    },
+    "actor_mode": {
+      "type": "string"
+    },
+    "business_name_original": {
+      "type": "string"
+    },
+    "business_name_candidate": {
+      "type": "string"
+    },
+    "business_name_confidence": {
+      "type": "number"
+    },
+    "business_name_state": {
+      "type": "string"
+    },
+    "business_name_evidence_json": {
+      "type": "string"
+    },
+    "business_name_review_decision": {
+      "type": "string"
+    },
+    "domain_original": {
+      "type": "string"
+    },
+    "domain_candidate": {
+      "type": "string"
+    },
+    "domain_confidence": {
+      "type": "number"
+    },
+    "domain_state": {
+      "type": "string"
+    },
+    "domain_evidence_json": {
+      "type": "string"
+    },
+    "domain_review_decision": {
+      "type": "string"
+    },
+    "primary_location": {
+      "type": "string"
+    },
+    "search_query": {
+      "type": "string"
+    },
+    "search_query_hash": {
+      "type": "string"
+    },
+    "search_urls_json": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "errors_json": {
+      "type": "string"
+    },
+    "applied_fields_json": {
+      "type": "string"
+    },
+    "reviewed_by": {
+      "type": "string"
+    },
+    "reviewed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "record_type",
+    "record_id",
+    "trigger",
+    "payload_fingerprint",
+    "resolver_version"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
