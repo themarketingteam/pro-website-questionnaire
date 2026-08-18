@@ -961,24 +961,24 @@ declare module '@base44/sdk' {
     "restoreProQuestionnaireRetentionBackup": true;
     "scheduleProQuestionnaireIdentityRecovery": true;
     "verifyProQuestionnaireRetentionBackup": true;
-    "generateAIContentOpenAI": true;
     "generateAIContent": true;
     "manageQuestionnairePdfVersions": true;
-    "manageRecoveryRecordLifecycle": true;
     "queryDraftRecoveryRecords": true;
-    "repairProQuestionnaireIntakeSubmission": true;
+    "generateAIContentOpenAI": true;
+    "manageRecoveryRecordLifecycle": true;
     "resolveProQuestionnaireIdentity": true;
+    "repairProQuestionnaireIntakeSubmission": true;
     "retryProQuestionnaireIntakeSubmission": true;
     "reviewProQuestionnaireIdentityCandidate": true;
-    "syncProQuestionnaireDraft": true;
     "submitProQuestionnaireFallback": true;
+    "syncProQuestionnaireDraft": true;
     "sendToZapier": true;
     "validateQuestionText": true;
     "verifyDraftRecoveryAccess": true;
     "_shared/base44Agent": true;
-    "_shared/proSubmissionRepair": true;
     "retryProQuestionnaireIntakeSubmission/entry": true;
     "submitProQuestionnaireFallback/entry": true;
+    "_shared/proSubmissionRepair": true;
     "sendToZapier/entry": true;
   }
   
