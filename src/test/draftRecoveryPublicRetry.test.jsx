@@ -67,6 +67,9 @@ describe('public draft recovery actions', () => {
     expect(container.querySelector('main')).toHaveClass('draft-recovery-brand', 'draft-recovery-brand-page');
     expect(screen.getByText('Draft Filters')).toHaveClass('brand-heading');
     expect(screen.getByRole('button', { name: 'Refresh' })).toHaveClass('brand-filter-refresh');
+    const draftHeading = screen.getByRole('heading', { name: 'Questionnaire Drafts' });
+    const submissionHeading = screen.getByRole('heading', { name: 'Standalone Final Submissions' });
+    expect(draftHeading.compareDocumentPosition(submissionHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await waitFor(() => {
       expect(container.querySelector('.brand-filter-last-updated')).not.toHaveTextContent('—');
     });

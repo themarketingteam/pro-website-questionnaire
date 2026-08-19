@@ -90,6 +90,11 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) => Response.j
   }
 });
 
+const badRequest = (error: string, context: Record<string, unknown>) => {
+  console.warn('[Draft recovery query] request rejected', { error, ...context });
+  return jsonResponse({ success: false, error }, 400);
+};
+
 const cleanText = (value: unknown, maxLength: number) => (
   typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
 );
@@ -282,7 +287,10 @@ Deno.serve(async (req) => {
   const recordType = cleanText(body?.recordType, 20) as keyof typeof RECORD_CONFIG;
   const config = RECORD_CONFIG[recordType];
   if (!config) {
-    return jsonResponse({ success: false, error: 'Unsupported recovery record type.' }, 400);
+    return badRequest('Unsupported recovery record type.', {
+      action: cleanText(body?.action, 20),
+      recordType: recordType || '(missing)'
+    });
   }
 
   const entity = base44.asServiceRole.entities[config.entityName];
@@ -297,10 +305,10 @@ Deno.serve(async (req) => {
       const search = cleanText(body?.search, 200);
 
       if (status !== 'all' && !config.statuses.has(status)) {
-        return jsonResponse({ success: false, error: 'Unsupported status filter.' }, 400);
+        return badRequest('Unsupported status filter.', { action, recordType, status });
       }
       if (!['active', 'archived', 'deleted', 'all'].includes(archiveState)) {
-        return jsonResponse({ success: false, error: 'Unsupported archive filter.' }, 400);
+        return badRequest('Unsupported archive filter.', { action, recordType, archiveState });
       }
 
       const query = buildListQuery(config, status, archiveState, search);
@@ -375,7 +383,7 @@ Deno.serve(async (req) => {
 
     const recordId = cleanText(body?.recordId, 200);
     if (!recordId) {
-      return jsonResponse({ success: false, error: 'A recovery record ID is required.' }, 400);
+      return badRequest('A recovery record ID is required.', { action, recordType });
     }
 
     if (action === 'get') {
@@ -393,7 +401,7 @@ Deno.serve(async (req) => {
       const updates = body?.updates && typeof body.updates === 'object' ? body.updates : {};
       const mappedPayload = updates.mapped_payload_json;
       if (!validateMappedPayload(mappedPayload)) {
-        return jsonResponse({ success: false, error: 'The mapped payload must be valid JSON.' }, 400);
+        return badRequest('The mapped payload must be valid JSON.', { action, recordType });
       }
 
       const updated = await entity.update(recordId, {
@@ -410,7 +418,7 @@ Deno.serve(async (req) => {
       return jsonResponse({ success: true, record: updated });
     }
 
-    return jsonResponse({ success: false, error: 'Unsupported recovery action.' }, 400);
+    return badRequest('Unsupported recovery action.', { action: action || '(missing)', recordType });
   } catch (error) {
     console.error('[Draft recovery query] request failed:', error);
     return jsonResponse({ success: false, error: 'Unable to access recovery records.' }, 500);

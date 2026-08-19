@@ -1,0 +1,51 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadRetentionBucketConfiguration",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetBucketLocation",
+        "s3:GetBucketVersioning"
+      ],
+      "Resource": "arn:aws:s3:::pro-tier-bucket"
+    },
+    {
+      "Sid": "ListRetentionBackupPrefix",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::pro-tier-bucket",
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": [
+            "contentDraftEntry",
+            "contentDraftEntry/*"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "ManageRetentionBackupObjectsWithoutDelete",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::pro-tier-bucket/contentDraftEntry/*"
+    },
+    {
+      "Sid": "UseRetentionKmsKey",
+      "Effect": "Allow",
+      "Action": [
+        "kms:Decrypt",
+        "kms:DescribeKey",
+        "kms:Encrypt",
+        "kms:GenerateDataKey",
+        "kms:ReEncryptFrom",
+        "kms:ReEncryptTo"
+      ],
+      "Resource": "arn:aws:kms:us-east-2:390258260780:key/2f45dc08-63d0-4415-8fff-f03be04f915c"
+    }
+  ]
+}

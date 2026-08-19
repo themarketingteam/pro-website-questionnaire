@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import mspSuccessDigitalLogoDataUrl from '@/assets/mspSuccessDigitalLogo';
+import { getRecoveryRequestErrorMessage } from '@/lib/draftRecoveryApi';
 import '@fontsource/plus-jakarta-sans/700.css';
 import '@fontsource/figtree/300.css';
 import '@fontsource/figtree/400.css';
@@ -37,13 +38,6 @@ const readSavedGrant = () => {
 };
 
 const getResponseData = (response) => response?.data ?? response;
-
-const getErrorMessage = (error, fallback) => (
-  error?.response?.data?.error
-  || error?.data?.error
-  || error?.message
-  || fallback
-);
 
 const getErrorStatus = (error) => error?.status || error?.response?.status;
 
@@ -88,7 +82,7 @@ export default function DraftRecoveryPasswordGate({ children }) {
           window.localStorage.removeItem(STORAGE_KEY);
         }
         setRecoveryGrant('');
-        setError(getErrorMessage(
+        setError(getRecoveryRequestErrorMessage(
           verifyError,
           'Unable to verify saved access. Please enter the password again.'
         ));
@@ -127,7 +121,7 @@ export default function DraftRecoveryPasswordGate({ children }) {
       setAccessState('authorized');
     } catch (submitError) {
       setPassword('');
-      setError(getErrorMessage(submitError, 'Incorrect password.'));
+      setError(getRecoveryRequestErrorMessage(submitError, 'Incorrect password.'));
     } finally {
       setSubmitting(false);
     }

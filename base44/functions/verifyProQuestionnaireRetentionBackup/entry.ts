@@ -1,6 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
-import { GetObjectCommand, S3Client } from "npm:@aws-sdk/client-s3@3.1112.0";
 import { secrets } from "base44:runtime";
+import { createS3Client, getBackupObjectBytes } from "./s3Read.ts";
 
 const SECRET_NAMES = [
   'RETENTION_S3_BUCKET',
@@ -24,20 +24,6 @@ const getBackupConfiguration = () => {
     accessKeyId: values.RETENTION_AWS_ACCESS_KEY_ID,
     secretAccessKey: values.RETENTION_AWS_SECRET_ACCESS_KEY
   };
-};
-const createS3Client = (configuration: ReturnType<typeof getBackupConfiguration>) => new S3Client({
-  region: configuration.region,
-  credentials: { accessKeyId: configuration.accessKeyId, secretAccessKey: configuration.secretAccessKey },
-  maxAttempts: 3
-});
-const getBackupObjectBytes = async ({ client, configuration, key, versionId }: any) => {
-  const response = await client.send(new GetObjectCommand({
-    Bucket: configuration.bucket,
-    Key: key,
-    ...(versionId ? { VersionId: versionId } : {})
-  }));
-  if (!response.Body) throw new Error('backup_object_body_missing');
-  return new Uint8Array(await response.Body.transformToByteArray());
 };
 const sha256Hex = async (value: Uint8Array) => {
   const digest = await crypto.subtle.digest('SHA-256', value);

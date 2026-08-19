@@ -1,6 +1,6 @@
 import { createClientFromRequest } from "npm:@base44/sdk";
-import { GetObjectCommand, S3Client } from "npm:@aws-sdk/client-s3@3.1112.0";
 import { secrets } from "base44:runtime";
+import { createS3Client, getBackupObjectText } from "./s3Read.ts";
 
 const SECRET_NAMES = [
   'RETENTION_S3_BUCKET',
@@ -25,20 +25,6 @@ const getBackupConfiguration = () => {
     secretAccessKey: values.RETENTION_AWS_SECRET_ACCESS_KEY
   };
 };
-const createS3Client = (configuration: ReturnType<typeof getBackupConfiguration>) => new S3Client({
-  region: configuration.region,
-  credentials: { accessKeyId: configuration.accessKeyId, secretAccessKey: configuration.secretAccessKey },
-  maxAttempts: 3
-});
-const getBackupObjectText = async ({ client, configuration, key, versionId }: any) => {
-  const response = await client.send(new GetObjectCommand({
-    Bucket: configuration.bucket,
-    Key: key,
-    ...(versionId ? { VersionId: versionId } : {})
-  }));
-  if (!response.Body) throw new Error('backup_object_body_missing');
-  return response.Body.transformToString();
-};
 const sha256Hex = async (value: string) => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -55,6 +41,7 @@ const RESTORABLE_ENTITIES = new Set([
   'ProFormIdentityResolutionAttempt',
   'ProFormIdentityResolutionRun'
 ]);
+const EVENT_BATCH_ENTITY = 'ProFormDraftEventBatch';
 const PRIMARY_ENTITIES = new Set(['ProFormDraft', 'ProFormSubmission', 'ProFormSubmissionIntake']);
 const SYSTEM_FIELDS = new Set(['id', 'created_date', 'updated_date', 'created_by', 'is_sample']);
 
@@ -71,6 +58,62 @@ const restorePayload = (record: Record<string, unknown>, sourceId: string, prima
   const payload = Object.fromEntries(Object.entries(record || {}).filter(([key]) => !SYSTEM_FIELDS.has(key)));
   if (primary) payload.retention_restore_source_id = sourceId;
   return payload;
+};
+
+const restoreEventBatch = async (entities: any, envelope: any, manifestId: string, apply: boolean) => {
+  const records = Array.isArray(envelope?.record?.records)
+    ? envelope.record.records.slice(0, 500)
+    : [];
+  if (records.length === 0) {
+    return jsonResponse({ success: false, error: 'The event backup batch is empty or invalid.' }, 409);
+  }
+  if (!apply) {
+    return jsonResponse({
+      success: true,
+      dryRun: true,
+      manifestId,
+      sourceEntity: EVENT_BATCH_ENTITY,
+      sourceRecordId: envelope.source_record_id,
+      recordCount: records.length,
+      decision: 'inspect_event_recovery_batch',
+      willOverwrite: false
+    });
+  }
+
+  let restoredCount = 0;
+  let existingCount = 0;
+  for (const record of records) {
+    const lookup = {
+      session_id: cleanId(record?.session_id),
+      event_type: cleanId(record?.event_type),
+      question_id: cleanId(record?.question_id),
+      created_at_iso: cleanId(record?.created_at_iso)
+    };
+    const matches = await entities.ProFormDraftEvent.filter(lookup, '-created_date', 1, 0, ['id']);
+    if (Array.isArray(matches) && matches.length > 0) {
+      existingCount += 1;
+      continue;
+    }
+    await entities.ProFormDraftEvent.create(restorePayload(record, cleanId(record?.id), false));
+    restoredCount += 1;
+  }
+  console.info('[Retention backup] event recovery batch applied', {
+    manifestId,
+    recordCount: records.length,
+    restoredCount,
+    existingCount
+  });
+  return jsonResponse({
+    success: true,
+    applied: true,
+    manifestId,
+    sourceEntity: EVENT_BATCH_ENTITY,
+    sourceRecordId: envelope.source_record_id,
+    recordCount: records.length,
+    restoredCount,
+    existingCount,
+    willOverwrite: false
+  });
 };
 
 export default async function (req: Request): Promise<Response> {
@@ -97,7 +140,8 @@ export default async function (req: Request): Promise<Response> {
   const entities = base44.asServiceRole.entities;
   try {
     const manifest = await entities.ProFormRetentionBackupManifest.get(manifestId);
-    if (!manifest || !RESTORABLE_ENTITIES.has(manifest.source_entity)) {
+    if (!manifest || (!RESTORABLE_ENTITIES.has(manifest.source_entity)
+      && manifest.source_entity !== EVENT_BATCH_ENTITY)) {
       return jsonResponse({ success: false, error: 'Restorable backup manifest not found.' }, 404);
     }
     const serialized = await getBackupObjectText({
@@ -116,6 +160,10 @@ export default async function (req: Request): Promise<Response> {
       || !envelope?.record
       || typeof envelope.record !== 'object') {
       return jsonResponse({ success: false, error: 'Backup envelope does not match its manifest.' }, 409);
+    }
+
+    if (manifest.source_entity === EVENT_BATCH_ENTITY) {
+      return restoreEventBatch(entities, envelope, manifestId, apply);
     }
 
     const entity = entities[manifest.source_entity];

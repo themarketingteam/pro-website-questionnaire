@@ -2,8 +2,43 @@ import { base44 } from '@/api/base44Client';
 
 const getResponseData = (response) => response?.data ?? response;
 
+const readableErrorValue = (value) => {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (value && typeof value === 'object') {
+    return readableErrorValue(value.message)
+      || readableErrorValue(value.error)
+      || readableErrorValue(value.detail);
+  }
+  return '';
+};
+
+export const getRecoveryRequestErrorMessage = (error, fallback = 'Unable to load recovery records.') => (
+  readableErrorValue(error?.response?.data?.error)
+  || readableErrorValue(error?.response?.data?.detail)
+  || readableErrorValue(error?.response?.data?.message)
+  || readableErrorValue(error?.data?.error)
+  || readableErrorValue(error?.data?.detail)
+  || readableErrorValue(error?.message)
+  || fallback
+);
+
+const invokeRecoveryFunction = async (functionName, payload, fallback) => {
+  try {
+    return await base44.functions.invoke(functionName, payload);
+  } catch (error) {
+    const normalizedError = new Error(getRecoveryRequestErrorMessage(error, fallback));
+    normalizedError.status = error?.response?.status || error?.status;
+    normalizedError.response = error?.response;
+    throw normalizedError;
+  }
+};
+
 const invokeRecoveryQuery = async (payload) => {
-  const response = await base44.functions.invoke('queryDraftRecoveryRecords', payload);
+  const response = await invokeRecoveryFunction(
+    'queryDraftRecoveryRecords',
+    payload,
+    'Unable to load recovery records.'
+  );
   const data = getResponseData(response);
 
   if (!data?.success) {
@@ -54,13 +89,13 @@ export const changeRecoveryRecordLifecycle = async ({
   action,
   reason = '',
 }) => {
-  const response = await base44.functions.invoke('manageRecoveryRecordLifecycle', {
+  const response = await invokeRecoveryFunction('manageRecoveryRecordLifecycle', {
     recoveryGrant,
     recordType,
     recordId,
     action,
     reason,
-  });
+  }, 'Unable to change the recovery record state.');
   const data = getResponseData(response);
   if (!data?.success) throw new Error(data?.error || 'Unable to change the recovery record state.');
   return data;
@@ -73,13 +108,13 @@ export const reviewIdentityCandidate = async ({
   decision,
   expectedFingerprint,
 }) => {
-  const response = await base44.functions.invoke('reviewProQuestionnaireIdentityCandidate', {
+  const response = await invokeRecoveryFunction('reviewProQuestionnaireIdentityCandidate', {
     recoveryGrant,
     attemptId,
     field,
     decision,
     expectedFingerprint,
-  });
+  }, 'Unable to review the identity candidate.');
   const data = getResponseData(response);
   if (!data?.success) {
     throw new Error(data?.error || 'Unable to review the identity candidate.');

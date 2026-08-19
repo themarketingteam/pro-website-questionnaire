@@ -838,13 +838,6 @@ export default function ProFormDraftRecovery() {
 
           <QuestionnaireIntakeRecovery recoveryGrant={recoveryGrant} />
 
-          <StandaloneSubmissionRecovery
-            recoveryGrant={recoveryGrant}
-            archiveState={archiveState}
-            search={debouncedSearch}
-            refreshKey={refreshKey}
-          />
-
           <section className="space-y-4" aria-labelledby="draft-records-title">
             <div className="draft-recovery-brand__list-heading">
               <h2 id="draft-records-title">Questionnaire Drafts</h2>
@@ -911,6 +904,13 @@ export default function ProFormDraftRecovery() {
               </>
             )}
           </section>
+
+          <StandaloneSubmissionRecovery
+            recoveryGrant={recoveryGrant}
+            archiveState={archiveState}
+            search={debouncedSearch}
+            refreshKey={refreshKey}
+          />
         </div>
       </div>
     </main>

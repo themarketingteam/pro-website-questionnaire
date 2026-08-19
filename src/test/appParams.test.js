@@ -33,11 +33,19 @@ describe('Base44 app parameters on the custom domain', () => {
     expect(localStorage.getItem('base44_functions_version')).toBeNull();
   });
 
-  it('allows version pinning only on Base44-owned preview hosts', async () => {
-    const { shouldUseFunctionsVersion } = await import('@/lib/app-params');
+  it('never pins the source-controlled app to an older backend function bundle', async () => {
+    const { shouldUseFunctionsVersion, resolveFunctionsVersion } = await import('@/lib/app-params');
 
     expect(shouldUseFunctionsVersion('app.base44.com')).toBe(true);
     expect(shouldUseFunctionsVersion('pro-website-questionnaire-2522b010.base44.app')).toBe(true);
     expect(shouldUseFunctionsVersion('proform.tmtwebsiteresources.xyz')).toBe(false);
+    expect(resolveFunctionsVersion({
+      hostname: 'pro-website-questionnaire-2522b010.base44.app',
+      search: ''
+    })).toBeNull();
+    expect(resolveFunctionsVersion({
+      hostname: 'pro-website-questionnaire-2522b010.base44.app',
+      search: '?functions_version=current-editor-version'
+    })).toBeNull();
   });
 });

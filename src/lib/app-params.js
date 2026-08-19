@@ -26,6 +26,19 @@ export const shouldUseFunctionsVersion = (hostname = '') => {
 		|| normalized.endsWith('.base44.app');
 };
 
+// A function version is an editor-preview routing hint, not durable app state.
+// Reusing a value from localStorage can pair a newly deployed UI with an older
+// backend bundle and make otherwise valid function payloads fail with HTTP 400.
+export const resolveFunctionsVersion = ({ hostname = '', search = '' } = {}) => {
+	// This source-controlled application always targets the latest deployed
+	// backend bundle. Allowing an editor/browser URL to pin an older function
+	// version can make the current UI send newly supported record types to an
+	// obsolete query function and produce HTTP 400 responses.
+	void hostname;
+	void search;
+	return null;
+};
+
 const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl = false } = {}) => {
 	if (isNode) {
 		return defaultValue;
@@ -58,13 +71,9 @@ const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl =
 const getAppParams = () => {
 	const functionsVersion = (() => {
 		if (isNode) return null;
-		if (!shouldUseFunctionsVersion(window.location.hostname)) {
-			// A version captured while using the Base44 editor must never pin the
-			// public custom domain to an older backend-function deployment.
-			storage.removeItem('base44_functions_version');
-			return null;
-		}
-		return getAppParamValue('functions_version');
+		// Never allow an editor version to survive navigation or a deployment.
+		storage.removeItem('base44_functions_version');
+		return null;
 	})();
 	return {
 		appId: getAppParamValue("app_id", {

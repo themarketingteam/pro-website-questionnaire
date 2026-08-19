@@ -70,15 +70,27 @@ describe('three-year questionnaire retention', () => {
 
   it('provides fingerprinted encrypted backups with dry-run-first non-overwriting restore', () => {
     const backup = readProjectFile('base44/functions/backupProQuestionnaireRetention/retentionBackup.ts');
+    const backupEntry = readProjectFile('base44/functions/backupProQuestionnaireRetention/entry.ts');
     const restore = readProjectFile('base44/functions/restoreProQuestionnaireRetentionBackup/entry.ts');
     const automation = readEntity('base44/functions/backupProQuestionnaireRetention/function.jsonc');
 
-    expect(backup).toContain("ServerSideEncryption: 'aws:kms'");
-    expect(backup).toContain('SSEKMSKeyId: configuration.kmsKeyId');
+    expect(backup).toContain("requestHeaders['x-amz-server-side-encryption'] = 'aws:kms'");
+    expect(backup).toContain("requestHeaders['x-amz-server-side-encryption-aws-kms-key-id'] = configuration.kmsKeyId");
+    expect(backup).toContain("'AWS4-HMAC-SHA256'");
     expect(backup).toContain("crypto.subtle.digest('SHA-256'");
+    expect(backup).toContain("safeKeyPart(businessName) || 'Business-Unknown'");
+    expect(backup).toContain('safeDatePart(draftStartedAt)');
+    expect(backup).toContain('folder_context: folderContext');
+    expect(backupEntry).toContain("entities[entityName].list(\n          '-updated_date'");
+    expect(backupEntry).toContain('SCHEDULED_RECENT_RECORDS_PER_ENTITY');
+    expect(backupEntry).toContain("const EVENT_BATCH_ENTITY = 'ProFormDraftEventBatch'");
+    expect(backupEntry).toContain('source_record_ids: records.map((record) => record.id)');
+    expect(backupEntry).not.toContain("watermarks[entityName] = { offset: 0 }");
     expect(restore).toContain('const apply = body?.apply === true');
     expect(restore).toContain("decision = existing");
     expect(restore).toContain("'blocked_newer_record'");
+    expect(restore).toContain("const EVENT_BATCH_ENTITY = 'ProFormDraftEventBatch'");
+    expect(restore).toContain('restoreEventBatch(entities, envelope, manifestId, apply)');
     expect(restore).not.toContain('.update(manifest.source_record_id');
     expect(automation.automations[0].cron_expression).toBe('30 8 * * *');
     expect(automation.automations[0].is_active).toBe(false);

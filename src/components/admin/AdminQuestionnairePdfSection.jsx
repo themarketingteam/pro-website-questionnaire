@@ -9,6 +9,7 @@ import {
   hashQuestionnairePdfSnapshot,
   stableQuestionnairePdfSnapshot
 } from '@/lib/questionnairePdfVersions';
+import { getRecoveryRequestErrorMessage } from '@/lib/draftRecoveryApi';
 
 const CURRENT_VALUES_OPTION = '__current_questionnaire_values__';
 
@@ -50,13 +51,6 @@ export const downloadStoredQuestionnairePdf = async ({ fileUrl, filename }) => {
     clickDownloadLink({ url: fileUrl, filename, openInNewTab: true });
   }
 };
-
-const getErrorMessage = (error) => (
-  error?.response?.data?.error
-  || error?.response?.data?.message
-  || error?.message
-  || 'Unable to download this questionnaire PDF.'
-);
 
 const formatVersionDate = (value) => {
   if (!value) return 'date unavailable';
@@ -134,7 +128,7 @@ export default function AdminQuestionnairePdfSection({
         console.error('[Admin questionnaire PDF] version list failed:', error);
         setVersions([]);
         setSelectedVersionId(CURRENT_VALUES_OPTION);
-        setLoadError(getErrorMessage(error));
+        setLoadError(getRecoveryRequestErrorMessage(error, 'Saved PDF versions could not be loaded.'));
       } finally {
         if (!cancelled) setIsLoadingVersions(false);
       }
@@ -215,7 +209,7 @@ export default function AdminQuestionnairePdfSection({
       toast.success(`PDF version ${savedVersion.version_number} saved and downloaded.`);
     } catch (error) {
       console.error('[Admin questionnaire PDF] download failed:', error);
-      toast.error(getErrorMessage(error));
+      toast.error(getRecoveryRequestErrorMessage(error, 'Unable to download this questionnaire PDF.'));
     } finally {
       inProgressRef.current = false;
       setIsGenerating(false);

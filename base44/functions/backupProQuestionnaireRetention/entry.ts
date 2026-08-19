@@ -10,7 +10,10 @@ import {
 
 const CHECKPOINT_KEY = 'pro-questionnaire-retention-v1';
 const DEFAULT_MAX_RECORDS = 15;
-const MAX_MANUAL_RECORDS = 100;
+const MAX_MANUAL_RECORDS = 450;
+const BACKUP_CONCURRENCY = 3;
+const SCHEDULED_RECENT_RECORDS_PER_ENTITY = 15;
+const EVENT_BATCH_ENTITY = 'ProFormDraftEventBatch';
 const ENTITY_NAMES = [
   'ProFormDraft',
   'ProFormSubmission',
@@ -30,6 +33,112 @@ const jsonResponse = (body: Record<string, unknown>, status = 200) => Response.j
 
 const safeParse = (value: unknown, fallback: any) => {
   try { return typeof value === 'string' && value ? JSON.parse(value) : fallback; } catch { return fallback; }
+};
+
+const wait = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+const isRetryableBase44Error = (error: any) => {
+  const status = Number(error?.status || error?.response?.status || error?.data?.status || 0);
+  const message = String(error?.message || error?.data?.message || '').toLowerCase();
+  return status === 429 || status >= 500 || message.includes('rate limit') || message.includes('too many requests');
+};
+
+const withBoundedRetry = async <T>(operation: () => Promise<T>): Promise<T> => {
+  let lastError: any = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try { return await operation(); } catch (error) {
+      lastError = error;
+      if (!isRetryableBase44Error(error) || attempt === 3) throw error;
+      await wait(500 * (2 ** attempt));
+    }
+  }
+  throw lastError;
+};
+
+const cleanFolderValue = (value: unknown, fallback = '') => (
+  typeof value === 'string' && value.trim() ? value.trim().slice(0, 300) : fallback
+);
+
+const directFolderContext = (record: any) => ({
+  businessName: cleanFolderValue(
+    record?.business_name
+      || record?.metadata?.business_name
+      || record?.business_name_original
+      || record?.business_name_candidate,
+    'Business-Unknown'
+  ),
+  draftStartedAt: cleanFolderValue(
+    record?.created_date
+      || record?.created_at_server
+      || record?.metadata?.submission_datetime
+      || record?.started_at
+      || record?.generated_at
+      || record?.occurred_at,
+    'date-unknown'
+  )
+});
+
+const getLinkedRecord = async (entities: any, recordType: string, recordId: string) => {
+  const entityName = recordType === 'draft'
+    ? 'ProFormDraft'
+    : recordType === 'intake'
+      ? 'ProFormSubmissionIntake'
+      : recordType === 'submission'
+        ? 'ProFormSubmission'
+        : '';
+  if (!entityName || !recordId) return null;
+  try { return await entities[entityName].get(recordId); } catch { return null; }
+};
+
+const resolveFolderContext = async (
+  entities: any,
+  entityName: string,
+  record: any,
+  cache: Map<string, any>
+) => {
+  let linked: any = null;
+  const relationKey = entityName === 'ProFormSubmission' && record?.metadata?.source_draft_id
+    ? `draft:${record.metadata.source_draft_id}`
+    : entityName === 'ProFormDraftRevision' && record?.draft_id
+      ? `draft:${record.draft_id}`
+      : entityName === 'ProFormDraftEvent' && record?.session_id
+        ? `session:${record.session_id}`
+        : entityName === 'QuestionnairePdfVersion'
+          ? `${record?.source_type}:${record?.source_id}`
+          : (entityName === 'ProFormRecoveryLifecycleEvent' || entityName === 'ProFormIdentityResolutionAttempt')
+            ? `${record?.record_type}:${record?.record_id}`
+            : '';
+  if (relationKey && cache.has(relationKey)) return cache.get(relationKey);
+
+  if (entityName === 'ProFormSubmission' && record?.metadata?.source_draft_id) {
+    linked = await getLinkedRecord(entities, 'draft', record.metadata.source_draft_id);
+  } else if (entityName === 'ProFormDraftRevision' && record?.draft_id) {
+    linked = await getLinkedRecord(entities, 'draft', record.draft_id);
+  } else if (entityName === 'ProFormDraftEvent' && record?.session_id) {
+    const matches = await entities.ProFormDraft.filter({ session_id: record.session_id }, 'created_date', 1);
+    linked = Array.isArray(matches) ? matches[0] : null;
+  } else if (entityName === 'QuestionnairePdfVersion') {
+    linked = await getLinkedRecord(entities, record?.source_type, record?.source_id);
+  } else if (entityName === 'ProFormRecoveryLifecycleEvent' || entityName === 'ProFormIdentityResolutionAttempt') {
+    linked = await getLinkedRecord(entities, record?.record_type, record?.record_id);
+  }
+
+  const direct = directFolderContext(record);
+  if (!linked) {
+    if (relationKey) cache.set(relationKey, direct);
+    return direct;
+  }
+  const linkedContext = directFolderContext(linked);
+  const context = {
+    businessName: linkedContext.businessName !== 'Business-Unknown'
+      ? linkedContext.businessName
+      : direct.businessName,
+    draftStartedAt: linkedContext.draftStartedAt !== 'date-unknown'
+      ? linkedContext.draftStartedAt
+      : direct.draftStartedAt
+  };
+  if (relationKey) cache.set(relationKey, context);
+  return context;
 };
 
 const getCheckpoint = async (entities: any) => {
@@ -52,23 +161,21 @@ const alreadyStored = async (entities: any, entityName: string, recordId: string
 };
 
 const nextRows = async (entity: any, state: any, wanted: number) => {
-  const timestamp = typeof state?.timestamp === 'string' && state.timestamp
-    ? state.timestamp
-    : '1970-01-01T00:00:00.000Z';
-  const knownIds = new Set(Array.isArray(state?.ids) ? state.ids : []);
-  const fetchLimit = Math.min(5000, Math.max(100, wanted + knownIds.size + 50));
-  const records = await entity.filter({ updated_date: { $gte: timestamp } }, 'updated_date', fetchLimit);
-  return (Array.isArray(records) ? records : []).filter((record) => (
-    record.updated_date !== timestamp || !knownIds.has(record.id)
-  ));
+  const offset = Number.isFinite(Number(state?.offset)) ? Math.max(0, Math.floor(Number(state.offset))) : 0;
+  const fetchLimit = Math.min(501, Math.max(2, wanted + 1));
+  // System updated_date cannot be filtered by Base44, and ordering by a value
+  // that changes during the backup can make offset pages overlap or skip rows.
+  // created_date is immutable, so it provides a stable checkpointed sweep.
+  const records = await entity.list('created_date', fetchLimit, offset);
+  return Array.isArray(records) ? records : [];
 };
 
 const advanceWatermark = (state: any, record: any) => {
-  const timestamp = record.updated_date || record.created_date || new Date().toISOString();
-  if (timestamp === state.timestamp) {
-    return { timestamp, ids: [...new Set([...(state.ids || []), record.id])].slice(-5000) };
-  }
-  return { timestamp, ids: [record.id] };
+  return {
+    offset: Math.max(0, Math.floor(Number(state?.offset) || 0)) + 1,
+    last_record_id: record.id,
+    last_record_updated_at: record.updated_date || record.created_date || ''
+  };
 };
 
 export default async function (req: Request): Promise<Response> {
@@ -113,80 +220,206 @@ export default async function (req: Request): Promise<Response> {
   try {
     const client = createS3Client(configuration);
     let remaining = maxRecords;
+    const folderContextCache = new Map<string, any>();
+
+    const storeManifest = async (entityName: string, record: any, stored: any) => (
+      withBoundedRetry(() => entities.ProFormRetentionBackupManifest.create({
+        source_entity: entityName,
+        source_record_id: record.id,
+        source_updated_at: record.updated_date || record.created_date || '',
+        record_fingerprint: stored.recordFingerprint,
+        object_checksum: stored.objectChecksum,
+        object_key: stored.key,
+        object_version_id: stored.versionId,
+        object_etag: stored.etag,
+        kms_key_id: configuration.kmsKeyId,
+        asset_manifest_json: JSON.stringify(stored.assets),
+        backup_status: 'stored',
+        backed_up_at: new Date().toISOString(),
+        verified_at: '',
+        verification_error: ''
+      }))
+    );
+
+    const processEventRows = async (selectedRows: any[]) => {
+      const grouped = new Map<string, any[]>();
+      selectedRows.forEach((record) => {
+        const groupKey = cleanFolderValue(record?.session_id)
+          || `${cleanFolderValue(record?.business_name, 'Business-Unknown')}:${String(record?.created_date || '').slice(0, 10)}`;
+        grouped.set(groupKey, [...(grouped.get(groupKey) || []), record]);
+      });
+      const outcomes: any[] = [];
+      for (const [groupKey, records] of grouped.entries()) {
+        const firstRecord = records[0];
+        const lastRecord = records[records.length - 1];
+        const batchRecord = {
+          id: `events-${firstRecord.id}-${lastRecord.id}`,
+          created_date: firstRecord.created_date || firstRecord.created_at_iso || '',
+          updated_date: lastRecord.updated_date || lastRecord.created_date || lastRecord.created_at_iso || '',
+          session_id: cleanFolderValue(firstRecord.session_id),
+          batch_group: groupKey,
+          record_count: records.length,
+          source_record_ids: records.map((record) => record.id),
+          records
+        };
+        try {
+          const fingerprint = await sha256Hex(stableStringify(batchRecord));
+          const exists = await withBoundedRetry(() => alreadyStored(
+            entities,
+            EVENT_BATCH_ENTITY,
+            batchRecord.id,
+            fingerprint
+          ));
+          if (exists) {
+            outcomes.push(...records.map((record) => ({ status: 'skipped', record })));
+            continue;
+          }
+          const folderContext = await resolveFolderContext(
+            entities,
+            'ProFormDraftEvent',
+            firstRecord,
+            folderContextCache
+          );
+          const stored = await backupRecordToS3({
+            client,
+            configuration,
+            entityName: EVENT_BATCH_ENTITY,
+            record: batchRecord,
+            folderContext
+          });
+          await storeManifest(EVENT_BATCH_ENTITY, batchRecord, stored);
+          outcomes.push(...records.map((record, index) => ({
+            status: 'stored',
+            record,
+            stored: index === 0 ? stored : null
+          })));
+        } catch (error) {
+          console.error('[Retention backup] event batch failed', {
+            firstRecordId: firstRecord.id,
+            lastRecordId: lastRecord.id,
+            recordCount: records.length,
+            name: error instanceof Error ? error.name : 'Error'
+          });
+          outcomes.push(...records.map((record) => ({ status: 'failed', record })));
+        }
+      }
+      return outcomes;
+    };
+
+    const processRows = async (entityName: string, selectedRows: any[]) => {
+      if (entityName === 'ProFormDraftEvent') return processEventRows(selectedRows);
+      const outcomes: any[] = [];
+      for (let index = 0; index < selectedRows.length; index += BACKUP_CONCURRENCY) {
+        const batch = selectedRows.slice(index, index + BACKUP_CONCURRENCY);
+        const batchOutcomes = await Promise.all(batch.map(async (record) => {
+          try {
+            const fingerprint = await sha256Hex(stableStringify(record));
+            if (await withBoundedRetry(() => alreadyStored(entities, entityName, record.id, fingerprint))) {
+              return { status: 'skipped', record };
+            }
+            const folderContext = await resolveFolderContext(
+              entities,
+              entityName,
+              record,
+              folderContextCache
+            );
+            const stored = await backupRecordToS3({
+              client,
+              configuration,
+              entityName,
+              record,
+              folderContext
+            });
+            await storeManifest(entityName, record, stored);
+            return { status: 'stored', record, stored };
+          } catch (error) {
+            console.error('[Retention backup] record failed', {
+              entityName,
+              recordId: record.id,
+              name: error instanceof Error ? error.name : 'Error'
+            });
+            return { status: 'failed', record };
+          }
+        }));
+        outcomes.push(...batchOutcomes);
+      }
+      return outcomes;
+    };
+
+    const collectOutcomeMetrics = (outcomes: any[]) => {
+      metrics.records_scanned += outcomes.length;
+      metrics.records_skipped += outcomes.filter((outcome) => outcome.status === 'skipped').length;
+      metrics.records_stored += outcomes.filter((outcome) => outcome.status === 'stored').length;
+      metrics.assets_stored += outcomes.reduce((count, outcome) => (
+        count + (outcome.stored?.assets || []).filter((asset: any) => asset.status === 'stored').length
+      ), 0);
+      const failedRecords = outcomes.filter((outcome) => outcome.status === 'failed').length;
+      metrics.provider_failures += failedRecords + outcomes.reduce((count, outcome) => (
+        count + (outcome.stored?.assets || []).filter((asset: any) => asset.status === 'failed').length
+      ), 0);
+      if (failedRecords > 0) metrics.remaining_backlog += failedRecords;
+      return failedRecords;
+    };
+
+    // The checkpoint sweep captures every newly appended record. A small
+    // newest-first scan also captures changed fingerprints for older drafts,
+    // submissions, PDFs, and audit rows without restarting the full history.
+    if (scheduled) {
+      for (const entityName of ENTITY_NAMES) {
+        // Draft events are immutable and are captured by the append-only
+        // checkpoint sweep in compact per-session batches.
+        if (entityName === 'ProFormDraftEvent') continue;
+        const recentRows = await withBoundedRetry(() => entities[entityName].list(
+          '-updated_date',
+          SCHEDULED_RECENT_RECORDS_PER_ENTITY,
+          0
+        ));
+        const outcomes = await processRows(entityName, Array.isArray(recentRows) ? recentRows : []);
+        collectOutcomeMetrics(outcomes);
+      }
+    }
 
     for (const entityName of ENTITY_NAMES) {
       if (remaining <= 0) { metrics.remaining_backlog += 1; break; }
       const entity = entities[entityName];
-      let state = watermarks[entityName] || { timestamp: '1970-01-01T00:00:00.000Z', ids: [] };
-      const rows = await nextRows(entity, state, remaining);
+      let state = watermarks[entityName] || { offset: 0 };
+      const rows = await withBoundedRetry(() => nextRows(entity, state, remaining));
       if (rows.length > remaining) metrics.remaining_backlog += 1;
 
-      for (const record of rows.slice(0, remaining)) {
-        metrics.records_scanned += 1;
-        const fingerprint = await sha256Hex(stableStringify(record));
-        if (await alreadyStored(entities, entityName, record.id, fingerprint)) {
-          metrics.records_skipped += 1;
-          state = advanceWatermark(state, record);
-          watermarks[entityName] = state;
-          remaining -= 1;
-          continue;
-        }
+      const selectedRows = rows.slice(0, remaining);
+      const outcomes = await processRows(entityName, selectedRows);
+      const failedRecords = collectOutcomeMetrics(outcomes);
 
-        try {
-          const stored = await backupRecordToS3({ client, configuration, entityName, record });
-          await entities.ProFormRetentionBackupManifest.create({
-            source_entity: entityName,
-            source_record_id: record.id,
-            source_updated_at: record.updated_date || record.created_date || '',
-            record_fingerprint: stored.recordFingerprint,
-            object_checksum: stored.objectChecksum,
-            object_key: stored.key,
-            object_version_id: stored.versionId,
-            object_etag: stored.etag,
-            kms_key_id: configuration.kmsKeyId,
-            asset_manifest_json: JSON.stringify(stored.assets),
-            backup_status: 'stored',
-            backed_up_at: new Date().toISOString(),
-            verified_at: '',
-            verification_error: ''
-          });
-          metrics.records_stored += 1;
-          metrics.assets_stored += stored.assets.filter((asset: any) => asset.status === 'stored').length;
-          metrics.provider_failures += stored.assets.filter((asset: any) => asset.status === 'failed').length;
-          state = advanceWatermark(state, record);
-          watermarks[entityName] = state;
-        } catch (error) {
-          metrics.provider_failures += 1;
-          console.error('[Retention backup] record failed', {
-            entityName,
-            recordId: record.id,
-            name: error instanceof Error ? error.name : 'Error'
-          });
-          metrics.remaining_backlog += 1;
-          break;
-        } finally {
-          remaining -= 1;
-        }
+      const firstFailure = outcomes.findIndex((outcome) => outcome.status === 'failed');
+      const safeAdvanceCount = firstFailure === -1 ? outcomes.length : firstFailure;
+      for (const outcome of outcomes.slice(0, safeAdvanceCount)) {
+        state = advanceWatermark(state, outcome.record);
       }
+      watermarks[entityName] = state;
+      remaining -= outcomes.length;
     }
+
+    // Keep end-of-list offsets in place. Newly created records are appended to
+    // the immutable created_date ordering, while the scheduled newest-first
+    // scan above independently captures changes to older retained records.
 
     const completedAt = new Date();
     const status = metrics.provider_failures > 0 ? 'partial' : 'completed';
-    await upsertCheckpoint(entities, checkpoint, {
+    await withBoundedRetry(() => upsertCheckpoint(entities, checkpoint, {
       watermarks_json: JSON.stringify(watermarks),
       last_started_at: startedAt.toISOString(),
       last_completed_at: completedAt.toISOString(),
       last_status: status,
       remaining_backlog: metrics.remaining_backlog,
       last_error: ''
-    });
-    await entities.ProFormRetentionRun.update(run.id, {
+    }));
+    await withBoundedRetry(() => entities.ProFormRetentionRun.update(run.id, {
       status,
       completed_at: completedAt.toISOString(),
       ...metrics,
       duration_ms: completedAt.getTime() - startedAt.getTime(),
       error_code: ''
-    });
+    }));
     console.info('[Retention backup] run complete', { trigger, status, ...metrics });
     return jsonResponse({ success: true, configured: true, trigger, status, ...metrics });
   } catch (error) {

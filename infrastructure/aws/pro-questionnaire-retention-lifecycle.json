@@ -1,0 +1,17 @@
+{
+  "Rules": [
+    {
+      "ID": "RetainProQuestionnaireBackupVersionsForThreeYears",
+      "Status": "Enabled",
+      "Filter": {
+        "Prefix": "contentDraftEntry/"
+      },
+      "NoncurrentVersionExpiration": {
+        "NoncurrentDays": 1095
+      },
+      "AbortIncompleteMultipartUpload": {
+        "DaysAfterInitiation": 7
+      }
+    }
+  ]
+}

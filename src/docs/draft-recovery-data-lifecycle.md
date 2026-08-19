@@ -30,6 +30,10 @@ The policy never automatically deletes records. Soft-deleted records remain reta
 
 `backupProQuestionnaireRetention` incrementally writes immutable, fingerprinted record envelopes and referenced PDF/image/file binaries to the configured company S3 bucket. Each object uses SSE-KMS and receives a SHA-256 integrity hash. `verifyProQuestionnaireRetentionBackup` validates record and binary hashes; `restoreProQuestionnaireRetentionBackup` defaults to a dry run and refuses to overwrite an existing or newer database record.
 
+Objects use the key layout `contentDraftEntry/<Business_Name>/<YYYY-MM-DD>/...`. The date is the original draft creation date whenever the record can be linked to its draft. Records without resolvable business or start-date context use explicit `Business-Unknown` or `date-unknown` folders so they are never skipped.
+
+Drafts, submissions, intakes, revisions, PDF versions, and lifecycle records are stored as individual immutable envelopes. The high-volume, immutable `ProFormDraftEvent` audit stream is stored in per-session batches under the same business/date folder; each batch contains every source event ID and complete event record, and its protected restore path recreates only missing events.
+
 The daily `08:30 UTC` schedule is intentionally inactive until all six secrets are configured and an administrator completes and reconciles the initial full backup:
 
 - `RETENTION_S3_BUCKET`
