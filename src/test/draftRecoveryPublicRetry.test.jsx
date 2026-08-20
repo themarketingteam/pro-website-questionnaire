@@ -25,7 +25,7 @@ describe('public draft recovery actions', () => {
     intakeRecords = [];
     submissionRecords = [];
     base44.functions.invoke.mockImplementation(async (name, payload = {}) => {
-      if (name === 'queryDraftRecoveryRecords') {
+      if (name === 'queryProQuestionnaireRecoveryRecords') {
         const source = payload.recordType === 'intake'
           ? intakeRecords
           : (payload.recordType === 'submission' ? submissionRecords : draftRecords);
@@ -90,7 +90,7 @@ describe('public draft recovery actions', () => {
     expect(screen.getByRole('combobox', { name: 'Record set filter' })).toHaveTextContent('Active Records');
     await waitFor(() => {
       expect(base44.functions.invoke).toHaveBeenCalledWith(
-        'queryDraftRecoveryRecords',
+        'queryProQuestionnaireRecoveryRecords',
         expect.objectContaining({
           recordType: 'draft',
           page: 1,
@@ -107,7 +107,7 @@ describe('public draft recovery actions', () => {
 
     await waitFor(() => {
       expect(base44.functions.invoke).toHaveBeenCalledWith(
-        'queryDraftRecoveryRecords',
+        'queryProQuestionnaireRecoveryRecords',
         expect.objectContaining({
           action: 'list',
           recordType: 'intake',
@@ -140,7 +140,7 @@ describe('public draft recovery actions', () => {
     expect(await screen.findByRole('region', { name: 'Stored Final Submission Payload' })).toHaveTextContent('Stored Final Submission Payload');
     expect(screen.getAllByText('historical.example').length).toBeGreaterThan(0);
     expect(base44.functions.invoke).toHaveBeenCalledWith(
-      'queryDraftRecoveryRecords',
+      'queryProQuestionnaireRecoveryRecords',
       expect.objectContaining({
         action: 'list',
         recordType: 'submission',
@@ -205,7 +205,7 @@ describe('public draft recovery actions', () => {
 
   it('requests server-filtered draft pages without using direct entity list reads', async () => {
     base44.functions.invoke.mockImplementation(async (name, payload = {}) => {
-      if (name !== 'queryDraftRecoveryRecords') return { data: { success: true } };
+      if (name !== 'queryProQuestionnaireRecoveryRecords') return { data: { success: true } };
       if (payload.recordType === 'intake' || payload.recordType === 'submission') {
         return { data: { success: true, records: [], hasMore: false, hasAnyRecords: false } };
       }
@@ -232,7 +232,7 @@ describe('public draft recovery actions', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(await screen.findByText('Second Page Client')).toBeInTheDocument();
     expect(base44.functions.invoke).toHaveBeenCalledWith(
-      'queryDraftRecoveryRecords',
+      'queryProQuestionnaireRecoveryRecords',
       expect.objectContaining({
         action: 'list',
         recordType: 'draft',
@@ -250,7 +250,7 @@ describe('public draft recovery actions', () => {
     );
     await waitFor(() => {
       expect(base44.functions.invoke).toHaveBeenCalledWith(
-        'queryDraftRecoveryRecords',
+        'queryProQuestionnaireRecoveryRecords',
         expect.objectContaining({
           action: 'list',
           recordType: 'draft',

@@ -58,7 +58,7 @@ describe('three-year questionnaire retention', () => {
   });
 
   it('exposes protected standalone submissions and excludes linked duplicates', () => {
-    const source = readProjectFile('base44/functions/queryDraftRecoveryRecords/entry.ts');
+    const source = readProjectFile('base44/functions/queryProQuestionnaireRecoveryRecords/entry.ts');
 
     expect(source).toContain("submission: {");
     expect(source).toContain("entityName: 'ProFormSubmission'");

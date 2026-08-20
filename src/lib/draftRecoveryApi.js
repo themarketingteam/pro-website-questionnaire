@@ -35,7 +35,7 @@ const invokeRecoveryFunction = async (functionName, payload, fallback) => {
 
 const invokeRecoveryQuery = async (payload) => {
   const response = await invokeRecoveryFunction(
-    'queryDraftRecoveryRecords',
+    'queryProQuestionnaireRecoveryRecords',
     payload,
     'Unable to load recovery records.'
   );

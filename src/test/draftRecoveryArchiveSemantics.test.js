@@ -6,7 +6,7 @@ const readProjectFile = (path) => readFileSync(resolve(process.cwd(), path), 'ut
 
 describe('draft recovery archive-state semantics', () => {
   it('treats missing, null, and blank archive values as active records', () => {
-    const source = readProjectFile('base44/functions/queryDraftRecoveryRecords/entry.ts');
+    const source = readProjectFile('base44/functions/queryProQuestionnaireRecoveryRecords/entry.ts');
 
     expect(source).toContain("if (archiveState === 'active')");
     expect(source).toContain('{ archived_at: { $exists: false } }');
@@ -15,7 +15,7 @@ describe('draft recovery archive-state semantics', () => {
   });
 
   it('requires a real nonblank archive value for archived records', () => {
-    const source = readProjectFile('base44/functions/queryDraftRecoveryRecords/entry.ts');
+    const source = readProjectFile('base44/functions/queryProQuestionnaireRecoveryRecords/entry.ts');
 
     expect(source).toContain("if (archiveState === 'archived')");
     expect(source).toContain('{ archived_at: { $ne: null } }');

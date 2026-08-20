@@ -1,5 +1,5 @@
 const query = async (payload: any) => {
-  const response = await base44.functions.invoke('queryDraftRecoveryRecords', payload);
+  const response = await base44.functions.invoke('queryProQuestionnaireRecoveryRecords', payload);
   return response?.data ?? response;
 };
 const collect = async (recordType: string, archiveState: string) => {

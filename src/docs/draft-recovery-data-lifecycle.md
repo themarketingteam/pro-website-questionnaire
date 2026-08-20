@@ -2,7 +2,7 @@
 
 ## Admin reads
 
-The draft-recovery page reads `ProFormDraft`, `ProFormSubmissionIntake`, and standalone `ProFormSubmission` records through the protected `queryDraftRecoveryRecords` backend function.
+The draft-recovery page reads `ProFormDraft`, `ProFormSubmissionIntake`, and standalone `ProFormSubmission` records through the protected `queryProQuestionnaireRecoveryRecords` backend function.
 
 - List requests are filtered and paginated on the server.
 - The UI requests 25 records per page; the backend enforces a maximum of 50.
