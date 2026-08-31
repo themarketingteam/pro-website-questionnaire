@@ -1,0 +1,82 @@
+{
+  "type": "object",
+  "name": "ProFormRetentionBackupManifest",
+  "properties": {
+    "source_entity": {
+      "type": "string"
+    },
+    "source_record_id": {
+      "type": "string"
+    },
+    "source_updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "record_fingerprint": {
+      "type": "string"
+    },
+    "object_checksum": {
+      "type": "string"
+    },
+    "object_key": {
+      "type": "string"
+    },
+    "object_version_id": {
+      "type": "string"
+    },
+    "object_etag": {
+      "type": "string"
+    },
+    "kms_key_id": {
+      "type": "string"
+    },
+    "asset_manifest_json": {
+      "type": "string"
+    },
+    "backup_status": {
+      "type": "string",
+      "enum": [
+        "stored",
+        "verified",
+        "failed"
+      ]
+    },
+    "backed_up_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "verified_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "verification_error": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "source_entity",
+    "source_record_id",
+    "record_fingerprint",
+    "object_key",
+    "backup_status",
+    "backed_up_at"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": false
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "type": "object",
+  "name": "ProFormRecoveryLifecycleEvent",
+  "properties": {
+    "record_type": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "intake",
+        "submission"
+      ]
+    },
+    "record_id": {
+      "type": "string"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "soft_delete",
+        "restore",
+        "archive",
+        "reactivate"
+      ]
+    },
+    "actor_mode": {
+      "type": "string"
+    },
+    "actor_identifier": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "previous_state_json": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "record_type",
+    "record_id",
+    "action",
+    "occurred_at"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": false,
+    "delete": false
+  }
+}

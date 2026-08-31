@@ -19,6 +19,7 @@
   "voice_config": {
     "voice_id": null
   },
+  "emails_settings": null,
   "allow_anonymous_access": false,
   "name": "form_qa_validator"
 }
