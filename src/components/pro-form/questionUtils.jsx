@@ -43,6 +43,50 @@ export function getAllQuestionIds(QUESTIONS) {
   return ids;
 }
 
+// Build a complete, boolean-only expansion map so QuestionWrapper and
+// conditional-child rendering never interpret a missing key differently.
+// Older drafts can contain child expansion keys without the parent key. When
+// that legacy shape belongs to an answered "yes" branch, reveal the branch so
+// the client is not left with a selected answer and inaccessible follow-ups.
+export function normalizeExpandedQuestionState(QUESTIONS, responses = {}, expandedQuestions = {}) {
+  if (!Array.isArray(QUESTIONS)) return {};
+
+  const source = expandedQuestions && typeof expandedQuestions === 'object'
+    ? expandedQuestions
+    : {};
+  const answers = responses && typeof responses === 'object' ? responses : {};
+  const next = {};
+
+  QUESTIONS.forEach((question) => {
+    const children = Array.isArray(question.conditionalChildren)
+      ? question.conditionalChildren
+      : [];
+    const hasParentState = Object.prototype.hasOwnProperty.call(source, question.id);
+    const repairLegacyYesBranch = (
+      !hasParentState
+      && children.length > 0
+      && answers[question.id] === 'yes'
+    );
+
+    next[question.id] = hasParentState
+      ? source[question.id] === true
+      : repairLegacyYesBranch;
+
+    children.forEach((child) => {
+      const hasChildState = Object.prototype.hasOwnProperty.call(source, child.id);
+      if (repairLegacyYesBranch) {
+        next[child.id] = true;
+      } else if (hasChildState) {
+        next[child.id] = source[child.id] === true;
+      } else {
+        next[child.id] = answers[question.id] === 'yes' && next[question.id] === true;
+      }
+    });
+  });
+
+  return next;
+}
+
 export function isChildQuestion(questionId) {
   return String(questionId || '').includes('.');
 }

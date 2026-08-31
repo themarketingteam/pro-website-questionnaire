@@ -43,7 +43,13 @@ const ReduxDataValidator = lazy(() => import('@/components/pro-form/ReduxDataVal
 import ErrorBoundary from '@/components/common/ErrorBoundary';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import { trackValidationDispatch, trackParentStatusChange, devDiagEnabled } from '@/lib/devDiagnostics';
-import { getQuestionById, getParentQuestionByChildId, getAllQuestionIds, isChildQuestion } from '@/components/pro-form/questionUtils';
+import {
+  getQuestionById,
+  getParentQuestionByChildId,
+  getAllQuestionIds,
+  isChildQuestion,
+  normalizeExpandedQuestionState
+} from '@/components/pro-form/questionUtils';
 import {
   REQUIRE_AI_TEXT_VALIDATION_FOR_SUBMISSION,
   hasNonEmptyTextValue
@@ -237,20 +243,18 @@ export default function ProQuestionnaire() {
   useEffect(() => {
     if (!isDraftReady) return;
     try {
-      // Only initialize if not already initialized
-      if (Object.keys(expandedQuestions).length === 0) {
-        const expanded = {};
-        QUESTIONS.forEach(q => {
-          expanded[q.id] = false;
-          if (q.conditionalChildren) {
-            q.conditionalChildren.forEach(child => {
-              expanded[child.id] = false;
-            });
-          }
+      const normalizedExpandedQuestions = normalizeExpandedQuestionState(
+        QUESTIONS,
+        responses,
+        expandedQuestions
+      );
+      if (JSON.stringify(normalizedExpandedQuestions) !== JSON.stringify(expandedQuestions)) {
+        dispatch(initializeExpandedQuestions(normalizedExpandedQuestions));
+        queueDraftSave([], responses, {
+          expandedQuestions: normalizedExpandedQuestions,
+          delayMs: 0,
+          source: 'expanded_state_repair'
         });
-        if (initializeExpandedQuestions) {
-          dispatch(initializeExpandedQuestions(expanded));
-        }
       }
 
       // Check if there's any actual user data
@@ -485,6 +489,22 @@ export default function ProQuestionnaire() {
 
     // Textarea dirtiness invalidation: if a textarea that had a validated status is edited, mark dirty and clear its redux validation
     const q = getQuestionById(QUESTIONS, questionId);
+    let nextExpandedQuestions = expandedQuestions;
+    if (q?.type === 'yes_no' && Array.isArray(q.conditionalChildren)) {
+      const conditionalExpansion = {
+        ...expandedQuestions,
+        [questionId]: true
+      };
+      q.conditionalChildren.forEach((child) => {
+        conditionalExpansion[child.id] = value === 'yes';
+      });
+      nextExpandedQuestions = normalizeExpandedQuestionState(
+        QUESTIONS,
+        { ...responses, [questionId]: value },
+        conditionalExpansion
+      );
+      dispatch(initializeExpandedQuestions(nextExpandedQuestions));
+    }
 
     if (
       (q?.type === 'text' || q?.type === 'textarea') &&
@@ -538,6 +558,7 @@ export default function ProQuestionnaire() {
       newResponses,
       {
         deletedKeys: relatedDeletedKeys,
+        expandedQuestions: nextExpandedQuestions,
         currentQuestionId: questionId,
         delayMs: isTypingField ? 650 : 120
       }
@@ -606,6 +627,7 @@ export default function ProQuestionnaire() {
   }, [
     dispatch,
     responses,
+    expandedQuestions,
     hasTrackedStart,
     validationStatus,
     credentials.domain,
@@ -1676,7 +1698,7 @@ export default function ProQuestionnaire() {
 
   const renderConditionalChildren = (parent) => {
     // Hide children if parent is collapsed OR if answer is not "yes"
-    if (!parent.conditionalChildren || responses[parent.id] !== 'yes' || !expandedQuestions[parent.id]) {
+    if (!parent.conditionalChildren || responses[parent.id] !== 'yes' || expandedQuestions[parent.id] === false) {
       return null;
     }
 
@@ -1691,7 +1713,7 @@ export default function ProQuestionnaire() {
               why={child.why}
               examples={child.examples}
               isCollapsible={true}
-              isExpanded={expandedQuestions[child.id]}
+              isExpanded={expandedQuestions[child.id] !== false}
               onToggle={() => toggleQuestion(child.id)}
               required={child.requiredIfParentYes}
               onReset={() => resetQuestion(child.id)}
@@ -1784,7 +1806,7 @@ export default function ProQuestionnaire() {
                                   why={q.why}
                                   examples={q.examples}
                                   isCollapsible={true}
-                                  isExpanded={expandedQuestions[q.id]}
+                                  isExpanded={expandedQuestions[q.id] !== false}
                                   onToggle={() => toggleQuestion(q.id)}
                                   onReset={() => resetQuestion(q.id)}
                                   hasAnswer={!!responses[q.id] || !!responses[`${q.id}_other`]}
@@ -1847,7 +1869,7 @@ export default function ProQuestionnaire() {
                       why={question.why}
                       examples={question.examples}
                       isCollapsible={true}
-                      isExpanded={expandedQuestions[question.id]}
+                      isExpanded={expandedQuestions[question.id] !== false}
                       onToggle={() => toggleQuestion(question.id)}
                       onReset={() => resetQuestion(question.id)}
                       hasAnswer={!!responses[question.id] || !!responses[`${question.id}_other`]}

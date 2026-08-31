@@ -1,5 +1,9 @@
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
-import { getAllQuestionIds, getQuestionById } from '@/components/pro-form/questionUtils';
+import {
+  getAllQuestionIds,
+  getQuestionById,
+  normalizeExpandedQuestionState
+} from '@/components/pro-form/questionUtils';
 import { canonicalizeServiceSelectionState } from '@/lib/serviceSelectionModel';
 
 function uniqArray(arr) {
@@ -65,13 +69,16 @@ export function normalizePersistedState(state) {
       next.responses['12'] = legacyCertYesNo;
     }
   }
-  // Remove legacy mirror fields post-migration across all slices
-  ['1.2', '1.2.1'].forEach((legacyId) => {
-    if (legacyId in next.responses) delete next.responses[legacyId];
-    if (legacyId in next.validationStatus) delete next.validationStatus[legacyId];
-    if (legacyId in next.touchedQuestions) delete next.touchedQuestions[legacyId];
-    if (legacyId in next.expandedQuestions) delete next.expandedQuestions[legacyId];
-  });
+  // 1.2 is now an active informational child. Only its obsolete yes/no
+  // response is a legacy mirror; its current UI state must be preserved.
+  if (legacyCertYesNo === 'yes' || legacyCertYesNo === 'no') {
+    delete next.responses['1.2'];
+  }
+  // 1.2.1 is no longer in the active schema and can be fully removed.
+  if ('1.2.1' in next.responses) delete next.responses['1.2.1'];
+  if ('1.2.1' in next.validationStatus) delete next.validationStatus['1.2.1'];
+  if ('1.2.1' in next.touchedQuestions) delete next.touchedQuestions['1.2.1'];
+  if ('1.2.1' in next.expandedQuestions) delete next.expandedQuestions['1.2.1'];
 
   // STAGE 2 — Schema cleanup: remove unknown keys across slices (after migration)
   Object.keys(next.responses).forEach((k) => {
@@ -325,6 +332,12 @@ export function normalizePersistedStateV3(state) {
   };
   fixOptional('23', '23.1');
   fixOptional('25', '25.1');
+
+  next.expandedQuestions = normalizeExpandedQuestionState(
+    QUESTIONS,
+    next.responses,
+    next.expandedQuestions
+  );
 
   return next;
 }

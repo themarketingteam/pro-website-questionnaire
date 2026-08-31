@@ -5,6 +5,8 @@ import userEvent from '@testing-library/user-event';
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
 import { renderWithStore } from './utils/renderWithStore';
 import { QUESTIONS } from '@/components/pro-form/questionData';
+import { normalizeExpandedQuestionState } from '@/components/pro-form/questionUtils';
+import { normalizePersistedStateV3 } from '@/components/store/normalization';
 import { formatAnswerForDisplay } from '@/components/pro-form/answerFormatting';
 import {
   normalizeCertifications,
@@ -99,6 +101,73 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     vi.useRealTimers();
   });
 
+  it('repairs legacy Yes branches whose parent expansion key is missing', () => {
+    const expanded = normalizeExpandedQuestionState(
+      QUESTIONS,
+      { '1': 'yes' },
+      { '1.1': false }
+    );
+
+    expect(expanded['1']).toBe(true);
+    expect(expanded['1.1']).toBe(true);
+    expect(expanded['1.2']).toBe(true);
+
+    const restored = normalizePersistedStateV3({
+      responses: { '1': 'yes' },
+      validationStatus: { '1': 'incomplete' },
+      touchedQuestions: { '1': true },
+      expandedQuestions: { '1.1': false },
+      textValidationMeta: {}
+    });
+
+    expect(restored.expandedQuestions['1']).toBe(true);
+    expect(restored.expandedQuestions['1.1']).toBe(true);
+    expect(restored.expandedQuestions['1.2']).toBe(true);
+  });
+
+  it('opens and durably saves every Q1 child when Yes is selected', async () => {
+    const user = setupUser();
+    const preloaded = {
+      form: {
+        responses: { '6': 'Existing questionnaire response' },
+        validationStatus: {},
+        touchedQuestions: {},
+        expandedQuestions: { '1': true },
+        credentials: {}
+      }
+    };
+
+    const { store } = renderWithStore(<ProQuestionnaire />, { preloadedState: preloaded });
+    const question = await screen.findByTestId('question-wrapper-1');
+    await user.click(within(question).getByRole('radio', { name: 'Yes' }));
+
+    expect(await screen.findByTestId('question-wrapper-1.1')).toBeInTheDocument();
+    expect(await screen.findByTestId('question-wrapper-1.2')).toBeInTheDocument();
+    expect(store.getState().form.expandedQuestions['1']).toBe(true);
+    expect(store.getState().form.expandedQuestions['1.1']).toBe(true);
+    expect(store.getState().form.expandedQuestions['1.2']).toBe(true);
+
+    await user.click(within(question).getByRole('radio', { name: 'No' }));
+    expect(screen.queryByTestId('question-wrapper-1.1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('question-wrapper-1.2')).not.toBeInTheDocument();
+
+    await user.click(within(question).getByRole('radio', { name: 'Yes' }));
+    expect(await screen.findByTestId('question-wrapper-1.1')).toBeInTheDocument();
+    expect(await screen.findByTestId('question-wrapper-1.2')).toBeInTheDocument();
+
+    await waitFor(() => {
+      const savedOpenBranch = base44.functions.invoke.mock.calls.some(([name, payload]) => (
+        name === 'syncProQuestionnaireDraft'
+        && payload?.action === 'save'
+        && payload?.responses?.['1'] === 'yes'
+        && payload?.expandedQuestions?.['1'] === true
+        && payload?.expandedQuestions?.['1.1'] === true
+        && payload?.expandedQuestions?.['1.2'] === true
+      ));
+      expect(savedOpenBranch).toBe(true);
+    });
+  });
+
   it('Q23 answered Yes, then 23.1 expanded: renders without crash or loop', async () => {
     const preloaded = {
       form: {
@@ -186,7 +255,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     const user = setupUser();
     const preloaded = {
       form: {
-        responses: {},
+        responses: { '6': 'Existing questionnaire response' },
         validationStatus: {},
         touchedQuestions: {},
         expandedQuestions: { '24': true },
@@ -208,7 +277,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     const user = setupUser();
     const preloaded = {
       form: {
-        responses: {},
+        responses: { '6': 'Existing questionnaire response' },
         validationStatus: {},
         touchedQuestions: {},
         expandedQuestions: { '24': true },

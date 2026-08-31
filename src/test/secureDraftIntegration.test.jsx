@@ -54,7 +54,13 @@ describe('secure questionnaire draft integration', () => {
     base44.functions.invoke.mockImplementation(async (name, payload) => {
       if (name !== 'syncProQuestionnaireDraft') return { data: { success: true } };
       if (payload.action === 'bootstrap') {
-        return { data: { success: true, resumeCredential: CREDENTIAL, draft: draftResponse() } };
+        return {
+          data: {
+            success: true,
+            resumeCredential: CREDENTIAL,
+            draft: draftResponse({ expandedQuestions: { '6': true } })
+          }
+        };
       }
       if (payload.action === 'save') {
         Object.assign(stored, payload.responses);
