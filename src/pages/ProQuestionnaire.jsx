@@ -120,10 +120,15 @@ export default function ProQuestionnaire() {
     isDraftReady,
     draftSaveState,
     lastSavedAt,
+    lastConfirmedRevision,
+    hasLocalRecoveryCopy,
+    draftConnection,
     questionnaireSessionId,
     restoredQuestionId,
     queueDraftSave,
     saveDraftNow,
+    updateDraftIdentity,
+    retryDraftBootstrap,
     createDraftEvent: persistDraftEvent
   } = useSecureQuestionnaireDraft({
     base44,
@@ -1483,6 +1488,16 @@ export default function ProQuestionnaire() {
     }
   };
 
+  const handleDraftIdentityChange = useCallback(({ businessName, domain }) => {
+    const nextCredentials = {
+      ...credentials,
+      businessName,
+      domain
+    };
+    dispatch(setCredentials(nextCredentials));
+    updateDraftIdentity(nextCredentials, { delayMs: 300 });
+  }, [credentials, dispatch, updateDraftIdentity]);
+
 
 
   // Determine background color based on selection balance
@@ -1734,14 +1749,38 @@ export default function ProQuestionnaire() {
   };
 
   if (!isDraftReady) {
+    const connectionFailed = Boolean(draftConnection.error);
     return (
       <ErrorBoundary>
         <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
           <FormHeader />
           <main className="min-h-[50vh] flex items-center justify-center px-6" aria-live="polite">
-            <div className="flex items-center gap-3 text-[#122947] font-semibold">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Restoring your saved questionnaire…
+            <div className="max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-lg text-center">
+              <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-blue-50">
+                {connectionFailed
+                  ? <AlertCircle className="h-5 w-5 text-amber-600" />
+                  : <Loader2 className="h-5 w-5 animate-spin text-[#1E6BA8]" />}
+              </div>
+              <h1 className="text-lg font-bold text-[#122947]">
+                {connectionFailed ? 'Reconnecting secure draft saving…' : 'Restoring your saved questionnaire…'}
+              </h1>
+              <p className="mt-2 text-sm text-slate-600">
+                {connectionFailed
+                  ? 'The questionnaire will open as soon as the database confirms that your answers can be saved. Your browser is retrying automatically.'
+                  : 'Please wait while we establish a secure database draft for your answers.'}
+              </p>
+              {connectionFailed && (
+                <button
+                  type="button"
+                  onClick={retryDraftBootstrap}
+                  className="mt-5 inline-flex min-h-[44px] items-center justify-center rounded-lg bg-[#1E6BA8] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#175789]"
+                >
+                  Retry now
+                </button>
+              )}
+              {draftConnection.attempt > 0 && (
+                <p className="mt-3 text-xs text-slate-500">Connection attempt {draftConnection.attempt}</p>
+              )}
             </div>
           </main>
         </div>
@@ -1956,6 +1995,8 @@ export default function ProQuestionnaire() {
         show={showAutoSave}
         status={draftSaveState}
         lastSavedAt={lastSavedAt}
+        lastConfirmedRevision={lastConfirmedRevision}
+        hasLocalRecoveryCopy={hasLocalRecoveryCopy}
       />
       <Suspense fallback={null}>
         <ReduxDataValidator />
@@ -1967,9 +2008,10 @@ export default function ProQuestionnaire() {
             formData={responses}
             onConfirm={handleConfirmSubmit}
             onCancel={() => setShowConfirmModal(false)}
+            onIdentityChange={handleDraftIdentityChange}
             isSubmitting={isSubmitting}
-            initialBusinessName={businessNameParam}
-            initialDomain={domainParam}
+            initialBusinessName={businessNameParam || credentials.businessName || ''}
+            initialDomain={domainParam || credentials.domain || ''}
           />
         </Suspense>
       )}

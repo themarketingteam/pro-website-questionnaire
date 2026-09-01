@@ -269,6 +269,11 @@ export const submitProQuestionnaire = async ({
     : {};
   const recoveryCode = questionnaireSessionId || 'unknown-session';
   const resolvedDomain = domain || credentials?.domain || domainParam || 'unknown';
+  const submissionCredentials = {
+    ...(credentials || {}),
+    businessName: businessName || credentials?.businessName || '',
+    domain: domain || credentials?.domain || domainParam || ''
+  };
   const submitContext = getSafeSubmitContext({
     business_name: businessName,
     domain: domain || credentials?.domain || domainParam || null,
@@ -327,6 +332,7 @@ export const submitProQuestionnaire = async ({
       validationStatusSnapshot: validationStatus,
       touchedQuestionsSnapshot: touchedQuestions,
       expandedQuestionsSnapshot: expandedQuestions,
+      credentialsSnapshot: submissionCredentials,
       required: true,
       source: 'final_submission_barrier'
     });
@@ -352,6 +358,7 @@ export const submitProQuestionnaire = async ({
       validationStatusSnapshot: validationStatus,
       touchedQuestionsSnapshot: touchedQuestions,
       expandedQuestionsSnapshot: expandedQuestions,
+      credentialsSnapshot: submissionCredentials,
       required: true,
       source: receivedViaIntake ? 'durable_intake_link' : 'durable_submission_link'
     });
@@ -410,6 +417,7 @@ export const submitProQuestionnaire = async ({
       touchedQuestionsSnapshot: touchedQuestions,
       expandedQuestionsSnapshot: expandedQuestions,
       options: {
+        credentialsSnapshot: submissionCredentials,
         status: 'submit_failed',
         submitError: safeJsonStringify({
           stage: 'payload_transform_failed',
@@ -562,6 +570,7 @@ export const submitProQuestionnaire = async ({
       touchedQuestionsSnapshot: touchedQuestions,
       expandedQuestionsSnapshot: expandedQuestions,
       options: {
+        credentialsSnapshot: submissionCredentials,
         status: 'submit_failed',
         submitError: safeJsonStringify({
           stage: 'payload_validation_failed',
@@ -698,6 +707,7 @@ export const submitProQuestionnaire = async ({
       touchedQuestionsSnapshot: touchedQuestions,
       expandedQuestionsSnapshot: expandedQuestions,
       options: {
+        credentialsSnapshot: submissionCredentials,
         status: 'submit_failed',
         submitError: safeJsonStringify(serialized)
       }

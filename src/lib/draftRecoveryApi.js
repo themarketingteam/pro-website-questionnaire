@@ -56,6 +56,7 @@ export const listRecoveryRecords = ({
   status = 'all',
   archiveState = 'active',
   search = '',
+  identityState = 'all',
 }) => invokeRecoveryQuery({
   action: 'list',
   recoveryGrant,
@@ -65,6 +66,7 @@ export const listRecoveryRecords = ({
   status,
   archiveState,
   search,
+  identityState,
 });
 
 export const getRecoveryRecord = ({ recoveryGrant, recordType, recordId }) => invokeRecoveryQuery({

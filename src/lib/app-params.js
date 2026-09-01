@@ -2,6 +2,32 @@ const isNode = typeof window === 'undefined';
 const windowObj = isNode ? { localStorage: new Map() } : window;
 const storage = windowObj.localStorage;
 
+const safeStorageGet = (key) => {
+	try {
+		return storage?.getItem?.(key) ?? null;
+	} catch {
+		return null;
+	}
+};
+
+const safeStorageSet = (key, value) => {
+	try {
+		storage?.setItem?.(key, value);
+		return true;
+	} catch {
+		return false;
+	}
+};
+
+const safeStorageRemove = (key) => {
+	try {
+		storage?.removeItem?.(key);
+		return true;
+	} catch {
+		return false;
+	}
+};
+
 // Custom-domain builds do not always receive Base44's Vite environment values.
 // These identifiers are public client configuration (not secrets) and keep every
 // browser entry path pointed at the correct Base44 application.
@@ -53,15 +79,15 @@ const getAppParamValue = (paramName, { defaultValue = undefined, removeFromUrl =
 		window.history.replaceState({}, document.title, newUrl);
 	}
 	if (searchParam) {
-		storage.setItem(storageKey, searchParam);
+		safeStorageSet(storageKey, searchParam);
 		return searchParam;
 	}
 	const normalizedDefaultValue = normalizeParamValue(defaultValue);
 	if (normalizedDefaultValue) {
-		storage.setItem(storageKey, normalizedDefaultValue);
+		safeStorageSet(storageKey, normalizedDefaultValue);
 		return normalizedDefaultValue;
 	}
-	const storedValue = normalizeParamValue(storage.getItem(storageKey));
+	const storedValue = normalizeParamValue(safeStorageGet(storageKey));
 	if (storedValue) {
 		return storedValue;
 	}
@@ -72,7 +98,7 @@ const getAppParams = () => {
 	const functionsVersion = (() => {
 		if (isNode) return null;
 		// Never allow an editor version to survive navigation or a deployment.
-		storage.removeItem('base44_functions_version');
+		safeStorageRemove('base44_functions_version');
 		return null;
 	})();
 	return {

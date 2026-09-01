@@ -16,12 +16,14 @@ const RECORD_CONFIG = {
     entityName: 'ProFormDraft',
     sort: '-last_saved_at',
     statuses: new Set(['draft', 'submit_attempted', 'submit_failed', 'received_intake', 'submitted']),
-    searchFields: ['business_name', 'domain', 'user_email', 'session_id'],
+    searchFields: ['business_name', 'domain', 'user_email', 'user_name', 'user_id', 'session_id', 'metadata_json'],
     summaryFields: [
       'id',
       'business_name',
       'domain',
       'user_email',
+      'user_name',
+      'user_id',
       'status',
       'last_saved_at',
       'created_date',
@@ -237,7 +239,8 @@ const buildListQuery = (
   config: typeof RECORD_CONFIG[keyof typeof RECORD_CONFIG],
   status: string,
   archiveState: string,
-  search: string
+  search: string,
+  identityState: string
 ) => {
   const conditions: Record<string, unknown>[] = [];
 
@@ -264,6 +267,25 @@ const buildListQuery = (
   }
   const archiveCondition = buildArchiveCondition(archiveState);
   if (archiveCondition) conditions.push(archiveCondition);
+
+  if (config.entityName === 'ProFormDraft' && identityState === 'identified') {
+    conditions.push({
+      $and: [
+        { business_name: { $exists: true } },
+        { business_name: { $ne: null } },
+        { business_name: { $ne: '' } }
+      ]
+    });
+  }
+  if (config.entityName === 'ProFormDraft' && identityState === 'unidentified') {
+    conditions.push({
+      $or: [
+        { business_name: { $exists: false } },
+        { business_name: null },
+        { business_name: '' }
+      ]
+    });
+  }
 
   if (search) {
     const regex = `(?i)${escapeRegex(search)}`;
@@ -336,6 +358,7 @@ Deno.serve(async (req) => {
       const pageSize = clampInteger(body?.pageSize, DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE);
       const status = cleanText(body?.status, 40) || 'all';
       const archiveState = cleanText(body?.archiveState, 20) || 'active';
+      const identityState = cleanText(body?.identityState, 20) || 'all';
       const search = cleanText(body?.search, 200);
 
       if (status !== 'all' && !config.statuses.has(status)) {
@@ -344,8 +367,11 @@ Deno.serve(async (req) => {
       if (!['active', 'archived', 'deleted', 'all'].includes(archiveState)) {
         return badRequest('Unsupported archive filter.', { action, recordType, archiveState });
       }
+      if (!['all', 'identified', 'unidentified'].includes(identityState)) {
+        return badRequest('Unsupported identity filter.', { action, recordType, identityState });
+      }
 
-      const query = buildListQuery(config, status, archiveState, search);
+      const query = buildListQuery(config, status, archiveState, search, identityState);
       const skip = (page - 1) * pageSize;
       const requestedLimit = pageSize + 1;
       const records = query
