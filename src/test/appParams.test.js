@@ -48,4 +48,29 @@ describe('Base44 app parameters on the custom domain', () => {
       search: '?functions_version=current-editor-version'
     })).toBeNull();
   });
+
+  it('still resolves production routing when browser storage is blocked', async () => {
+    const originalGetItem = localStorage.getItem;
+    const originalSetItem = localStorage.setItem;
+    const originalRemoveItem = localStorage.removeItem;
+    Object.defineProperties(localStorage, {
+      getItem: { configurable: true, value: () => { throw new DOMException('Blocked', 'SecurityError'); } },
+      setItem: { configurable: true, value: () => { throw new DOMException('Blocked', 'SecurityError'); } },
+      removeItem: { configurable: true, value: () => { throw new DOMException('Blocked', 'SecurityError'); } },
+    });
+
+    try {
+      vi.resetModules();
+      const { appParams } = await import('@/lib/app-params');
+      expect(appParams.appId).toBe('6925fec3678942d22522b010');
+      expect(appParams.serverUrl).toBe('https://base44.app');
+      expect(appParams.functionsVersion).toBeNull();
+    } finally {
+      Object.defineProperties(localStorage, {
+        getItem: { configurable: true, value: originalGetItem },
+        setItem: { configurable: true, value: originalSetItem },
+        removeItem: { configurable: true, value: originalRemoveItem },
+      });
+    }
+  });
 });

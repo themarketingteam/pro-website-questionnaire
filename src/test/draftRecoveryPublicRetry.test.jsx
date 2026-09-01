@@ -34,9 +34,16 @@ describe('public draft recovery actions', () => {
             },
           };
         }
-        const source = payload.recordType === 'intake'
+        let source = payload.recordType === 'intake'
           ? intakeRecords
           : (payload.recordType === 'submission' ? submissionRecords : draftRecords);
+        if (payload.recordType === 'draft' && payload.action === 'list') {
+          if (payload.identityState === 'identified') {
+            source = source.filter((record) => String(record.business_name || '').trim());
+          } else if (payload.identityState === 'unidentified') {
+            source = source.filter((record) => !String(record.business_name || '').trim());
+          }
+        }
         if (payload.action === 'get') {
           return {
             data: {
@@ -87,7 +94,7 @@ describe('public draft recovery actions', () => {
   it('clears search and restores the default filters when Refresh is selected', async () => {
     renderRecoveryPage();
 
-    const searchInput = screen.getByPlaceholderText('Search by business name, domain, user email, or session ID');
+    const searchInput = screen.getByPlaceholderText('Search by business name, domain, client name/email, user ID, or session ID');
     fireEvent.change(searchInput, { target: { value: 'filtered client' } });
 
     expect(searchInput).toHaveValue('filtered client');
@@ -217,6 +224,9 @@ describe('public draft recovery actions', () => {
       if (payload.recordType === 'intake' || payload.recordType === 'submission') {
         return { data: { success: true, records: [], hasMore: false, hasAnyRecords: false } };
       }
+      if (payload.identityState === 'unidentified') {
+        return { data: { success: true, records: [], hasMore: false, hasAnyRecords: false } };
+      }
 
       const record = payload.page === 2
         ? { id: 'page-2', business_name: 'Second Page Client', status: 'submitted' }
@@ -253,7 +263,7 @@ describe('public draft recovery actions', () => {
     );
 
     fireEvent.change(
-      screen.getByPlaceholderText('Search by business name, domain, user email, or session ID'),
+      screen.getByPlaceholderText('Search by business name, domain, client name/email, user ID, or session ID'),
       { target: { value: 'client.example' } },
     );
     await waitFor(() => {
@@ -268,6 +278,34 @@ describe('public draft recovery actions', () => {
       );
     });
     expect(base44.entities.ProFormDraft.list).not.toHaveBeenCalled();
+  });
+
+  it('lists unidentified drafts separately and requests safe identity-field searches server-side', async () => {
+    draftRecords = [{
+      id: 'unidentified-draft-1',
+      session_id: 'anonymous-session-1',
+      business_name: '',
+      domain: '',
+      user_name: 'Managed 247 Contact',
+      user_email: 'contact@managed247.example',
+      status: 'draft',
+    }];
+
+    renderRecoveryPage();
+
+    expect(await screen.findByRole('heading', { name: 'Unidentified Drafts' })).toBeInTheDocument();
+    expect(await screen.findByText('Unnamed business')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Unnamed business'));
+    expect(await screen.findByText(/Managed 247 Contact/)).toBeInTheDocument();
+    expect(base44.functions.invoke).toHaveBeenCalledWith(
+      'queryProQuestionnaireRecoveryRecords',
+      expect.objectContaining({
+        action: 'list',
+        recordType: 'draft',
+        identityState: 'unidentified',
+        recoveryGrant,
+      })
+    );
   });
 
   it('passes the verified recovery grant to Retry and Repair + Retry', async () => {

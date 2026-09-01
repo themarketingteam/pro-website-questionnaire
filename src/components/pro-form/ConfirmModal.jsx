@@ -16,6 +16,7 @@ export default function ConfirmModal({
   formData, 
   onConfirm, 
   onCancel,
+  onIdentityChange,
   isSubmitting = false,
   initialBusinessName = '', 
   initialDomain = '' 
@@ -175,7 +176,12 @@ export default function ConfirmModal({
                 ref={businessNameRef}
                 type="text"
                 value={businessName}
-                onChange={(e) => { setBusinessName(e.target.value); setFieldErrors(prev => ({ ...prev, businessName: '' })); }}
+                onChange={(e) => {
+                  const nextBusinessName = e.target.value;
+                  setBusinessName(nextBusinessName);
+                  setFieldErrors(prev => ({ ...prev, businessName: '' }));
+                  onIdentityChange?.({ businessName: nextBusinessName, domain: cleanDomainForSubmission(domain) });
+                }}
                 placeholder="Enter your business name"
                 autoComplete="organization"
                 disabled={isSubmitting}
@@ -197,7 +203,12 @@ export default function ConfirmModal({
                 ref={domainRef}
                 type="text"
                 value={domain}
-                onChange={(e) => { setDomain(e.target.value); setFieldErrors(prev => ({ ...prev, domain: '' })); }}
+                onChange={(e) => {
+                  const nextDomain = e.target.value;
+                  setDomain(nextDomain);
+                  setFieldErrors(prev => ({ ...prev, domain: '' }));
+                  onIdentityChange?.({ businessName, domain: cleanDomainForSubmission(nextDomain) });
+                }}
                 placeholder="example.com or https://example.com"
                 autoComplete="url"
                 disabled={isSubmitting}

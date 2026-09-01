@@ -6,6 +6,7 @@ import {
   safeLocalStorageSet,
   safeNowIso
 } from '@/lib/browserSafety';
+import { appParams } from '@/lib/app-params';
 
 const SAVE_FUNCTION = 'syncProQuestionnaireDraft';
 const MAX_ATTEMPTS = 3;
@@ -13,8 +14,12 @@ const MAX_ATTEMPTS = 3;
 const getTimerApi = () => (typeof window !== 'undefined' ? window : globalThis);
 const delay = (ms) => new Promise((resolve) => getTimerApi().setTimeout(resolve, ms));
 
-const isRetryable = (error) => {
-  const status = Number(error?.status || error?.response?.status || 0);
+export const getDraftErrorStatus = (error) => Number(
+  error?.status || error?.response?.status || 0
+);
+
+export const isRetryableDraftError = (error) => {
+  const status = getDraftErrorStatus(error);
   if ([408, 425, 429, 500, 502, 503, 504].includes(status)) return true;
   const message = String(error?.message || '').toLowerCase();
   return !status || /network|timeout|timed out|failed to fetch|load failed|offline/.test(message);
@@ -33,7 +38,7 @@ const invokeDraftFunction = async (functions, payload, { attempts = MAX_ATTEMPTS
       return response.data;
     } catch (error) {
       lastError = error;
-      if (attempt >= attempts || !isRetryable(error)) throw error;
+      if (attempt >= attempts || !isRetryableDraftError(error)) throw error;
       const baseDelay = import.meta.env.MODE === 'test' ? 0 : 250 * (2 ** (attempt - 1));
       await delay(baseDelay + (import.meta.env.MODE === 'test' ? 0 : Math.floor(Math.random() * 120)));
     }
@@ -51,6 +56,54 @@ export const bootstrapServerDraft = async ({
   resumeCredential,
   legacySessionId,
   credentials: sanitizeCredentialsForDraft(credentials)
+});
+
+export const createServerDraftMutationPayload = ({
+  resumeCredential,
+  clientInstanceId,
+  mutationId,
+  clientSequence,
+  baseRevision,
+  responses,
+  changedKeys,
+  deletedKeys,
+  validationStatus,
+  touchedQuestions,
+  expandedQuestions,
+  credentials,
+  currentQuestionId,
+  lastChangedQuestionId,
+  progressPercent,
+  status = 'draft',
+  submitError = '',
+  finalSubmissionId = '',
+  intakeId = '',
+  mappedPayload,
+  source = 'autosave'
+}) => ({
+  action: 'save',
+  resumeCredential,
+  clientInstanceId,
+  mutationId,
+  clientSequence,
+  baseRevision,
+  clientChangedAt: safeNowIso(),
+  responses,
+  changedKeys,
+  deletedKeys,
+  validationStatus,
+  touchedQuestions,
+  expandedQuestions,
+  credentials: sanitizeCredentialsForDraft(credentials),
+  currentQuestionId,
+  lastChangedQuestionId,
+  progressPercent,
+  status,
+  submitError,
+  finalSubmissionId,
+  intakeId,
+  mappedPayload,
+  source
 });
 
 export const saveServerDraftMutation = async ({
@@ -76,21 +129,19 @@ export const saveServerDraftMutation = async ({
   intakeId = '',
   mappedPayload,
   source = 'autosave'
-}) => invokeDraftFunction(functions, {
-  action: 'save',
+}) => invokeDraftFunction(functions, createServerDraftMutationPayload({
   resumeCredential,
   clientInstanceId,
   mutationId,
   clientSequence,
   baseRevision,
-  clientChangedAt: safeNowIso(),
   responses,
   changedKeys,
   deletedKeys,
   validationStatus,
   touchedQuestions,
   expandedQuestions,
-  credentials: sanitizeCredentialsForDraft(credentials),
+  credentials,
   currentQuestionId,
   lastChangedQuestionId,
   progressPercent,
@@ -100,7 +151,35 @@ export const saveServerDraftMutation = async ({
   intakeId,
   mappedPayload,
   source
-});
+}));
+
+const KEEPALIVE_MAX_BYTES = 60_000;
+
+export const flushDraftMutationKeepalive = ({ payload, fetchImpl = globalThis.fetch } = {}) => {
+  if (!payload || typeof fetchImpl !== 'function') return false;
+  const body = safeJsonStringify(payload, '');
+  if (!body || new TextEncoder().encode(body).byteLength > KEEPALIVE_MAX_BYTES) return false;
+  const serverUrl = String(appParams.serverUrl || '').replace(/\/+$/, '');
+  const appId = String(appParams.appId || '').trim();
+  if (!serverUrl || !appId) return false;
+
+  try {
+    void fetchImpl(`${serverUrl}/api/apps/${encodeURIComponent(appId)}/functions/${SAVE_FUNCTION}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-App-Id': appId
+      },
+      body,
+      keepalive: true,
+      mode: 'cors',
+      credentials: 'omit'
+    }).catch(() => null);
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 export const createSecureDraftEvent = async ({
   functions,
@@ -255,7 +334,7 @@ export const writeDraftFailureBackup = ({
   error
 }) => {
   try {
-    safeLocalStorageSet(
+    return safeLocalStorageSet(
       `pro_questionnaire_local_backup_${questionnaireSessionId}`,
       {
         session_id: questionnaireSessionId,
@@ -271,6 +350,6 @@ export const writeDraftFailureBackup = ({
       }
     );
   } catch {
-    // no-op
+    return false;
   }
 };

@@ -698,6 +698,132 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
   );
 }
 
+function UnidentifiedDraftRecovery({
+  recoveryGrant,
+  archiveState,
+  search,
+  status,
+  refreshKey,
+  onChanged
+}) {
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [expandedId, setExpandedId] = useState('');
+  const [duplicateSessionIds, setDuplicateSessionIds] = useState(new Set());
+
+  useEffect(() => {
+    setPage(1);
+    setExpandedId('');
+  }, [archiveState, search, status]);
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const data = await listRecoveryRecords({
+          recoveryGrant,
+          recordType: 'draft',
+          page,
+          pageSize: RECOVERY_PAGE_SIZE,
+          status,
+          archiveState,
+          search,
+          identityState: 'unidentified'
+        });
+        if (!mounted) return;
+        setRecords(Array.isArray(data.records) ? data.records : []);
+        setHasMore(Boolean(data.hasMore));
+        setDuplicateSessionIds(new Set(Array.isArray(data.duplicateSessionIds) ? data.duplicateSessionIds : []));
+      } catch (loadError) {
+        if (mounted) setError(loadError?.message || 'Failed to load unidentified drafts.');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+    load();
+    return () => { mounted = false; };
+  }, [archiveState, page, recoveryGrant, refreshKey, search, status]);
+
+  const reload = () => {
+    onChanged?.();
+  };
+
+  return (
+    <section className="space-y-4" aria-labelledby="unidentified-drafts-title">
+      <div className="draft-recovery-brand__list-heading">
+        <div>
+          <h2 id="unidentified-drafts-title">Unidentified Drafts</h2>
+          <p className="mt-1 max-w-3xl text-sm text-white/70">
+            Securely saved drafts without a business name. Search by domain, client email or name, user ID, or session ID when available.
+          </p>
+        </div>
+        <p>Page {page}</p>
+      </div>
+
+      {error && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="p-6 text-red-700">{error}</CardContent>
+        </Card>
+      )}
+      {loading ? (
+        <Card className="brand-loading-card">
+          <CardContent className="p-6 text-slate-600">Loading unidentified drafts...</CardContent>
+        </Card>
+      ) : records.length === 0 ? (
+        <Card className="brand-loading-card">
+          <CardContent className="p-6 text-slate-600">No matching unidentified drafts found.</CardContent>
+        </Card>
+      ) : (
+        <>
+          {records.map((draft) => (
+            <DraftRow
+              key={draft.id}
+              draft={draft}
+              expanded={expandedId === draft.id}
+              onToggle={() => setExpandedId(expandedId === draft.id ? '' : draft.id)}
+              hasDuplicateSession={duplicateSessionIds.has(draft.session_id)}
+              onRetrySuccess={reload}
+              recoveryGrant={recoveryGrant}
+            />
+          ))}
+          <div className="flex items-center justify-between gap-3 pt-1" aria-label="Unidentified draft pagination">
+            <Button
+              type="button"
+              variant="outline"
+              className="brand-button-secondary"
+              disabled={page === 1 || loading}
+              onClick={() => {
+                setPage((current) => Math.max(1, current - 1));
+                setExpandedId('');
+              }}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-white">Page {page}</span>
+            <Button
+              type="button"
+              variant="outline"
+              className="brand-button-secondary"
+              disabled={!hasMore || loading}
+              onClick={() => {
+                setPage((current) => current + 1);
+                setExpandedId('');
+              }}
+            >
+              Next
+            </Button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 export default function ProFormDraftRecovery() {
   const { recoveryGrant } = useDraftRecoveryAccess();
   const [drafts, setDrafts] = useState([]);
@@ -754,7 +880,8 @@ export default function ProFormDraftRecovery() {
           pageSize: RECOVERY_PAGE_SIZE,
           status: statusFilter,
           archiveState,
-          search: debouncedSearch
+          search: debouncedSearch,
+          identityState: 'identified'
         });
 
         if (!mounted) return;
@@ -847,7 +974,7 @@ export default function ProFormDraftRecovery() {
 
               <Input
                 className="brand-filter-search"
-                placeholder="Search by business name, domain, user email, or session ID"
+                placeholder="Search by business name, domain, client name/email, user ID, or session ID"
                 value={search}
                 onChange={(event) => {
                   setSearch(event.target.value);
@@ -940,6 +1067,15 @@ export default function ProFormDraftRecovery() {
               </>
             )}
           </section>
+
+          <UnidentifiedDraftRecovery
+            recoveryGrant={recoveryGrant}
+            archiveState={archiveState}
+            search={debouncedSearch}
+            status={statusFilter}
+            refreshKey={refreshKey}
+            onChanged={reloadDrafts}
+          />
 
           <StandaloneSubmissionRecovery
             recoveryGrant={recoveryGrant}

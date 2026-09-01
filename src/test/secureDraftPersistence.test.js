@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   bootstrapServerDraft,
+  createServerDraftMutationPayload,
+  flushDraftMutationKeepalive,
   getDraftLocalBackup,
   saveServerDraftMutation,
   writeDraftFailureBackup
@@ -118,5 +120,42 @@ describe('secure draft persistence client contract', () => {
     expect(backup.changedKeys).toEqual(['6']);
     expect(backup.deletedKeys).toEqual(['7']);
     expect(backup.baseRevision).toBe(4);
+  });
+
+  it('queues an unload-safe save through the configured Base44 endpoint', () => {
+    const fetchImpl = vi.fn(() => Promise.resolve({ ok: true }));
+    const payload = createServerDraftMutationPayload({
+      resumeCredential: CREDENTIAL,
+      clientInstanceId: 'client_1234567890',
+      mutationId: 'mutation_1234567890',
+      clientSequence: 3,
+      baseRevision: 2,
+      responses: { '6': 'Latest unsent answer' },
+      changedKeys: ['6'],
+      deletedKeys: [],
+      credentials: {},
+      source: 'pagehide_flush'
+    });
+
+    expect(flushDraftMutationKeepalive({ payload, fetchImpl })).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'https://base44.app/api/apps/6925fec3678942d22522b010/functions/syncProQuestionnaireDraft',
+      expect.objectContaining({
+        method: 'POST',
+        keepalive: true,
+        credentials: 'omit',
+        headers: expect.objectContaining({ 'X-App-Id': '6925fec3678942d22522b010' }),
+        body: expect.stringContaining('Latest unsent answer')
+      })
+    );
+  });
+
+  it('declines an unload request that exceeds the browser keepalive limit', () => {
+    const fetchImpl = vi.fn();
+    expect(flushDraftMutationKeepalive({
+      payload: { oversized: 'x'.repeat(61_000) },
+      fetchImpl
+    })).toBe(false);
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });
