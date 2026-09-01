@@ -241,6 +241,45 @@ describe('secure questionnaire draft integration', () => {
     expect(bootstrapRequests).toBe(4);
   });
 
+  it('replaces a soft-deleted stored credential with a new recoverable draft', async () => {
+    persistResumeCredential(CREDENTIAL);
+    window.history.replaceState({}, '', '/');
+    let bootstrapRequests = 0;
+    base44.functions.invoke.mockImplementation(async (name, payload) => {
+      if (name !== 'syncProQuestionnaireDraft') return { data: { success: true } };
+      if (payload.action === 'bootstrap') {
+        bootstrapRequests += 1;
+        if (bootstrapRequests === 1) {
+          expect(payload.resumeCredential).toBe(CREDENTIAL);
+          throw Object.assign(new Error('This questionnaire draft was removed by an administrator.'), {
+            response: {
+              status: 410,
+              data: { error: 'This questionnaire draft was removed by an administrator.' }
+            }
+          });
+        }
+        expect(payload.resumeCredential).toBe('');
+        return {
+          data: {
+            success: true,
+            resumeCredential: REPLACEMENT_CREDENTIAL,
+            draft: draftResponse({
+              draftId: 'replacement-draft',
+              sessionId: 'replacement_session_1234567890'
+            })
+          }
+        };
+      }
+      return { data: { success: true, draft: draftResponse({ revision: payload.clientSequence }) } };
+    });
+
+    renderWithStore(<ProQuestionnaire />);
+    expect(await screen.findByText('Reconnecting secure draft saving…')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry now' }));
+    expect(await screen.findByRole('button', { name: 'Submit Questionnaire' })).toBeInTheDocument();
+    expect(bootstrapRequests).toBe(2);
+  });
+
   it('locks and re-bootstrap saves current answers when a draft credential is rejected', async () => {
     let bootstrapRequests = 0;
     base44.functions.invoke.mockImplementation(async (name, payload) => {

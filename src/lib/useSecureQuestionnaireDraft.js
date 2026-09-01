@@ -659,7 +659,8 @@ export const useSecureQuestionnaireDraft = ({
       } catch (error) {
         if (cancelled) return;
         const summary = safeErrorSummary(error);
-        const invalidStoredCredential = summary.status === 401 && Boolean(getStoredResumeCredential());
+        const invalidStoredCredential = ['401', '410'].includes(String(summary.status))
+          && Boolean(getStoredResumeCredential());
         if (invalidStoredCredential) {
           clearQuestionnaireSessionId();
           resumeCredentialRef.current = '';
