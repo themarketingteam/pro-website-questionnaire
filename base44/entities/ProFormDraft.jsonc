@@ -15,6 +15,24 @@
       "default": 1,
       "description": "Version of the anonymous draft access contract"
     },
+    "shared_access_token_hashes_json": {
+      "type": "string",
+      "description": "JSON array of SHA-256 hashes for administrator-created client resume links; plaintext credentials are never stored"
+    },
+    "shared_access_link_created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When an administrator most recently created a client resume link"
+    },
+    "shared_access_link_created_by": {
+      "type": "string",
+      "description": "Audited administrator or recovery-grant actor that most recently created a client resume link"
+    },
+    "shared_access_link_generation_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of client resume links generated for this draft"
+    },
     "history_baseline_json": {
       "type": "string",
       "description": "Server-side baseline used to deterministically replay append-only draft mutations"

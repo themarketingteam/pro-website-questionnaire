@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Wrench, Pencil, Stethoscope, Loader2 } from 'lucide-react';
+import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Wrench, Pencil, Stethoscope, Loader2, Link2 } from 'lucide-react';
 import DraftEditPanel from '@/components/admin/DraftEditPanel';
 import { toast } from 'sonner';
 import QuestionnaireIntakeRecovery from '@/components/admin/QuestionnaireIntakeRecovery';
@@ -22,10 +22,12 @@ import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
 import { SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import mspSuccessDigitalLogoDataUrl from '@/assets/mspSuccessDigitalLogo';
 import {
+  createRecoveryDraftShareLink,
   getRecoveryRecord,
   listRecoveryRecords,
   updateRecoveryDraft
 } from '@/lib/draftRecoveryApi';
+import { buildDraftShareUrl, copyTextToClipboard } from '@/lib/draftShareLink';
 import AdminWorkspaceNav from '@/components/admin/AdminWorkspaceNav';
 import IdentityResolutionPanel from '@/components/admin/IdentityResolutionPanel';
 import StandaloneSubmissionRecovery from '@/components/admin/StandaloneSubmissionRecovery';
@@ -139,8 +141,9 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
   const [detailVersion, setDetailVersion] = useState(0);
+  const [copyingDraftLink, setCopyingDraftLink] = useState(false);
 
-  const isWorking = retrying || !!aiRunning;
+  const isWorking = retrying || !!aiRunning || copyingDraftLink;
 
   // Keep localDraft in sync when parent reloads (but not while editing to avoid clobbering)
   React.useEffect(() => { if (!editing) setLocalDraft(draft); }, [draft, editing]);
@@ -322,6 +325,24 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
     toast.success('AI repair report copied');
   };
 
+  const handleCopyDraftLink = async (event) => {
+    event.stopPropagation();
+    setCopyingDraftLink(true);
+    try {
+      const data = await createRecoveryDraftShareLink({
+        recoveryGrant,
+        recordId: localDraft.id
+      });
+      const shareUrl = buildDraftShareUrl(data.resumeCredential);
+      await copyTextToClipboard(shareUrl);
+      toast.success('Draft link copied — ready to share with the client');
+    } catch (error) {
+      toast.error(error?.message || 'Unable to create the client draft link.');
+    } finally {
+      setCopyingDraftLink(false);
+    }
+  };
+
 
   return (
     <Card className={`brand-record-card ${expanded ? 'brand-record-card--expanded' : ''}`}>
@@ -484,6 +505,21 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
             <section aria-label="Actions" className="space-y-2">
               <p className="brand-action-label text-xs uppercase">Actions</p>
               <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="brand-button-secondary gap-2"
+                  onClick={handleCopyDraftLink}
+                  disabled={isWorking || Boolean(localDraft.soft_deleted_at)}
+                  title={localDraft.soft_deleted_at
+                    ? 'Restore this deleted draft before creating a client link.'
+                    : 'Copies a secure link that lets the client continue this saved questionnaire.'}
+                >
+                  {copyingDraftLink ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
+                  {copyingDraftLink ? 'Copying...' : 'Copy Draft Link'}
+                </Button>
+
                 {/* Edit Draft — always available */}
                 {!editing && (
                   <Button

@@ -82,6 +82,13 @@ export const updateRecoveryDraft = ({ recoveryGrant, recordId, updates }) => inv
   updates,
 });
 
+export const createRecoveryDraftShareLink = ({ recoveryGrant, recordId }) => invokeRecoveryQuery({
+  action: 'create_share_link',
+  recoveryGrant,
+  recordType: 'draft',
+  recordId,
+});
+
 export const changeRecoveryRecordLifecycle = async ({
   recoveryGrant,
   recordType,

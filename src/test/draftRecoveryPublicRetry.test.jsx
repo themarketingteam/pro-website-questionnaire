@@ -26,6 +26,14 @@ describe('public draft recovery actions', () => {
     submissionRecords = [];
     base44.functions.invoke.mockImplementation(async (name, payload = {}) => {
       if (name === 'queryProQuestionnaireRecoveryRecords') {
+        if (payload.action === 'create_share_link') {
+          return {
+            data: {
+              success: true,
+              resumeCredential: 'secure_share_session_1234567890.abcdefghijklmnopqrstuvwxyzABCDEFGH',
+            },
+          };
+        }
         const source = payload.recordType === 'intake'
           ? intakeRecords
           : (payload.recordType === 'submission' ? submissionRecords : draftRecords);
@@ -285,6 +293,7 @@ describe('public draft recovery actions', () => {
     expect(screen.getByRole('region', { name: 'Actions' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'AI Actions' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Data Copy Options (JSON)' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy Draft Link' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Diagnose' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Repair Only' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Repair + Retry' })).toBeInTheDocument();
@@ -320,6 +329,41 @@ describe('public draft recovery actions', () => {
           mode: 'repair_and_retry',
           recoveryGrant,
         }),
+      );
+    });
+  });
+
+  it('creates and copies a secure client resume link from the draft Actions section', async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    draftRecords = [{
+      id: 'draft-share-1',
+      session_id: 'secure_share_session_1234567890',
+      business_name: 'Share Link Client',
+      domain: 'share-link.example',
+      status: 'draft',
+      responses_json: '{}',
+    }];
+
+    renderRecoveryPage();
+    fireEvent.click(await screen.findByText('Share Link Client'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy Draft Link' }));
+
+    await waitFor(() => {
+      expect(base44.functions.invoke).toHaveBeenCalledWith(
+        'queryProQuestionnaireRecoveryRecords',
+        {
+          action: 'create_share_link',
+          recoveryGrant,
+          recordType: 'draft',
+          recordId: 'draft-share-1',
+        },
+      );
+      expect(writeText).toHaveBeenCalledWith(
+        'https://proform.tmtwebsiteresources.xyz/#draft=secure_share_session_1234567890.abcdefghijklmnopqrstuvwxyzABCDEFGH',
       );
     });
   });

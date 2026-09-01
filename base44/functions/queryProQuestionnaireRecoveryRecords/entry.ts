@@ -8,6 +8,7 @@ const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 50;
 const RETENTION_DAYS = 1095;
 const RETENTION_POLICY_VERSION = 'three-year-active-v1';
+const MAX_ACTIVE_SHARE_LINKS = 20;
 const encoder = new TextEncoder();
 
 const RECORD_CONFIG = {
@@ -103,6 +104,37 @@ const clampInteger = (value: unknown, fallback: number, minimum: number, maximum
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(maximum, Math.max(minimum, Math.floor(parsed)));
+};
+
+const toBase64Url = (bytes: Uint8Array) => {
+  let binary = '';
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+};
+
+const randomToken = (byteLength = 32) => {
+  const bytes = new Uint8Array(byteLength);
+  crypto.getRandomValues(bytes);
+  return toBase64Url(bytes);
+};
+
+const hashToken = async (value: string) => {
+  const digest = await crypto.subtle.digest('SHA-256', encoder.encode(value));
+  return toBase64Url(new Uint8Array(digest));
+};
+
+const isSessionId = (value: string) => /^[A-Za-z0-9_-]{20,120}$/.test(value);
+
+const parseSharedAccessHashes = (value: unknown) => {
+  if (typeof value !== 'string' || !value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed)
+      ? [...new Set(parsed.filter((item) => typeof item === 'string' && /^[A-Za-z0-9_-]{43,64}$/.test(item)))]
+      : [];
+  } catch {
+    return [];
+  }
 };
 
 const fromBase64Url = (value: string) => {
@@ -266,10 +298,12 @@ Deno.serve(async (req) => {
   const configuredPassword = Deno.env.get(SECRET_NAME) || '';
   const recoveryGrant = cleanText(body?.recoveryGrant, 4096);
   let isAdmin = false;
+  let adminIdentifier = '';
 
   try {
     const user = await base44.auth.me();
     isAdmin = user?.role === 'admin';
+    if (isAdmin) adminIdentifier = cleanText(user?.email || user?.id, 320);
   } catch {
     isAdmin = false;
   }
@@ -384,6 +418,65 @@ Deno.serve(async (req) => {
     const recordId = cleanText(body?.recordId, 200);
     if (!recordId) {
       return badRequest('A recovery record ID is required.', { action, recordType });
+    }
+
+    if (action === 'create_share_link' && recordType === 'draft') {
+      const draft = await entity.get(recordId);
+      if (!draft?.id) {
+        return jsonResponse({ success: false, error: 'Questionnaire draft not found.' }, 404);
+      }
+      if (cleanText(draft.soft_deleted_at, 100)) {
+        return jsonResponse({ success: false, error: 'Restore this deleted draft before creating a client link.' }, 410);
+      }
+
+      const sessionId = cleanText(draft.session_id, 120);
+      if (!isSessionId(sessionId)) {
+        return badRequest('This draft does not have a valid secure session ID.', { action, recordType, recordId });
+      }
+
+      const secret = randomToken();
+      const tokenHash = await hashToken(secret);
+      const previousHashes = parseSharedAccessHashes(draft.shared_access_token_hashes_json);
+      const nextHashes = [...previousHashes, tokenHash].slice(-MAX_ACTIVE_SHARE_LINKS);
+      const now = new Date().toISOString();
+      const actorIdentifier = isAdmin ? (adminIdentifier || 'base44-admin') : 'password-recovery-grant';
+
+      await entity.update(recordId, {
+        shared_access_token_hashes_json: JSON.stringify(nextHashes),
+        shared_access_link_created_at: now,
+        shared_access_link_created_by: actorIdentifier,
+        shared_access_link_generation_count: Math.max(0, Number(draft.shared_access_link_generation_count) || 0) + 1
+      });
+
+      try {
+        await base44.asServiceRole.entities.ProFormDraftEvent.create({
+          session_id: sessionId,
+          event_type: 'admin_share_link_created',
+          question_id: '',
+          question_type: 'administrative_access',
+          value_json: '{}',
+          value_summary: 'An administrator created a secure client draft-resume link.',
+          value_length: 0,
+          selected_option_count: 0,
+          business_name: cleanText(draft.business_name, 300),
+          domain: cleanText(draft.domain, 500),
+          user_id: '',
+          created_at_iso: now
+        });
+      } catch (auditError) {
+        // The draft itself retains who/when/count metadata. Do not strand the
+        // newly issued client link if the secondary event record is unavailable.
+        console.warn('[Draft recovery query] share-link event audit failed', {
+          recordId,
+          message: auditError instanceof Error ? auditError.message : 'unknown audit error'
+        });
+      }
+
+      return jsonResponse({
+        success: true,
+        resumeCredential: `${sessionId}.${secret}`,
+        issuedAt: now
+      });
     }
 
     if (action === 'get') {

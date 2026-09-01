@@ -152,27 +152,43 @@ const parseCredential = (value: unknown) => {
   return { sessionId, secret, raw: text };
 };
 
-const findLatestDraft = async (entity: any, sessionId: string) => {
+const findDraftCandidates = async (entity: any, sessionId: string) => {
   const records = await entity.filter({ session_id: sessionId }, '-last_saved_at', 10);
   const safeRecords = Array.isArray(records) ? records : [];
   return safeRecords.sort((left, right) => {
     const leftTime = Date.parse(left.last_saved_at || left.updated_date || left.created_date || '') || 0;
     const rightTime = Date.parse(right.last_saved_at || right.updated_date || right.created_date || '') || 0;
     return rightTime - leftTime;
-  })[0] || null;
+  });
+};
+
+const findLatestDraft = async (entity: any, sessionId: string) => (
+  (await findDraftCandidates(entity, sessionId))[0] || null
+);
+
+const parseSharedAccessHashes = (value: unknown) => {
+  const parsed = safeParse(value, []);
+  return Array.isArray(parsed)
+    ? parsed.filter((item) => typeof item === 'string' && /^[A-Za-z0-9_-]{43,64}$/.test(item))
+    : [];
+};
+
+const draftAcceptsAccessHash = (draft: any, suppliedHash: string) => {
+  const primaryMatches = constantTimeEqual(String(draft?.access_token_hash || ''), suppliedHash);
+  const sharedMatches = parseSharedAccessHashes(draft?.shared_access_token_hashes_json)
+    .some((storedHash) => constantTimeEqual(storedHash, suppliedHash));
+  return primaryMatches || sharedMatches;
 };
 
 const authorizeDraft = async (entity: any, credentialValue: unknown) => {
   const credential = parseCredential(credentialValue);
   if (!credential) return { error: 'A valid draft recovery credential is required.', status: 401 };
-  const draft = await findLatestDraft(entity, credential.sessionId);
-  if (!draft?.id || !draft.access_token_hash) return { error: 'Draft recovery credential was not recognized.', status: 401 };
+  const suppliedHash = await hashToken(credential.secret);
+  const candidates = await findDraftCandidates(entity, credential.sessionId);
+  const draft = candidates.find((candidate) => candidate?.id && draftAcceptsAccessHash(candidate, suppliedHash));
+  if (!draft?.id) return { error: 'Draft recovery credential was not recognized.', status: 401 };
   if (cleanText(draft.soft_deleted_at, 100)) {
     return { error: 'This questionnaire draft was removed by an administrator.', status: 410 };
-  }
-  const suppliedHash = await hashToken(credential.secret);
-  if (!constantTimeEqual(String(draft.access_token_hash), suppliedHash)) {
-    return { error: 'Draft recovery credential was not recognized.', status: 401 };
   }
   return { draft, credential };
 };
