@@ -46,12 +46,12 @@ describe('three-year questionnaire retention', () => {
       'base44/entities/ProFormDraft.jsonc',
       'base44/entities/ProFormSubmission.jsonc',
       'base44/entities/ProFormSubmissionIntake.jsonc',
-      'base44/entities/pro-form-draft-revision.jsonc',
+      'base44/entities/ProFormDraftRevision.jsonc',
       'base44/entities/ProFormDraftEvent.jsonc',
       'base44/entities/QuestionnairePdfVersion.jsonc',
-      'base44/entities/pro-form-recovery-lifecycle-event.jsonc',
-      'base44/entities/pro-form-identity-resolution-attempt.jsonc',
-      'base44/entities/pro-form-identity-resolution-run.jsonc',
+      'base44/entities/ProFormRecoveryLifecycleEvent.jsonc',
+      'base44/entities/ProFormIdentityResolutionAttempt.jsonc',
+      'base44/entities/ProFormIdentityResolutionRun.jsonc',
     ];
 
     for (const path of entityPaths) expect(readEntity(path).rls.delete, path).toBe(false);
