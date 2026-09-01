@@ -4,6 +4,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
 import { renderWithStore } from './utils/renderWithStore';
 import { base44 } from '@/api/base44Client';
+import { persistResumeCredential } from '@/lib/sessionId';
 
 const CREDENTIAL = 'integration_session_1234567890.abcdefghijklmnopqrstuvwxyzABCDEFGH';
 const REPLACEMENT_CREDENTIAL = 'replacement_session_1234567890.HGFEDCBAabcdefghijklmnopqrstuvwxyz';
@@ -471,7 +472,7 @@ describe('secure questionnaire draft integration', () => {
       })
     );
   });
-  it('synchronizes newer URL identity into an existing server draft immediately after restore', async () => {
+  it('keeps an explicit recovery link authoritative when URL identity conflicts', async () => {
     window.history.replaceState(
       {},
       '',
@@ -508,6 +509,102 @@ describe('secure questionnaire draft integration', () => {
       };
     });
 
+    const { store } = renderWithStore(<ProQuestionnaire />);
+    await screen.findByRole('button', { name: 'Submit Questionnaire' });
+    expect(store.getState().form.credentials).toEqual(expect.objectContaining({
+      businessName: 'Prior Business',
+      domain: 'prior.example'
+    }));
+    const saveCalls = base44.functions.invoke.mock.calls.filter(([, payload]) => payload?.action === 'save');
+    expect(saveCalls).toHaveLength(0);
+  });
+
+  it('starts a separate draft when stored browser identity conflicts with a newly opened client URL', async () => {
+    persistResumeCredential(CREDENTIAL);
+    window.history.replaceState({}, '', '/?businessName=New%20Client&domainName=new-client.example');
+    let bootstrapCount = 0;
+    base44.functions.invoke.mockImplementation(async (name, payload) => {
+      if (name !== 'syncProQuestionnaireDraft') return { data: { success: true } };
+      if (payload.action === 'bootstrap') {
+        bootstrapCount += 1;
+        if (bootstrapCount === 1) {
+          expect(payload.resumeCredential).toBe(CREDENTIAL);
+          return {
+            data: {
+              success: true,
+              resumeCredential: CREDENTIAL,
+              draft: draftResponse({
+                responses: { '6': 'Answer belonging to the prior client' },
+                credentials: { businessName: 'Prior Client', domain: 'prior-client.example' }
+              })
+            }
+          };
+        }
+        expect(payload.resumeCredential).toBe('');
+        return {
+          data: {
+            success: true,
+            resumeCredential: REPLACEMENT_CREDENTIAL,
+            draft: draftResponse({
+              draftId: 'new-client-draft',
+              sessionId: 'replacement_session_1234567890',
+              credentials: payload.credentials
+            })
+          }
+        };
+      }
+      return { data: { success: true, draft: draftResponse({ revision: payload.clientSequence }) } };
+    });
+
+    const { store } = renderWithStore(<ProQuestionnaire />, {
+      preloadedState: {
+        form: {
+          responses: { '6': 'Stale local answer' },
+          validationStatus: { '6': 'complete' },
+          touchedQuestions: { '6': true },
+          expandedQuestions: { '6': true },
+          credentials: { businessName: 'Prior Client', domain: 'prior-client.example' },
+          textValidationMeta: {}
+        }
+      }
+    });
+    await screen.findByRole('button', { name: 'Submit Questionnaire' });
+    expect(bootstrapCount).toBe(2);
+    expect(store.getState().form.responses['6']).toBeUndefined();
+    expect(store.getState().form.credentials).toEqual(expect.objectContaining({
+      businessName: 'New Client',
+      domain: 'new-client.example'
+    }));
+  });
+
+  it('fills missing identity on an explicit recovery link without replacing established identity', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      `/?businessName=Recovered%20Business&domainName=recovered.example#draft=${CREDENTIAL}`
+    );
+    base44.functions.invoke.mockImplementation(async (name, payload) => {
+      if (name !== 'syncProQuestionnaireDraft') return { data: { success: true } };
+      if (payload.action === 'bootstrap') {
+        return {
+          data: {
+            success: true,
+            resumeCredential: CREDENTIAL,
+            draft: draftResponse({ credentials: {} })
+          }
+        };
+      }
+      return {
+        data: {
+          success: true,
+          draft: draftResponse({
+            revision: payload.clientSequence,
+            credentials: payload.credentials
+          })
+        }
+      };
+    });
+
     renderWithStore(<ProQuestionnaire />);
     await screen.findByRole('button', { name: 'Submit Questionnaire' });
     await waitFor(() => {
@@ -517,8 +614,8 @@ describe('secure questionnaire draft integration', () => {
           action: 'save',
           source: 'identity_sync',
           credentials: expect.objectContaining({
-            businessName: 'Updated Business',
-            domain: 'updated.example'
+            businessName: 'Recovered Business',
+            domain: 'recovered.example'
           })
         })
       );

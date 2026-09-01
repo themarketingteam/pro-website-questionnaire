@@ -16,6 +16,7 @@ import {
 } from '@/lib/draftPersistence';
 import {
   clearQuestionnaireSessionId,
+  getFragmentResumeCredential,
   getOrCreateDraftClientInstanceId,
   getOrCreateQuestionnaireSessionId,
   getStoredResumeCredential,
@@ -51,6 +52,31 @@ const sameValue = (left, right) => {
   } catch {
     return left === right;
   }
+};
+
+const normalizeIdentityValue = (value, type = 'text') => {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (type !== 'domain') return normalized.replace(/\s+/g, ' ');
+  return normalized
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .split(/[/?#]/)[0]
+    .replace(/\.$/, '');
+};
+
+const identityFieldsInConflict = (incoming = {}, server = {}) => {
+  const conflicts = new Set();
+  const incomingBusinessName = normalizeIdentityValue(incoming.businessName);
+  const serverBusinessName = normalizeIdentityValue(server.businessName);
+  const incomingDomain = normalizeIdentityValue(incoming.domain, 'domain');
+  const serverDomain = normalizeIdentityValue(server.domain, 'domain');
+  if (incomingBusinessName && serverBusinessName && incomingBusinessName !== serverBusinessName) {
+    conflicts.add('businessName');
+  }
+  if (incomingDomain && serverDomain && incomingDomain !== serverDomain) {
+    conflicts.add('domain');
+  }
+  return conflicts;
 };
 
 const randomMutationId = () => {
@@ -190,6 +216,7 @@ export const useSecureQuestionnaireDraft = ({
   const unconfirmedMutationsRef = useRef(new Map());
   const storageFailureTrackedRef = useRef(false);
   const lastIdentityFingerprintRef = useRef('');
+  const blockedUrlIdentityFieldsRef = useRef(new Set());
   const saveChainRef = useRef(Promise.resolve(null));
   const pendingChangedKeysRef = useRef(new Set());
   const pendingDeletedKeysRef = useRef(new Set());
@@ -218,8 +245,12 @@ export const useSecureQuestionnaireDraft = ({
 
   const effectiveCredentials = useCallback((snapshotCredentials = latestRef.current.credentials) => ({
     ...(snapshotCredentials || {}),
-    businessName: businessNameParam || snapshotCredentials?.businessName || '',
-    domain: domainParam || snapshotCredentials?.domain || ''
+    businessName: (
+      blockedUrlIdentityFieldsRef.current.has('businessName') ? '' : businessNameParam
+    ) || snapshotCredentials?.businessName || '',
+    domain: (
+      blockedUrlIdentityFieldsRef.current.has('domain') ? '' : domainParam
+    ) || snapshotCredentials?.domain || ''
   }), [businessNameParam, domainParam]);
 
   const writeLocalOutbox = useCallback((error = '') => {
@@ -525,15 +556,52 @@ export const useSecureQuestionnaireDraft = ({
         immediate: String(Boolean(immediate))
       });
       try {
-        const legacySessionId = getOrCreateQuestionnaireSessionId();
-        const initialResumeCredential = getStoredResumeCredential();
-        const result = await bootstrapServerDraft({
+        let legacySessionId = getOrCreateQuestionnaireSessionId();
+        let initialResumeCredential = getStoredResumeCredential();
+        let forkedFromStoredIdentityConflict = false;
+        const fragmentResumeCredential = getFragmentResumeCredential();
+        const incomingUrlIdentity = {
+          businessName: businessNameParam,
+          domain: domainParam
+        };
+        let result = await bootstrapServerDraft({
           functions: base44.functions,
           resumeCredential: initialResumeCredential,
           legacySessionId,
           credentials: effectiveCredentials(latestRef.current.credentials)
         });
         if (cancelled) return;
+        const initialIdentityConflicts = identityFieldsInConflict(
+          incomingUrlIdentity,
+          result.draft?.credentials || {}
+        );
+        if (initialResumeCredential && initialIdentityConflicts.size > 0 && !fragmentResumeCredential) {
+          forkedFromStoredIdentityConflict = true;
+          clearQuestionnaireSessionId();
+          resumeCredentialRef.current = '';
+          blockedUrlIdentityFieldsRef.current.clear();
+          legacySessionId = getOrCreateQuestionnaireSessionId();
+          initialResumeCredential = '';
+          trackClarityEvent('pro_questionnaire_draft_identity_conflict_forked', {
+            fields: [...initialIdentityConflicts].join(','),
+            source: 'stored_browser_credential'
+          });
+          result = await bootstrapServerDraft({
+            functions: base44.functions,
+            resumeCredential: '',
+            legacySessionId,
+            credentials: effectiveCredentials(latestRef.current.credentials)
+          });
+          if (cancelled) return;
+        } else if (fragmentResumeCredential && initialIdentityConflicts.size > 0) {
+          blockedUrlIdentityFieldsRef.current = initialIdentityConflicts;
+          trackClarityEvent('pro_questionnaire_draft_identity_conflict_ignored', {
+            fields: [...initialIdentityConflicts].join(','),
+            source: 'explicit_resume_link'
+          });
+        } else {
+          blockedUrlIdentityFieldsRef.current.clear();
+        }
         const persistedCredential = persistResumeCredential(result.resumeCredential);
         if (!persistedCredential) throw new Error('The draft service did not return a valid recovery credential.');
         resumeCredentialRef.current = persistedCredential;
@@ -553,11 +621,15 @@ export const useSecureQuestionnaireDraft = ({
           // into it. Legacy Redux migration is only for sessions that had no
           // secure resume credential yet.
           allowLegacyCurrentStateMigration: !initialResumeCredential
+            && !forkedFromStoredIdentityConflict
         });
         const normalized = normalizePersistedStateV3(merged.state);
+        const effectiveIdentity = effectiveCredentials();
         const mergedCredentials = {
           ...(serverDraft.credentials || {}),
-          ...Object.fromEntries(Object.entries(effectiveCredentials()).filter(([, value]) => Boolean(value)))
+          ...Object.fromEntries(Object.entries(effectiveIdentity).filter(([field, value]) => (
+            Boolean(value) && !blockedUrlIdentityFieldsRef.current.has(field)
+          )))
         };
         latestRef.current = {
           ...latestRef.current,

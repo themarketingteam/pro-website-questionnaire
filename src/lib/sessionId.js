@@ -41,6 +41,8 @@ const readFragmentCredential = () => {
   }
 };
 
+export const getFragmentResumeCredential = () => readFragmentCredential();
+
 export const getStoredResumeCredential = () => {
   const fragmentValue = readFragmentCredential();
   if (fragmentValue) return fragmentValue;
