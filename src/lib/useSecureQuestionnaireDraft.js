@@ -52,11 +52,18 @@ const calculateProgress = (responses, totalQuestionCount) => {
     : 0;
 };
 
-const mergeNewerLocalBackup = ({ serverDraft, localBackup, currentLocalState }) => {
+const mergeNewerLocalBackup = ({
+  serverDraft,
+  localBackup,
+  currentLocalState,
+  allowLegacyCurrentStateMigration = false
+}) => {
   const serverSavedAt = Date.parse(serverDraft?.lastSavedAt || '') || 0;
   const backupSavedAt = Date.parse(localBackup?.savedAt || '') || 0;
   const serverResponses = serverDraft?.responses || {};
   const mayUseCurrentStateAsLegacyMigration = (
+    allowLegacyCurrentStateMigration
+    &&
     Object.keys(serverResponses).length === 0
     && Object.keys(currentLocalState?.responses || {}).length > 0
   );
@@ -373,9 +380,10 @@ export const useSecureQuestionnaireDraft = ({
       setDraftSaveState('loading');
       try {
         const legacySessionId = getOrCreateQuestionnaireSessionId();
+        const initialResumeCredential = getStoredResumeCredential();
         const result = await bootstrapServerDraft({
           functions: base44.functions,
-          resumeCredential: getStoredResumeCredential(),
+          resumeCredential: initialResumeCredential,
           legacySessionId,
           credentials: effectiveCredentials(latestRef.current.credentials)
         });
@@ -390,7 +398,12 @@ export const useSecureQuestionnaireDraft = ({
         const merged = mergeNewerLocalBackup({
           serverDraft,
           localBackup: localBackup?.session_id === sessionId ? localBackup : null,
-          currentLocalState: latestRef.current
+          currentLocalState: latestRef.current,
+          // An explicit capability identifies an existing authoritative draft.
+          // Never merge persisted Redux answers from a different browser draft
+          // into it. Legacy Redux migration is only for sessions that had no
+          // secure resume credential yet.
+          allowLegacyCurrentStateMigration: !initialResumeCredential
         });
         const normalized = normalizePersistedStateV3(merged.state);
         const mergedCredentials = {

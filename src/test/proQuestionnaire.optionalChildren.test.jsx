@@ -16,6 +16,10 @@ function getQ(id) {
 describe('Optional child behavior: Q23.1 and Q25.1', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Each case represents a pre-secure-storage legacy session. A credential
+    // created by one case must not make the next case look like an explicit
+    // server-side resume.
+    window.history.replaceState({}, '', '/');
   });
 
   afterEach(() => {

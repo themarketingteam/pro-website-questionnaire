@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import ProQuestionnaire from '@/pages/ProQuestionnaire';
 import { renderWithStore } from './utils/renderWithStore';
@@ -23,6 +23,10 @@ const draftResponse = (overrides = {}) => ({
 });
 
 describe('secure questionnaire draft integration', () => {
+  afterEach(() => {
+    window.history.replaceState({}, '', '/');
+  });
+
   it('restores authoritative server answers before showing the questionnaire', async () => {
     base44.functions.invoke.mockImplementation(async (name, payload) => {
       if (name !== 'syncProQuestionnaireDraft') return { data: { success: true } };
@@ -141,6 +145,45 @@ describe('secure questionnaire draft integration', () => {
       const saveCalls = base44.functions.invoke.mock.calls.filter(([, payload]) => payload?.action === 'save');
       expect(saveCalls.length).toBeGreaterThan(0);
       expect(saveCalls.at(-1)[1].deletedKeys).toContain('6');
+    });
+  });
+
+  it('does not merge another draft\'s persisted Redux answers into an explicit shared link', async () => {
+    window.history.replaceState({}, '', `/#draft=${CREDENTIAL}`);
+    base44.functions.invoke.mockImplementation(async (name, payload) => {
+      if (name !== 'syncProQuestionnaireDraft') return { data: { success: true } };
+      if (payload.action === 'bootstrap') {
+        return {
+          data: {
+            success: true,
+            resumeCredential: CREDENTIAL,
+            draft: draftResponse({ responses: {}, expandedQuestions: {} })
+          }
+        };
+      }
+      return { data: { success: true, draft: draftResponse({ responses: payload.responses }) } };
+    });
+
+    const { store } = renderWithStore(<ProQuestionnaire />, {
+      preloadedState: {
+        form: {
+          responses: { '6': 'Stale answer from a different draft' },
+          validationStatus: { '6': 'complete' },
+          touchedQuestions: { '6': true },
+          expandedQuestions: { '6': true },
+          credentials: {},
+          textValidationMeta: {}
+        }
+      }
+    });
+
+    await screen.findByRole('button', { name: 'Submit Questionnaire' });
+    await waitFor(() => {
+      expect(store.getState().form.responses['6']).toBeUndefined();
+    });
+    const saveCalls = base44.functions.invoke.mock.calls.filter(([, payload]) => payload?.action === 'save');
+    saveCalls.forEach(([, payload]) => {
+      expect(payload.responses?.['6']).toBeUndefined();
     });
   });
 });
