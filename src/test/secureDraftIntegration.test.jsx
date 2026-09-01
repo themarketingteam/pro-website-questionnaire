@@ -471,7 +471,6 @@ describe('secure questionnaire draft integration', () => {
       })
     );
   });
-
   it('synchronizes newer URL identity into an existing server draft immediately after restore', async () => {
     window.history.replaceState(
       {},
