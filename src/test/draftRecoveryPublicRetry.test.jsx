@@ -328,6 +328,9 @@ describe('public draft recovery actions', () => {
     renderRecoveryPage();
     fireEvent.click(await screen.findByText('Public Recovery Client'));
     expect(await screen.findByRole('button', { name: /download pdf/i })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Draft Link' })).toHaveTextContent(
+      'Select Copy Draft Link below to generate and display a secure client link.'
+    );
     expect(screen.getByRole('region', { name: 'Actions' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'AI Actions' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Data Copy Options (JSON)' })).toBeInTheDocument();
@@ -404,6 +407,23 @@ describe('public draft recovery actions', () => {
         'https://proform.tmtwebsiteresources.xyz/#draft=secure_share_session_1234567890.abcdefghijklmnopqrstuvwxyzABCDEFGH',
       );
     });
+
+    const displayedLink = screen.getByRole('link', {
+      name: 'https://proform.tmtwebsiteresources.xyz/#draft=secure_share_session_1234567890.abcdefghijklmnopqrstuvwxyzABCDEFGH',
+    });
+    expect(displayedLink).toHaveAttribute(
+      'href',
+      'https://proform.tmtwebsiteresources.xyz/#draft=secure_share_session_1234567890.abcdefghijklmnopqrstuvwxyzABCDEFGH',
+    );
+    expect(displayedLink).toHaveAttribute('target', '_blank');
+    expect(displayedLink).toHaveAttribute('rel', 'noopener noreferrer');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy Draft Link' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+    const shareLinkRequests = base44.functions.invoke.mock.calls.filter(([, payload]) => (
+      payload?.action === 'create_share_link'
+    ));
+    expect(shareLinkRequests).toHaveLength(1);
   });
 
   it('passes the verified recovery grant to intake Retry and Repair + Retry', async () => {

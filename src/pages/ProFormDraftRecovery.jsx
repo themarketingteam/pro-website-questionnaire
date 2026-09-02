@@ -142,11 +142,16 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
   const [detailError, setDetailError] = useState('');
   const [detailVersion, setDetailVersion] = useState(0);
   const [copyingDraftLink, setCopyingDraftLink] = useState(false);
+  const [draftShareUrl, setDraftShareUrl] = useState('');
 
   const isWorking = retrying || !!aiRunning || copyingDraftLink;
 
   // Keep localDraft in sync when parent reloads (but not while editing to avoid clobbering)
   React.useEffect(() => { if (!editing) setLocalDraft(draft); }, [draft, editing]);
+
+  useEffect(() => {
+    setDraftShareUrl('');
+  }, [draft.id]);
 
   useEffect(() => {
     if (!expanded) return undefined;
@@ -328,16 +333,24 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
   const handleCopyDraftLink = async (event) => {
     event.stopPropagation();
     setCopyingDraftLink(true);
+    let shareUrl = draftShareUrl;
     try {
-      const data = await createRecoveryDraftShareLink({
-        recoveryGrant,
-        recordId: localDraft.id
-      });
-      const shareUrl = buildDraftShareUrl(data.resumeCredential);
+      if (!shareUrl) {
+        const data = await createRecoveryDraftShareLink({
+          recoveryGrant,
+          recordId: localDraft.id
+        });
+        shareUrl = buildDraftShareUrl(data.resumeCredential);
+        setDraftShareUrl(shareUrl);
+      }
       await copyTextToClipboard(shareUrl);
       toast.success('Draft link copied — ready to share with the client');
     } catch (error) {
-      toast.error(error?.message || 'Unable to create the client draft link.');
+      toast.error(
+        shareUrl
+          ? 'The draft link is displayed, but this browser could not copy it automatically.'
+          : (error?.message || 'Unable to create the client draft link.')
+      );
     } finally {
       setCopyingDraftLink(false);
     }
@@ -500,6 +513,35 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
             recoveryGrant={recoveryGrant}
             disabled={isWorking}
           />
+
+          <section
+            aria-label="Draft Link"
+            className="brand-draft-link-panel rounded-lg border px-4 py-3"
+          >
+            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-4">
+              <p className="shrink-0 text-sm font-semibold text-slate-900">Draft Link</p>
+              {localDraft.soft_deleted_at ? (
+                <p className="text-sm text-slate-600">
+                  Restore this deleted draft before creating a client link.
+                </p>
+              ) : draftShareUrl ? (
+                <a
+                  href={draftShareUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  referrerPolicy="no-referrer"
+                  className="brand-draft-link-panel__link min-w-0 break-all text-sm"
+                  title="Open this client draft link in a new tab"
+                >
+                  {draftShareUrl}
+                </a>
+              ) : (
+                <p className="text-sm text-slate-600" aria-live="polite">
+                  Select Copy Draft Link below to generate and display a secure client link.
+                </p>
+              )}
+            </div>
+          </section>
 
           <div className="space-y-4">
             <section aria-label="Actions" className="space-y-2">

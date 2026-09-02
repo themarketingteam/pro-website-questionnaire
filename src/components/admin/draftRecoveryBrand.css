@@ -370,6 +370,25 @@
   background: linear-gradient(135deg, #f3f3ff 0%, #ffffff 100%);
 }
 
+.draft-recovery-brand .brand-draft-link-panel {
+  border-color: rgba(49, 49, 204, 0.28);
+  background: #ffffff;
+}
+
+.draft-recovery-brand .brand-draft-link-panel__link {
+  color: var(--msp-blue-600);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: rgba(49, 49, 204, 0.45);
+  text-underline-offset: 0.18em;
+}
+
+.draft-recovery-brand .brand-draft-link-panel__link:hover,
+.draft-recovery-brand .brand-draft-link-panel__link:focus-visible {
+  color: var(--msp-blue-500);
+  text-decoration-color: currentColor;
+}
+
 .draft-recovery-brand .brand-action-divider {
   border-color: var(--msp-blue-200);
 }
