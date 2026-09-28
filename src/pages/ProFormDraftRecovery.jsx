@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Wrench, Pencil, Stethoscope, Loader2, Link2 } from 'lucide-react';
+import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Wrench, Pencil, Stethoscope, Loader2, Link2, History, GitBranch } from 'lucide-react';
 import DraftEditPanel from '@/components/admin/DraftEditPanel';
 import { toast } from 'sonner';
 import QuestionnaireIntakeRecovery from '@/components/admin/QuestionnaireIntakeRecovery';
@@ -23,7 +23,10 @@ import { SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import mspSuccessDigitalLogoDataUrl from '@/assets/mspSuccessDigitalLogo';
 import {
   createRecoveryDraftShareLink,
+  createRecoveryDraftVersionCopy,
+  getRecoveryDraftVersion,
   getRecoveryRecord,
+  listRecoveryDraftVersions,
   listRecoveryRecords,
   updateRecoveryDraft
 } from '@/lib/draftRecoveryApi';
@@ -68,6 +71,27 @@ const formatDate = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleString();
+};
+
+const VERSION_KIND_LABELS = {
+  submitted: 'Submitted draft',
+  final_submission: 'Final submission',
+  submission_barrier: 'Submission checkpoint',
+  cleared: 'Answers cleared',
+  question_cleared: 'Question cleared',
+  admin_edit: 'Admin-edited payload',
+  recovery_copy: 'Recovery copy',
+  current: 'Current draft',
+  autosave: 'Saved draft'
+};
+
+const formatVersionOption = (version) => {
+  const kind = version.beforeClear
+    ? 'Before answers were cleared'
+    : (VERSION_KIND_LABELS[version.kind] || 'Saved draft');
+  const answered = Number(version.responseCount) || 0;
+  const progress = Number(version.progressPercent) || 0;
+  return `${kind} · ${formatDate(version.timestamp)} · ${answered} answers · ${progress}%`;
 };
 
 const formatRefreshTime = (value) => value?.toLocaleTimeString([], {
@@ -143,14 +167,26 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
   const [detailVersion, setDetailVersion] = useState(0);
   const [copyingDraftLink, setCopyingDraftLink] = useState(false);
   const [draftShareUrl, setDraftShareUrl] = useState('');
+  const [versions, setVersions] = useState([]);
+  const [selectedVersionId, setSelectedVersionId] = useState('');
+  const [selectedVersion, setSelectedVersion] = useState(null);
+  const [showAllVersions, setShowAllVersions] = useState(false);
+  const [versionError, setVersionError] = useState('');
+  const [creatingVersionCopy, setCreatingVersionCopy] = useState(false);
+  const [versionMeta, setVersionMeta] = useState({ totalVersionCount: 0, relatedDraftCount: 1, truncated: false });
 
-  const isWorking = retrying || !!aiRunning || copyingDraftLink;
+  const isWorking = retrying || !!aiRunning || copyingDraftLink || creatingVersionCopy;
 
   // Keep localDraft in sync when parent reloads (but not while editing to avoid clobbering)
   React.useEffect(() => { if (!editing) setLocalDraft(draft); }, [draft, editing]);
 
   useEffect(() => {
     setDraftShareUrl('');
+    setSelectedVersionId('');
+    setSelectedVersion(null);
+    setVersions([]);
+    setShowAllVersions(false);
+    setVersionError('');
   }, [draft.id]);
 
   useEffect(() => {
@@ -161,14 +197,42 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
       setDetailLoading(true);
       setDetailError('');
       try {
-        const data = await getRecoveryRecord({
-          recoveryGrant,
-          recordType: 'draft',
-          recordId: draft.id
+        const [data, catalog] = await Promise.all([
+          getRecoveryRecord({
+            recoveryGrant,
+            recordType: 'draft',
+            recordId: draft.id
+          }),
+          listRecoveryDraftVersions({
+            recoveryGrant,
+            recordId: draft.id,
+            mode: showAllVersions ? 'all' : 'meaningful'
+          })
+        ]);
+        if (!active) return;
+        setLocalDraft((current) => ({ ...current, ...data.record }));
+        const nextVersions = Array.isArray(catalog.versions) ? catalog.versions : [];
+        setVersions(nextVersions);
+        setVersionMeta({
+          totalVersionCount: Number(catalog.totalVersionCount) || nextVersions.length,
+          relatedDraftCount: Number(catalog.relatedDraftCount) || 1,
+          truncated: Boolean(catalog.truncated)
         });
-        if (active) setLocalDraft((current) => ({ ...current, ...data.record }));
+        const nextVersionId = selectedVersionId && nextVersions.some((version) => version.versionId === selectedVersionId)
+          ? selectedVersionId
+          : (catalog.defaultVersionId || `current:${draft.id}`);
+        setSelectedVersionId(nextVersionId);
+        const versionData = await getRecoveryDraftVersion({
+          recoveryGrant,
+          recordId: draft.id,
+          versionId: nextVersionId
+        });
+        if (active) setSelectedVersion(versionData.version || null);
       } catch (error) {
-        if (active) setDetailError(error?.message || 'Unable to load this draft.');
+        if (active) {
+          setDetailError(error?.message || 'Unable to load this draft.');
+          setVersionError(error?.message || 'Unable to load questionnaire versions.');
+        }
       } finally {
         if (active) setDetailLoading(false);
       }
@@ -178,17 +242,53 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
     return () => {
       active = false;
     };
-  }, [expanded, draft.id, recoveryGrant, detailVersion]);
+  }, [expanded, draft.id, recoveryGrant, detailVersion, showAllVersions]);
 
-  const parsedResponses = safeJsonParse(localDraft.responses_json, {});
+  const handleVersionChange = async (versionId) => {
+    setSelectedVersionId(versionId);
+    setVersionError('');
+    setDetailLoading(true);
+    try {
+      const data = await getRecoveryDraftVersion({ recoveryGrant, recordId: draft.id, versionId });
+      setSelectedVersion(data.version || null);
+      setEditing(false);
+    } catch (error) {
+      setVersionError(error?.message || 'Unable to load the selected questionnaire version.');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const selectedSnapshot = selectedVersion?.snapshot || null;
+  const isCurrentVersion = !selectedVersion
+    || Boolean(selectedVersion?.current && selectedVersion?.draftId === localDraft.id);
+  const isHistoricalVersion = Boolean(selectedVersion && !isCurrentVersion);
+  const parsedResponses = selectedSnapshot?.responses && typeof selectedSnapshot.responses === 'object'
+    ? selectedSnapshot.responses
+    : safeJsonParse(localDraft.responses_json, {});
+  const selectedCredentials = selectedSnapshot?.credentials || {};
+  const displayDraft = selectedVersion ? {
+    ...localDraft,
+    business_name: selectedCredentials.businessName || localDraft.business_name,
+    domain: selectedCredentials.domain || localDraft.domain,
+    user_id: selectedCredentials.userId || localDraft.user_id,
+    user_name: selectedCredentials.userName || localDraft.user_name,
+    user_email: selectedCredentials.userEmail || localDraft.user_email,
+    status: selectedVersion.status || localDraft.status,
+    current_question_id: selectedSnapshot?.currentQuestionId || '',
+    last_changed_question_id: selectedSnapshot?.lastChangedQuestionId || '',
+    progress_percent: Number(selectedVersion.progressPercent) || 0,
+    last_saved_at: selectedVersion.timestamp || localDraft.last_saved_at,
+    submitted_at: selectedVersion.submitted ? selectedVersion.timestamp : ''
+  } : localDraft;
 
   // Build the final submission payload exactly as it would be sent to ProFormSubmission.create()
   // Step 1: transform raw responses → raw payload
   // Step 2: run through repairProSubmissionPayload (same as the real submit path)
   const { finalSubmissionPayload, repairWarnings } = useMemo(() => {
     try {
-      const businessName = localDraft.business_name || '';
-      const domain = localDraft.domain || '';
+      const businessName = displayDraft.business_name || '';
+      const domain = displayDraft.domain || '';
       const rawPayload = transformResponsesToPayload(
         parsedResponses,
         businessName,
@@ -203,7 +303,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
         repairWarnings: []
       };
     }
-  }, [parsedResponses, localDraft.business_name, localDraft.domain]);
+  }, [parsedResponses, displayDraft.business_name, displayDraft.domain]);
 
   const handleRetry = async (e) => {
     e.stopPropagation();
@@ -291,7 +391,11 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
 
   // The "active" payload: manually edited mapped_payload_json takes priority over computed
   const activeFinalPayload = useMemo(() => {
-    if (localDraft.mapped_payload_json) {
+    const selectedPayload = selectedVersion?.payload;
+    if (selectedPayload && typeof selectedPayload === 'object' && Object.keys(selectedPayload).length > 0) {
+      return selectedPayload;
+    }
+    if (isCurrentVersion && localDraft.mapped_payload_json) {
       try {
         const p = typeof localDraft.mapped_payload_json === 'string'
           ? JSON.parse(localDraft.mapped_payload_json)
@@ -300,9 +404,13 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
       } catch { /* fall through */ }
     }
     return finalSubmissionPayload;
-  }, [localDraft.mapped_payload_json, finalSubmissionPayload]);
+  }, [selectedVersion, isCurrentVersion, localDraft.mapped_payload_json, finalSubmissionPayload]);
 
-  const isMappedPayloadOverride = !!localDraft.mapped_payload_json;
+  const isMappedPayloadOverride = Boolean(
+    selectedVersion?.sourceType === 'submission'
+    || (selectedVersion?.payload && Object.keys(selectedVersion.payload).length > 0)
+    || (isCurrentVersion && localDraft.mapped_payload_json)
+  );
   const payloadValidation = useMemo(
     () => validateSubmissionPayload(activeFinalPayload),
     [activeFinalPayload]
@@ -353,6 +461,27 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
       );
     } finally {
       setCopyingDraftLink(false);
+    }
+  };
+
+  const handleCreateVersionCopy = async (event) => {
+    event.stopPropagation();
+    if (!selectedVersionId || !isHistoricalVersion) return;
+    setCreatingVersionCopy(true);
+    try {
+      const data = await createRecoveryDraftVersionCopy({
+        recoveryGrant,
+        recordId: localDraft.id,
+        versionId: selectedVersionId
+      });
+      const shareUrl = buildDraftShareUrl(data.resumeCredential);
+      await copyTextToClipboard(shareUrl);
+      toast.success('Editable recovery copy created. Its secure client link was copied.');
+      onRetrySuccess?.();
+    } catch (error) {
+      toast.error(error?.message || 'Unable to create an editable recovery copy from this version.');
+    } finally {
+      setCreatingVersionCopy(false);
     }
   };
 
@@ -436,6 +565,93 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
 
       {expanded && !detailLoading && !detailError && (
         <div className="brand-expanded-panel p-4 space-y-4">
+          <section className="brand-version-panel rounded-lg border p-4 space-y-3" aria-labelledby={`draft-version-${draft.id}`}>
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p id={`draft-version-${draft.id}`} className="brand-action-label flex items-center gap-2 text-xs uppercase">
+                  <History className="h-4 w-4" aria-hidden="true" /> Questionnaire Version
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  Choose a retained version. Every detail, payload, copy action, and PDF below uses the selected version.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                <Badge variant="outline">{versionMeta.totalVersionCount} retained versions</Badge>
+                {versionMeta.relatedDraftCount > 1 && (
+                  <Badge variant="outline">{versionMeta.relatedDraftCount} related draft sessions</Badge>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+              <Select value={selectedVersionId} onValueChange={handleVersionChange}>
+                <SelectTrigger aria-label="Questionnaire version to review" className="min-w-0 flex-1">
+                  <SelectValue placeholder="Select a retained questionnaire version" />
+                </SelectTrigger>
+                <SelectContent className="max-h-96">
+                  {versions.map((version) => (
+                    <SelectItem value={version.versionId} key={version.versionId}>
+                      {formatVersionOption(version)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="brand-button-secondary whitespace-nowrap"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setShowAllVersions((current) => !current);
+                }}
+              >
+                {showAllVersions ? 'Show Key Versions' : `Show All Autosaves (${versionMeta.totalVersionCount})`}
+              </Button>
+            </div>
+
+            {versionMeta.truncated && (
+              <p className="text-sm text-amber-800" role="alert">
+                This record exceeds the safe history display limit. No versions were deleted; contact engineering to compact the history before reviewing the remainder.
+              </p>
+            )}
+            {versionError && <p className="text-sm text-red-700" role="alert">{versionError}</p>}
+            {selectedVersion && (
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                <Badge className={selectedVersion.submitted
+                  ? 'brand-status-badge brand-status-badge--submitted'
+                  : 'brand-status-badge brand-status-badge--neutral'}>
+                  {selectedVersion.submitted ? 'submitted snapshot' : (isCurrentVersion ? 'current draft' : 'historical snapshot')}
+                </Badge>
+                <span>Saved {formatDate(selectedVersion.timestamp)}</span>
+                <span>·</span>
+                <span>{selectedVersion.responseCount || 0} populated answers</span>
+                <span>·</span>
+                <span>Source: {selectedVersion.source || selectedVersion.sourceType}</span>
+              </div>
+            )}
+            {isHistoricalVersion && (
+              <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
+                <p className="font-semibold">Read-only historical version</p>
+                <p className="mt-1">
+                  Editing, retrying, AI repair, and client-link actions are disabled so this retained snapshot cannot overwrite the active draft.
+                </p>
+                {selectedVersion?.sourceType !== 'submission' && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="brand-button-secondary mt-3 gap-2"
+                    onClick={handleCreateVersionCopy}
+                    disabled={isWorking}
+                  >
+                    {creatingVersionCopy ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitBranch className="h-3 w-3" />}
+                    {creatingVersionCopy ? 'Creating Copy...' : 'Create Editable Recovery Copy'}
+                  </Button>
+                )}
+              </div>
+            )}
+          </section>
           {localDraft.archived_at && (
             <div className="brand-archive-notice rounded-lg border p-3 text-sm" role="note">
               <p className="font-semibold">Archived recovery record</p>
@@ -458,18 +674,19 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2 text-sm">
-              <p><span className="font-medium">Business Name:</span> {localDraft.business_name || '—'}</p>
-              <p><span className="font-medium">Domain:</span> {localDraft.domain || '—'}</p>
-              <p><span className="font-medium">User Name:</span> {localDraft.user_name || '—'}</p>
-              <p><span className="font-medium">User Email:</span> {localDraft.user_email || '—'}</p>
-              <p><span className="font-medium">User ID:</span> {localDraft.user_id || '—'}</p>
+              <p><span className="font-medium">Business Name:</span> {displayDraft.business_name || '—'}</p>
+              <p><span className="font-medium">Domain:</span> {displayDraft.domain || '—'}</p>
+              <p><span className="font-medium">User Name:</span> {displayDraft.user_name || '—'}</p>
+              <p><span className="font-medium">User Email:</span> {displayDraft.user_email || '—'}</p>
+              <p><span className="font-medium">User ID:</span> {displayDraft.user_id || '—'}</p>
               <p><span className="font-medium">Final Submission ID:</span> {localDraft.final_submission_id || '—'}</p>
             </div>
             <div className="space-y-2 text-sm">
               <p><span className="font-medium">Submit Attempted:</span> {formatDate(localDraft.submit_attempted_at)}</p>
-              <p><span className="font-medium">Submitted At:</span> {formatDate(localDraft.submitted_at)}</p>
-              <p><span className="font-medium">Current Question:</span> {localDraft.current_question_id || '—'}</p>
-              <p><span className="font-medium">Last Changed At:</span> {formatDate(localDraft.last_changed_at)}</p>
+              <p><span className="font-medium">Submitted At:</span> {formatDate(displayDraft.submitted_at)}</p>
+              <p><span className="font-medium">Current Question:</span> {displayDraft.current_question_id || '—'}</p>
+              <p><span className="font-medium">Version Saved At:</span> {formatDate(displayDraft.last_saved_at)}</p>
+              <p><span className="font-medium">Completion:</span> {Number(displayDraft.progress_percent) || 0}%</p>
               <p><span className="font-medium">Save Error:</span> {localDraft.save_error || '—'}</p>
               <p><span className="font-medium">Submit Error:</span> {localDraft.submit_error || '—'}</p>
               <p><span className="font-medium">Archived At:</span> {formatDate(localDraft.archived_at)}</p>
@@ -480,7 +697,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
           </div>
 
           {/* Edit panel */}
-          {editing ? (
+          {editing && isCurrentVersion ? (
             <DraftEditPanel
               draft={localDraft}
               computedPayload={finalSubmissionPayload}
@@ -507,9 +724,9 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
             sessionId={localDraft.session_id}
             payload={activeFinalPayload}
             fallbackResponses={parsedResponses}
-            businessName={localDraft.business_name}
-            domain={localDraft.domain}
-            submissionDate={localDraft.submitted_at || localDraft.last_saved_at}
+            businessName={displayDraft.business_name}
+            domain={displayDraft.domain}
+            submissionDate={displayDraft.submitted_at || displayDraft.last_saved_at}
             recoveryGrant={recoveryGrant}
             disabled={isWorking}
           />
@@ -520,7 +737,11 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
           >
             <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-4">
               <p className="shrink-0 text-sm font-semibold text-slate-900">Draft Link</p>
-              {localDraft.soft_deleted_at ? (
+              {isHistoricalVersion ? (
+                <p className="text-sm text-slate-600">
+                  Historical snapshots are read-only. Create an editable recovery copy to generate a new client link from this version.
+                </p>
+              ) : localDraft.soft_deleted_at ? (
                 <p className="text-sm text-slate-600">
                   Restore this deleted draft before creating a client link.
                 </p>
@@ -553,9 +774,11 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                   size="sm"
                   className="brand-button-secondary gap-2"
                   onClick={handleCopyDraftLink}
-                  disabled={isWorking || Boolean(localDraft.soft_deleted_at)}
+                  disabled={isWorking || isHistoricalVersion || Boolean(localDraft.soft_deleted_at)}
                   title={localDraft.soft_deleted_at
                     ? 'Restore this deleted draft before creating a client link.'
+                    : isHistoricalVersion
+                      ? 'Create an editable recovery copy before generating a client link from a historical version.'
                     : 'Copies a secure link that lets the client continue this saved questionnaire.'}
                 >
                   {copyingDraftLink ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
@@ -570,7 +793,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                     size="sm"
                     className="brand-button-secondary gap-2"
                     onClick={(e) => { e.stopPropagation(); setEditing(true); }}
-                    disabled={isWorking}
+                    disabled={isWorking || isHistoricalVersion}
                   >
                     <Pencil className="w-3 h-3" />
                     Edit Draft
@@ -582,7 +805,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                   type="button"
                   size="sm"
                   onClick={handleRetry}
-                  disabled={isWorking}
+                  disabled={isWorking || isHistoricalVersion}
                   className="brand-button-primary gap-2"
                 >
                   {retrying ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
@@ -592,7 +815,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                   recordType="draft"
                   record={localDraft}
                   recoveryGrant={recoveryGrant}
-                  disabled={isWorking}
+                  disabled={isWorking || isHistoricalVersion}
                   onChanged={() => {
                     setEditing(false);
                     onRetrySuccess?.();
@@ -610,7 +833,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                   size="sm"
                   variant="outline"
                   className="brand-button-secondary gap-2"
-                  disabled={isWorking}
+                  disabled={isWorking || isHistoricalVersion}
                   onClick={(e) => handleAiAction(e, 'diagnose_only')}
                   title="Analyzes structure and missing identity fields without changing the draft or creating a submission."
                 >
@@ -624,7 +847,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                   size="sm"
                   variant="outline"
                   className="brand-button-secondary gap-2"
-                  disabled={isWorking}
+                  disabled={isWorking || isHistoricalVersion}
                   onClick={(e) => handleAiAction(e, 'repair_only')}
                   title="Diagnoses and repairs the draft payload. Does NOT create a final submission."
                 >
@@ -637,7 +860,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                   type="button"
                   size="sm"
                   className="brand-button-dark gap-2"
-                  disabled={isWorking || Boolean(localDraft.final_submission_id)}
+                  disabled={isWorking || isHistoricalVersion || Boolean(localDraft.final_submission_id)}
                   onClick={(e) => handleAiAction(e, 'repair_and_retry')}
                   title={localDraft.final_submission_id
                     ? 'A final submission already exists. Use Retry Submission only if it must be delivered again.'
@@ -666,12 +889,12 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                 <Button type="button" variant="outline" size="sm" onClick={copyRawResponses} className="brand-button-secondary gap-2" disabled={isWorking}>
                   <Copy className="w-3 h-3" /> Raw Draft
                 </Button>
-                {localDraft.ai_repaired_payload_json && (
+                {!isHistoricalVersion && localDraft.ai_repaired_payload_json && (
                   <Button type="button" variant="outline" size="sm" onClick={copyAiRepairedPayload} className="brand-button-secondary gap-2">
                     <Copy className="w-3 h-3" /> Copy AI Repaired Payload
                   </Button>
                 )}
-                {localDraft.ai_repair_report_json && (
+                {!isHistoricalVersion && localDraft.ai_repair_report_json && (
                   <Button type="button" variant="outline" size="sm" onClick={copyAiReport} className="brand-button-secondary gap-2">
                     <Copy className="w-3 h-3" /> Copy AI Report
                   </Button>
@@ -681,12 +904,14 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
           </div>
 
           {/* AI Repair status panel */}
-          <DraftAiRepairSection
-            draft={localDraft}
-            recoveryGrant={recoveryGrant}
-            disabled={isWorking}
-            onReviewed={() => setDetailVersion((version) => version + 1)}
-          />
+          {!isHistoricalVersion && (
+            <DraftAiRepairSection
+              draft={localDraft}
+              recoveryGrant={recoveryGrant}
+              disabled={isWorking}
+              onReviewed={() => setDetailVersion((version) => version + 1)}
+            />
+          )}
 
           <section className="brand-payload-card" aria-label="Final Submission Payload">
             <div className="brand-payload-card__header">
@@ -704,9 +929,17 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
             <div className="brand-payload-card__source">
               <p>
                 <span className="brand-payload-card__meta-label">Source:</span>{' '}
-                <code>{isMappedPayloadOverride ? 'mapped_payload_json' : 'responses_json'}</code>
+                <code>{selectedVersion?.sourceType === 'submission'
+                  ? 'retained final submission'
+                  : isMappedPayloadOverride
+                    ? 'mapped_payload_json'
+                    : 'responses_json'}</code>
                 <span className="brand-payload-card__source-detail">
-                  {isMappedPayloadOverride ? ' · manually edited' : ' · computed and normalized'}
+                  {isHistoricalVersion
+                    ? ' · selected retained version'
+                    : isMappedPayloadOverride
+                      ? ' · manually edited'
+                      : ' · computed and normalized'}
                 </span>
               </p>
               <span className="brand-payload-card__usage">Used by Retry Submission</span>

@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { base44 } from '@/api/base44Client';
 import {
   getRecoveryRequestErrorMessage,
+  getRecoveryDraftVersion,
+  listRecoveryDraftVersions,
+  createRecoveryDraftVersionCopy,
   listRecoveryRecords,
 } from '@/lib/draftRecoveryApi';
 
@@ -32,5 +35,35 @@ describe('draft recovery API errors', () => {
     expect(getRecoveryRequestErrorMessage({
       response: { data: { error: { message: 'Mapped payload is invalid.' } } },
     })).toBe('Mapped payload is invalid.');
+  });
+
+  it('uses protected, record-scoped actions for version history and recovery copies', async () => {
+    base44.functions.invoke.mockResolvedValue({ data: { success: true, versions: [] } });
+
+    await listRecoveryDraftVersions({ recoveryGrant: 'signed-grant', recordId: 'draft-1', mode: 'all' });
+    await getRecoveryDraftVersion({ recoveryGrant: 'signed-grant', recordId: 'draft-1', versionId: 'revision:rev-1' });
+    await createRecoveryDraftVersionCopy({ recoveryGrant: 'signed-grant', recordId: 'draft-1', versionId: 'revision:rev-1' });
+
+    expect(base44.functions.invoke).toHaveBeenNthCalledWith(1, 'queryProQuestionnaireRecoveryRecords', {
+      action: 'list_versions',
+      recoveryGrant: 'signed-grant',
+      recordType: 'draft',
+      recordId: 'draft-1',
+      mode: 'all',
+    });
+    expect(base44.functions.invoke).toHaveBeenNthCalledWith(2, 'queryProQuestionnaireRecoveryRecords', {
+      action: 'get_version',
+      recoveryGrant: 'signed-grant',
+      recordType: 'draft',
+      recordId: 'draft-1',
+      versionId: 'revision:rev-1',
+    });
+    expect(base44.functions.invoke).toHaveBeenNthCalledWith(3, 'queryProQuestionnaireRecoveryRecords', {
+      action: 'create_version_copy',
+      recoveryGrant: 'signed-grant',
+      recordType: 'draft',
+      recordId: 'draft-1',
+      versionId: 'revision:rev-1',
+    });
   });
 });

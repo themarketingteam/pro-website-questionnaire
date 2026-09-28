@@ -254,13 +254,27 @@ const applyChanges = (snapshot: any, changeRecord: any) => {
   return snapshot;
 };
 
+const listDraftRevisions = async (base44: any, draftId: string) => {
+  const pageSize = 500;
+  const maximum = 25_000;
+  const revisions: any[] = [];
+  for (let skip = 0; skip < maximum; skip += pageSize) {
+    const page = await base44.asServiceRole.entities.ProFormDraftRevision.filter(
+      { draft_id: draftId },
+      'server_received_at',
+      pageSize,
+      skip
+    );
+    const safePage = Array.isArray(page) ? page : [];
+    revisions.push(...safePage);
+    if (safePage.length < pageSize) return revisions;
+  }
+  throw new Error('Draft revision history exceeds the supported replay window and requires compaction.');
+};
+
 const rebuildSnapshot = async (base44: any, draft: any) => {
   const snapshot = getBaseline(draft);
-  const revisions = await base44.asServiceRole.entities.ProFormDraftRevision.filter(
-    { draft_id: draft.id },
-    'server_received_at',
-    5000
-  );
+  const revisions = await listDraftRevisions(base44, draft.id);
   const ordered = (Array.isArray(revisions) ? revisions : []).sort((left, right) => {
     const timeDifference = (Date.parse(left.client_changed_at || left.server_received_at || left.created_date || '') || 0)
       - (Date.parse(right.client_changed_at || right.server_received_at || right.created_date || '') || 0);
@@ -493,7 +507,9 @@ Deno.serve(async (req) => {
       }
 
       const rebuilt = await rebuildSnapshot(base44, draft);
-      const materialized = await materializeDraft(base44, draft, rebuilt, { changed: false });
+      const materialized = draft.status === 'submitted'
+        ? draft
+        : await materializeDraft(base44, draft, rebuilt, { changed: false });
       return jsonResponse({
         success: true,
         resumeCredential,
@@ -525,6 +541,16 @@ Deno.serve(async (req) => {
     }
 
     if (action !== 'save') return jsonResponse({ success: false, error: 'Unsupported draft action.' }, 400);
+
+    if (cleanText(draft.status, 40) === 'submitted' && cleanText(body?.status, 40) !== 'submitted') {
+      const rebuilt = await rebuildSnapshot(base44, draft);
+      return jsonResponse({
+        success: true,
+        finalized: true,
+        ignored: true,
+        draft: publicDraft(draft, rebuilt)
+      });
+    }
 
     const clientInstanceId = cleanText(body?.clientInstanceId, 120);
     const mutationId = cleanText(body?.mutationId, 160);

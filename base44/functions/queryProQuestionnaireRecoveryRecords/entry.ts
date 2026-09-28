@@ -9,6 +9,9 @@ const MAX_PAGE_SIZE = 50;
 const RETENTION_DAYS = 1095;
 const RETENTION_POLICY_VERSION = 'three-year-active-v1';
 const MAX_ACTIVE_SHARE_LINKS = 20;
+const VERSION_QUERY_PAGE_SIZE = 500;
+const VERSION_QUERY_MAX_RECORDS = 25_000;
+const VERSION_SESSION_GAP_MS = 30 * 60 * 1000;
 const encoder = new TextEncoder();
 
 const RECORD_CONFIG = {
@@ -101,6 +104,70 @@ const badRequest = (error: string, context: Record<string, unknown>) => {
 const cleanText = (value: unknown, maxLength: number) => (
   typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
 );
+
+const safeParse = (value: unknown, fallback: any) => {
+  try {
+    if (!value) return fallback;
+    return typeof value === 'string' ? JSON.parse(value) : value;
+  } catch {
+    return fallback;
+  }
+};
+
+const safeStringify = (value: unknown, fallback = '{}') => {
+  try { return JSON.stringify(value); } catch { return fallback; }
+};
+
+const normalizeDomain = (value: unknown) => cleanText(value, 500)
+  .toLowerCase()
+  .replace(/^https?:\/\//, '')
+  .replace(/^www\./, '')
+  .split('/')[0]
+  .split('?')[0]
+  .split('#')[0]
+  .replace(/\.+$/, '');
+
+const isPresentValue = (value: unknown): boolean => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.some(isPresentValue);
+  if (typeof value === 'object') return Object.values(value as Record<string, unknown>).some(isPresentValue);
+  return true;
+};
+
+const responseCount = (responses: unknown) => Object.values(
+  responses && typeof responses === 'object' && !Array.isArray(responses)
+    ? responses as Record<string, unknown>
+    : {}
+).filter(isPresentValue).length;
+
+const hashValue = async (value: unknown) => {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(safeStringify(value))));
+  return toBase64Url(bytes);
+};
+
+const collectFiltered = async (
+  entity: any,
+  query: Record<string, unknown>,
+  sort: string,
+  fields: string[],
+  maximum = VERSION_QUERY_MAX_RECORDS
+) => {
+  const records: any[] = [];
+  for (let skip = 0; skip < maximum; skip += VERSION_QUERY_PAGE_SIZE) {
+    const page = await entity.filter(
+      query,
+      sort,
+      Math.min(VERSION_QUERY_PAGE_SIZE, maximum - skip),
+      skip,
+      fields
+    );
+    const safePage = Array.isArray(page) ? page : [];
+    records.push(...safePage);
+    if (safePage.length < VERSION_QUERY_PAGE_SIZE) return { records, truncated: false };
+  }
+  return { records, truncated: true };
+};
 
 const clampInteger = (value: unknown, fallback: number, minimum: number, maximum: number) => {
   const parsed = Number(value);
@@ -309,6 +376,403 @@ const validateMappedPayload = (value: unknown) => {
   }
 };
 
+const draftVersionFields = [
+  'id', 'session_id', 'business_name', 'domain', 'user_email', 'user_name', 'user_id',
+  'status', 'responses_json', 'validation_status_json', 'touched_questions_json',
+  'expanded_questions_json', 'history_baseline_json', 'history_started_at', 'mapped_payload_json',
+  'current_question_id', 'last_changed_question_id', 'progress_percent', 'save_revision',
+  'last_saved_at', 'last_changed_at', 'submit_attempted_at', 'submitted_at',
+  'final_submission_id', 'intake_id', 'created_date', 'updated_date', 'archived_at',
+  'soft_deleted_at', 'retention_until'
+];
+
+const revisionVersionFields = [
+  'id', 'draft_id', 'session_id', 'mutation_id', 'client_instance_id', 'client_sequence',
+  'base_revision', 'changed_keys_json', 'deleted_keys_json', 'result_snapshot_json',
+  'status', 'source', 'server_received_at', 'client_changed_at', 'created_date'
+];
+
+const submissionVersionFields = [
+  'id', 'metadata', 'userdata', 'created_date', 'updated_date', 'created_by',
+  'archived_at', 'soft_deleted_at', 'retention_until'
+];
+
+const identityMatchesDraft = (anchor: any, candidate: any) => {
+  if (!anchor?.id || !candidate?.id) return false;
+  if (anchor.id === candidate.id || (anchor.session_id && anchor.session_id === candidate.session_id)) return true;
+  const anchorDomain = normalizeDomain(anchor.domain);
+  const candidateDomain = normalizeDomain(candidate.domain);
+  const anchorEmail = cleanText(anchor.user_email, 320).toLowerCase();
+  const candidateEmail = cleanText(candidate.user_email, 320).toLowerCase();
+  const anchorUserId = cleanText(anchor.user_id, 300);
+  const candidateUserId = cleanText(candidate.user_id, 300);
+  const anchorName = cleanText(anchor.business_name, 300).toLowerCase();
+  const candidateName = cleanText(candidate.business_name, 300).toLowerCase();
+  if (anchorUserId && candidateUserId && anchorUserId === candidateUserId) return true;
+  if (anchorEmail && candidateEmail && anchorEmail === candidateEmail) return true;
+  return Boolean(
+    anchorDomain
+    && candidateDomain
+    && anchorDomain === candidateDomain
+    && anchorName
+    && candidateName
+    && anchorName === candidateName
+  );
+};
+
+const findRelatedDrafts = async (base44: any, anchor: any) => {
+  const candidates = new Map<string, any>([[anchor.id, anchor]]);
+  const queries: Record<string, unknown>[] = [];
+  if (anchor.session_id) queries.push({ session_id: anchor.session_id });
+  if (normalizeDomain(anchor.domain)) queries.push({ domain: normalizeDomain(anchor.domain) });
+  if (cleanText(anchor.user_email, 320)) queries.push({ user_email: cleanText(anchor.user_email, 320) });
+  if (cleanText(anchor.user_id, 300)) queries.push({ user_id: cleanText(anchor.user_id, 300) });
+
+  for (const query of queries) {
+    const matches = await base44.asServiceRole.entities.ProFormDraft.filter(
+      query,
+      '-last_saved_at',
+      250,
+      0,
+      draftVersionFields
+    );
+    for (const candidate of Array.isArray(matches) ? matches : []) {
+      if (identityMatchesDraft(anchor, candidate)) candidates.set(candidate.id, candidate);
+    }
+  }
+  return [...candidates.values()];
+};
+
+const versionTimestamp = (record: any) => cleanText(
+  record?.server_received_at
+    || record?.client_changed_at
+    || record?.submitted_at
+    || record?.last_saved_at
+    || record?.created_date,
+  100
+);
+
+const versionLabelKind = (source: string, status: string) => {
+  if (source === 'durable_submission_link' || status === 'submitted') return 'submitted';
+  if (source === 'final_submission_barrier') return 'submission_barrier';
+  if (source === 'explicit_clear_all') return 'cleared';
+  if (source === 'explicit_question_clear') return 'question_cleared';
+  if (source === 'admin_payload_edit') return 'admin_edit';
+  if (source === 'recovery_version_copy') return 'recovery_copy';
+  return 'autosave';
+};
+
+const buildVersionCatalog = async (base44: any, anchor: any, mode: string) => {
+  const relatedDrafts = await findRelatedDrafts(base44, anchor);
+  const draftIds = relatedDrafts.map((draft) => draft.id).filter(Boolean);
+  const sessionIds = [...new Set(relatedDrafts.map((draft) => draft.session_id).filter(Boolean))];
+  const revisionResult = draftIds.length
+    ? await collectFiltered(
+        base44.asServiceRole.entities.ProFormDraftRevision,
+        { draft_id: { $in: draftIds } },
+        'server_received_at',
+        revisionVersionFields
+      )
+    : { records: [], truncated: false };
+
+  const draftById = new Map(relatedDrafts.map((draft) => [draft.id, draft]));
+  const revisionVersions: any[] = [];
+  for (let index = 0; index < revisionResult.records.length; index += 1) {
+    const revision = revisionResult.records[index];
+    const snapshot = safeParse(revision.result_snapshot_json, {});
+    const responses = snapshot?.responses || {};
+    const sourceDraft = draftById.get(revision.draft_id) || anchor;
+    revisionVersions.push({
+      versionId: `revision:${revision.id}`,
+      kind: versionLabelKind(cleanText(revision.source, 80), cleanText(revision.status, 40)),
+      sourceType: 'revision',
+      sourceRecordId: revision.id,
+      draftId: revision.draft_id,
+      sessionId: revision.session_id || sourceDraft.session_id || '',
+      timestamp: versionTimestamp(revision),
+      source: cleanText(revision.source, 80) || 'autosave',
+      status: cleanText(revision.status, 40) || 'draft',
+      responseCount: responseCount(responses),
+      rawResponseKeyCount: Object.keys(responses).length,
+      progressPercent: Math.max(0, Math.min(100, Number(snapshot?.progressPercent) || 0)),
+      changedKeyCount: safeParse(revision.changed_keys_json, []).length || 0,
+      deletedKeyCount: safeParse(revision.deleted_keys_json, []).length || 0,
+      businessName: cleanText(snapshot?.credentials?.businessName || sourceDraft.business_name, 300),
+      domain: normalizeDomain(snapshot?.credentials?.domain || sourceDraft.domain),
+      snapshotHash: await hashValue(snapshot),
+      meaningful: false,
+      current: false,
+      submitted: revision.source === 'durable_submission_link' || revision.status === 'submitted'
+    });
+  }
+
+  const revisionsByDraft = new Map<string, any[]>();
+  for (const version of revisionVersions) {
+    const values = revisionsByDraft.get(version.draftId) || [];
+    values.push(version);
+    revisionsByDraft.set(version.draftId, values);
+  }
+  for (const values of revisionsByDraft.values()) {
+    values.sort((left, right) => Date.parse(left.timestamp || '') - Date.parse(right.timestamp || ''));
+    let highWater = -1;
+    for (let index = 0; index < values.length; index += 1) {
+      const version = values[index];
+      const previous = values[index - 1];
+      const next = values[index + 1];
+      const gapAfter = next
+        ? Date.parse(next.timestamp || '') - Date.parse(version.timestamp || '')
+        : Number.POSITIVE_INFINITY;
+      const isNewHighWater = version.responseCount > highWater;
+      highWater = Math.max(highWater, version.responseCount);
+      const beforeLargeDrop = Boolean(next && (
+        next.responseCount === 0 && version.responseCount > 0
+        || next.responseCount < version.responseCount * 0.5
+        || next.deletedKeyCount >= Math.max(3, Math.floor(version.responseCount * 0.5))
+      ));
+      version.meaningful = Boolean(
+        isNewHighWater
+        || beforeLargeDrop
+        || gapAfter >= VERSION_SESSION_GAP_MS
+        || version.kind !== 'autosave'
+        || index === values.length - 1
+        || !previous
+      );
+      version.beforeClear = beforeLargeDrop;
+    }
+  }
+
+  const currentVersions = await Promise.all(relatedDrafts.map(async (draft) => {
+    const responses = safeParse(draft.responses_json, {});
+    const snapshot = {
+      responses,
+      validationStatus: safeParse(draft.validation_status_json, {}),
+      touchedQuestions: safeParse(draft.touched_questions_json, {}),
+      expandedQuestions: safeParse(draft.expanded_questions_json, {}),
+      credentials: {
+        businessName: draft.business_name || '',
+        domain: draft.domain || '',
+        userId: draft.user_id || '',
+        userName: draft.user_name || '',
+        userEmail: draft.user_email || ''
+      },
+      currentQuestionId: draft.current_question_id || '',
+      lastChangedQuestionId: draft.last_changed_question_id || '',
+      progressPercent: Number(draft.progress_percent) || 0,
+      mappedPayload: safeParse(draft.mapped_payload_json, {})
+    };
+    return {
+      versionId: `current:${draft.id}`,
+      kind: 'current',
+      sourceType: 'draft',
+      sourceRecordId: draft.id,
+      draftId: draft.id,
+      sessionId: draft.session_id || '',
+      timestamp: versionTimestamp(draft),
+      source: 'current_materialized_draft',
+      status: draft.status || 'draft',
+      responseCount: responseCount(responses),
+      rawResponseKeyCount: Object.keys(responses).length,
+      progressPercent: Math.max(0, Math.min(100, Number(draft.progress_percent) || 0)),
+      changedKeyCount: 0,
+      deletedKeyCount: 0,
+      businessName: cleanText(draft.business_name, 300),
+      domain: normalizeDomain(draft.domain),
+      snapshotHash: await hashValue(snapshot),
+      meaningful: true,
+      current: draft.id === anchor.id,
+      submitted: draft.status === 'submitted'
+    };
+  }));
+
+  const submissionIds = new Set(relatedDrafts.map((draft) => draft.final_submission_id).filter(Boolean));
+  let sessionSubmissions: any[] = [];
+  if (sessionIds.length > 0) {
+    const result = await collectFiltered(
+      base44.asServiceRole.entities.ProFormSubmission,
+      { 'metadata.questionnaire_session_id': { $in: sessionIds } },
+      'created_date',
+      submissionVersionFields,
+      5000
+    );
+    sessionSubmissions = result.records;
+    result.records.forEach((record) => submissionIds.add(record.id));
+  }
+  const linkedSubmissions = submissionIds.size > 0
+    ? await base44.asServiceRole.entities.ProFormSubmission.filter(
+        { id: { $in: [...submissionIds] } },
+        'created_date',
+        Math.min(5000, submissionIds.size),
+        0,
+        submissionVersionFields
+      )
+    : [];
+  const submissions = new Map<string, any>();
+  [...sessionSubmissions, ...(Array.isArray(linkedSubmissions) ? linkedSubmissions : [])]
+    .forEach((record) => { if (record?.id) submissions.set(record.id, record); });
+  const submissionVersions = await Promise.all([...submissions.values()].map(async (submission) => {
+    const payload = { metadata: submission.metadata || {}, userdata: submission.userdata || {} };
+    return {
+      versionId: `submission:${submission.id}`,
+      kind: 'final_submission',
+      sourceType: 'submission',
+      sourceRecordId: submission.id,
+      draftId: submission.metadata?.source_draft_id || '',
+      sessionId: submission.metadata?.questionnaire_session_id || '',
+      timestamp: submission.metadata?.submission_datetime || submission.created_date || '',
+      source: 'final_submission',
+      status: 'submitted',
+      responseCount: Object.keys(submission.userdata || {}).filter((key) => isPresentValue(submission.userdata?.[key])).length,
+      rawResponseKeyCount: 0,
+      progressPercent: 100,
+      changedKeyCount: 0,
+      deletedKeyCount: 0,
+      businessName: cleanText(submission.metadata?.business_name, 300),
+      domain: normalizeDomain(submission.metadata?.businessDomain || submission.metadata?.business_domain),
+      snapshotHash: await hashValue(payload),
+      meaningful: true,
+      current: false,
+      submitted: true
+    };
+  }));
+
+  const allVersions = [...submissionVersions, ...currentVersions, ...revisionVersions]
+    .sort((left, right) => Date.parse(right.timestamp || '') - Date.parse(left.timestamp || ''));
+  const defaultVersion = [...allVersions].sort((left, right) => {
+    const priority = (version: any) => version.kind === 'submitted'
+      ? 6
+      : version.kind === 'final_submission'
+        ? 5
+        : version.kind === 'submission_barrier'
+          ? 3
+          : version.responseCount > 0
+            ? 2
+            : 1;
+    return priority(right) - priority(left)
+      || right.responseCount - left.responseCount
+      || right.progressPercent - left.progressPercent
+      || Date.parse(right.timestamp || '') - Date.parse(left.timestamp || '');
+  })[0] || null;
+  const selectedVersions = mode === 'all'
+    ? allVersions
+    : allVersions.filter((version) => version.meaningful || version.versionId === defaultVersion?.versionId);
+  const unique = new Map<string, any>();
+  for (const version of selectedVersions) {
+    const key = `${version.sourceType}:${version.sourceRecordId}`;
+    if (!unique.has(key)) unique.set(key, version);
+  }
+  return {
+    versions: [...unique.values()],
+    defaultVersionId: defaultVersion?.versionId || `current:${anchor.id}`,
+    totalVersionCount: allVersions.length,
+    meaningfulVersionCount: allVersions.filter((version) => version.meaningful).length,
+    relatedDraftCount: relatedDrafts.length,
+    truncated: revisionResult.truncated,
+    relatedDraftIds: draftIds
+  };
+};
+
+const snapshotFromDraft = (draft: any) => ({
+  responses: safeParse(draft.responses_json, {}),
+  validationStatus: safeParse(draft.validation_status_json, {}),
+  touchedQuestions: safeParse(draft.touched_questions_json, {}),
+  expandedQuestions: safeParse(draft.expanded_questions_json, {}),
+  credentials: {
+    businessName: draft.business_name || '',
+    domain: draft.domain || '',
+    userId: draft.user_id || '',
+    userName: draft.user_name || '',
+    userEmail: draft.user_email || ''
+  },
+  currentQuestionId: draft.current_question_id || '',
+  lastChangedQuestionId: draft.last_changed_question_id || '',
+  progressPercent: Number(draft.progress_percent) || 0,
+  mappedPayload: safeParse(draft.mapped_payload_json, {})
+});
+
+const publicVersionDetail = async (base44: any, anchor: any, versionId: string) => {
+  const relatedDrafts = await findRelatedDrafts(base44, anchor);
+  const relatedDraftIds = new Set(relatedDrafts.map((draft) => draft.id));
+  const relatedSessionIds = new Set(relatedDrafts.map((draft) => draft.session_id).filter(Boolean));
+  const [kind, sourceId] = versionId.split(':', 2);
+  if (!kind || !sourceId) return null;
+
+  if (kind === 'current') {
+    const draft = relatedDrafts.find((record) => record.id === sourceId);
+    if (!draft) return null;
+    const snapshot = snapshotFromDraft(draft);
+    return {
+      versionId,
+      sourceType: 'draft',
+      sourceRecordId: draft.id,
+      draftId: draft.id,
+      sessionId: draft.session_id || '',
+      timestamp: versionTimestamp(draft),
+      source: 'current_materialized_draft',
+      status: draft.status || 'draft',
+      snapshot,
+      payload: snapshot.mappedPayload,
+      responseCount: responseCount(snapshot.responses),
+      progressPercent: snapshot.progressPercent,
+      current: draft.id === anchor.id,
+      submitted: draft.status === 'submitted'
+    };
+  }
+
+  if (kind === 'revision') {
+    const revision = await base44.asServiceRole.entities.ProFormDraftRevision.get(sourceId).catch(() => null);
+    if (!revision?.id || !relatedDraftIds.has(revision.draft_id)) return null;
+    const snapshot = safeParse(revision.result_snapshot_json, {});
+    const sourceDraft = relatedDrafts.find((draft) => draft.id === revision.draft_id) || anchor;
+    const mappedPayload = snapshot?.mappedPayload && typeof snapshot.mappedPayload === 'object'
+      ? snapshot.mappedPayload
+      : {};
+    return {
+      versionId,
+      sourceType: 'revision',
+      sourceRecordId: revision.id,
+      draftId: revision.draft_id,
+      sessionId: revision.session_id || sourceDraft.session_id || '',
+      timestamp: versionTimestamp(revision),
+      source: revision.source || 'autosave',
+      status: revision.status || 'draft',
+      snapshot,
+      payload: mappedPayload,
+      responseCount: responseCount(snapshot.responses),
+      progressPercent: Number(snapshot.progressPercent) || 0,
+      current: false,
+      submitted: revision.source === 'durable_submission_link' || revision.status === 'submitted'
+    };
+  }
+
+  if (kind === 'submission') {
+    const submission = await base44.asServiceRole.entities.ProFormSubmission.get(sourceId).catch(() => null);
+    const submissionSessionId = submission?.metadata?.questionnaire_session_id || '';
+    const submissionDraftId = submission?.metadata?.source_draft_id || '';
+    if (!submission?.id || (!relatedSessionIds.has(submissionSessionId) && !relatedDraftIds.has(submissionDraftId))) return null;
+    const payload = { metadata: submission.metadata || {}, userdata: submission.userdata || {} };
+    return {
+      versionId,
+      sourceType: 'submission',
+      sourceRecordId: submission.id,
+      draftId: submissionDraftId,
+      sessionId: submissionSessionId,
+      timestamp: submission.metadata?.submission_datetime || submission.created_date || '',
+      source: 'final_submission',
+      status: 'submitted',
+      snapshot: { responses: {}, credentials: {
+        businessName: submission.metadata?.business_name || '',
+        domain: submission.metadata?.businessDomain || submission.metadata?.business_domain || ''
+      }, progressPercent: 100 },
+      payload,
+      responseCount: Object.values(submission.userdata || {}).filter(isPresentValue).length,
+      progressPercent: 100,
+      current: false,
+      submitted: true
+    };
+  }
+  return null;
+};
+
 // eslint-disable-next-line no-undef
 Deno.serve(async (req) => {
   if (req.method !== 'POST') {
@@ -446,6 +910,132 @@ Deno.serve(async (req) => {
       return badRequest('A recovery record ID is required.', { action, recordType });
     }
 
+    if (recordType === 'draft' && action === 'list_versions') {
+      const anchor = await entity.get(recordId).catch(() => null);
+      if (!anchor?.id) return jsonResponse({ success: false, error: 'Questionnaire draft not found.' }, 404);
+      const mode = cleanText(body?.mode, 20) === 'all' ? 'all' : 'meaningful';
+      const catalog = await buildVersionCatalog(base44, anchor, mode);
+      return jsonResponse({ success: true, mode, ...catalog });
+    }
+
+    if (recordType === 'draft' && action === 'get_version') {
+      const anchor = await entity.get(recordId).catch(() => null);
+      if (!anchor?.id) return jsonResponse({ success: false, error: 'Questionnaire draft not found.' }, 404);
+      const versionId = cleanText(body?.versionId, 300);
+      const version = await publicVersionDetail(base44, anchor, versionId);
+      return version
+        ? jsonResponse({ success: true, version })
+        : jsonResponse({ success: false, error: 'Questionnaire version not found.' }, 404);
+    }
+
+    if (recordType === 'draft' && action === 'create_version_copy') {
+      const anchor = await entity.get(recordId).catch(() => null);
+      if (!anchor?.id) return jsonResponse({ success: false, error: 'Questionnaire draft not found.' }, 404);
+      const versionId = cleanText(body?.versionId, 300);
+      const version = await publicVersionDetail(base44, anchor, versionId);
+      if (!version) return jsonResponse({ success: false, error: 'Questionnaire version not found.' }, 404);
+      const snapshot = version.snapshot && typeof version.snapshot === 'object' ? version.snapshot : {};
+      const responses = snapshot.responses && typeof snapshot.responses === 'object' && !Array.isArray(snapshot.responses)
+        ? snapshot.responses
+        : {};
+      if (Object.keys(responses).length === 0 && version.sourceType === 'submission') {
+        return badRequest('Final submissions do not contain the raw answer map required to create an editable draft copy.', {
+          action,
+          recordType,
+          recordId,
+          versionId
+        });
+      }
+      const credentials = snapshot.credentials && typeof snapshot.credentials === 'object'
+        ? snapshot.credentials
+        : {};
+      const now = new Date().toISOString();
+      const sessionId = crypto.randomUUID();
+      const secret = randomToken();
+      const baseline = {
+        responses,
+        validationStatus: snapshot.validationStatus || {},
+        touchedQuestions: snapshot.touchedQuestions || {},
+        expandedQuestions: snapshot.expandedQuestions || {},
+        credentials: {
+          businessName: cleanText(credentials.businessName || anchor.business_name, 300),
+          domain: normalizeDomain(credentials.domain || anchor.domain),
+          userId: cleanText(credentials.userId || anchor.user_id, 300),
+          userName: cleanText(credentials.userName || anchor.user_name, 300),
+          userEmail: cleanText(credentials.userEmail || anchor.user_email, 320)
+        },
+        currentQuestionId: cleanText(snapshot.currentQuestionId, 40),
+        lastChangedQuestionId: cleanText(snapshot.lastChangedQuestionId, 40),
+        progressPercent: Math.max(0, Math.min(100, Number(snapshot.progressPercent) || 0))
+      };
+      const payload = version.payload && typeof version.payload === 'object'
+        ? version.payload
+        : {};
+      const created = await entity.create({
+        session_id: sessionId,
+        access_token_hash: await hashToken(secret),
+        access_version: 1,
+        shared_access_token_hashes_json: '[]',
+        history_baseline_json: safeStringify(baseline),
+        history_started_at: now,
+        save_revision: 0,
+        latest_client_sequences_json: '{}',
+        progress_percent: baseline.progressPercent,
+        business_name: baseline.credentials.businessName,
+        domain: baseline.credentials.domain,
+        user_id: baseline.credentials.userId,
+        user_name: baseline.credentials.userName,
+        user_email: baseline.credentials.userEmail,
+        status: 'draft',
+        current_question_id: baseline.currentQuestionId,
+        last_changed_question_id: baseline.lastChangedQuestionId,
+        responses_json: safeStringify(baseline.responses),
+        validation_status_json: safeStringify(baseline.validationStatus),
+        touched_questions_json: safeStringify(baseline.touchedQuestions),
+        expanded_questions_json: safeStringify(baseline.expandedQuestions),
+        metadata_json: safeStringify(payload?.metadata || {}),
+        userdata_json: safeStringify(payload?.userdata || {}),
+        mapped_payload_json: safeStringify(payload),
+        draft_metadata_json: safeStringify({
+          app: 'pro_questionnaire',
+          source: 'recovery_version_copy',
+          source_draft_id: anchor.id,
+          source_version_id: versionId
+        }),
+        last_changed_at: now,
+        last_saved_at: now,
+        retention_policy_version: RETENTION_POLICY_VERSION,
+        retention_started_at: now,
+        retention_until: new Date(Date.now() + RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+        archived_at: '',
+        archive_reason: '',
+        soft_deleted_at: '',
+        soft_deleted_by: '',
+        soft_delete_reason: ''
+      });
+      await base44.asServiceRole.entities.ProFormDraftEvent.create({
+        session_id: sessionId,
+        event_type: 'recovery_version_copy_created',
+        question_id: '',
+        question_type: 'administrative_recovery',
+        value_json: safeStringify({ source_draft_id: anchor.id, source_version_id: versionId }),
+        value_summary: 'An administrator created an editable recovery copy from a retained questionnaire version.',
+        value_length: 0,
+        selected_option_count: 0,
+        business_name: baseline.credentials.businessName,
+        domain: baseline.credentials.domain,
+        user_id: baseline.credentials.userId,
+        created_at_iso: now
+      }).catch(() => null);
+      return jsonResponse({
+        success: true,
+        recordId: created?.id || '',
+        sessionId,
+        resumeCredential: `${sessionId}.${secret}`,
+        sourceVersionId: versionId
+      });
+    }
+
     if (action === 'create_share_link' && recordType === 'draft') {
       const draft = await entity.get(recordId);
       if (!draft?.id) {
@@ -523,6 +1113,7 @@ Deno.serve(async (req) => {
         return badRequest('The mapped payload must be valid JSON.', { action, recordType });
       }
 
+      const beforeUpdate = await entity.get(recordId);
       const updated = await entity.update(recordId, {
         business_name: cleanText(updates.business_name, 300),
         domain: cleanText(updates.domain, 500),
@@ -534,7 +1125,42 @@ Deno.serve(async (req) => {
         retention_started_at: new Date().toISOString(),
         retention_until: new Date(Date.now() + RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString()
       });
-      return jsonResponse({ success: true, record: updated });
+      const now = new Date().toISOString();
+      const adminInstanceId = `admin-${crypto.randomUUID()}`;
+      const snapshot = {
+        ...snapshotFromDraft(updated),
+        mappedPayload: safeParse(mappedPayload, {})
+      };
+      const revision = await base44.asServiceRole.entities.ProFormDraftRevision.create({
+        draft_id: updated.id,
+        session_id: updated.session_id,
+        mutation_id: `admin-payload-${crypto.randomUUID()}`,
+        client_instance_id: adminInstanceId,
+        client_sequence: 1,
+        base_revision: Math.max(0, Number(beforeUpdate?.save_revision) || 0),
+        changed_keys_json: '[]',
+        deleted_keys_json: '[]',
+        changes_json: safeStringify({
+          responses: {},
+          deletedKeys: [],
+          validationStatus: {},
+          touchedQuestions: {},
+          expandedQuestions: {},
+          credentials: snapshot.credentials,
+          currentQuestionId: snapshot.currentQuestionId,
+          lastChangedQuestionId: snapshot.lastChangedQuestionId,
+          progressPercent: snapshot.progressPercent
+        }),
+        result_snapshot_json: safeStringify(snapshot),
+        status: updated.status || 'draft',
+        server_received_at: now,
+        client_changed_at: now,
+        source: 'admin_payload_edit'
+      });
+      const materialized = await entity.update(recordId, {
+        save_revision: Math.max(0, Number(beforeUpdate?.save_revision) || 0) + 1
+      });
+      return jsonResponse({ success: true, record: materialized, revisionId: revision?.id || '' });
     }
 
     return badRequest('Unsupported recovery action.', { action: action || '(missing)', recordType });

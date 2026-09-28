@@ -91,6 +91,34 @@ export const createRecoveryDraftShareLink = ({ recoveryGrant, recordId }) => inv
   recordId,
 });
 
+export const listRecoveryDraftVersions = ({
+  recoveryGrant,
+  recordId,
+  mode = 'meaningful',
+}) => invokeRecoveryQuery({
+  action: 'list_versions',
+  recoveryGrant,
+  recordType: 'draft',
+  recordId,
+  mode,
+});
+
+export const getRecoveryDraftVersion = ({ recoveryGrant, recordId, versionId }) => invokeRecoveryQuery({
+  action: 'get_version',
+  recoveryGrant,
+  recordType: 'draft',
+  recordId,
+  versionId,
+});
+
+export const createRecoveryDraftVersionCopy = ({ recoveryGrant, recordId, versionId }) => invokeRecoveryQuery({
+  action: 'create_version_copy',
+  recoveryGrant,
+  recordType: 'draft',
+  recordId,
+  versionId,
+});
+
 export const changeRecoveryRecordLifecycle = async ({
   recoveryGrant,
   recordType,

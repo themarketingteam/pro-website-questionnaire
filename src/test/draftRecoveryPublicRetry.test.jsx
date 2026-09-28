@@ -34,6 +34,68 @@ describe('public draft recovery actions', () => {
             },
           };
         }
+        if (payload.recordType === 'draft' && payload.action === 'list_versions') {
+          const record = draftRecords.find((draft) => draft.id === payload.recordId);
+          const responses = JSON.parse(record?.responses_json || '{}');
+          const version = {
+            versionId: `current:${record?.id}`,
+            kind: 'current',
+            sourceType: 'draft',
+            sourceRecordId: record?.id,
+            draftId: record?.id,
+            sessionId: record?.session_id,
+            timestamp: record?.last_saved_at,
+            source: 'current_materialized_draft',
+            status: record?.status || 'draft',
+            responseCount: Object.keys(responses).length,
+            progressPercent: record?.progress_percent || 0,
+            current: true,
+            submitted: record?.status === 'submitted',
+          };
+          return { data: { success: true, versions: [version], defaultVersionId: version.versionId, totalVersionCount: 1, relatedDraftCount: 1 } };
+        }
+        if (payload.recordType === 'draft' && payload.action === 'get_version') {
+          const record = draftRecords.find((draft) => draft.id === payload.recordId);
+          const responses = JSON.parse(record?.responses_json || '{}');
+          return {
+            data: {
+              success: true,
+              version: {
+                versionId: payload.versionId,
+                sourceType: 'draft',
+                sourceRecordId: record?.id,
+                draftId: record?.id,
+                sessionId: record?.session_id,
+                timestamp: record?.last_saved_at,
+                source: 'current_materialized_draft',
+                status: record?.status || 'draft',
+                current: true,
+                submitted: record?.status === 'submitted',
+                responseCount: Object.keys(responses).length,
+                progressPercent: record?.progress_percent || 0,
+                payload: JSON.parse(record?.mapped_payload_json || '{}'),
+                snapshot: {
+                  responses,
+                  credentials: {
+                    businessName: record?.business_name || '',
+                    domain: record?.domain || '',
+                    userEmail: record?.user_email || '',
+                  },
+                  progressPercent: record?.progress_percent || 0,
+                },
+              },
+            },
+          };
+        }
+        if (payload.recordType === 'draft' && payload.action === 'create_version_copy') {
+          return {
+            data: {
+              success: true,
+              recordId: 'recovery-copy-1',
+              resumeCredential: 'recovery_copy_session_1234567890.abcdefghijklmnopqrstuvwxyzABCDEFGH',
+            },
+          };
+        }
         let source = payload.recordType === 'intake'
           ? intakeRecords
           : (payload.recordType === 'submission' ? submissionRecords : draftRecords);
@@ -327,6 +389,9 @@ describe('public draft recovery actions', () => {
 
     renderRecoveryPage();
     fireEvent.click(await screen.findByText('Public Recovery Client'));
+    expect(await screen.findByRole('combobox', { name: 'Questionnaire version to review' })).toBeInTheDocument();
+    expect(screen.getByText('1 retained versions')).toBeInTheDocument();
+    expect(screen.getByText(/every detail, payload, copy action, and PDF below uses the selected version/i)).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: /download pdf/i })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Draft Link' })).toHaveTextContent(
       'Select Copy Draft Link below to generate and display a secure client link.'

@@ -375,6 +375,19 @@
   background: #ffffff;
 }
 
+.draft-recovery-brand .brand-version-panel {
+  border-color: rgba(79, 70, 229, 0.24);
+  background: linear-gradient(135deg, rgba(238, 242, 255, 0.92), rgba(255, 255, 255, 0.98));
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+
+.draft-recovery-brand .brand-version-panel [role="combobox"] {
+  min-height: 44px;
+  border-color: rgba(79, 70, 229, 0.28);
+  background: #fff;
+  color: #11143f;
+}
+
 .draft-recovery-brand .brand-draft-link-panel__link {
   color: var(--msp-blue-600);
   font-weight: 500;

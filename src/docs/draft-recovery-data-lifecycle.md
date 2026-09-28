@@ -8,6 +8,9 @@ The draft-recovery page reads `ProFormDraft`, `ProFormSubmissionIntake`, and sta
 - The UI requests 25 records per page; the backend enforces a maximum of 50.
 - List responses contain only the fields needed to render record summaries.
 - Large response, payload, diagnostic, and PDF data is fetched only when an administrator expands a specific record.
+- Expanded drafts expose retained server revisions, related exact-identity draft sessions, and linked final submissions through a protected version selector. The selector defaults to the durable submitted snapshot, then the most complete saved snapshot, rather than blindly defaulting to the newest timestamp.
+- Historical versions are read-only. Editing, retry, repair, and client-link actions require an explicitly created recovery copy with a new secure session, so reviewing history can never overwrite the active draft.
+- Key versions include completion high-water marks, submission barriers, submitted snapshots, session endpoints, and pre-clear snapshots. Administrators may opt into the complete autosave history.
 - Search covers business name, domain, user email, and session ID without loading all records into the browser.
 - The backend requires either an authenticated Base44 administrator or a valid signed draft-recovery grant.
 
@@ -33,6 +36,8 @@ The policy never automatically deletes records. Soft-deleted records remain reta
 Objects use the key layout `contentDraftEntry/<Business_Name>/<YYYY-MM-DD>/...`. The date is the original draft creation date whenever the record can be linked to its draft. Records without resolvable business or start-date context use explicit `Business-Unknown` or `date-unknown` folders so they are never skipped.
 
 Drafts, submissions, intakes, revisions, PDF versions, and lifecycle records are stored as individual immutable envelopes. The high-volume, immutable `ProFormDraftEvent` audit stream is stored in per-session batches under the same business/date folder; each batch contains every source event ID and complete event record, and its protected restore path recreates only missing events.
+
+`ProFormDraftRevision` is immutable after creation. Revision replay is paginated and fails closed if an unusually large history requires compaction; it never silently drops revisions. Finalized drafts reject later autosave, visibility, and pagehide mutations so a post-submit browser reset cannot regress their progress or answers.
 
 The daily `08:30 UTC` schedule is intentionally inactive until all six secrets are configured and an administrator completes and reconciles the initial full backup:
 
