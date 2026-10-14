@@ -6,6 +6,18 @@
       "type": "string",
       "description": "Questionnaire session identifier used for recovery and deduplication"
     },
+    "source_draft_id": {
+      "type": "string",
+      "description": "Secured draft that authorized this fallback intake"
+    },
+    "submission_attempt_id": {
+      "type": "string",
+      "description": "Stable idempotency key for the attempted submission"
+    },
+    "submission_content_fingerprint": {
+      "type": "string",
+      "description": "Fingerprint used to distinguish changed questionnaire content"
+    },
     "business_name": {
       "type": "string"
     },

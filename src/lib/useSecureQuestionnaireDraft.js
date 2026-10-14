@@ -24,6 +24,10 @@ import {
 } from '@/lib/sessionId';
 import { safeNowIso } from '@/lib/browserSafety';
 import { trackClarityEvent } from '@/lib/clarity';
+import {
+  removeIncomingIdentityParams,
+  removeNewClientLaunchParams
+} from '@/lib/clientIdentityLaunch';
 
 const MAX_RETRY_DELAY_MS = 30_000;
 const MAX_BACKGROUND_SAVE_RETRIES = 8;
@@ -183,6 +187,7 @@ export const useSecureQuestionnaireDraft = ({
   credentials,
   businessNameParam,
   domainParam,
+  newClientLaunch = { active: false, requestId: '' },
   serviceOptionsGrouped,
   totalQuestionCount,
   isTestMode = false
@@ -199,6 +204,7 @@ export const useSecureQuestionnaireDraft = ({
   });
   const [questionnaireSessionId, setQuestionnaireSessionId] = useState(() => getOrCreateQuestionnaireSessionId());
   const [restoredQuestionId, setRestoredQuestionId] = useState('');
+  const [identityConflict, setIdentityConflict] = useState(null);
   const resumeCredentialRef = useRef(getStoredResumeCredential());
   const clientInstanceIdRef = useRef(null);
   if (!clientInstanceIdRef.current) {
@@ -382,13 +388,13 @@ export const useSecureQuestionnaireDraft = ({
         deletedKeys.forEach((key) => pendingDeletedKeysRef.current.add(key));
         const serialized = serializeError(error);
         writeLocalOutbox(serialized);
-        setDraftSaveState('error');
         const summary = safeErrorSummary(error);
+        const retryable = isRetryableDraftError(error);
         trackClarityEvent('pro_questionnaire_draft_save_rejected', {
           status: summary.status,
           name: summary.name,
           source,
-          retryable: String(isRetryableDraftError(error))
+          retryable: String(retryable)
         });
         if (summary.status === 401) {
           clearQuestionnaireSessionId();
@@ -405,21 +411,25 @@ export const useSecureQuestionnaireDraft = ({
           });
           setTimeout(() => bootstrapRunnerRef.current?.({ immediate: true }), 0);
         }
-        if (isRetryableDraftError(error)) {
+        if (retryable) {
           saveRetryAttemptRef.current += 1;
           if (saveRetryAttemptRef.current <= MAX_BACKGROUND_SAVE_RETRIES) {
+            setDraftSaveState('retrying');
             saveRetryTimerRef.current = setTimeout(() => {
               saveRetryTimerRef.current = null;
               if (!mountedRef.current || !resumeCredentialRef.current) return;
               executeSaveRef.current?.({ source: 'background_retry' });
             }, isTestMode ? 0 : retryDelayForAttempt(saveRetryAttemptRef.current));
           } else {
+            setDraftSaveState('error');
             trackClarityEvent('pro_questionnaire_draft_retry_exhausted', {
               attempts: saveRetryAttemptRef.current,
               source,
               last_confirmed_revision: revisionRef.current
             });
           }
+        } else {
+          setDraftSaveState('error');
         }
         if (required) throw error;
         return null;
@@ -443,7 +453,7 @@ export const useSecureQuestionnaireDraft = ({
     if (options.expandedQuestions) latestRef.current.expandedQuestions = options.expandedQuestions;
     if (options.credentials) latestRef.current.credentials = options.credentials;
     lastChangedQuestionIdRef.current = options.currentQuestionId || keys.find(Boolean) || lastChangedQuestionIdRef.current;
-    setDraftSaveState('saving');
+    setDraftSaveState('pending');
     writeLocalOutbox('pending_server_save');
 
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -537,7 +547,7 @@ export const useSecureQuestionnaireDraft = ({
     let bootstrapInFlight = false;
     let attemptCount = 0;
 
-    const initialize = async ({ immediate = false } = {}) => {
+    const initialize = async ({ immediate = false, identityDecision = '' } = {}) => {
       if (cancelled || bootstrapInFlight) return;
       if (bootstrapRetryTimerRef.current) {
         clearTimeout(bootstrapRetryTimerRef.current);
@@ -556,55 +566,51 @@ export const useSecureQuestionnaireDraft = ({
         immediate: String(Boolean(immediate))
       });
       try {
-        let legacySessionId = getOrCreateQuestionnaireSessionId();
-        let initialResumeCredential = getStoredResumeCredential();
-        let forkedFromStoredIdentityConflict = false;
+        let legacySessionId = newClientLaunch.active ? '' : getOrCreateQuestionnaireSessionId();
+        let initialResumeCredential = newClientLaunch.active ? '' : getStoredResumeCredential();
         const fragmentResumeCredential = getFragmentResumeCredential();
         const incomingUrlIdentity = {
-          businessName: businessNameParam,
-          domain: domainParam
+          businessName: blockedUrlIdentityFieldsRef.current.has('businessName') ? '' : businessNameParam,
+          domain: blockedUrlIdentityFieldsRef.current.has('domain') ? '' : domainParam
         };
         let result = await bootstrapServerDraft({
           functions: base44.functions,
           resumeCredential: initialResumeCredential,
           legacySessionId,
-          credentials: effectiveCredentials(latestRef.current.credentials)
+          credentials: effectiveCredentials(latestRef.current.credentials),
+          incomingIdentity: incomingUrlIdentity,
+          newClient: newClientLaunch.active,
+          newClientRequestId: newClientLaunch.requestId,
+          identityDecision
         });
         if (cancelled) return;
-        const initialIdentityConflicts = identityFieldsInConflict(
-          incomingUrlIdentity,
-          result.draft?.credentials || {}
-        );
-        if (initialResumeCredential && initialIdentityConflicts.size > 0 && !fragmentResumeCredential) {
-          forkedFromStoredIdentityConflict = true;
-          clearQuestionnaireSessionId();
-          resumeCredentialRef.current = '';
-          blockedUrlIdentityFieldsRef.current.clear();
-          legacySessionId = getOrCreateQuestionnaireSessionId();
-          initialResumeCredential = '';
-          trackClarityEvent('pro_questionnaire_draft_identity_conflict_forked', {
-            fields: [...initialIdentityConflicts].join(','),
-            source: 'stored_browser_credential'
-          });
-          result = await bootstrapServerDraft({
-            functions: base44.functions,
-            resumeCredential: '',
-            legacySessionId,
-            credentials: effectiveCredentials(latestRef.current.credentials)
-          });
-          if (cancelled) return;
-        } else if (fragmentResumeCredential && initialIdentityConflicts.size > 0) {
-          blockedUrlIdentityFieldsRef.current = initialIdentityConflicts;
-          trackClarityEvent('pro_questionnaire_draft_identity_conflict_ignored', {
-            fields: [...initialIdentityConflicts].join(','),
-            source: 'explicit_resume_link'
-          });
-        } else {
-          blockedUrlIdentityFieldsRef.current.clear();
-        }
         const persistedCredential = persistResumeCredential(result.resumeCredential);
         if (!persistedCredential) throw new Error('The draft service did not return a valid recovery credential.');
         resumeCredentialRef.current = persistedCredential;
+        const initialIdentityConflicts = new Set(
+          result?.identityConflict?.fields || identityFieldsInConflict(
+          incomingUrlIdentity,
+          result.draft?.credentials || {}
+          )
+        );
+        if (initialIdentityConflicts.size > 0 && identityDecision !== 'continue_existing') {
+          setIdentityConflict({
+            fields: [...initialIdentityConflicts],
+            incoming: incomingUrlIdentity,
+            existing: result.draft?.credentials || {},
+            explicitRecoveryLink: Boolean(fragmentResumeCredential),
+            cancelled: false
+          });
+          setDraftSaveState('conflict');
+          setIsDraftReady(false);
+          setDraftConnection({ attempt: attemptCount, error: '', nextRetryAt: '' });
+          trackClarityEvent('pro_questionnaire_draft_identity_conflict', {
+            fields: [...initialIdentityConflicts].join(','),
+            source: fragmentResumeCredential ? 'explicit_resume_link' : 'stored_browser_credential'
+          });
+          return;
+        }
+        setIdentityConflict(null);
         const serverDraft = result.draft || {};
         const sessionId = serverDraft.sessionId || legacySessionId;
         setQuestionnaireSessionId(sessionId);
@@ -621,7 +627,7 @@ export const useSecureQuestionnaireDraft = ({
           // into it. Legacy Redux migration is only for sessions that had no
           // secure resume credential yet.
           allowLegacyCurrentStateMigration: !initialResumeCredential
-            && !forkedFromStoredIdentityConflict
+            && !newClientLaunch.active
         });
         const normalized = normalizePersistedStateV3(merged.state);
         const effectiveIdentity = effectiveCredentials();
@@ -645,6 +651,9 @@ export const useSecureQuestionnaireDraft = ({
         setIsDraftReady(true);
         setDraftSaveState('saved');
         setDraftConnection({ attempt: attemptCount, error: '', nextRetryAt: '' });
+        if (newClientLaunch.active && result.newClientRequestConfirmed) {
+          removeNewClientLaunchParams();
+        }
         trackClarityEvent('pro_questionnaire_draft_bootstrap_confirmed', {
           attempt: attemptCount,
           revision: revisionRef.current,
@@ -708,6 +717,26 @@ export const useSecureQuestionnaireDraft = ({
   const retryDraftBootstrap = useCallback(() => {
     bootstrapRunnerRef.current?.({ immediate: true });
   }, []);
+
+  const resolveIdentityConflict = useCallback((decision) => {
+    if (!identityConflict) return;
+    if (decision === 'cancel') {
+      setIdentityConflict((current) => current ? { ...current, cancelled: true } : current);
+      trackClarityEvent('pro_questionnaire_draft_identity_conflict_cancelled', {
+        fields: identityConflict.fields.join(',')
+      });
+      return;
+    }
+    if (decision !== 'continue_existing') return;
+    blockedUrlIdentityFieldsRef.current = new Set(identityConflict.fields);
+    removeIncomingIdentityParams();
+    setIdentityConflict(null);
+    trackClarityEvent('pro_questionnaire_draft_identity_conflict_resolved', {
+      decision: 'continue_existing',
+      fields: identityConflict.fields.join(',')
+    });
+    bootstrapRunnerRef.current?.({ immediate: true, identityDecision: 'continue_existing' });
+  }, [identityConflict]);
 
   useEffect(() => {
     if (!isDraftReady) return;
@@ -855,10 +884,13 @@ export const useSecureQuestionnaireDraft = ({
     draftConnection,
     questionnaireSessionId,
     restoredQuestionId,
+    identityConflict,
     queueDraftSave,
     saveDraftNow,
     updateDraftIdentity,
     retryDraftBootstrap,
+    resolveIdentityConflict,
+    getDraftResumeCredential: () => resumeCredentialRef.current,
     createDraftEvent
   };
 };

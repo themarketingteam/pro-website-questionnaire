@@ -16,6 +16,10 @@ import {
   safeLocalStorageSet,
   safeNowIso
 } from '@/lib/browserSafety';
+import {
+  createClientSubmissionFingerprint,
+  createSubmissionAttemptId
+} from '@/lib/submissionIdentity';
 
 export { serializeSubmitError } from '@/lib/proSubmissionResilience';
 
@@ -258,6 +262,7 @@ export const submitProQuestionnaire = async ({
   credentials,
   domainParam,
   questionnaireSessionId,
+  draftResumeCredential,
   saveDraftNow,
   createDraftEvent,
   onFinalSubmitSuccess,
@@ -348,6 +353,14 @@ export const submitProQuestionnaire = async ({
       serializedError
     });
   }
+
+  let submissionContentFingerprint = await createClientSubmissionFingerprint({
+    rawResponses: responseSnapshot,
+    draftId: activeDraftId,
+    businessName: submissionCredentials.businessName,
+    domain: submissionCredentials.domain
+  });
+  let submissionAttemptId = createSubmissionAttemptId(submissionContentFingerprint);
 
   const persistDurableOutcome = async ({ submission, intakeId = '', receivedViaIntake = false }) => {
     return saveDraftNow({
@@ -445,6 +458,9 @@ export const submitProQuestionnaire = async ({
       transformError: serializedError,
       questionnaireSessionId,
       draftId: activeDraftId,
+      resumeCredential: draftResumeCredential,
+      submissionAttemptId,
+      submissionContentFingerprint,
       submitContext
     });
 
@@ -472,6 +488,13 @@ export const submitProQuestionnaire = async ({
         responseSnapshot,
         transformedPayload: null
       };
+    }
+
+    if (fallbackResult?.failureKind === 'identity') {
+      await recordSubmitStage('submission_identity_conflict', {
+        failureKind: 'identity',
+        usedFallback: true
+      });
     }
 
     await recordSubmitStage('fallback_failed', {
@@ -506,6 +529,18 @@ export const submitProQuestionnaire = async ({
 
   const repairResult = repairProSubmissionPayload(transformedPayload);
   transformedPayload = repairResult.payload;
+  submissionContentFingerprint = await createClientSubmissionFingerprint({
+    payload: transformedPayload,
+    draftId: activeDraftId,
+    businessName: submissionCredentials.businessName,
+    domain: submissionCredentials.domain
+  });
+  submissionAttemptId = createSubmissionAttemptId(submissionContentFingerprint);
+  transformedPayload.metadata = {
+    ...(transformedPayload.metadata || {}),
+    submission_attempt_id: submissionAttemptId,
+    submission_content_fingerprint: submissionContentFingerprint
+  };
 
   await recordSubmitStage('payload_repair_completed', {
     warningCount: repairResult.warnings.length,
@@ -600,6 +635,9 @@ export const submitProQuestionnaire = async ({
       validationError: serializedError,
       questionnaireSessionId,
       draftId: activeDraftId,
+      resumeCredential: draftResumeCredential,
+      submissionAttemptId,
+      submissionContentFingerprint,
       submitContext
     });
 
@@ -627,6 +665,13 @@ export const submitProQuestionnaire = async ({
         responseSnapshot,
         transformedPayload
       };
+    }
+
+    if (fallbackResult?.failureKind === 'identity') {
+      await recordSubmitStage('submission_identity_conflict', {
+        failureKind: 'identity',
+        usedFallback: true
+      });
     }
 
     await recordSubmitStage('fallback_failed', {
@@ -668,6 +713,9 @@ export const submitProQuestionnaire = async ({
       responseSnapshot,
       questionnaireSessionId,
       draftId: activeDraftId,
+      resumeCredential: draftResumeCredential,
+      submissionAttemptId,
+      submissionContentFingerprint,
       submitContext,
       debugFailureMode: submitDebugMode
     }
@@ -675,6 +723,13 @@ export const submitProQuestionnaire = async ({
 
   if (!resilientSubmitResult.ok) {
     const serialized = resilientSubmitResult.error || serializeSubmitError(null);
+
+    if (resilientSubmitResult.failureKind === 'identity') {
+      await recordSubmitStage('submission_identity_conflict', {
+        failureKind: 'identity',
+        usedFallback: resilientSubmitResult.usedFallback
+      });
+    }
 
     await recordSubmitStage('submission_create_failed', {
       failureKind: resilientSubmitResult.failureKind,

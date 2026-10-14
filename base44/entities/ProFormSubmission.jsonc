@@ -34,6 +34,18 @@
         "source_intake_id": {
           "type": "string",
           "description": "Server-side fallback intake linked to this submission"
+        },
+        "submission_attempt_id": {
+          "type": "string",
+          "description": "Stable idempotency key for this client submission attempt"
+        },
+        "submission_content_fingerprint": {
+          "type": "string",
+          "description": "Server-computed fingerprint of the source draft identity and submitted content"
+        },
+        "client_identity_fingerprint": {
+          "type": "string",
+          "description": "Server-computed fingerprint used to prevent cross-client submission reuse"
         }
       }
     },

@@ -6,6 +6,19 @@
       "type": "string",
       "description": "Stable questionnaire session ID"
     },
+    "client_identity_id": {
+      "type": "string",
+      "description": "Server-generated identifier for the client card represented by this draft"
+    },
+    "new_client_request_hash": {
+      "type": "string",
+      "description": "One-way hash of an explicit new-client request identifier used for idempotent bootstrap"
+    },
+    "new_client_requested_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When an explicit new-client request first created this draft"
+    },
     "access_token_hash": {
       "type": "string",
       "description": "SHA-256 hash of the anonymous draft capability; the token itself is never stored"

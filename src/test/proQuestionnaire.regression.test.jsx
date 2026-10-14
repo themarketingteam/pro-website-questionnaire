@@ -516,12 +516,18 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
       success: true,
       filename: 'retained-responses.pdf',
     });
-    const createMock = base44.entities.ProFormSubmission.create;
-    createMock.mockResolvedValueOnce({ id: 'saved-ok' });
-
     const invoke = base44.functions.invoke;
     invoke.mockImplementation(async (name, payload) => {
       if (name === 'syncProQuestionnaireDraft') return secureDraftMockResponse(payload);
+      if (name === 'submitProQuestionnaireDurable') {
+        return {
+          status: 200,
+          data: {
+            success: true,
+            submission: { id: 'saved-ok', ...payload.transformedPayload }
+          }
+        };
+      }
       if (name === 'validateQuestionText') {
         return { status: 200, data: { status: 'complete' } };
       }
@@ -562,7 +568,14 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     );
 
     await waitFor(() => {
-      expect(base44.entities.ProFormSubmission.create).toHaveBeenCalled();
+      expect(base44.functions.invoke).toHaveBeenCalledWith(
+        'submitProQuestionnaireDurable',
+        expect.objectContaining({
+          action: 'submit',
+          draftId: 'draft-1',
+          resumeCredential: expect.stringContaining('.')
+        })
+      );
       expect(base44.functions.invoke).toHaveBeenCalledWith('sendToZapier', expect.any(Object));
     });
 

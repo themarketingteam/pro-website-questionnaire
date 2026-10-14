@@ -5,6 +5,7 @@ import ProQuestionnaire from '@/pages/ProQuestionnaire';
 import { renderWithStore } from './utils/renderWithStore';
 import { base44 } from '@/api/base44Client';
 import { persistResumeCredential } from '@/lib/sessionId';
+import * as clientIdentityLaunch from '@/lib/clientIdentityLaunch';
 
 const CREDENTIAL = 'integration_session_1234567890.abcdefghijklmnopqrstuvwxyzABCDEFGH';
 const REPLACEMENT_CREDENTIAL = 'replacement_session_1234567890.HGFEDCBAabcdefghijklmnopqrstuvwxyz';
@@ -361,7 +362,7 @@ describe('secure questionnaire draft integration', () => {
       const question = await screen.findByTestId('question-wrapper-6');
       fireEvent.change(within(question).getByRole('textbox'), { target: { value: 'Must reach the database' } });
       expect(await screen.findByText(/database has not confirmed this change, and this browser blocked/i)).toBeInTheDocument();
-      expect(screen.getByText('Save interrupted')).toBeInTheDocument();
+      expect(screen.getByText('Unable to save')).toBeInTheDocument();
       expect(window.location.hash).toContain('draft=');
     } finally {
       view.unmount();
@@ -511,7 +512,7 @@ describe('secure questionnaire draft integration', () => {
       })
     );
   });
-  it('keeps an explicit recovery link authoritative when URL identity conflicts', async () => {
+  it('stops for an explicit choice when URL identity conflicts with a secured recovery link', async () => {
     window.history.replaceState(
       {},
       '',
@@ -549,16 +550,26 @@ describe('secure questionnaire draft integration', () => {
     });
 
     const { store } = renderWithStore(<ProQuestionnaire />);
+    expect(await screen.findByText('Choose which client questionnaire to open')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Submit Questionnaire' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue existing draft' }));
     await screen.findByRole('button', { name: 'Submit Questionnaire' });
     expect(store.getState().form.credentials).toEqual(expect.objectContaining({
       businessName: 'Prior Business',
       domain: 'prior.example'
     }));
+    expect(base44.functions.invoke).toHaveBeenCalledWith(
+      'syncProQuestionnaireDraft',
+      expect.objectContaining({
+        action: 'bootstrap',
+        identityDecision: 'continue_existing'
+      })
+    );
     const saveCalls = base44.functions.invoke.mock.calls.filter(([, payload]) => payload?.action === 'save');
     expect(saveCalls).toHaveLength(0);
   });
 
-  it('starts a separate draft when stored browser identity conflicts with a newly opened client URL', async () => {
+  it('never silently reassigns a stored browser draft to a newly supplied client identity', async () => {
     persistResumeCredential(CREDENTIAL);
     window.history.replaceState({}, '', '/?businessName=New%20Client&domainName=new-client.example');
     let bootstrapCount = 0;
@@ -566,26 +577,58 @@ describe('secure questionnaire draft integration', () => {
       if (name !== 'syncProQuestionnaireDraft') return { data: { success: true } };
       if (payload.action === 'bootstrap') {
         bootstrapCount += 1;
-        if (bootstrapCount === 1) {
-          expect(payload.resumeCredential).toBe(CREDENTIAL);
-          return {
-            data: {
-              success: true,
-              resumeCredential: CREDENTIAL,
-              draft: draftResponse({
-                responses: { '6': 'Answer belonging to the prior client' },
-                credentials: { businessName: 'Prior Client', domain: 'prior-client.example' }
-              })
-            }
-          };
-        }
-        expect(payload.resumeCredential).toBe('');
+        expect(payload.resumeCredential).toBe(CREDENTIAL);
         return {
           data: {
             success: true,
+            resumeCredential: CREDENTIAL,
+            draft: draftResponse({
+              responses: { '6': 'Answer belonging to the prior client' },
+              credentials: { businessName: 'Prior Client', domain: 'prior-client.example' }
+            })
+          }
+        };
+      }
+      return { data: { success: true, draft: draftResponse({ revision: payload.clientSequence }) } };
+    });
+
+    renderWithStore(<ProQuestionnaire />, {
+      preloadedState: {
+        form: {
+          responses: { '6': 'Stale local answer' },
+          validationStatus: { '6': 'complete' },
+          touchedQuestions: { '6': true },
+          expandedQuestions: { '6': true },
+          credentials: { businessName: 'Prior Client', domain: 'prior-client.example' },
+          textValidationMeta: {}
+        }
+      }
+    });
+    expect(await screen.findByText('Choose which client questionnaire to open')).toBeInTheDocument();
+    expect(bootstrapCount).toBe(1);
+    expect(screen.queryByRole('button', { name: 'Submit Questionnaire' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByText(/No questionnaire was opened or changed/)).toBeInTheDocument();
+    expect(bootstrapCount).toBe(1);
+  });
+
+  it('creates an explicit new client without reusing browser state and keeps the request idempotent', async () => {
+    persistResumeCredential(CREDENTIAL);
+    window.history.replaceState(
+      {},
+      '',
+      '/?newClient=true&newClientRequestId=req_explicit_client_123456&businessName=Separate%20Client&domainName=separate.example'
+    );
+    base44.functions.invoke.mockImplementation(async (name, payload) => {
+      if (name !== 'syncProQuestionnaireDraft') return { data: { success: true } };
+      if (payload.action === 'bootstrap') {
+        return {
+          data: {
+            success: true,
+            newClientRequestConfirmed: true,
             resumeCredential: REPLACEMENT_CREDENTIAL,
             draft: draftResponse({
-              draftId: 'new-client-draft',
+              draftId: 'explicit-new-client-draft',
               sessionId: 'replacement_session_1234567890',
               credentials: payload.credentials
             })
@@ -598,22 +641,37 @@ describe('secure questionnaire draft integration', () => {
     const { store } = renderWithStore(<ProQuestionnaire />, {
       preloadedState: {
         form: {
-          responses: { '6': 'Stale local answer' },
+          responses: { '6': 'Answer from the prior browser client' },
           validationStatus: { '6': 'complete' },
           touchedQuestions: { '6': true },
           expandedQuestions: { '6': true },
-          credentials: { businessName: 'Prior Client', domain: 'prior-client.example' },
+          credentials: { businessName: 'Prior Client', domain: 'prior.example' },
           textValidationMeta: {}
         }
       }
     });
+
     await screen.findByRole('button', { name: 'Submit Questionnaire' });
-    expect(bootstrapCount).toBe(2);
+    expect(base44.functions.invoke).toHaveBeenCalledWith(
+      'syncProQuestionnaireDraft',
+      expect.objectContaining({
+        action: 'bootstrap',
+        resumeCredential: '',
+        newClient: true,
+        newClientRequestId: 'req_explicit_client_123456',
+        credentials: expect.objectContaining({
+          businessName: 'Separate Client',
+          domain: 'separate.example'
+        })
+      })
+    );
     expect(store.getState().form.responses['6']).toBeUndefined();
     expect(store.getState().form.credentials).toEqual(expect.objectContaining({
-      businessName: 'New Client',
-      domain: 'new-client.example'
+      businessName: 'Separate Client',
+      domain: 'separate.example'
     }));
+    expect(window.location.search).not.toContain('newClient');
+    expect(window.location.search).not.toContain('newClientRequestId');
   });
 
   it('fills missing identity on an explicit recovery link without replacing established identity', async () => {
@@ -658,6 +716,56 @@ describe('secure questionnaire draft integration', () => {
           })
         })
       );
+    });
+  });
+
+  it('requires confirmation for the manual separate-client reset and preserves the current draft first', async () => {
+    const navigateSpy = vi.spyOn(clientIdentityLaunch, 'navigateToNewClientLaunch').mockReturnValue(true);
+    base44.functions.invoke.mockImplementation(async (name, payload) => {
+      if (name !== 'syncProQuestionnaireDraft') return { data: { success: true } };
+      if (payload.action === 'bootstrap') {
+        return {
+          data: {
+            success: true,
+            resumeCredential: CREDENTIAL,
+            draft: draftResponse({ credentials: { businessName: 'Current Client', domain: 'current.example' } })
+          }
+        };
+      }
+      return {
+        data: {
+          success: true,
+          draft: draftResponse({
+            revision: payload.clientSequence,
+            credentials: payload.credentials,
+            responses: payload.responses
+          })
+        }
+      };
+    });
+
+    renderWithStore(<ProQuestionnaire />);
+    const resetButton = await screen.findByRole('button', { name: 'Having trouble? Reset saved browser data' });
+    fireEvent.click(resetButton);
+    expect(screen.getByText('Create a separate client draft?')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByText('Create a separate client draft?')).not.toBeInTheDocument();
+    expect(navigateSpy).not.toHaveBeenCalled();
+
+    fireEvent.click(resetButton);
+    fireEvent.change(screen.getByLabelText(/New business name/), { target: { value: 'Separate Client' } });
+    fireEvent.change(screen.getByLabelText(/New domain/), { target: { value: 'https://separate.example/path' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create separate client' }));
+
+    await waitFor(() => {
+      expect(base44.functions.invoke).toHaveBeenCalledWith(
+        'syncProQuestionnaireDraft',
+        expect.objectContaining({ action: 'save', source: 'before_manual_client_reset' })
+      );
+      expect(navigateSpy).toHaveBeenCalledWith({
+        businessName: 'Separate Client',
+        domain: 'https://separate.example/path'
+      });
     });
   });
 });

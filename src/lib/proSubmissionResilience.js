@@ -85,6 +85,14 @@ export const classifySubmitError = (error) => {
     return 'rate_limit';
   }
 
+  if (
+    status === 409 ||
+    /identity conflict|different client|draft identity|submission conflict/.test(message) ||
+    /submission_identity_conflict|submission_attempt_conflict/.test(code)
+  ) {
+    return 'identity';
+  }
+
   if (status === 400 || status === 422) {
     if (/schema|column|field type|invalid input syntax|shape/.test(message) || /schema/.test(code)) return 'schema';
     if (/validation|invalid|required|must be|expected/.test(message)) return 'validation';
@@ -207,7 +215,8 @@ export const createProFormSubmissionResilient = async (payload, options = {}) =>
     baseDelayMs = 750,
     onAttempt = null,
     onFailure = null,
-    debugFailureMode = null
+    debugFailureMode = null,
+    createSubmission = (submissionPayload) => base44.entities.ProFormSubmission.create(submissionPayload)
   } = options;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -225,7 +234,7 @@ export const createProFormSubmissionResilient = async (payload, options = {}) =>
       }
 
       const submission = await withTimeout(
-        () => base44.entities.ProFormSubmission.create(payload),
+        () => createSubmission(payload),
         timeoutMs
       );
 
@@ -379,6 +388,9 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
     validationError = null,
     questionnaireSessionId,
     draftId,
+    resumeCredential,
+    submissionAttemptId,
+    submissionContentFingerprint,
     submitContext,
     onPrimaryFailure,
     onFallbackAttempt,
@@ -413,6 +425,9 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
         validationError,
         questionnaireSessionId,
         draftId,
+        resumeCredential,
+        submissionAttemptId,
+        submissionContentFingerprint,
         primaryError: transformError || validationError,
         submitContext,
         diagnostics: null
@@ -474,9 +489,34 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
     }
   }
 
+  const useDurableSubmission = Boolean(
+    resumeCredential && draftId && submissionAttemptId && submissionContentFingerprint
+  );
   const primaryResult = await createProFormSubmissionResilient(payload, {
     ...resilientOptions,
-    debugFailureMode
+    debugFailureMode,
+    createSubmission: useDurableSubmission
+      ? async (submissionPayload) => {
+          const response = await base44.functions.invoke('submitProQuestionnaireDurable', {
+            action: 'submit',
+            transformedPayload: submissionPayload,
+            questionnaireSessionId,
+            draftId,
+            resumeCredential,
+            submissionAttemptId,
+            submissionContentFingerprint,
+            submitContext
+          });
+          const data = response?.data;
+          if (!data?.success || !data?.submission) {
+            const error = new Error(data?.error || 'Durable submission creation failed.');
+            error.status = response?.status || 500;
+            error.code = data?.code || '';
+            throw error;
+          }
+          return data.submission;
+        }
+      : undefined
   });
 
   if (primaryResult.ok) {
@@ -502,6 +542,9 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
       validationError,
       questionnaireSessionId,
       draftId,
+      resumeCredential,
+      submissionAttemptId,
+      submissionContentFingerprint,
       primaryError: primaryResult.error || transformError || validationError,
       submitContext,
       diagnostics: null

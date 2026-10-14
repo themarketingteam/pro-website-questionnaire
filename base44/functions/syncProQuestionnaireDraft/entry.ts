@@ -74,6 +74,7 @@ const constantTimeEqual = (left: string, right: string) => {
 const isSessionId = (value: string) => /^[A-Za-z0-9_-]{20,120}$/.test(value);
 const isClientId = (value: string) => /^[A-Za-z0-9_-]{12,120}$/.test(value);
 const isMutationId = (value: string) => /^[A-Za-z0-9_-]{12,160}$/.test(value);
+const isNewClientRequestId = (value: string) => /^[A-Za-z0-9_-]{12,200}$/.test(value);
 const isAnswerKey = (value: string) => /^\d+(?:\.\d+)?(?:_(?:other|primary))?$/.test(value);
 const forbiddenKey = (value: string) => /(?:password|authorization|access[_-]?token|refresh[_-]?token|api[_-]?key|secret)/i.test(value);
 
@@ -123,17 +124,6 @@ const sanitizeStateMap = (value: unknown, kind: 'validation' | 'boolean') => {
   }, {} as JsonRecord);
 };
 
-const sanitizeCredentials = (value: unknown) => {
-  const source = value && typeof value === 'object' && !Array.isArray(value) ? value as JsonRecord : {};
-  return {
-    businessName: cleanText(source.businessName, 300),
-    domain: cleanText(source.domain, 500),
-    userId: cleanText(source.userId, 300),
-    userName: cleanText(source.userName, 300),
-    userEmail: cleanText(source.userEmail, 320)
-  };
-};
-
 const normalizeDomain = (value: string) => value
   .replace(/^https?:\/\//i, '')
   .replace(/^www\./i, '')
@@ -141,6 +131,36 @@ const normalizeDomain = (value: string) => value
   .trim()
   .toLowerCase()
   .slice(0, 500);
+
+const sanitizeCredentials = (value: unknown) => {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value as JsonRecord : {};
+  return {
+    businessName: cleanText(source.businessName, 300),
+    domain: normalizeDomain(cleanText(source.domain, 500)),
+    userId: cleanText(source.userId, 300),
+    userName: cleanText(source.userName, 300),
+    userEmail: cleanText(source.userEmail, 320)
+  };
+};
+
+const normalizeBusinessName = (value: string) => cleanText(value, 300).toLowerCase().replace(/\s+/g, ' ');
+
+const identityConflictFields = (incomingValue: unknown, existingValue: unknown) => {
+  const incoming = sanitizeCredentials(incomingValue);
+  const existing = sanitizeCredentials(existingValue);
+  const fields: string[] = [];
+  if (
+    normalizeBusinessName(incoming.businessName)
+    && normalizeBusinessName(existing.businessName)
+    && normalizeBusinessName(incoming.businessName) !== normalizeBusinessName(existing.businessName)
+  ) fields.push('businessName');
+  if (
+    normalizeDomain(incoming.domain)
+    && normalizeDomain(existing.domain)
+    && normalizeDomain(incoming.domain) !== normalizeDomain(existing.domain)
+  ) fields.push('domain');
+  return { fields, incoming, existing };
+};
 
 const parseCredential = (value: unknown) => {
   const text = cleanText(value, 400);
@@ -402,7 +422,13 @@ const publicDraft = (draft: any, rebuilt: any) => ({
   lastSavedAt: draft.last_saved_at || draft.updated_date || draft.created_date || ''
 });
 
-const createDraft = async (base44: any, sessionId: string, accessHash: string, credentialsValue: unknown) => {
+const createDraft = async (
+  base44: any,
+  sessionId: string,
+  accessHash: string,
+  credentialsValue: unknown,
+  options: { requestHash?: string; explicitNewClient?: boolean } = {}
+) => {
   const now = new Date().toISOString();
   const credentials = sanitizeCredentials(credentialsValue);
   const baseline = {
@@ -417,6 +443,9 @@ const createDraft = async (base44: any, sessionId: string, accessHash: string, c
   };
   return base44.asServiceRole.entities.ProFormDraft.create({
     session_id: sessionId,
+    client_identity_id: crypto.randomUUID(),
+    new_client_request_hash: options.requestHash || '',
+    new_client_requested_at: options.explicitNewClient ? now : '',
     access_token_hash: accessHash,
     access_version: ACCESS_VERSION,
     history_baseline_json: safeStringify(baseline),
@@ -437,7 +466,10 @@ const createDraft = async (base44: any, sessionId: string, accessHash: string, c
     metadata_json: '{}',
     userdata_json: '{}',
     mapped_payload_json: '{}',
-    draft_metadata_json: safeStringify({ app: 'pro_questionnaire', source: 'secure_server_draft_v1' }),
+    draft_metadata_json: safeStringify({
+      app: 'pro_questionnaire',
+      source: options.explicitNewClient ? 'explicit_new_client' : 'secure_server_draft_v1'
+    }),
     last_changed_at: now,
     last_saved_at: now,
     retention_policy_version: RETENTION_POLICY_VERSION,
@@ -472,6 +504,73 @@ Deno.serve(async (req) => {
 
   try {
     if (action === 'bootstrap') {
+      const explicitNewClient = body?.newClient === true;
+      if (explicitNewClient) {
+        const requestId = cleanText(body?.newClientRequestId, 200);
+        if (!isNewClientRequestId(requestId)) {
+          return jsonResponse({ success: false, error: 'A valid new-client request identifier is required.' }, 400);
+        }
+        const requestHash = await hashToken(`pro-new-client:${requestId}`);
+        const matches = await draftEntity.filter(
+          { new_client_request_hash: requestHash },
+          'created_date',
+          10
+        );
+        const existing = (Array.isArray(matches) ? matches : []).find((candidate) => (
+          candidate?.id && !cleanText(candidate.soft_deleted_at, 100)
+        ));
+        const requestedCredentials = sanitizeCredentials(body?.credentials);
+        let draft: any = existing || null;
+        let resumeCredential = '';
+
+        if (draft?.id) {
+          const rebuiltExisting = await rebuildSnapshot(base44, draft);
+          const requestConflict = identityConflictFields(
+            requestedCredentials,
+            rebuiltExisting.snapshot.credentials
+          );
+          if (requestConflict.fields.length > 0) {
+            console.warn('[Secure draft persistence] new-client request identity conflict', {
+              fieldCount: requestConflict.fields.length
+            });
+            return jsonResponse({
+              success: false,
+              code: 'NEW_CLIENT_REQUEST_IDENTITY_CONFLICT',
+              error: 'This new-client request identifier is already connected to a different client identity.'
+            }, 409);
+          }
+          const secret = randomToken();
+          resumeCredential = `${draft.session_id}.${secret}`;
+          const tokenHash = await hashToken(secret);
+          const sharedHashes = [...parseSharedAccessHashes(draft.shared_access_token_hashes_json), tokenHash].slice(-8);
+          draft = await draftEntity.update(draft.id, {
+            shared_access_token_hashes_json: safeStringify(sharedHashes, '[]')
+          });
+        } else {
+          const sessionId = crypto.randomUUID();
+          const secret = randomToken();
+          resumeCredential = `${sessionId}.${secret}`;
+          draft = await createDraft(
+            base44,
+            sessionId,
+            await hashToken(secret),
+            requestedCredentials,
+            { requestHash, explicitNewClient: true }
+          );
+        }
+
+        const rebuilt = await rebuildSnapshot(base44, draft);
+        const materialized = draft.status === 'submitted'
+          ? draft
+          : await materializeDraft(base44, draft, rebuilt, { changed: false });
+        return jsonResponse({
+          success: true,
+          resumeCredential,
+          newClientRequestConfirmed: true,
+          draft: publicDraft(materialized, rebuilt)
+        });
+      }
+
       const suppliedCredential = parseCredential(body?.resumeCredential);
       let draft: any = null;
       let resumeCredential = suppliedCredential?.raw || '';
@@ -507,6 +606,36 @@ Deno.serve(async (req) => {
       }
 
       const rebuilt = await rebuildSnapshot(base44, draft);
+      const identityConflict = identityConflictFields(
+        body?.incomingIdentity,
+        rebuilt.snapshot.credentials
+      );
+      if (identityConflict.fields.length > 0 && cleanText(body?.identityDecision, 40) !== 'continue_existing') {
+        await base44.asServiceRole.entities.ProFormDraftEvent.create({
+          session_id: draft.session_id,
+          event_type: 'client_identity_conflict',
+          question_id: '',
+          question_type: 'draft_bootstrap',
+          value_json: safeStringify({ fields: identityConflict.fields }),
+          value_summary: 'Incoming URL identity conflicted with the secured draft identity.',
+          value_length: 0,
+          selected_option_count: identityConflict.fields.length,
+          business_name: '',
+          domain: '',
+          user_id: '',
+          created_at_iso: new Date().toISOString()
+        }).catch(() => null);
+        console.warn('[Secure draft persistence] client identity conflict', {
+          fieldCount: identityConflict.fields.length
+        });
+        return jsonResponse({
+          success: true,
+          requiresIdentityDecision: true,
+          identityConflict,
+          resumeCredential,
+          draft: publicDraft(draft, rebuilt)
+        });
+      }
       const materialized = draft.status === 'submitted'
         ? draft
         : await materializeDraft(base44, draft, rebuilt, { changed: false });

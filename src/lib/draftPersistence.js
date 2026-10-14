@@ -50,12 +50,20 @@ export const bootstrapServerDraft = async ({
   functions,
   resumeCredential,
   legacySessionId,
-  credentials
+  credentials,
+  incomingIdentity,
+  newClient = false,
+  newClientRequestId = '',
+  identityDecision = ''
 }) => invokeDraftFunction(functions, {
   action: 'bootstrap',
   resumeCredential,
   legacySessionId,
-  credentials: sanitizeCredentialsForDraft(credentials)
+  credentials: sanitizeCredentialsForDraft(credentials),
+  incomingIdentity: sanitizeCredentialsForDraft(incomingIdentity || credentials),
+  newClient: Boolean(newClient),
+  newClientRequestId,
+  identityDecision
 });
 
 export const createServerDraftMutationPayload = ({

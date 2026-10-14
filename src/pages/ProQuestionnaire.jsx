@@ -67,6 +67,11 @@ import {
   countSelectedServiceChildren,
   getServiceParentsWithoutChildren
 } from '@/lib/serviceSelectionModel';
+import {
+  navigateToNewClientLaunch,
+  normalizeClientDomain,
+  readNewClientLaunch
+} from '@/lib/clientIdentityLaunch';
 
 const DeferredSectionLoader = () => (
   <div className="flex items-center justify-center py-6">
@@ -95,6 +100,9 @@ export default function ProQuestionnaire() {
   const [submittedDomain, setSubmittedDomain] = useState('');
   const [submittedFormData, setSubmittedFormData] = useState({});
   const [showClearAllModal, setShowClearAllModal] = useState(false);
+  const [showBrowserResetModal, setShowBrowserResetModal] = useState(false);
+  const [browserResetIdentity, setBrowserResetIdentity] = useState({ businessName: '', domain: '' });
+  const [isStartingSeparateClient, setIsStartingSeparateClient] = useState(false);
   const [showIncompleteList, setShowIncompleteList] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [validatingQuestions, setValidatingQuestions] = useState([]);
@@ -107,14 +115,16 @@ export default function ProQuestionnaire() {
   const clearAllReloadDelayMs = isTestMode ? 0 : 100;
   const hasFinalSubmittedRef = useRef(false);
 
+  // Resolve an explicit new-client request before reading the remaining URL
+  // values. A generated request ID is written into the URL so a refresh during
+  // bootstrap remains idempotent even when browser storage is unavailable.
+  const [newClientLaunch] = useState(() => readNewClientLaunch());
+
   // Extract URL parameters
   const urlParams = new URLSearchParams(window.location.search);
   const businessNameParam = urlParams.get('businessName') || '';
   const rawDomainParam = urlParams.get('domainName') || '';
-  const domainParam = rawDomainParam
-    .replace(/^https?:\/\//i, '')
-    .replace(/^www\./i, '')
-    .replace(/\/+$/, '');
+  const domainParam = normalizeClientDomain(rawDomainParam);
 
   const {
     isDraftReady,
@@ -125,10 +135,13 @@ export default function ProQuestionnaire() {
     draftConnection,
     questionnaireSessionId,
     restoredQuestionId,
+    identityConflict,
     queueDraftSave,
     saveDraftNow,
     updateDraftIdentity,
     retryDraftBootstrap,
+    resolveIdentityConflict,
+    getDraftResumeCredential,
     createDraftEvent: persistDraftEvent
   } = useSecureQuestionnaireDraft({
     base44,
@@ -141,6 +154,7 @@ export default function ProQuestionnaire() {
     credentials,
     businessNameParam,
     domainParam,
+    newClientLaunch,
     serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
     totalQuestionCount: getAllQuestionIds(QUESTIONS).length,
     isTestMode
@@ -319,7 +333,6 @@ export default function ProQuestionnaire() {
     } catch (error) {
       console.error('Error in initialization useEffect:', error);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDraftReady]);
 
   const createDraftEvent = useCallback(async ({
@@ -1451,6 +1464,7 @@ export default function ProQuestionnaire() {
         credentials,
         domainParam,
         questionnaireSessionId,
+        draftResumeCredential: getDraftResumeCredential(),
         saveDraftNow,
         createDraftEvent,
         serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
@@ -1498,6 +1512,33 @@ export default function ProQuestionnaire() {
     updateDraftIdentity(nextCredentials, { delayMs: 300 });
   }, [credentials, dispatch, updateDraftIdentity]);
 
+  const openBrowserReset = () => {
+    setBrowserResetIdentity({ businessName: '', domain: '' });
+    setShowBrowserResetModal(true);
+  };
+
+  const handleSeparateClientStart = async () => {
+    if (isStartingSeparateClient) return;
+    setIsStartingSeparateClient(true);
+    try {
+      await saveDraftNow({
+        required: true,
+        source: 'before_manual_client_reset'
+      });
+      trackClarityEvent('pro_questionnaire_manual_new_client_confirmed', {
+        business_name_present: String(Boolean(browserResetIdentity.businessName.trim())),
+        domain_present: String(Boolean(browserResetIdentity.domain.trim()))
+      });
+      navigateToNewClientLaunch({
+        businessName: browserResetIdentity.businessName,
+        domain: browserResetIdentity.domain
+      });
+    } catch {
+      setIsStartingSeparateClient(false);
+      toast.error('Your current draft could not be confirmed. Please keep this page open and try again.');
+    }
+  };
+
 
 
   // Determine background color based on selection balance
@@ -1516,7 +1557,7 @@ export default function ProQuestionnaire() {
     return acc;
   }, {});
 
-  const renderQuestion = (question, index) => {
+  const renderQuestion = (question) => {
     const commonProps = {
       value: responses[question.id],
       onChange: (val) => updateResponse(question.id, val)
@@ -1719,7 +1760,7 @@ export default function ProQuestionnaire() {
 
     return (
       <div className="mt-6 ml-6 pl-6 border-l-2 border-blue-200 space-y-8">
-        {parent.conditionalChildren.map((child, idx) => (
+        {parent.conditionalChildren.map((child) => (
           <React.Fragment key={child.id}>
             <QuestionWrapper
               number={child.id}
@@ -1749,6 +1790,76 @@ export default function ProQuestionnaire() {
   };
 
   if (!isDraftReady) {
+    if (identityConflict) {
+      const incomingName = identityConflict.incoming?.businessName || 'Not provided';
+      const incomingDomain = identityConflict.incoming?.domain || 'Not provided';
+      const existingName = identityConflict.existing?.businessName || 'Not provided';
+      const existingDomain = identityConflict.existing?.domain || 'Not provided';
+      return (
+        <ErrorBoundary>
+          <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+            <FormHeader />
+            <main className="min-h-[55vh] flex items-center justify-center px-4 py-10" aria-live="polite">
+              <div className="w-full max-w-2xl rounded-2xl border border-amber-200 bg-white p-6 sm:p-8 shadow-xl">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="mt-0.5 h-6 w-6 flex-none text-amber-600" />
+                  <div>
+                    <h1 className="text-xl font-bold text-[#122947]">Choose which client questionnaire to open</h1>
+                    <p className="mt-2 text-sm text-slate-600">
+                      The client information in this link does not match the secured draft already available in this browser. Nothing has been changed.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Existing secured draft</p>
+                    <p className="mt-2 font-semibold text-slate-900">{existingName}</p>
+                    <p className="text-sm text-slate-600">{existingDomain}</p>
+                  </div>
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                    <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Incoming client</p>
+                    <p className="mt-2 font-semibold text-slate-900">{incomingName}</p>
+                    <p className="text-sm text-slate-600">{incomingDomain}</p>
+                  </div>
+                </div>
+                {identityConflict.cancelled ? (
+                  <div className="mt-6 rounded-lg bg-slate-100 p-4 text-sm text-slate-700">
+                    No questionnaire was opened or changed. You may close this page or return to the previous page.
+                  </div>
+                ) : (
+                  <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => resolveIdentityConflict('continue_existing')}
+                      className="min-h-[44px] rounded-lg bg-[#1E6BA8] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#175789]"
+                    >
+                      Continue existing draft
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => navigateToNewClientLaunch({
+                        businessName: identityConflict.incoming?.businessName || '',
+                        domain: identityConflict.incoming?.domain || ''
+                      })}
+                      className="min-h-[44px] rounded-lg border-2 border-[#1E6BA8] bg-white px-5 py-2.5 text-sm font-bold text-[#1E6BA8] hover:bg-blue-50"
+                    >
+                      Create separate new client
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => resolveIdentityConflict('cancel')}
+                      className="min-h-[44px] rounded-lg px-5 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            </main>
+          </div>
+        </ErrorBoundary>
+      );
+    }
     const connectionFailed = Boolean(draftConnection.error);
     return (
       <ErrorBoundary>
@@ -1817,7 +1928,7 @@ export default function ProQuestionnaire() {
         </div>
 
         <div className="space-y-16">
-          {Object.entries(sections).map(([sectionName, sectionQuestions], sectionIndex) => (
+          {Object.entries(sections).map(([sectionName, sectionQuestions]) => (
             <section key={sectionName} className="space-y-8">
               <div className="pb-6 border-b-2 border-[#1E6BA8]">
                 <h2 className="text-2xl font-bold text-[#1E6BA8]">
@@ -1825,7 +1936,7 @@ export default function ProQuestionnaire() {
                 </h2>
               </div>
 
-              {sectionQuestions.map((question, qIndex) => {
+              {sectionQuestions.map((question) => {
                 // For questions 3-5, render with background wrapper
                 if (question.id === "3") {
                   const spanQuestions = sectionQuestions.filter(q => ["3", "4", "5"].includes(q.id));
@@ -1984,6 +2095,20 @@ export default function ProQuestionnaire() {
             )}
           </div>
 
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 sm:p-6">
+            <h3 className="font-bold text-[#122947]">Having trouble with saved browser data?</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Resetting saved browser data starts a separate client card and a new blank draft. It does not delete or overwrite this questionnaire. If you only want to erase answers while staying with this client, use <strong>Clear All</strong> above.
+            </p>
+            <button
+              type="button"
+              onClick={openBrowserReset}
+              className="mt-4 min-h-[44px] rounded-lg border-2 border-[#4A5F8C] bg-white px-5 py-2.5 text-sm font-bold text-[#4A5F8C] hover:bg-[#F0F2F5]"
+            >
+              Having trouble? Reset saved browser data
+            </button>
+          </div>
+
               <Suspense fallback={<DeferredSectionLoader />}>
                 <ValidationGuide />
               </Suspense>
@@ -2045,6 +2170,55 @@ export default function ProQuestionnaire() {
                 className="flex-1 px-6 py-3 bg-[#C1C6C8] hover:bg-[#A9B3B7] text-white rounded-lg font-medium transition-colors"
               >
                 No, Keep Form Info
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showBrowserResetModal && (
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
+            <h3 className="text-xl font-bold text-[#122947]">Create a separate client draft?</h3>
+            <p className="mt-3 text-sm leading-6 text-[#566C75]">
+              Your current client and answers will remain saved. A new client card and blank questionnaire will be created. This is different from clearing answers on the current client.
+            </p>
+            <div className="mt-5 space-y-4">
+              <label className="block text-sm font-semibold text-slate-800">
+                New business name <span className="font-normal text-slate-500">(optional)</span>
+                <input
+                  type="text"
+                  value={browserResetIdentity.businessName}
+                  onChange={(event) => setBrowserResetIdentity((current) => ({ ...current, businessName: event.target.value }))}
+                  className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none focus:border-[#1E6BA8] focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
+              <label className="block text-sm font-semibold text-slate-800">
+                New domain <span className="font-normal text-slate-500">(optional)</span>
+                <input
+                  type="text"
+                  value={browserResetIdentity.domain}
+                  onChange={(event) => setBrowserResetIdentity((current) => ({ ...current, domain: event.target.value }))}
+                  placeholder="example.com"
+                  className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none focus:border-[#1E6BA8] focus:ring-2 focus:ring-blue-100"
+                />
+              </label>
+            </div>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => setShowBrowserResetModal(false)}
+                disabled={isStartingSeparateClient}
+                className="flex-1 rounded-lg border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSeparateClientStart}
+                disabled={isStartingSeparateClient}
+                className="flex-1 rounded-lg bg-[#1E6BA8] px-5 py-3 font-semibold text-white hover:bg-[#175789] disabled:opacity-60"
+              >
+                {isStartingSeparateClient ? 'Confirming current draft…' : 'Create separate client'}
               </button>
             </div>
           </div>

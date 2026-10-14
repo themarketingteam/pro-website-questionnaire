@@ -9,12 +9,13 @@ export default function AutoSaveIndicator({
   lastConfirmedRevision = 0,
   hasLocalRecoveryCopy = null
 }) {
-  const [visible, setVisible] = useState(status === 'saving' || status === 'error');
+  const activeStatus = ['pending', 'saving', 'retrying', 'error'].includes(status);
+  const [visible, setVisible] = useState(activeStatus);
   const [copied, setCopied] = useState(false);
   const isTestMode = import.meta.env.MODE === 'test';
 
   useEffect(() => {
-    if (status === 'saving' || status === 'error') {
+    if (['pending', 'saving', 'retrying', 'error'].includes(status)) {
       setVisible(true);
       return undefined;
     }
@@ -37,6 +38,8 @@ export default function AutoSaveIndicator({
   if (!visible) return null;
 
   const isSaving = status === 'saving';
+  const isPending = status === 'pending';
+  const isRetrying = status === 'retrying';
   const isError = status === 'error';
   const savedTime = lastSavedAt && Number.isFinite(Date.parse(lastSavedAt))
     ? new Date(lastSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
@@ -54,7 +57,7 @@ export default function AutoSaveIndicator({
         <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-none ${
           isError ? 'bg-amber-100' : 'bg-blue-100'
         }`}>
-          {isSaving ? (
+          {isSaving || isPending || isRetrying ? (
             <Loader2 className="w-4 h-4 text-blue-700 animate-spin" />
           ) : isError ? (
             <AlertTriangle className="w-4 h-4 text-amber-700" />
@@ -64,19 +67,33 @@ export default function AutoSaveIndicator({
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-semibold text-slate-900 text-sm">
-            {isSaving ? 'Saving answers…' : isError ? 'Save interrupted' : 'Answers saved'}
+            {isPending
+              ? 'Waiting to save…'
+              : isRetrying
+                ? 'Retrying secure backup…'
+                : isSaving
+                  ? 'Saving answers…'
+                  : isError
+                    ? 'Unable to save'
+                    : 'Database backup confirmed'}
           </p>
           <p className="text-xs text-slate-600 mt-0.5">
-            {isError
+            {isPending
+              ? 'Your latest change is queued and has not been confirmed by the database yet.'
+              : isRetrying
+                ? hasLocalRecoveryCopy
+                  ? 'The database has not confirmed this change yet. A temporary browser copy is retained while automatic retries continue.'
+                  : 'The database has not confirmed this change, and browser storage is unavailable. Keep this page open while retries continue.'
+                : isError
               ? hasLocalRecoveryCopy
-                ? 'The database has not confirmed this change yet. A temporary browser copy is available while automatic retries continue.'
-                : 'The database has not confirmed this change, and this browser blocked the temporary backup. Keep this page open while automatic retries continue.'
+                ? 'The database has not confirmed this change. A temporary browser copy is retained; keep this page open and edit any answer to try again.'
+                : 'The database has not confirmed this change, and this browser blocked the temporary backup. Keep this page open and edit any answer to try again.'
               : `Saved securely to the database${savedTime ? ` at ${savedTime}` : ''}.`}
           </p>
-          {!isSaving && !isError && lastConfirmedRevision > 0 && (
+          {!isSaving && !isPending && !isRetrying && !isError && lastConfirmedRevision > 0 && (
             <p className="mt-1 text-[11px] text-slate-500">Confirmed revision {lastConfirmedRevision}</p>
           )}
-          {!isSaving && !isError && (
+          {!isSaving && !isPending && !isRetrying && !isError && (
             <button
               type="button"
               onClick={copyReturnLink}
