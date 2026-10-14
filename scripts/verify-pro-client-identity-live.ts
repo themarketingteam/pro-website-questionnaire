@@ -2,9 +2,29 @@ const unwrap = (response: any) => response?.data ?? response;
 const assert = (condition: unknown, message: string) => {
   if (!condition) throw new Error(message);
 };
-const invoke = async (name: string, payload: any) => unwrap(
-  await base44.functions.invoke(name, payload)
-);
+const wait = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+const invoke = async (name: string, payload: any) => {
+  let lastError: any;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      return unwrap(await base44.functions.invoke(name, payload));
+    } catch (error: any) {
+      lastError = error;
+      const status = Number(error?.response?.status || error?.status || 0);
+      const retryable = status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+      if (!retryable || attempt === 3) break;
+      await wait(1000 * (2 ** attempt));
+    }
+  }
+
+  const status = Number(lastError?.response?.status || lastError?.status || 0);
+  const code = lastError?.response?.data?.code || lastError?.data?.code || lastError?.code || '';
+  const message = lastError?.response?.data?.error || lastError?.response?.data?.message || lastError?.message || 'Function invocation failed.';
+  const safeError: any = new Error(`${name} failed${status ? ` (${status})` : ''}: ${message}`);
+  safeError.status = status;
+  safeError.code = code;
+  throw safeError;
+};
 const deleteMatches = async (entity: any, query: any) => {
   const records = await entity.filter(query, '-created_date', 100);
   for (const record of Array.isArray(records) ? records : []) {
@@ -120,7 +140,7 @@ try {
   if (draftId) {
     cleanup.revisions = await deleteMatches(base44.entities.ProFormDraftRevision, { draft_id: draftId });
     cleanup.events = await deleteMatches(base44.entities.ProFormDraftEvent, { session_id: sessionId });
-    cleanup.drafts = await deleteMatches(base44.entities.ProFormDraft, { id: draftId });
+    cleanup.drafts = await deleteMatches(base44.entities.ProFormDraft, { session_id: sessionId });
   }
   console.log(JSON.stringify({ synthetic_cleanup: cleanup }, null, 2));
 }
