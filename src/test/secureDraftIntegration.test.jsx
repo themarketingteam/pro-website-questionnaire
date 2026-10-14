@@ -719,8 +719,9 @@ describe('secure questionnaire draft integration', () => {
     });
   });
 
-  it('requires confirmation for the manual separate-client reset and preserves the current draft first', async () => {
+  it('warns before a manual separate-client reset, highlights Clear All on cancel, and preserves the draft before continuing', async () => {
     const navigateSpy = vi.spyOn(clientIdentityLaunch, 'navigateToNewClientLaunch').mockReturnValue(true);
+    const clearBrowserStateSpy = vi.spyOn(clientIdentityLaunch, 'clearLocalQuestionnaireBrowserState').mockReturnValue(true);
     base44.functions.invoke.mockImplementation(async (name, payload) => {
       if (name !== 'syncProQuestionnaireDraft') return { data: { success: true } };
       if (payload.action === 'bootstrap') {
@@ -747,25 +748,117 @@ describe('secure questionnaire draft integration', () => {
     renderWithStore(<ProQuestionnaire />);
     const resetButton = await screen.findByRole('button', { name: 'Having trouble? Reset saved browser data' });
     fireEvent.click(resetButton);
-    expect(screen.getByText('Create a separate client draft?')).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Start a completely new client?' })).toBeInTheDocument();
+    expect(screen.getByText(/entirely new client card and a separate blank server draft/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText('Business Name')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByText('Create a separate client draft?')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Start a completely new client?' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear All Answers' })).toHaveClass('pro-clear-all-attention');
     expect(navigateSpy).not.toHaveBeenCalled();
 
     fireEvent.click(resetButton);
-    fireEvent.change(screen.getByLabelText(/New business name/), { target: { value: 'Separate Client' } });
-    fireEvent.change(screen.getByLabelText(/New domain/), { target: { value: 'https://separate.example/path' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create separate client' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create New Client & Start Fresh' }));
 
     await waitFor(() => {
       expect(base44.functions.invoke).toHaveBeenCalledWith(
         'syncProQuestionnaireDraft',
         expect.objectContaining({ action: 'save', source: 'before_manual_client_reset' })
       );
-      expect(navigateSpy).toHaveBeenCalledWith({
-        businessName: 'Separate Client',
-        domain: 'https://separate.example/path'
-      });
+      expect(clearBrowserStateSpy).toHaveBeenCalledTimes(1);
+      expect(navigateSpy).toHaveBeenCalledWith({ promptForIdentity: true });
     });
+  });
+
+  it('shows identity fields only after the new blank draft is confirmed and saves them durably', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/?newClient=true&newClientRequestId=req_manual_reset_123456&newClientIdentityPrompt=true'
+    );
+    base44.functions.invoke.mockImplementation(async (name, payload) => {
+      if (name !== 'syncProQuestionnaireDraft') return { data: { success: true } };
+      if (payload.action === 'bootstrap') {
+        return {
+          data: {
+            success: true,
+            newClientRequestConfirmed: true,
+            resumeCredential: REPLACEMENT_CREDENTIAL,
+            draft: draftResponse({
+              draftId: 'new-client-draft',
+              sessionId: 'replacement_session_1234567890',
+              credentials: {}
+            })
+          }
+        };
+      }
+      return {
+        data: {
+          success: true,
+          draft: draftResponse({
+            draftId: 'new-client-draft',
+            sessionId: 'replacement_session_1234567890',
+            revision: payload.clientSequence,
+            credentials: payload.credentials
+          })
+        }
+      };
+    });
+
+    renderWithStore(<ProQuestionnaire />);
+    const dialog = await screen.findByRole('dialog', { name: 'New client draft created' });
+    const saveButton = within(dialog).getByRole('button', { name: 'Save & Continue' });
+    expect(saveButton).toBeDisabled();
+    fireEvent.change(within(dialog).getByLabelText('Business Name'), { target: { value: 'Separate Client' } });
+    fireEvent.change(within(dialog).getByLabelText(/Website Domain/), { target: { value: 'https://separate.example/path' } });
+    expect(saveButton).toBeEnabled();
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(base44.functions.invoke).toHaveBeenCalledWith(
+        'syncProQuestionnaireDraft',
+        expect.objectContaining({
+          action: 'save',
+          source: 'manual_new_client_identity',
+          credentials: expect.objectContaining({
+            businessName: 'Separate Client',
+            domain: 'separate.example'
+          })
+        })
+      );
+      expect(screen.queryByRole('dialog', { name: 'New client draft created' })).not.toBeInTheDocument();
+    });
+    expect(new URLSearchParams(window.location.search).has('newClient')).toBe(false);
+    expect(window.location.hash).toContain('draft=');
+  });
+
+  it('allows the user to skip identity entry after the new draft is confirmed', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/?newClient=true&newClientRequestId=req_manual_skip_123456&newClientIdentityPrompt=true'
+    );
+    base44.functions.invoke.mockImplementation(async (name, payload) => {
+      if (name !== 'syncProQuestionnaireDraft') return { data: { success: true } };
+      if (payload.action === 'bootstrap') {
+        return {
+          data: {
+            success: true,
+            newClientRequestConfirmed: true,
+            resumeCredential: REPLACEMENT_CREDENTIAL,
+            draft: draftResponse({
+              draftId: 'new-client-draft',
+              sessionId: 'replacement_session_1234567890',
+              credentials: {}
+            })
+          }
+        };
+      }
+      return { data: { success: true, draft: draftResponse() } };
+    });
+
+    renderWithStore(<ProQuestionnaire />);
+    const dialog = await screen.findByRole('dialog', { name: 'New client draft created' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Skip for Now' }));
+    expect(screen.queryByRole('dialog', { name: 'New client draft created' })).not.toBeInTheDocument();
   });
 });

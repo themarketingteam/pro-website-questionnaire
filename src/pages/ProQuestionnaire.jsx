@@ -34,6 +34,10 @@ import InfoMessageQuestion from '@/components/pro-form/InfoMessageQuestion';
 import SelectionSpanIndicator from '@/components/pro-form/SelectionSpanIndicator';
 import AutoSaveIndicator from '@/components/pro-form/AutoSaveIndicator';
 import ValidationGuideCollapsible from '@/components/pro-form/ValidationGuideCollapsible';
+import {
+  NewClientIdentityModal,
+  StartFreshWarningModal
+} from '@/components/pro-form/NewClientDraftModals';
 
 const ImageTaggingQuestion = lazy(() => import('@/components/pro-form/ImageTaggingQuestion'));
 const ConfirmModal = lazy(() => import('@/components/pro-form/ConfirmModal'));
@@ -68,6 +72,7 @@ import {
   getServiceParentsWithoutChildren
 } from '@/lib/serviceSelectionModel';
 import {
+  clearLocalQuestionnaireBrowserState,
   navigateToNewClientLaunch,
   normalizeClientDomain,
   readNewClientLaunch
@@ -101,8 +106,11 @@ export default function ProQuestionnaire() {
   const [submittedFormData, setSubmittedFormData] = useState({});
   const [showClearAllModal, setShowClearAllModal] = useState(false);
   const [showBrowserResetModal, setShowBrowserResetModal] = useState(false);
+  const [showNewClientIdentityModal, setShowNewClientIdentityModal] = useState(false);
   const [browserResetIdentity, setBrowserResetIdentity] = useState({ businessName: '', domain: '' });
   const [isStartingSeparateClient, setIsStartingSeparateClient] = useState(false);
+  const [isSavingNewClientIdentity, setIsSavingNewClientIdentity] = useState(false);
+  const [clearAllHighlightVersion, setClearAllHighlightVersion] = useState(0);
   const [showIncompleteList, setShowIncompleteList] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [validatingQuestions, setValidatingQuestions] = useState([]);
@@ -114,6 +122,8 @@ export default function ProQuestionnaire() {
   const expandLinkedQuestionDelayMs = isTestMode ? 0 : 500;
   const clearAllReloadDelayMs = isTestMode ? 0 : 100;
   const hasFinalSubmittedRef = useRef(false);
+  const clearAllButtonRef = useRef(null);
+  const newClientIdentityPromptOpenedRef = useRef(false);
 
   // Resolve an explicit new-client request before reading the remaining URL
   // values. A generated request ID is written into the URL so a refresh during
@@ -159,6 +169,18 @@ export default function ProQuestionnaire() {
     totalQuestionCount: getAllQuestionIds(QUESTIONS).length,
     isTestMode
   });
+
+  useEffect(() => {
+    if (
+      !isDraftReady
+      || !newClientLaunch.active
+      || !newClientLaunch.promptForIdentity
+      || newClientIdentityPromptOpenedRef.current
+    ) return;
+    newClientIdentityPromptOpenedRef.current = true;
+    setBrowserResetIdentity({ businessName: '', domain: '' });
+    setShowNewClientIdentityModal(true);
+  }, [isDraftReady, newClientLaunch.active, newClientLaunch.promptForIdentity]);
 
   // Calculate span totals for Q3-Q5
   const otherServices = responses['3_other'];
@@ -1517,6 +1539,17 @@ export default function ProQuestionnaire() {
     setShowBrowserResetModal(true);
   };
 
+  const cancelBrowserReset = () => {
+    setShowBrowserResetModal(false);
+    setClearAllHighlightVersion((current) => current + 1);
+    setTimeout(() => {
+      const clearAllButton = clearAllButtonRef.current;
+      if (!clearAllButton) return;
+      clearAllButton.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      clearAllButton.focus?.({ preventScroll: true });
+    }, 0);
+  };
+
   const handleSeparateClientStart = async () => {
     if (isStartingSeparateClient) return;
     setIsStartingSeparateClient(true);
@@ -1525,18 +1558,47 @@ export default function ProQuestionnaire() {
         required: true,
         source: 'before_manual_client_reset'
       });
-      trackClarityEvent('pro_questionnaire_manual_new_client_confirmed', {
-        business_name_present: String(Boolean(browserResetIdentity.businessName.trim())),
-        domain_present: String(Boolean(browserResetIdentity.domain.trim()))
-      });
-      navigateToNewClientLaunch({
-        businessName: browserResetIdentity.businessName,
-        domain: browserResetIdentity.domain
-      });
+      trackClarityEvent('pro_questionnaire_manual_new_client_confirmed');
+      clearLocalQuestionnaireBrowserState();
+      const started = navigateToNewClientLaunch({ promptForIdentity: true });
+      if (!started) throw new Error('The new-client launch could not be started.');
     } catch {
       setIsStartingSeparateClient(false);
       toast.error('Your current draft could not be confirmed. Please keep this page open and try again.');
     }
+  };
+
+  const handleNewClientIdentitySave = async () => {
+    const businessName = browserResetIdentity.businessName.trim();
+    if (!businessName || isSavingNewClientIdentity) return;
+    const nextCredentials = {
+      ...credentials,
+      businessName,
+      domain: normalizeClientDomain(browserResetIdentity.domain)
+    };
+    setIsSavingNewClientIdentity(true);
+    dispatch(setCredentials(nextCredentials));
+    try {
+      await saveDraftNow({
+        credentialsSnapshot: nextCredentials,
+        required: true,
+        source: 'manual_new_client_identity'
+      });
+      trackClarityEvent('pro_questionnaire_manual_new_client_identity_saved', {
+        domain_present: String(Boolean(nextCredentials.domain))
+      });
+      setShowNewClientIdentityModal(false);
+      toast.success('New client details saved');
+    } catch {
+      toast.error('The new client details could not be saved. Please try again or skip for now.');
+    } finally {
+      setIsSavingNewClientIdentity(false);
+    }
+  };
+
+  const skipNewClientIdentity = () => {
+    trackClarityEvent('pro_questionnaire_manual_new_client_identity_skipped');
+    setShowNewClientIdentityModal(false);
   };
 
 
@@ -2067,11 +2129,15 @@ export default function ProQuestionnaire() {
               </button>
 
               <button
+                key={`clear-all-${clearAllHighlightVersion}`}
+                ref={clearAllButtonRef}
                 type="button"
                 onClick={clearAll}
-                className="w-full sm:w-auto px-8 sm:px-12 py-4 bg-white text-[#4A5F8C] border-2 border-[#4A5F8C] hover:bg-[#F0F2F5] active:bg-[#E0E4EC] rounded transition-all uppercase text-sm font-bold tracking-wide min-h-[52px]"
+                className={`w-full sm:w-auto px-8 sm:px-12 py-4 bg-white text-[#4A5F8C] border-2 border-[#4A5F8C] hover:bg-[#F0F2F5] active:bg-[#E0E4EC] rounded transition-all uppercase text-sm font-bold tracking-wide min-h-[52px] ${
+                  clearAllHighlightVersion > 0 ? 'pro-clear-all-attention' : ''
+                }`}
               >
-                Clear All
+                Clear All Answers
               </button>
             </div>
 
@@ -2095,18 +2161,17 @@ export default function ProQuestionnaire() {
             )}
           </div>
 
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 sm:p-6">
-            <h3 className="font-bold text-[#122947]">Having trouble with saved browser data?</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Resetting saved browser data starts a separate client card and a new blank draft. It does not delete or overwrite this questionnaire. If you only want to erase answers while staying with this client, use <strong>Clear All</strong> above.
-            </p>
+          <div className="border-t border-slate-200 pt-8">
             <button
               type="button"
               onClick={openBrowserReset}
-              className="mt-4 min-h-[44px] rounded-lg border-2 border-[#4A5F8C] bg-white px-5 py-2.5 text-sm font-bold text-[#4A5F8C] hover:bg-[#F0F2F5]"
+              className="text-left text-sm font-medium text-[#60738F] underline decoration-1 underline-offset-4 transition-colors hover:text-red-600 focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red-600 sm:text-base"
             >
               Having trouble? Reset saved browser data
             </button>
+            <p className="mt-3 text-sm leading-6 text-[#8A9BB5]">
+              Use this only if the form appears stuck or old browser data will not clear.
+            </p>
           </div>
 
               <Suspense fallback={<DeferredSectionLoader />}>
@@ -2176,53 +2241,20 @@ export default function ProQuestionnaire() {
         </div>
       )}
       {showBrowserResetModal && (
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
-            <h3 className="text-xl font-bold text-[#122947]">Create a separate client draft?</h3>
-            <p className="mt-3 text-sm leading-6 text-[#566C75]">
-              Your current client and answers will remain saved. A new client card and blank questionnaire will be created. This is different from clearing answers on the current client.
-            </p>
-            <div className="mt-5 space-y-4">
-              <label className="block text-sm font-semibold text-slate-800">
-                New business name <span className="font-normal text-slate-500">(optional)</span>
-                <input
-                  type="text"
-                  value={browserResetIdentity.businessName}
-                  onChange={(event) => setBrowserResetIdentity((current) => ({ ...current, businessName: event.target.value }))}
-                  className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none focus:border-[#1E6BA8] focus:ring-2 focus:ring-blue-100"
-                />
-              </label>
-              <label className="block text-sm font-semibold text-slate-800">
-                New domain <span className="font-normal text-slate-500">(optional)</span>
-                <input
-                  type="text"
-                  value={browserResetIdentity.domain}
-                  onChange={(event) => setBrowserResetIdentity((current) => ({ ...current, domain: event.target.value }))}
-                  placeholder="example.com"
-                  className="mt-1.5 w-full rounded-lg border border-slate-300 px-3 py-2.5 font-normal outline-none focus:border-[#1E6BA8] focus:ring-2 focus:ring-blue-100"
-                />
-              </label>
-            </div>
-            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => setShowBrowserResetModal(false)}
-                disabled={isStartingSeparateClient}
-                className="flex-1 rounded-lg border border-slate-300 px-5 py-3 font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSeparateClientStart}
-                disabled={isStartingSeparateClient}
-                className="flex-1 rounded-lg bg-[#1E6BA8] px-5 py-3 font-semibold text-white hover:bg-[#175789] disabled:opacity-60"
-              >
-                {isStartingSeparateClient ? 'Confirming current draft…' : 'Create separate client'}
-              </button>
-            </div>
-          </div>
-        </div>
+        <StartFreshWarningModal
+          onCancel={cancelBrowserReset}
+          onConfirm={handleSeparateClientStart}
+          isWorking={isStartingSeparateClient}
+        />
+      )}
+      {showNewClientIdentityModal && (
+        <NewClientIdentityModal
+          identity={browserResetIdentity}
+          onChange={setBrowserResetIdentity}
+          onSkip={skipNewClientIdentity}
+          onSave={handleNewClientIdentitySave}
+          isSaving={isSavingNewClientIdentity}
+        />
       )}
       </div>
       </ErrorBoundary>

@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes pro-clear-all-attention {
+  0%, 100% {
+    background-color: #ffffff;
+    box-shadow: 0 0 0 0 rgba(74, 95, 140, 0);
+  }
+  50% {
+    background-color: #dce9f7;
+    box-shadow: 0 0 0 5px rgba(74, 95, 140, 0.16);
+  }
+}
+
+.pro-clear-all-attention {
+  animation: pro-clear-all-attention 700ms ease-in-out 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pro-clear-all-attention {
+    animation: none;
+    background-color: #dce9f7;
+    box-shadow: 0 0 0 4px rgba(74, 95, 140, 0.16);
+  }
+}
+
 
 /* :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
