@@ -22,7 +22,7 @@ describe('server-side client identity contracts', () => {
 
   it('authorizes submissions against an unguessable credential and rejects cross-client reuse', () => {
     const durable = readProjectFile('base44/functions/submitProQuestionnaireDurable/entry.ts');
-    const authorization = readProjectFile('base44/functions/_shared/proDraftSubmissionAuthorization.ts');
+    const authorization = readProjectFile('base44/functions/submitProQuestionnaireDurable/proDraftSubmissionAuthorization.ts');
     expect(durable).toContain("code: 'SUBMISSION_ATTEMPT_CONFLICT'");
     expect(durable).toContain("code: 'SUBMISSION_CONTENT_CONFLICT'");
     expect(authorization).toContain("code: 'SUBMISSION_IDENTITY_CONFLICT'");

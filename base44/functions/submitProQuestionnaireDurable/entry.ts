@@ -3,7 +3,7 @@ import {
   authorizeDraftSubmission,
   createSubmissionContentFingerprint,
   createSubmissionIdentityFingerprint
-} from '../_shared/proDraftSubmissionAuthorization.ts';
+} from './proDraftSubmissionAuthorization.ts';
 
 const MAX_REQUEST_BYTES = 2_250_000;
 const cleanText = (value: unknown, maxLength = 500) => (
