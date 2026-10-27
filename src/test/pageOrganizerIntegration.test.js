@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import scoutLegacy from '../../fixtures/scout-networks-legacy.json';
-import { INDUSTRY_OPTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
+import { ACCEPTED_INDUSTRY_OPTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import { normalizePersistedStateV3 } from '@/components/store/normalization';
 import formReducer, { deleteResponse, loadInitialState, resetForm, setResponse } from '@/components/store/formSlice';
 import { transformResponsesToPayload, validateSubmissionPayload } from '@/components/pro-form/submissionPayload';
@@ -76,7 +76,7 @@ describe('page organizer persistence and submission compatibility', () => {
   });
 
   it('supports adopting only Q4 and keeps a custom parent and comma-containing custom child as separate pages', () => {
-    let structure = createPageStructure('4', ['Healthcare / Medical', 'Legal Firms'], [], {}, INDUSTRY_OPTIONS);
+    let structure = createPageStructure('4', ['Healthcare / Medical', 'Legal Firms'], [], {}, ACCEPTED_INDUSTRY_OPTIONS);
     const customParent = createPageNode('4', 'Professional organizations');
     const customChild = createPageNode('4', 'Finance, insurance and legal');
     structure = addPage(structure, customParent, null, 0);

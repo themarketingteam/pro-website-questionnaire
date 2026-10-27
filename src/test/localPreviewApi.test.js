@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLocalApi, createLocalApiMiddleware } from '../../scripts/local-preview-api.mjs';
 import { installLocalNetworkGuard } from '@/local/networkGuard';
 import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
-import { SERVICE_OPTIONS_GROUPED, SERVICE_OPTIONS, INDUSTRY_OPTIONS } from '@/components/pro-form/questionData';
+import { SERVICE_OPTIONS_GROUPED, SERVICE_OPTIONS, INDUSTRY_OPTIONS, ACCEPTED_INDUSTRY_OPTIONS } from '@/components/pro-form/questionData';
 import { createPageStructure, projectPageStructure, movePage } from '@/lib/pageOrganizerModel';
 
 const repository = process.cwd();
@@ -232,6 +232,27 @@ describe('isolated local preview API persistence', () => {
     expect(resumed.draft.responses['4']).toEqual(legacyIndustry);
     expect(resumed.draft.responses).not.toHaveProperty('4_structure');
     expect(() => save(restarted, resumed, {}, { deletedKeys: ['3_structure'] })).toThrow(/cannot be downgraded/);
+  });
+
+  it('accepts already-organized historical industry IDs after the picker separates their labels', () => {
+    const api = createLocalApi(fixtureRoot, { dataDirectory });
+    const session = bootstrap(api);
+    const labels = ['Financial / Accounting / CPA', 'Healthcare / Medical', 'Legal Firms'];
+    const original = createPageStructure('4', labels, [], {}, labels);
+    const recognized = createPageStructure('4', labels, [], {}, ACCEPTED_INDUSTRY_OPTIONS);
+    expect(recognized).toEqual(original);
+    save(api, session, { '4': labels, '4_other': [], '4_structure': original });
+    const restarted = createLocalApi(fixtureRoot, { dataDirectory });
+    const resumed = bootstrap(restarted, session.resumeCredential);
+    const result = restarted.invoke('submitProQuestionnaireDurable', {
+      resumeCredential: resumed.resumeCredential, draftId: resumed.draft.id,
+      transformedPayload: mapped(resumed.draft.responses)
+    });
+    expect(result.success).toBe(true);
+    expect(result.submission.userdata.target_industries).toEqual(labels);
+    expect(result.submission.userdata.target_industries_other).toBe('');
+    expect(result.submission.userdata.target_industries_structure).toEqual(original);
+    expect(fetch).not.toHaveBeenCalled();
   });
 
   it('captures submissions locally, deduplicates retries, and never calls fetch', () => {

@@ -3,7 +3,7 @@ import { normalizePersistedStateV3 } from '@/components/store/normalization';
 import { createPageNode, createPageStructure, flattenPageStructure } from '@/lib/pageOrganizerModel';
 import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
 import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
-import { SERVICE_OPTIONS_GROUPED, INDUSTRY_OPTIONS } from '@/components/pro-form/questionData';
+import { SERVICE_OPTIONS_GROUPED, ACCEPTED_INDUSTRY_OPTIONS } from '@/components/pro-form/questionData';
 
 describe('organizer preservation at legacy and repair boundaries', () => {
   it('retains retired and custom main-array labels through rehydrate before adoption', () => {
@@ -14,10 +14,11 @@ describe('organizer preservation at legacy and repair boundaries', () => {
     expect(normalized.responses['3']).toContain('Retired Service Name');
     expect(normalized.responses['4']).toContain('Specialist Clinics');
     const services = createPageStructure('3', normalized.responses['3'], normalized.responses['3_other'], SERVICE_OPTIONS_GROUPED);
-    const industries = createPageStructure('4', normalized.responses['4'], '', {}, INDUSTRY_OPTIONS);
+    const industries = createPageStructure('4', normalized.responses['4'], '', {}, ACCEPTED_INDUSTRY_OPTIONS);
     expect(flattenPageStructure(services).map((page) => page.label)).toContain('Retired Service Name');
     expect(flattenPageStructure(services).map((page) => page.label)).toContain('Compliance, Risk and Assurance');
     expect(flattenPageStructure(industries).find((page) => page.label === 'Specialist Clinics').source).toBe('custom');
+    expect(flattenPageStructure(industries).find((page) => page.label === 'Healthcare / Medical').source).toBe('predefined');
   });
 
   it('does not repair an unsupported envelope version into an accepted organized submission', () => {

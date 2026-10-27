@@ -75,7 +75,7 @@ export const createLocalApi = (root, { dataDirectory = path.join(root, '.local-p
   const validateCounts = (payload) => {
     const catalogIds = {
       '3': new Set(Object.entries(catalog.services).flatMap(([parent, children]) => [getPageCatalogId('3', parent, 'parent'), ...children.map((label) => getPageCatalogId('3', label))])),
-      '4': new Set(catalog.industries.map((label) => getPageCatalogId('4', label)))
+      '4': new Set([...catalog.industries, ...catalog.legacyIndustries].map((label) => getPageCatalogId('4', label)))
     };
     for (const [id, field] of [['3', 'service_offerings_structure'], ['4', 'target_industries_structure']]) {
       if (payload.userdata[field]) {

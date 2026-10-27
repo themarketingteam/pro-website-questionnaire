@@ -20,6 +20,7 @@ const sameLabel = (left, right) => left.trim().toLocaleLowerCase() === right.tri
 export default function PageOrganizerQuestion({
   questionId,
   options = [],
+  legacyOptions = [],
   groupedOptions,
   value = [],
   otherValue = '',
@@ -37,12 +38,12 @@ export default function PageOrganizerQuestion({
   const prepared = useMemo(() => {
     try {
       return { current: structure !== undefined ? normalizePageStructure(structure) : createPageStructure(
-        questionId, value, otherValue, groupedOptions || {}, options
+        questionId, value, otherValue, groupedOptions || {}, [...options, ...legacyOptions]
       ) };
     } catch (issue) {
       return { error: issue.message };
     }
-  }, [structure, questionId, value, otherValue, groupedOptions, options]);
+  }, [structure, questionId, value, otherValue, groupedOptions, options, legacyOptions]);
   const current = prepared.current;
   if (!current) return <p role="alert" className="rounded-lg border border-[#F29100] bg-[#FFF4E4] p-4 text-sm text-[#A45B00]">Your existing answers need review before they can be organized. They have been preserved. {prepared.error}</p>;
   const allPages = flattenPageStructure(current);
@@ -250,11 +251,13 @@ export default function PageOrganizerQuestion({
         <label htmlFor={`custom-page-${questionId}`} className="text-sm font-semibold text-[#122947]">Add a custom page</label>
         <p className="mt-1 text-xs text-[#566C75]">Enter one page at a time. You can use it as a parent or a child.</p>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <input id={`custom-page-${questionId}`} value={customLabel} maxLength={500} onChange={(event) => { setCustomLabel(event.target.value); setError(''); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addCustom(); } }} placeholder={String(questionId) === '3' ? 'e.g., IT Compliance Consulting' : 'e.g., Real Estate and Property Management'} className={`${controlClass} w-full min-w-0 flex-1 px-3 py-2`} />
+          <input id={`custom-page-${questionId}`} value={customLabel} maxLength={500} onChange={(event) => { setCustomLabel(event.target.value); setError(''); }} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addCustom(); } }} placeholder={String(questionId) === '3' ? 'e.g., IT Compliance Consulting' : 'e.g., Veterinary Practices'} className={`${controlClass} w-full min-w-0 flex-1 px-3 py-2`} />
           <button type="button" onClick={addCustom} disabled={!customLabel.trim()} className="inline-flex min-h-[42px] shrink-0 items-center justify-center gap-2 rounded-md bg-[#1C82DE] px-4 py-2 text-sm font-semibold text-white hover:bg-[#176BB7] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1C82DE] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-40"><Plus className="h-4 w-4" aria-hidden="true" />Add page</button>
         </div>
         {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
       </div>
+
+      {allPages.some((page) => legacyOptions.includes(page.label)) && <p className="rounded-lg border border-[#C9DDEC] bg-[#F4F9FD] px-3 py-2 text-xs leading-relaxed text-[#566C75]">Previously saved combined selections stay in your page list until you replace them with individual industries above.</p>}
 
       <section aria-label="Selected pages and priorities" className="space-y-3">
         <div className="flex flex-wrap items-start justify-between gap-3">

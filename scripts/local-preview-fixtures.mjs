@@ -3,7 +3,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 export const loadCatalog = (root) => {
   const source = fs.readFileSync(path.join(root, 'src/components/pro-form/questionData.jsx'), 'utf8').split('export const QUESTIONS')[0].replaceAll('export const', 'const');
-  return vm.runInNewContext(source + '\n;({ services: SERVICE_OPTIONS_GROUPED, industries: INDUSTRY_OPTIONS })');
+  return vm.runInNewContext(source + '\n;({ services: SERVICE_OPTIONS_GROUPED, industries: INDUSTRY_OPTIONS, legacyIndustries: LEGACY_INDUSTRY_OPTIONS })');
 };
 export const loadScoutFixture = (root) => {
   const payload = JSON.parse(fs.readFileSync(path.join(root, 'fixtures/scout-networks-legacy.json'), 'utf8'));

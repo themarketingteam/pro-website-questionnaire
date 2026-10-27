@@ -31,6 +31,12 @@ The existing dependencies are reused through a `node_modules` symlink to the ori
 
 The Scout sample starts at the existing combined cap of 25. Remove a counted service before testing a new custom service, or remove an industry before adding a custom industry.
 
+## Individual industry choices
+
+Q4 now offers individual industries, including separate Financial, Accounting, CPA, Professional Services, Marketing, Design Firms, and Food Services choices. All previously combined options have been separated in the picker.
+
+Existing saved combined answers remain unchanged and count as one page until explicitly replaced. Their original predefined identities remain accepted for save and submission; opening a draft does not expand it into extra pages or push it over the selection limits.
+
 ## Agreed rules
 
 - Two levels: parent and child. Standalone pages are allowed.

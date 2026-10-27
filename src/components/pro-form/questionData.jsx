@@ -84,15 +84,51 @@ export const SERVICE_OPTIONS_GROUPED = {
 export const SERVICE_OPTIONS = Object.values(SERVICE_OPTIONS_GROUPED).flat();
 
 export const INDUSTRY_OPTIONS = [
-  "Agriculture / Farming",
+  "Accounting",
+  "Agriculture",
+  "Architecture Firms",
+  "Construction",
+  "CPA",
   "Dental Practices",
+  "Design Firms",
+  "Education",
+  "Energy",
+  "Engineering Firms",
+  "Farming",
+  "Financial",
+  "Food Services",
+  "Gas",
+  "Government",
+  "Healthcare",
+  "Hospitality",
+  "Insurance Agencies",
+  "Legal Firms",
+  "Logistics",
+  "Manufacturing",
+  "Marketing",
+  "Medical",
+  "Municipalities",
+  "Nonprofits",
+  "Oil",
+  "Professional Services",
+  "Property Management",
+  "Real Estate",
+  "Retail",
+  "SaaS Companies",
+  "Technology",
+  "Transportation"
+];
+
+// Historical choices are recognized when loading saved answers but are never
+// offered for new selection. Do not expand or rename them: that changes pages,
+// catalog identities, and selection counts in existing client questionnaires.
+export const LEGACY_INDUSTRY_OPTIONS = Object.freeze([
+  "Agriculture / Farming",
   "Energy / Oil & Gas",
   "Engineering / Architecture Firms",
   "Financial / Accounting / CPA",
   "Government / Municipalities",
   "Healthcare / Medical",
-  "Insurance Agencies",
-  "Legal Firms",
   "Manufacturing / Construction",
   "Nonprofits / Education",
   "Professional Services (Marketing, Real Estate, etc.)",
@@ -100,7 +136,12 @@ export const INDUSTRY_OPTIONS = [
   "Retail / Hospitality",
   "Technology / SaaS Companies",
   "Transportation / Logistics"
-];
+]);
+
+export const ACCEPTED_INDUSTRY_OPTIONS = Object.freeze([
+  ...INDUSTRY_OPTIONS,
+  ...LEGACY_INDUSTRY_OPTIONS
+]);
 
 export const DELIVERY_MODEL_OPTIONS = [
   "Fully Managed IT Provider",
@@ -291,7 +332,7 @@ export const QUESTIONS = [
     showOther: true,
     limits: { min: 1, max: 10 },
     isSpanQuestion: true,
-    examples: { selections: ["Healthcare / Medical", "Financial / Accounting / CPA", "Manufacturing / Construction"], other: "Real Estate and Property Management" }
+    examples: { selections: ["Healthcare", "Financial", "Manufacturing"], other: "Veterinary Practices" }
   },
   {
     id: "5",
