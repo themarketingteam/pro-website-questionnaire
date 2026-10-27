@@ -83,41 +83,23 @@ export const SERVICE_OPTIONS_GROUPED = {
 
 export const SERVICE_OPTIONS = Object.values(SERVICE_OPTIONS_GROUPED).flat();
 
-export const INDUSTRY_OPTIONS = [
-  "Accounting",
-  "Agriculture",
-  "Architecture Firms",
-  "Construction",
-  "CPA",
-  "Dental Practices",
-  "Design Firms",
-  "Education",
-  "Energy",
-  "Engineering Firms",
-  "Farming",
-  "Financial",
-  "Food Services",
-  "Gas",
-  "Government",
-  "Healthcare",
-  "Hospitality",
-  "Insurance Agencies",
-  "Legal Firms",
-  "Logistics",
-  "Manufacturing",
-  "Marketing",
-  "Medical",
-  "Municipalities",
-  "Nonprofits",
-  "Oil",
-  "Professional Services",
-  "Property Management",
-  "Real Estate",
-  "Retail",
-  "SaaS Companies",
-  "Technology",
-  "Transportation"
-];
+// Picker sections only. Category headings do not create pages or catalog IDs.
+export const INDUSTRY_OPTIONS_GROUPED = {
+  "Financial": ["Financial", "CPA", "Accounting", "Insurance Agencies"],
+  "Healthcare": ["Healthcare", "Medical", "Dental Practices"],
+  "Professional Services": ["Professional Services", "Marketing", "Design Firms", "Legal Firms", "Engineering Firms", "Architecture Firms"],
+  "Real Estate": ["Real Estate", "Property Management"],
+  "Manufacturing & Construction": ["Manufacturing", "Construction"],
+  "Technology": ["Technology", "SaaS Companies"],
+  "Education & Nonprofits": ["Education", "Nonprofits"],
+  "Government": ["Government", "Municipalities"],
+  "Retail, Hospitality & Food Services": ["Retail", "Hospitality", "Food Services"],
+  "Agriculture": ["Agriculture", "Farming"],
+  "Energy": ["Energy", "Oil", "Gas"],
+  "Transportation & Logistics": ["Transportation", "Logistics"]
+};
+
+export const INDUSTRY_OPTIONS = Object.values(INDUSTRY_OPTIONS_GROUPED).flat().sort();
 
 // Historical choices are recognized when loading saved answers but are never
 // offered for new selection. Do not expand or rename them: that changes pages,

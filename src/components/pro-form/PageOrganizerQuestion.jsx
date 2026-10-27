@@ -22,6 +22,7 @@ export default function PageOrganizerQuestion({
   options = [],
   legacyOptions = [],
   groupedOptions,
+  optionGroups,
   value = [],
   otherValue = '',
   structure,
@@ -53,8 +54,11 @@ export default function PageOrganizerQuestion({
     .map((page) => [page.catalogId, page]));
   const searchText = query.trim().toLocaleLowerCase();
   const grouped = groupedOptions && Object.keys(groupedOptions).length > 0;
-  const catalogGroups = grouped
-    ? Object.entries(groupedOptions).map(([label, entries]) => ({ label, entries }))
+  const displayGrouped = optionGroups && Object.keys(optionGroups).length > 0;
+  const catalogGroups = displayGrouped
+    ? Object.entries(optionGroups).map(([label, entries]) => ({ label, entries, selectableParent: false }))
+    : grouped
+    ? Object.entries(groupedOptions).map(([label, entries]) => ({ label, entries, selectableParent: true }))
     : [{ label: '', entries: options }];
   const rootDropId = `page-organizer-${questionId}-root`;
 
@@ -230,14 +234,14 @@ export default function PageOrganizerQuestion({
             <input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="Search available pages…" className={`${controlClass} w-full py-2 pl-9 pr-3`} />
           </label>
           <div className="max-h-[340px] space-y-5 overflow-y-auto overscroll-contain pr-1">
-            {catalogGroups.map(({ label, entries }) => {
+            {catalogGroups.map(({ label, entries, selectableParent }) => {
               const matchesGroup = label.toLocaleLowerCase().includes(searchText);
               const visible = entries.filter((entry) => matchesGroup || entry.toLocaleLowerCase().includes(searchText));
               if (!matchesGroup && visible.length === 0) return null;
-              return <div key={label || 'all'} className="space-y-2">
+              return <div key={label || 'all'} role={label ? 'group' : undefined} aria-label={label || undefined} className="space-y-2">
                 {label && <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[#566C75]">{label}</p>
-                  {catalogChoice(label, 'parent')}
+                  <h5 className="text-xs font-semibold uppercase tracking-wide text-[#566C75]">{label}</h5>
+                  {selectableParent && catalogChoice(label, 'parent')}
                 </div>}
                 <div className="grid gap-2 sm:grid-cols-2">{visible.map((entry) => catalogChoice(entry))}</div>
               </div>;

@@ -48,7 +48,7 @@ const ThankYouModal = lazy(() => import('@/components/pro-form/ThankYouModal'));
 const ValidationGuide = lazy(() => import('@/components/pro-form/ValidationGuide'));
 const ReduxDataValidator = lazy(() => import('@/components/pro-form/ReduxDataValidator'));
 import ErrorBoundary from '@/components/common/ErrorBoundary';
-import { QUESTIONS, SERVICE_OPTIONS_GROUPED, LEGACY_INDUSTRY_OPTIONS } from '@/components/pro-form/questionData';
+import { QUESTIONS, SERVICE_OPTIONS_GROUPED, INDUSTRY_OPTIONS_GROUPED, LEGACY_INDUSTRY_OPTIONS } from '@/components/pro-form/questionData';
 import { trackValidationDispatch, trackParentStatusChange, devDiagEnabled } from '@/lib/devDiagnostics';
 import {
   getQuestionById,
@@ -1671,6 +1671,7 @@ export default function ProQuestionnaire() {
               options={question.options}
               legacyOptions={question.id === '4' ? LEGACY_INDUSTRY_OPTIONS : []}
               groupedOptions={question.id === '3' ? SERVICE_OPTIONS_GROUPED : {}}
+              optionGroups={question.id === '4' ? INDUSTRY_OPTIONS_GROUPED : undefined}
               value={responses[question.id] || []}
               otherValue={responses[`${question.id}_other`] || ''}
               structure={Object.prototype.hasOwnProperty.call(responses, `${question.id}_structure`) ? responses[`${question.id}_structure`] : undefined}

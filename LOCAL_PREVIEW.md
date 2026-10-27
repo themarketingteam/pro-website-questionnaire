@@ -35,6 +35,8 @@ The Scout sample starts at the existing combined cap of 25. Remove a counted ser
 
 Q4 now offers individual industries, including separate Financial, Accounting, CPA, Professional Services, Marketing, Design Firms, and Food Services choices. All previously combined options have been separated in the picker.
 
+The picker groups these choices under nonselectable category headings. For example, Financial contains Financial, CPA, Accounting, and Insurance Agencies. Searching a category shows its choices. These sections only help locate options; they do not add pages or set the client's chosen navigation hierarchy.
+
 Existing saved combined answers remain unchanged and count as one page until explicitly replaced. Their original predefined identities remain accepted for save and submission; opening a draft does not expand it into extra pages or push it over the selection limits.
 
 ## Agreed rules

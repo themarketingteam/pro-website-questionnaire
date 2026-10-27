@@ -1,16 +1,16 @@
 import { useState } from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import PageOrganizerQuestion from '@/components/pro-form/PageOrganizerQuestion';
-import { INDUSTRY_OPTIONS, LEGACY_INDUSTRY_OPTIONS, ACCEPTED_INDUSTRY_OPTIONS } from '@/components/pro-form/questionData';
+import { INDUSTRY_OPTIONS, INDUSTRY_OPTIONS_GROUPED, LEGACY_INDUSTRY_OPTIONS, ACCEPTED_INDUSTRY_OPTIONS } from '@/components/pro-form/questionData';
 import { createPageStructure, projectPageStructure, countPageSelections } from '@/lib/pageOrganizerModel';
 import { normalizePersistedStateV3 } from '@/components/store/normalization';
 import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
 
 function IndustryOrganizer({ onChange, ...props }) {
   const [structure, setStructure] = useState(undefined);
-  return <PageOrganizerQuestion questionId="4" options={INDUSTRY_OPTIONS} legacyOptions={LEGACY_INDUSTRY_OPTIONS} structure={structure} max={10} {...props} onChange={(next) => { onChange(next); setStructure(next); }} />;
+  return <PageOrganizerQuestion questionId="4" options={INDUSTRY_OPTIONS} optionGroups={INDUSTRY_OPTIONS_GROUPED} legacyOptions={LEGACY_INDUSTRY_OPTIONS} structure={structure} max={10} {...props} onChange={(next) => { onChange(next); setStructure(next); }} />;
 }
 
 describe('individual industry choices with historical compatibility', () => {
@@ -18,8 +18,12 @@ describe('individual industry choices with historical compatibility', () => {
     const onChange = vi.fn();
     render(<IndustryOrganizer onChange={onChange} />);
     const user = userEvent.setup({ pointerEventsCheck: 0 });
+    const financial = within(screen.getByRole('group', { name: 'Financial', exact: true }));
+    expect(financial.getAllByRole('checkbox')).toHaveLength(4);
+    await act(async () => user.click(financial.getByRole('heading', { name: 'Financial', exact: true })));
+    expect(onChange).not.toHaveBeenCalled();
     for (const name of ['Financial', 'Accounting', 'CPA']) {
-      await act(async () => user.click(screen.getByRole('checkbox', { name, exact: true })));
+      await act(async () => user.click(financial.getByRole('checkbox', { name, exact: true })));
     }
     const structure = onChange.mock.lastCall[0];
     expect(projectPageStructure(structure)).toEqual({ selections: ['Financial', 'Accounting', 'CPA'], otherValues: [] });
@@ -29,6 +33,11 @@ describe('individual industry choices with historical compatibility', () => {
       expect(screen.getByRole('checkbox', { name, exact: true })).toBeInTheDocument();
     }
     expect(screen.queryByRole('checkbox', { name: 'Financial / Accounting / CPA', exact: true })).not.toBeInTheDocument();
+    const changeCount = onChange.mock.calls.length;
+    await act(async () => user.type(screen.getByRole('searchbox', { name: 'Search available pages' }), 'Financial'));
+    expect(screen.getAllByRole('checkbox')).toHaveLength(4);
+    expect(screen.getByRole('checkbox', { name: 'Accounting', exact: true })).toBeInTheDocument();
+    expect(onChange).toHaveBeenCalledTimes(changeCount);
   });
 
   it('keeps a saved combined choice as one predefined page until explicitly replaced', async () => {
