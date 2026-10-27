@@ -7,6 +7,7 @@ import { INDUSTRY_OPTIONS, INDUSTRY_OPTIONS_GROUPED, LEGACY_INDUSTRY_OPTIONS, AC
 import { createPageStructure, projectPageStructure, countPageSelections } from '@/lib/pageOrganizerModel';
 import { normalizePersistedStateV3 } from '@/components/store/normalization';
 import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
+import { serializePageStructure } from '../../base44/shared/pageOrganizerContract.js';
 
 function IndustryOrganizer({ onChange, ...props }) {
   const [structure, setStructure] = useState(undefined);
@@ -55,7 +56,7 @@ describe('individual industry choices with historical compatibility', () => {
     const payload = transformResponsesToPayload(restored.responses, 'Local test', 'example.test');
     expect(payload.userdata.target_industries).toEqual([oldChoice]);
     expect(payload.userdata.target_industries_other).toBe('');
-    expect(payload.userdata.target_industries_structure).toEqual(original);
+    expect(payload.userdata.target_industries_structure).toEqual(serializePageStructure(original));
     expect(countPageSelections(adopted, '4')).toBe(1);
   });
 

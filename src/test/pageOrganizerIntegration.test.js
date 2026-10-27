@@ -10,7 +10,7 @@ import { buildQuestionnaireAiFormContext } from '@/components/pro-form/AIContent
 import { buildQuestionnairePdfSnapshot, questionnaireResponsesFromSubmissionPayload } from '@/lib/questionnairePdfVersions';
 import { repairSubmissionPayloadServer, validateSubmissionPayloadServer } from '@/lib/server/proSubmissionRepairHelpers';
 import { addPage, countPageSelections, createPageNode, createPageStructure, flattenPageStructure, movePage, projectPageStructure } from '@/lib/pageOrganizerModel';
-import { preserveOrganizedMappedPayload, validateOrganizedPayload, validateOrganizedSubmission } from '../../base44/shared/pageOrganizerContract.js';
+import { preserveOrganizedMappedPayload, serializePageStructure, validateOrganizedPayload, validateOrganizedSubmission } from '../../base44/shared/pageOrganizerContract.js';
 
 const legacyResponses = () => questionnaireResponsesFromSubmissionPayload(scoutLegacy);
 const payloadFor = (responses) => transformResponsesToPayload(responses, 'Scout Networks', 'scoutnetworks.net', SERVICE_OPTIONS_GROUPED);
@@ -66,7 +66,7 @@ describe('page organizer persistence and submission compatibility', () => {
     expect(payload.userdata.service_offerings.slice(6, 10)).toEqual(['Cloud Services', 'Cloud Solutions', 'Modern Workplace & Productivity Solutions', 'Microsoft 365']);
     const repaired = repairSubmissionPayloadServer(JSON.parse(JSON.stringify(payload)));
     expect(repaired.ok).toBe(true);
-    expect(repaired.payload.userdata.service_offerings_structure).toEqual(structure);
+    expect(repaired.payload.userdata.service_offerings_structure).toEqual(serializePageStructure(structure));
     expect(repaired.payload.userdata.service_offerings).toEqual(projectPageStructure(structure).selections);
     expect(validateSubmissionPayload(repaired.payload).ok).toBe(true);
     expect(validateSubmissionPayloadServer(repaired.payload).ok).toBe(true);
@@ -93,6 +93,33 @@ describe('page organizer persistence and submission compatibility', () => {
     expect(payload.userdata.target_industries_structure.pages[0].children[1].label).toBe('Finance, insurance and legal');
     expect(countPageSelections(restored.responses['4_structure'], '4')).toBe(4);
     expect(validateOrganizedPayload(payload).ok).toBe(true);
+  });
+
+  it('exports only page labels, sources and nonempty root children while retaining the editor identities', () => {
+    let structure = createPageStructure('4', ['Financial', 'CPA', 'Accounting'], [], {}, ACCEPTED_INDUSTRY_OPTIONS);
+    const financial = structure.pages[0];
+    structure = movePage(structure, structure.pages[1].id, financial.id);
+    structure = movePage(structure, structure.pages[1].id, financial.id);
+    structure = addPage(structure, createPageNode('4', 'Independent Clinics, Local'));
+    const responses = { ...legacyResponses(), '4_structure': structure };
+    const before = structuredClone(responses);
+    const payload = payloadFor(responses);
+    expect(payload.userdata.target_industries_structure).toEqual({
+      format: 'page-tree-v1',
+      pages: [
+        { label: 'Financial', source: 'predefined', children: [
+          { label: 'CPA', source: 'predefined' },
+          { label: 'Accounting', source: 'predefined' }
+        ] },
+        { label: 'Independent Clinics, Local', source: 'custom' }
+      ]
+    });
+    expect(payload.userdata.target_industries).toEqual(['Financial', 'CPA', 'Accounting']);
+    expect(payload.userdata.target_industries_other).toBe('Independent Clinics, Local');
+    expect(responses).toEqual(before);
+    expect(responses['4_structure'].pages[0].children[0]).toHaveProperty('id');
+    expect(responses['4_structure'].pages[0].children[0]).toHaveProperty('catalogId');
+    expect(validateOrganizedSubmission({ payload, responses }).ok).toBe(true);
   });
 
   it('treats explicit organized emptiness as empty instead of restoring stale flat answers', () => {
@@ -137,7 +164,7 @@ describe('page organizer persistence and submission compatibility', () => {
     const responses = { ...legacyResponses(), '3_structure': structure };
     const legacyPayload = payloadFor(legacyResponses());
     const mapped = preserveOrganizedMappedPayload(legacyPayload, responses);
-    expect(mapped.userdata.service_offerings_structure).toEqual(structure);
+    expect(mapped.userdata.service_offerings_structure).toEqual(serializePageStructure(structure));
     expect(mapped.userdata.service_offerings).toEqual(projectPageStructure(structure).selections);
     expect(mapped.userdata.target_industries).toEqual(legacyPayload.userdata.target_industries);
     expect(legacyPayload.userdata).not.toHaveProperty('service_offerings_structure');
@@ -170,7 +197,7 @@ describe('page organizer review and PDF display', () => {
     const responses = organizedResponses();
     const payload = payloadFor(responses);
     const snapshot = buildQuestionnairePdfSnapshot({ payload });
-    expect(snapshot.formData['3_structure']).toEqual(responses['3_structure']);
+    expect(serializePageStructure(snapshot.formData['3_structure'])).toEqual(serializePageStructure(responses['3_structure']));
     expect(formatAnswerForPdf('3', snapshot.formData['3'], snapshot.formData['3_other'], snapshot.formData)).toBe(formatAnswerForPdf('3', responses['3'], responses['3_other'], responses));
   });
 
@@ -188,7 +215,7 @@ describe('page organizer review and PDF display', () => {
     const context = buildQuestionnaireAiFormContext(responses, { businessName: 'Scout Networks' });
     const projected = projectPageStructure(responses['3_structure']);
     expect(context.businessName).toBe('Scout Networks');
-    expect(context.responses.service_offerings_structure).toEqual(responses['3_structure']);
+    expect(context.responses.service_offerings_structure).toEqual(serializePageStructure(responses['3_structure']));
     expect(context.responses.service_offerings).toEqual(projected.selections);
     expect(context.responses.service_offerings_other).toBe('Compliance Consulting (HIPAA, SOC 2)');
     expect(context.responses).not.toHaveProperty('target_industries_structure');

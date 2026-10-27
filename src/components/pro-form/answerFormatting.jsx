@@ -1,10 +1,10 @@
 import { formatServiceSelectionLabel } from '@/lib/serviceSelectionModel';
-import { normalizePageStructure } from '@/lib/pageOrganizerModel';
+import { serializePageStructure } from '../../../base44/shared/pageOrganizerContract.js';
 
 export const formatPageStructureForDisplay = (structure) => (
-  normalizePageStructure(structure).pages.flatMap((page, parentIndex) => [
+  serializePageStructure(structure).pages.flatMap((page, parentIndex) => [
     `${parentIndex + 1}. ${page.label}`,
-    ...page.children.map((child, childIndex) => `    ${childIndex + 1}. ${child.label}`)
+    ...(page.children || []).map((child, childIndex) => `    ${childIndex + 1}. ${child.label}`)
   ]).join('\n')
 );
 

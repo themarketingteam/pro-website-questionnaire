@@ -9,6 +9,7 @@ import { installLocalNetworkGuard } from '@/local/networkGuard';
 import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
 import { SERVICE_OPTIONS_GROUPED, SERVICE_OPTIONS, INDUSTRY_OPTIONS, ACCEPTED_INDUSTRY_OPTIONS } from '@/components/pro-form/questionData';
 import { createPageStructure, projectPageStructure, movePage } from '@/lib/pageOrganizerModel';
+import { serializePageStructure } from '../../base44/shared/pageOrganizerContract.js';
 
 const repository = process.cwd();
 // Inspect the actual configuration without starting Vite or importing esbuild
@@ -121,7 +122,7 @@ describe('isolated local preview API persistence', () => {
     expect(resumed.responses['3_structure'].pages[0].children.map((page) => page.label)).toEqual(['On-Site Support', 'Managed IT', 'Co-Managed IT']);
     expect(resumed.mappedPayload.metadata.questionnaire_payload_version).toBe(2);
     expect(resumed.mappedPayload.userdata.service_offerings).toEqual(projection.selections);
-    expect(resumed.mappedPayload.userdata.service_offerings_structure).toEqual(reordered);
+    expect(resumed.mappedPayload.userdata.service_offerings_structure).toEqual(serializePageStructure(reordered));
     expect(resumed.responses['4']).toEqual(session.draft.responses['4']);
   });
 
@@ -163,7 +164,7 @@ describe('isolated local preview API persistence', () => {
     const draft = currentDraft(api, session);
     expect(draft.responses['6']).toBe('An unrelated text edit from an older tab.');
     expect(draft.responses['3_structure']).toEqual(patch['3_structure']);
-    expect(draft.mappedPayload.userdata.service_offerings_structure).toEqual(patch['3_structure']);
+    expect(draft.mappedPayload.userdata.service_offerings_structure).toEqual(serializePageStructure(patch['3_structure']));
     expect(draft.mappedPayload.userdata.service_offerings).toEqual(patch['3']);
     expect(draft.mappedPayload.metadata.questionnaire_payload_version).toBe(2);
   });
@@ -251,7 +252,7 @@ describe('isolated local preview API persistence', () => {
     expect(result.success).toBe(true);
     expect(result.submission.userdata.target_industries).toEqual(labels);
     expect(result.submission.userdata.target_industries_other).toBe('');
-    expect(result.submission.userdata.target_industries_structure).toEqual(original);
+    expect(result.submission.userdata.target_industries_structure).toEqual(serializePageStructure(original));
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -270,6 +271,15 @@ describe('isolated local preview API persistence', () => {
     expect(api.state.captures).toHaveLength(1);
     expect(api.state.captures[0]).toMatchObject({ destination: 'LOCAL DISK ONLY — no webhook sent', payload: body.transformedPayload });
     expect(api.state.submissions[0].raw_responses['3_structure']).toEqual(draft.responses['3_structure']);
+    expect(api.state.captures[0].payload.userdata.service_offerings_structure.pages[0]).toEqual({
+      label: 'Managed IT Services', source: 'predefined', children: [
+        { label: 'Managed IT', source: 'predefined' },
+        { label: 'Co-Managed IT', source: 'predefined' },
+        { label: 'On-Site Support', source: 'predefined' }
+      ]
+    });
+    expect(api.state.submissions[0].raw_responses['3_structure'].pages[0]).toHaveProperty('id');
+    expect(api.state.submissions[0].raw_responses['3_structure'].pages[0]).toHaveProperty('catalogId');
     expect(fetch).not.toHaveBeenCalled();
     const restarted = createLocalApi(fixtureRoot, { dataDirectory });
     expect(restarted.state.captures).toEqual(api.state.captures);

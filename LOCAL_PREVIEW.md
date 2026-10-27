@@ -61,17 +61,24 @@ If either Q3 or Q4 adopts the organizer, `metadata.questionnaire_payload_version
   "format": "page-tree-v1",
   "pages": [
     {
-      "id": "stable-page-id",
       "label": "Managed IT Services",
       "source": "predefined",
-      "catalogId": "q3:parent:Managed%20IT%20Services",
-      "children": []
+      "children": [
+        { "label": "Managed IT", "source": "predefined" },
+        { "label": "IT Compliance Consulting", "source": "custom" }
+      ]
+    },
+    {
+      "label": "UI Design",
+      "source": "custom"
     }
   ]
 }
 ```
 
-Custom pages have `source: "custom"` and `catalogId: null`. Their individual labels remain separate in the structure, including labels containing commas. Legacy compatibility strings are generated from that structure; the flat fields do not carry navigation relationships or business priority.
+Outbound page nodes contain only `label` and `source` (`predefined` or `custom`), plus a nonempty `children` array for parent pages. Child pages and standalone pages omit `children`. No page `id` or `catalogId` is exported. Individual labels remain separate, including labels containing commas. Legacy compatibility strings are generated from that structure; the flat fields do not carry navigation relationships or business priority.
+
+Raw draft answers retain their internal page IDs, original catalog identities, and empty child arrays for editing, conflict protection, and the original service-parent counting rules. Serialization projects that editor state into the compact output without changing the draft. Previously saved ID-bearing mapped trees remain readable and are emitted in compact form when remapped or repaired. Submission validation compares page labels, sources, relationships, and order against the saved raw draft; it still rejects a changed hierarchy.
 
 The future duplicate Zap should route absent/version-1 payloads through the existing process, version-2 payloads through the structured process, and resolve Q3/Q4 independently. Unknown formats/versions must stop for review. No Zap was created, duplicated, changed, or called during this implementation.
 

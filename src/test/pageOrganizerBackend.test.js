@@ -13,7 +13,7 @@ const responses = () => ({ '3_structure': structure(), '3': ['Network Services',
 const payload = () => ({
   metadata: { business_name: 'Example', businessDomain: 'example.test', questionnaire_payload_version: 2 },
   userdata: {
-    service_offerings_structure: structure(), service_offerings: ['Network Services', 'Internet Services'], service_offerings_other: 'Custom service, with comma',
+    service_offerings_structure: contract.serializePageStructure(structure()), service_offerings: ['Network Services', 'Internet Services'], service_offerings_other: 'Custom service, with comma',
     target_industries: ['Healthcare/Medical'], target_industries_other: '',
     additional_pages_list: { meet_the_team_page: { team_photo_with_tags: {} } },
     geographic_areas: [], pricing_packaging: [], company_goals: [], certifications_partnerships: [], service_guarantee_items: [], website_objectives: [], client_challenges: [], client_outcomes: []
@@ -61,6 +61,52 @@ describe('page organizer backend contract', () => {
 
   it('preserves custom commas and arbitrary reparenting without inserting catalog parents', () => {
     expect(contract.projectOrganizedPages(structure())).toEqual({ selections: ['Network Services', 'Internet Services'], otherValues: ['Custom service, with comma'], other: 'Custom service, with comma' });
+  });
+
+  it('serializes compact pages without mutating rich editor state or accepting compact trees as raw draft answers', () => {
+    const raw = structure();
+    const before = clone(raw);
+    const compact = contract.serializePageStructure(raw);
+    expect(compact).toEqual({ format: 'page-tree-v1', pages: [{
+      label: 'Network Services', source: 'predefined', children: [
+        { label: 'Internet Services', source: 'predefined' },
+        { label: 'Custom service, with comma', source: 'custom' }
+      ]
+    }] });
+    expect(raw).toEqual(before);
+    expect(contract.validateMappedPageStructure(compact).ok).toBe(true);
+    expect(contract.validatePageStructure(compact).ok).toBe(false);
+    expect(contract.validateOrganizedResponses({ '3_structure': compact }).ok).toBe(false);
+    expect(contract.validateOrganizedSubmission({ payload: payload(), responses: responses() }).ok).toBe(true);
+  });
+
+  it('accepts historical rich mapped trees and re-exports their logical content without identities', () => {
+    const historical = payload();
+    historical.userdata.service_offerings_structure = structure();
+    const before = clone(historical);
+    expect(contract.validateOrganizedPayload(historical).ok).toBe(true);
+    expect(contract.validateOrganizedSubmission({ payload: historical, responses: responses() }).ok).toBe(true);
+    expect(contract.restoreOrganizedProjections(historical)).toEqual(payload());
+    expect(historical).toEqual(before);
+    historical.userdata.service_offerings_structure.pages[0].children[0].id = 'network';
+    expect(contract.validateOrganizedPayload(historical).ok).toBe(false);
+  });
+
+  it.each([
+    (tree) => { tree.pages[0].children[0].children = []; },
+    (tree) => { tree.pages[0].children[0].children = [{ label: 'Grandchild', source: 'custom' }]; },
+    (tree) => { tree.pages[0].children = []; },
+    (tree) => { delete tree.pages[0].label; },
+    (tree) => { tree.pages[0].source = 'folder'; },
+    (tree) => { tree.pages[0].id = 'partially-stripped-identity'; },
+    (tree) => { tree.pages[0].unrecognized = true; }
+  ])('rejects malformed compact mapped trees instead of silently discarding fields (%#)', (mutate) => {
+    const value = payload();
+    mutate(value.userdata.service_offerings_structure);
+    const before = clone(value);
+    expect(contract.validateOrganizedPayload(value).ok).toBe(false);
+    expect(() => contract.serializePageStructure(value.userdata.service_offerings_structure)).toThrow();
+    expect(value).toEqual(before);
   });
 
   it.each([
@@ -134,7 +180,7 @@ describe('page organizer backend contract', () => {
     const value = payload(); const before = clone(value);
     const repaired = repairSubmissionPayloadServer(value);
     expect(repaired.ok).toBe(true);
-    expect(repaired.payload.userdata.service_offerings_structure).toEqual(value.userdata.service_offerings_structure);
+    expect(repaired.payload.userdata.service_offerings_structure).toEqual(contract.serializePageStructure(value.userdata.service_offerings_structure));
     expect(value).toEqual(before);
     value.userdata.service_offerings_structure.format = 'future';
     expect(repairSubmissionPayloadServer(value).ok).toBe(false);
@@ -173,7 +219,7 @@ describe('actual Base44 handlers with local SDK fakes', () => {
     const { handler } = loadFunction('base44/functions/syncProQuestionnaireDraft/entry.ts', fixture);
     const result = await handler(request(fixture.body));
     expect(result.status).toBe(200);
-    expect(JSON.parse(fixture.getDraft().mapped_payload_json).userdata.service_offerings_structure).toEqual(structure());
+    expect(JSON.parse(fixture.getDraft().mapped_payload_json).userdata.service_offerings_structure).toEqual(contract.serializePageStructure(structure()));
     expect(JSON.parse(fixture.getDraft().responses_json)['3_structure']).toEqual(structure());
     const second = await handler(request({ ...fixture.body, mutationId: 'local_test_mutation_12346', clientSequence: 2, baseRevision: 1 }));
     expect(second.status).toBe(200);
@@ -208,7 +254,7 @@ describe('actual Base44 handlers with local SDK fakes', () => {
     const body = { draftId: 'draft-1', submissionAttemptId: 'local_submission_attempt_12345', transformedPayload: payload() };
     const result = await handler(request(body));
     expect(result.status).toBe(200);
-    expect(submissionEntity.create.mock.calls[0][0].userdata.service_offerings_structure).toEqual(structure());
+    expect(submissionEntity.create.mock.calls[0][0].userdata.service_offerings_structure).toEqual(contract.serializePageStructure(structure()));
     const old = await handler(request({ ...body, transformedPayload: legacyPayload() }));
     expect(old.status).toBe(409);
     expect((await old.json()).code).toBe('ORGANIZER_SUBMISSION_CONFLICT');
@@ -240,9 +286,33 @@ describe('actual Base44 handlers with local SDK fakes', () => {
     const base44 = { asServiceRole: { entities: {} }, agents: { createConversation: vi.fn() } };
     const valid = await exposed.runRepairPipeline({ base44, rawPayload: payload(), rawResponsesRawString: JSON.stringify(responses()), context: {}, mode: 'repair_only' });
     expect(valid.ok).toBe(true);
-    expect(valid.payload.userdata.service_offerings_structure).toEqual(structure());
+    expect(valid.payload.userdata.service_offerings_structure).toEqual(contract.serializePageStructure(structure()));
     const invalid = payload(); invalid.userdata.service_offerings_structure.format = 'future-format';
     expect(await exposed.runRepairPipeline({ base44, rawPayload: invalid, rawResponsesRawString: '{}', context: {}, mode: 'repair_and_retry' })).toMatchObject({ ok: false, source: 'organizer_validation' });
     expect(base44.agents.createConversation).not.toHaveBeenCalled();
+  });
+
+  it('compares compact mapped AI repair trees without treating them as identity-bearing raw responses', () => {
+    const { exposed } = loadFunction('base44/functions/repairProQuestionnaireIntakeSubmission/entry.ts', { expose: 'validateRepairedPageStructures', modules: { '../../shared/proIdentityResolution.ts': { isMissingIdentityValue: (value) => !value }, '../../shared/draftRecoveryAuthorization.ts': {} } });
+    const original = payload();
+    expect(exposed.validateRepairedPageStructures(original, clone(original)).ok).toBe(true);
+    expect(exposed.validateRepairedPageStructures(legacyPayload(), legacyPayload()).ok).toBe(true);
+    expect(exposed.validateRepairedPageStructures(original, legacyPayload()).ok).toBe(false);
+    expect(exposed.validateRepairedPageStructures(legacyPayload(), original).ok).toBe(false);
+    for (const mutate of [
+      (tree) => { tree.pages[0].label = 'Changed page'; },
+      (tree) => { tree.pages[0].children.reverse(); },
+      (tree) => { tree.pages.push(tree.pages[0].children.pop()); },
+      (tree) => { tree.pages[0].children[0].source = 'custom'; }
+    ]) {
+      const changed = clone(original);
+      const tree = changed.userdata.service_offerings_structure;
+      mutate(tree);
+      const projection = contract.projectOrganizedPages(tree);
+      changed.userdata.service_offerings = projection.selections;
+      changed.userdata.service_offerings_other = projection.other;
+      expect(contract.validateOrganizedPayload(changed).ok).toBe(true);
+      expect(exposed.validateRepairedPageStructures(original, changed).ok).toBe(false);
+    }
   });
 });

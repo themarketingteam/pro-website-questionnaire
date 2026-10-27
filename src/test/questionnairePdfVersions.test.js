@@ -8,6 +8,8 @@ import {
   stableQuestionnairePdfSnapshot
 } from '@/lib/questionnairePdfVersions';
 import { QUESTIONNAIRE_PDF_TEMPLATE_REVISION } from '@/components/pro-form/pdf/questionnairePdfTheme';
+import { formatAnswerForPdf } from '@/components/pro-form/pdf/pdfAnswerFormatting';
+import { serializePageStructure } from '../../base44/shared/pageOrganizerContract.js';
 
 const payload = {
   metadata: {
@@ -60,6 +62,44 @@ const legacyStableValue = (value) => {
 };
 
 describe('questionnaire PDF version payloads', () => {
+  it('renders compact mapped-only pages with sibling priorities and no invented editor identities', () => {
+    const compact = { format: 'page-tree-v1', pages: [
+      { label: 'Financial', source: 'predefined', children: [
+        { label: 'CPA', source: 'predefined' },
+        { label: 'Accounting', source: 'predefined' }
+      ] },
+      { label: 'Independent Clinics', source: 'custom' }
+    ] };
+    const structured = { ...payload, userdata: { ...payload.userdata,
+      target_industries: ['Financial', 'CPA', 'Accounting'], target_industries_other: 'Independent Clinics',
+      target_industries_structure: compact
+    } };
+    const before = structuredClone(structured);
+    const snapshot = buildQuestionnairePdfSnapshot({ payload: structured });
+    expect(snapshot.formData['4_structure']).toEqual(compact);
+    expect(formatAnswerForPdf('4', snapshot.formData['4'], snapshot.formData['4_other'], snapshot.formData))
+      .toBe('1. Financial\n    1. CPA\n    2. Accounting\n2. Independent Clinics');
+    expect(structured).toEqual(before);
+    expect(snapshot.formData['4_structure'].pages[0]).not.toHaveProperty('id');
+    expect(snapshot.formData['4_structure'].pages[0]).not.toHaveProperty('catalogId');
+  });
+
+  it('keeps historical rich trees readable and preserves matching raw identities without letting stale fallbacks replace mapped pages', () => {
+    const raw = { format: 'page-tree-v1', pages: [{ id: 'original-parent', label: 'Financial', source: 'predefined', catalogId: 'q4:option:Financial', children: [
+      { id: 'original-child', label: 'CPA', source: 'predefined', catalogId: 'q4:option:CPA', children: [] }
+    ] }] };
+    const compact = serializePageStructure(raw);
+    const makePayload = (tree) => ({ ...payload, userdata: { ...payload.userdata, target_industries_structure: tree } });
+    expect(questionnaireResponsesFromSubmissionPayload(makePayload(raw))['4_structure']).toEqual(raw);
+    const matching = buildQuestionnairePdfSnapshot({ payload: makePayload(compact), fallbackResponses: { '4_structure': raw } });
+    expect(matching.formData['4_structure']).toEqual(raw);
+    const stale = structuredClone(raw);
+    stale.pages[0].label = 'Changed page';
+    expect(buildQuestionnairePdfSnapshot({ payload: makePayload(compact), fallbackResponses: { '4_structure': stale } }).formData['4_structure']).toEqual(compact);
+    const historical = buildQuestionnairePdfSnapshot({ payload: makePayload(raw) });
+    expect(formatAnswerForPdf('4', [], '', historical.formData)).toBe('1. Financial\n    1. CPA');
+  });
+
   it('reconstructs the client PDF response shape from a final submission payload', () => {
     const responses = questionnaireResponsesFromSubmissionPayload(payload);
 

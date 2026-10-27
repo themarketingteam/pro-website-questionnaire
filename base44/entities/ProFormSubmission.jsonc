@@ -453,21 +453,15 @@
                         }
                       },
                       "required": [
-                        "id",
                         "label",
-                        "source",
-                        "catalogId",
-                        "children"
+                        "source"
                       ]
                     }
                   }
                 },
                 "required": [
-                  "id",
                   "label",
-                  "source",
-                  "catalogId",
-                  "children"
+                  "source"
                 ]
               }
             }
@@ -476,7 +470,7 @@
             "format",
             "pages"
           ],
-          "description": "Optional authoritative page tree. Array position is priority among siblings; every node represents a website page."
+          "description": "Optional authoritative mapped page tree. Array position is sibling priority. New pages contain label and source, with children only for nonempty parents; optional historical id/catalogId and empty children remain readable."
         },
         "target_industries_structure": {
           "type": "object",
@@ -559,21 +553,15 @@
                         }
                       },
                       "required": [
-                        "id",
                         "label",
-                        "source",
-                        "catalogId",
-                        "children"
+                        "source"
                       ]
                     }
                   }
                 },
                 "required": [
-                  "id",
                   "label",
-                  "source",
-                  "catalogId",
-                  "children"
+                  "source"
                 ]
               }
             }
@@ -582,7 +570,7 @@
             "format",
             "pages"
           ],
-          "description": "Optional authoritative page tree. Array position is priority among siblings; every node represents a website page."
+          "description": "Optional authoritative mapped page tree. Array position is sibling priority. New pages contain label and source, with children only for nonempty parents; optional historical id/catalogId and empty children remain readable."
         }
       }
     },

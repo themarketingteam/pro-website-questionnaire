@@ -1,6 +1,8 @@
 import { SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import { QUESTIONNAIRE_PDF_TEMPLATE_REVISION } from '@/components/pro-form/pdf/questionnairePdfTheme';
 import { normalizeServiceSelectionsForPayload } from '@/lib/serviceSelectionModel';
+import { normalizePageStructure } from '@/lib/pageOrganizerModel';
+import { serializePageStructure } from '../../base44/shared/pageOrganizerContract.js';
 
 const isPlainObject = (value) => (
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -24,6 +26,9 @@ const parseJsonObject = (value) => {
 
 const yesNo = (condition) => condition ? 'yes' : 'no';
 
+// These are display responses for PDF generation. A mapped-only compact tree
+// stays compact; editor identities and catalog provenance cannot be recovered
+// from its labels and must never be invented here.
 export const questionnaireResponsesFromSubmissionPayload = (payload) => {
   const safePayload = asObject(payload);
   const userdata = asObject(safePayload.userdata);
@@ -48,7 +53,7 @@ export const questionnaireResponsesFromSubmissionPayload = (payload) => {
     '2': yesNo(meetTheTeam.generate_page === true),
     '2.1': asString(meetTheTeam.team_introduction),
     '2.2': teamPhoto,
-    '3': userdata.service_offerings_structure ? asArray(userdata.service_offerings) : normalizeServiceSelectionsForPayload(
+    '3': Object.prototype.hasOwnProperty.call(userdata, 'service_offerings_structure') ? asArray(userdata.service_offerings) : normalizeServiceSelectionsForPayload(
       asArray(userdata.service_offerings),
       SERVICE_OPTIONS_GROUPED
     ),
@@ -126,6 +131,23 @@ export const buildQuestionnairePdfSnapshot = ({
   const formData = hasSubmissionPayload
     ? questionnaireResponsesFromSubmissionPayload(safePayload)
     : asObject(fallbackResponses);
+
+  if (hasSubmissionPayload) {
+    for (const id of ['3', '4']) {
+      const key = `${id}_structure`;
+      if (!Object.prototype.hasOwnProperty.call(formData, key)
+        || !Object.prototype.hasOwnProperty.call(asObject(fallbackResponses), key)) continue;
+      try {
+        const raw = normalizePageStructure(fallbackResponses[key]);
+        const samePages = JSON.stringify(serializePageStructure(raw))
+          === JSON.stringify(serializePageStructure(formData[key]));
+        if (samePages) formData[key] = raw;
+      } catch {
+        // Keep the stored mapped content for display or explicit review. A
+        // malformed/stale fallback never replaces it or guesses new identities.
+      }
+    }
+  }
 
   return {
     formData,

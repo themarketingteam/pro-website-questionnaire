@@ -75,16 +75,78 @@ export const validatePageStructure = (structure, { path = 'structure' } = {}) =>
   return outcome(errors);
 };
 
+/** Mapped trees are compact. Historical wholly ID-bearing trees remain readable. */
+export const validateMappedPageStructure = (structure, { path = 'structure' } = {}) => {
+  if (!plain(structure)) return outcome([`${path} must be an object.`]);
+  const errors = [];
+  if (structure.format !== PAGE_STRUCTURE_FORMAT) errors.push(`${path}.format must be ${PAGE_STRUCTURE_FORMAT}.`);
+  Object.keys(structure).forEach((key) => {
+    if (!['format', 'pages'].includes(key)) errors.push(`${path}.${key} is not supported.`);
+  });
+  if (!Array.isArray(structure.pages)) return outcome([...errors, `${path}.pages must be an array.`]);
+  const rich = structure.pages.some((page) => plain(page) && (
+    own(page, 'id') || own(page, 'catalogId')
+    || (Array.isArray(page.children) && page.children.some((child) => own(child, 'id') || own(child, 'catalogId')))
+  ));
+  // A partially stripped rich tree must not bypass identity validation.
+  if (rich) return validatePageStructure(structure, { path });
+  const visited = new Set();
+  let total = 0;
+  const visit = (node, depth, itemPath) => {
+    total += 1;
+    if (total > 100) { errors.push(`${path} exceeds 100 total pages.`); return; }
+    if (!plain(node)) { errors.push(`${itemPath} must be an object.`); return; }
+    if (visited.has(node)) { errors.push(`${itemPath} contains a cycle or repeated node.`); return; }
+    visited.add(node);
+    const allowed = depth === 1 ? ['label', 'source', 'children'] : ['label', 'source'];
+    Object.keys(node).forEach((key) => {
+      if (!allowed.includes(key)) errors.push(`${itemPath}.${key} is not supported.`);
+    });
+    if (typeof node.label !== 'string' || !node.label.trim() || node.label.length > 500) errors.push(`${itemPath}.label must be a nonempty string of at most 500 characters.`);
+    if (!['predefined', 'custom'].includes(node.source)) errors.push(`${itemPath}.source must be predefined or custom.`);
+    if (depth === 1 && own(node, 'children')) {
+      if (!Array.isArray(node.children) || node.children.length === 0) errors.push(`${itemPath}.children must be a nonempty array when present.`);
+      else {
+        if (node.children.length > 100) errors.push(`${itemPath}.children exceeds 100 pages.`);
+        node.children.slice(0, 101).forEach((child, index) => visit(child, 2, `${itemPath}.children[${index}]`));
+      }
+    }
+  };
+  if (structure.pages.length > 100) errors.push(`${path}.pages exceeds 100 pages.`);
+  structure.pages.slice(0, 101).forEach((page, index) => visit(page, 1, `${path}.pages[${index}]`));
+  return outcome(errors);
+};
+
+/** Serialize logical page content without editor identity or empty child arrays. */
+export const serializePageStructure = (structure) => {
+  const validation = validateMappedPageStructure(structure);
+  if (!validation.ok) throw Object.assign(new Error(validation.errors.join(' ')), { code: validation.code, status: validation.status });
+  return {
+    format: PAGE_STRUCTURE_FORMAT,
+    pages: structure.pages.map((page) => ({
+      label: page.label,
+      source: page.source,
+      ...(page.children?.length ? { children: page.children.map((child) => ({ label: child.label, source: child.source })) } : {})
+    }))
+  };
+};
+
+/** Invalid or unknown formats never compare equal, even to themselves. */
+export const samePageStructure = (left, right) => {
+  try { return same(serializePageStructure(left), serializePageStructure(right)); }
+  catch { return false; }
+};
+
 export const projectOrganizedPages = (structure) => {
   const selections = [];
   const otherValues = [];
   const visit = (pages) => {
     pages.forEach((page) => {
       (page.source === 'predefined' ? selections : otherValues).push(page.label);
-      visit(page.children);
+      if (page.children) visit(page.children);
     });
   };
-  visit(structure.pages);
+  visit(serializePageStructure(structure).pages);
   return { selections, otherValues, other: otherValues.join(', ') };
 };
 
@@ -106,7 +168,7 @@ export const validateOrganizedPayload = (payload) => {
     if (!own(payload?.userdata, question.structureField)) continue;
     organizedQuestions.push(question.questionId);
     const structure = payload.userdata[question.structureField];
-    const validation = validatePageStructure(structure, { path: `userdata.${question.structureField}` });
+    const validation = validateMappedPageStructure(structure, { path: `userdata.${question.structureField}` });
     errors.push(...validation.errors);
     if (!validation.ok) continue;
     const projection = projectOrganizedPages(structure);
@@ -156,18 +218,33 @@ export const guardOrganizedDraftMutation = ({
 
 /** Derive compatibility values from authoritative structures; never re-group by catalog. */
 export const preserveOrganizedMappedPayload = (payload, responses = {}) => {
-  const next = JSON.parse(JSON.stringify(payload || {}));
-  const adopted = ORGANIZER_QUESTIONS.filter((question) => own(responses, question.responseKey));
-  if (!adopted.length) return next;
   const validation = validateOrganizedResponses(responses);
   if (!validation.ok) throw Object.assign(new Error(validation.errors.join(' ')), { code: validation.code, status: 400 });
+  const next = JSON.parse(JSON.stringify(payload || {}));
+  const originalVersion = next?.metadata?.questionnaire_payload_version;
+  if (originalVersion !== undefined && originalVersion !== 1 && originalVersion !== 2) {
+    throw Object.assign(new Error('Unsupported questionnaire payload version.'), { code: 'INVALID_PAGE_STRUCTURE', status: 400 });
+  }
+  const structures = new Map();
+  for (const question of ORGANIZER_QUESTIONS) {
+    if (own(next.userdata, question.structureField)) {
+      // Validate historical mapped content before any authoritative replacement.
+      structures.set(question.structureField, serializePageStructure(next.userdata[question.structureField]));
+    }
+    if (own(responses, question.responseKey)) structures.set(question.structureField, serializePageStructure(responses[question.responseKey]));
+  }
+  if (!structures.size) {
+    if (originalVersion === 2) throw Object.assign(new Error('Version 2 requires an organized question structure.'), { code: 'INVALID_PAGE_STRUCTURE', status: 400 });
+    return next;
+  }
   next.metadata = plain(next.metadata) ? next.metadata : {};
   next.userdata = plain(next.userdata) ? next.userdata : {};
   next.metadata.questionnaire_payload_version = 2;
-  for (const question of adopted) {
-    const structure = responses[question.responseKey];
+  for (const question of ORGANIZER_QUESTIONS) {
+    if (!structures.has(question.structureField)) continue;
+    const structure = structures.get(question.structureField);
     const projection = projectOrganizedPages(structure);
-    next.userdata[question.structureField] = JSON.parse(JSON.stringify(structure));
+    next.userdata[question.structureField] = structure;
     next.userdata[question.field] = projection.selections;
     next.userdata[`${question.field}_other`] = projection.other;
   }
@@ -175,11 +252,7 @@ export const preserveOrganizedMappedPayload = (payload, responses = {}) => {
 };
 
 /** Generic legacy string cleanup must not truncate a structured projection. */
-export const restoreOrganizedProjections = (payload) => preserveOrganizedMappedPayload(payload,
-  Object.fromEntries(ORGANIZER_QUESTIONS
-    .filter((question) => own(payload?.userdata, question.structureField))
-    .map((question) => [question.responseKey, payload.userdata[question.structureField]]))
-);
+export const restoreOrganizedProjections = (payload) => preserveOrganizedMappedPayload(payload);
 
 export const validateOrganizedSubmission = ({ payload, responses = {}, allowMissingPayload = false }) => {
   const validation = validateOrganizedResponses(responses);
@@ -190,7 +263,7 @@ export const validateOrganizedSubmission = ({ payload, responses = {}, allowMiss
   for (const question of ORGANIZER_QUESTIONS) {
     const adopted = own(responses, question.responseKey);
     const supplied = own(payload?.userdata, question.structureField);
-    if ((adopted || supplied) && (!adopted || !supplied || !same(responses[question.responseKey], payload.userdata[question.structureField]))) {
+    if ((adopted || supplied) && (!adopted || !supplied || !samePageStructure(responses[question.responseKey], payload.userdata[question.structureField]))) {
       return outcome(['The submitted page structure does not match the saved draft. Reload and save before submitting.'], validation.organizedQuestions, 'ORGANIZER_SUBMISSION_CONFLICT', 409);
     }
   }
@@ -205,7 +278,7 @@ export const reconcileOrganizedRepairPayload = (payload, responses = {}) => {
   if (!payloadValidation.ok) return { ...payloadValidation, payload: null };
   for (const question of ORGANIZER_QUESTIONS) {
     if (own(responses, question.responseKey) && own(payload?.userdata, question.structureField)
-      && !same(responses[question.responseKey], payload.userdata[question.structureField])) {
+      && !samePageStructure(responses[question.responseKey], payload.userdata[question.structureField])) {
       return { ...outcome(['The saved raw and mapped page structures disagree; human review is required.'], sourceValidation.organizedQuestions, 'ORGANIZER_REPAIR_CONFLICT', 409), payload: null };
     }
   }

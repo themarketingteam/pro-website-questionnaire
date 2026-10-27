@@ -72,23 +72,25 @@ export const createLocalApi = (root, { dataDirectory = path.join(root, '.local-p
     const record = { id: randomId('capture'), route, capturedAt: now(), submissionId, payload: clone(payload), destination: 'LOCAL DISK ONLY — no webhook sent' };
     state.captures.push(record); persist(); return record;
   };
-  const validateCounts = (payload) => {
+  const validateCounts = (payload, responses) => {
     const catalogIds = {
       '3': new Set(Object.entries(catalog.services).flatMap(([parent, children]) => [getPageCatalogId('3', parent, 'parent'), ...children.map((label) => getPageCatalogId('3', label))])),
       '4': new Set([...catalog.industries, ...catalog.legacyIndustries].map((label) => getPageCatalogId('4', label)))
     };
-    for (const [id, field] of [['3', 'service_offerings_structure'], ['4', 'target_industries_structure']]) {
-      if (payload.userdata[field]) {
-        for (const page of flattenPageStructure(payload.userdata[field])) {
+    // Catalog provenance and counting belong to the saved editor state. The
+    // outbound page trees intentionally contain no editor or catalog IDs.
+    for (const id of ['3', '4']) {
+      if (responses[`${id}_structure`]) {
+        for (const page of flattenPageStructure(responses[`${id}_structure`])) {
           if (page.source === 'predefined' && !catalogIds[id].has(page.catalogId)) fail('A page has an unknown catalog identity; review it before submitting.');
         }
       }
     }
 
     let serviceCount;
-    if (payload.userdata.service_offerings_structure) serviceCount = countPageSelections(payload.userdata.service_offerings_structure, '3', catalog.services);
+    if (responses['3_structure']) serviceCount = countPageSelections(responses['3_structure'], '3', catalog.services);
     else serviceCount = payload.userdata.service_offerings.filter((label) => !Object.hasOwn(catalog.services, label)).length + countLegacyOther(payload.userdata.service_offerings_other);
-    const industryCount = payload.userdata.target_industries_structure ? countPageSelections(payload.userdata.target_industries_structure, '4') : payload.userdata.target_industries.length + countLegacyOther(payload.userdata.target_industries_other);
+    const industryCount = responses['4_structure'] ? countPageSelections(responses['4_structure'], '4') : payload.userdata.target_industries.length + countLegacyOther(payload.userdata.target_industries_other);
     const locationCount = payload.userdata.geographic_areas?.length || 0;
     if (serviceCount < 3 || serviceCount > 15 || industryCount < 1 || industryCount > 10 || locationCount < 1 || locationCount > 5 || serviceCount + industryCount + locationCount > 25) fail('Selection limits are not met (3–15 services, 1–10 industries, 1–5 locations, at most 25 combined).');
   };
@@ -98,7 +100,7 @@ export const createLocalApi = (root, { dataDirectory = path.join(root, '.local-p
     const draft = requireDraft(body.resumeCredential);
     if (body.draftId && body.draftId !== draft.id) fail('Local draft identity mismatch.', 409);
     assertResult(validateOrganizedSubmission({ payload, responses: draft.responses }));
-    validateCounts(payload);
+    validateCounts(payload, draft.responses);
     const fingerprint = body.submissionContentFingerprint || JSON.stringify(payload.userdata);
     const previous = state.submissions.find((item) => item.local_fingerprint === fingerprint && item.local_draft_id === draft.id);
     if (previous) {

@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import { normalizeServiceSelectionsForPayload } from '@/lib/serviceSelectionModel';
 import { normalizePageStructure, projectPageStructure } from '@/lib/pageOrganizerModel';
+import { serializePageStructure } from '../../../base44/shared/pageOrganizerContract.js';
 
 export const buildQuestionnaireAiFormContext = (responses = {}, credentials = {}) => {
   const has = (key) => Object.prototype.hasOwnProperty.call(responses, key);
@@ -22,11 +23,11 @@ export const buildQuestionnaireAiFormContext = (responses = {}, credentials = {}
       service_offerings: services ? services.selections : normalizeServiceSelectionsForPayload(responses['3'], SERVICE_OPTIONS_GROUPED),
       target_industries: industries ? industries.selections : responses['4'] || [],
       ...(serviceStructure ? {
-        service_offerings_structure: serviceStructure,
+        service_offerings_structure: serializePageStructure(serviceStructure),
         service_offerings_other: services.otherValues.join(', ')
       } : {}),
       ...(industryStructure ? {
-        target_industries_structure: industryStructure,
+        target_industries_structure: serializePageStructure(industryStructure),
         target_industries_other: industries.otherValues.join(', ')
       } : {}),
       additional_pages_list: responses['1.1'] || '',

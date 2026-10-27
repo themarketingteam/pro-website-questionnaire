@@ -4,6 +4,7 @@ import { createPageNode, createPageStructure, flattenPageStructure } from '@/lib
 import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
 import { repairProSubmissionPayload } from '@/lib/proPayloadRepair';
 import { SERVICE_OPTIONS_GROUPED, ACCEPTED_INDUSTRY_OPTIONS } from '@/components/pro-form/questionData';
+import { serializePageStructure } from '../../base44/shared/pageOrganizerContract.js';
 
 describe('organizer preservation at legacy and repair boundaries', () => {
   it('retains retired and custom main-array labels through rehydrate before adoption', () => {
@@ -38,6 +39,6 @@ describe('organizer preservation at legacy and repair boundaries', () => {
     const repaired = repairProSubmissionPayload(payload);
     expect(repaired.ok).toBe(true);
     expect(repaired.payload.userdata.service_offerings_other).toBe(payload.userdata.service_offerings_other);
-    expect(repaired.payload.userdata.service_offerings_structure).toEqual(structure);
+    expect(repaired.payload.userdata.service_offerings_structure).toEqual(serializePageStructure(structure));
   });
 });

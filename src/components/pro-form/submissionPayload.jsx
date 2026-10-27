@@ -1,5 +1,5 @@
 import { normalizePageStructure, projectPageStructure } from '@/lib/pageOrganizerModel';
-import { validateOrganizedPayload } from '../../../base44/shared/pageOrganizerContract.js';
+import { serializePageStructure, validateOrganizedPayload } from '../../../base44/shared/pageOrganizerContract.js';
 import {
   asArray,
   asPlainObject,
@@ -232,8 +232,8 @@ export const transformResponsesToPayload = (
     userdata: {
       additional_pages_list: additionalPagesList,
       service_offerings: serviceSelections,
-      ...(serviceStructure ? { service_offerings_structure: serviceStructure } : {}),
-      ...(industryStructure ? { target_industries_structure: industryStructure } : {}),
+      ...(serviceStructure ? { service_offerings_structure: serializePageStructure(serviceStructure) } : {}),
+      ...(industryStructure ? { target_industries_structure: serializePageStructure(industryStructure) } : {}),
       service_offerings_other: serviceOfferingsOther,
       target_industries: industryProjection?.selections || normalizeIndustrySelections(normalizedResponses['4']),
       target_industries_other: targetIndustriesOther,

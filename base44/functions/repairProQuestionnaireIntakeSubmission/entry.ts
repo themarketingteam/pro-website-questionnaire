@@ -1,4 +1,4 @@
-import { validateOrganizedPayload, validateOrganizedSubmission, reconcileOrganizedRepairPayload, restoreOrganizedProjections } from '../../shared/pageOrganizerContract.js';
+import { validateOrganizedPayload, samePageStructure, reconcileOrganizedRepairPayload, restoreOrganizedProjections } from '../../shared/pageOrganizerContract.js';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import { isMissingIdentityValue } from '../../shared/proIdentityResolution.ts';
 import { createIdentityResolverInternalGrant } from '../../shared/draftRecoveryAuthorization.ts';
@@ -520,6 +520,21 @@ function buildRepairPrompt({
 
 // ─── Core repair logic (shared between intake and draft) ─────────────────────
 
+// Both inputs here are mapped payloads, not raw editor responses. Compare their
+// logical page content without inventing editor identities for compact trees.
+function validateRepairedPageStructures(originalPayload, repairedPayload) {
+  const validation = validateOrganizedPayload(repairedPayload);
+  if (!validation.ok) return validation;
+  for (const field of ['service_offerings_structure', 'target_industries_structure']) {
+    const originalHas = Object.prototype.hasOwnProperty.call(originalPayload?.userdata || {}, field);
+    const repairedHas = Object.prototype.hasOwnProperty.call(repairedPayload?.userdata || {}, field);
+    if (originalHas !== repairedHas || (originalHas && !samePageStructure(originalPayload.userdata[field], repairedPayload.userdata[field]))) {
+      return { ok: false, errors: ['Repair cannot add, remove, relabel, reorder, or reparent organized pages.'] };
+    }
+  }
+  return validation;
+}
+
 async function runRepairPipeline({
   base44,
   rawPayload,          // parsed payload (may be {} if parsing failed)
@@ -603,8 +618,7 @@ async function runRepairPipeline({
 
   // Validate agent output deterministically
   // The agent may fix other fields, but cannot remove, relabel or reorder adopted pages.
-  const originalStructures = Object.fromEntries(['service_offerings', 'target_industries'].filter((field) => Object.prototype.hasOwnProperty.call(rawPayload?.userdata || {}, `${field}_structure`)).map((field) => [field === 'service_offerings' ? '3_structure' : '4_structure', rawPayload.userdata[`${field}_structure`]]));
-  const structureGuard = validateOrganizedSubmission({ payload: agentRepairedPayload, responses: originalStructures });
+  const structureGuard = validateRepairedPageStructures(rawPayload, agentRepairedPayload);
   if (!structureGuard.ok) return { source: 'agent_invalid', ok: false, payload: null, report: agentReport, errors: structureGuard.errors };
   const agentDetResult = repairSubmissionPayloadServer(agentRepairedPayload, context);
   const agentValidation = validateSubmissionPayloadServer(agentDetResult.payload);
