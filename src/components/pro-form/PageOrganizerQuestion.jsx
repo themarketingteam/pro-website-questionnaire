@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
-import { ArrowDown, ArrowUp, ChevronDown, GripVertical, Layers3, Plus, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, GripVertical, Layers3, Plus, Search, Trash2 } from 'lucide-react';
 import {
   addPage,
   countPageSelections,
@@ -14,7 +14,7 @@ import {
 } from '@/lib/pageOrganizerModel';
 
 const controlClass = 'min-h-[40px] rounded-md border border-[#C1C6C8] bg-white text-sm text-[#1E3950] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1C82DE] disabled:cursor-not-allowed disabled:opacity-40';
-const iconButtonClass = `${controlClass} inline-flex h-10 w-10 shrink-0 items-center justify-center hover:border-[#1C82DE] hover:bg-[#E8F3FC]`;
+const sortButtonClass = 'relative inline-flex h-11 w-11 shrink-0 items-center justify-center bg-white text-[#456078] transition-colors hover:bg-[#E8F3FC] hover:text-[#176BB7] focus:outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-[#1C82DE] disabled:cursor-not-allowed disabled:bg-[#F7F9FB] disabled:text-[#B4C0C9]';
 const sameLabel = (left, right) => left.trim().toLocaleLowerCase() === right.trim().toLocaleLowerCase();
 
 export default function PageOrganizerQuestion({
@@ -170,12 +170,12 @@ export default function PageOrganizerQuestion({
     <Draggable key={page.id} draggableId={page.id} index={index}>
       {(provided, snapshot) => (
         <div ref={provided.innerRef} {...provided.draggableProps} className={`rounded-lg border bg-white ${snapshot.isDragging ? 'border-[#1C82DE] shadow-lg' : 'border-[#DCE3E8]'} ${parentId ? 'ml-5 sm:ml-10' : ''}`}>
-          <div className="flex flex-wrap items-center gap-2 px-2 py-3 sm:gap-3 sm:px-3">
-            <button type="button" {...provided.dragHandleProps} aria-label={`Drag ${page.label} to change priority`} className="flex h-10 w-7 shrink-0 cursor-grab items-center justify-center rounded text-[#778B98] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1C82DE] active:cursor-grabbing">
+          <div className="grid grid-cols-[24px_32px_minmax(0,1fr)] items-start gap-x-2 gap-y-2 p-3 sm:grid-cols-[24px_32px_minmax(0,1fr)_auto] sm:gap-x-3">
+            <button type="button" {...provided.dragHandleProps} aria-label={`Drag ${page.label} to change priority`} title="Drag to change priority" className="col-start-1 row-start-1 flex h-11 w-6 cursor-grab items-center justify-center rounded-md text-[#778B98] transition-colors hover:bg-[#EFF3F6] hover:text-[#1E3950] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1C82DE] active:cursor-grabbing">
               <GripVertical className="h-5 w-5" aria-hidden="true" />
             </button>
-            <span aria-label={`Priority ${index + 1}`} className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm font-semibold ${parentId ? 'bg-[#EFF3F6] text-[#566C75]' : 'bg-[#122947] text-white'}`}>{index + 1}</span>
-            <div className="min-w-0 flex-1 basis-[calc(100%-100px)] sm:basis-0">
+            <span aria-label={`Priority ${index + 1}`} className={`col-start-2 row-start-1 mt-1.5 flex h-8 w-8 items-center justify-center rounded-md text-sm font-semibold ${parentId ? 'bg-[#EFF3F6] text-[#566C75]' : 'bg-[#122947] text-white'}`}>{index + 1}</span>
+            <div className="col-start-3 row-start-1 min-w-0 self-center">
               <p className="break-words text-sm font-semibold text-[#122947]">{page.label}</p>
               <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-[#566C75]">
                 <span>{parentId ? 'Child page' : page.children.length > 0 ? 'Parent page' : 'Top-level page'}</span>
@@ -183,18 +183,23 @@ export default function PageOrganizerQuestion({
                 <span>{page.source === 'custom' ? 'Custom' : 'From the list'}</span>
               </div>
             </div>
-            <label className="ml-9 flex min-w-0 flex-1 basis-[calc(100%-36px)] flex-col gap-1 sm:ml-0 sm:max-w-[200px] sm:basis-auto">
-              <span className="text-[11px] font-medium text-[#566C75]">Parent page<span className="sr-only"> for {page.label}</span></span>
-              <select aria-label={`Parent page for ${page.label}`} value={parentId || ''} onChange={(event) => reparent(page, event.target.value)} className={`${controlClass} w-full min-w-0 px-2`}>
-                <option value="">Top level (no parent)</option>
-                {current.pages.filter((item) => item.id !== page.id).map((parent) => <option key={parent.id} value={parent.id}>{parent.label}</option>)}
-              </select>
-            </label>
-            <div className="ml-auto flex items-center gap-1 pl-9 sm:pl-0">
-              <button type="button" aria-label={`Move ${page.label} up`} disabled={index === 0} onClick={() => reorder(page, parentId, index - 1)} className={iconButtonClass}><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
-              <button type="button" aria-label={`Move ${page.label} down`} disabled={index === siblings.length - 1} onClick={() => reorder(page, parentId, index + 1)} className={iconButtonClass}><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>
-              <button type="button" aria-label={`Remove ${page.label}`} onClick={() => commit(removePage(current, page.id), `${page.label} removed. Its child pages stay in the list.`)} className={`${iconButtonClass} text-[#778B98] hover:border-red-400 hover:bg-red-50 hover:text-red-600`}><X className="h-4 w-4" aria-hidden="true" /></button>
+            <div role="group" aria-label={`Page actions for ${page.label}`} className="col-span-2 col-start-2 row-start-2 flex items-center justify-end gap-2 sm:col-span-1 sm:col-start-4 sm:row-start-1 sm:self-center">
+              <div className="inline-flex divide-x divide-[#DCE3E8] rounded-lg border border-[#DCE3E8] shadow-sm">
+                <button type="button" aria-label={`Move ${page.label} up`} title="Move up in priority" disabled={index === 0} onClick={() => reorder(page, parentId, index - 1)} className={`${sortButtonClass} rounded-l-lg`}><ArrowUp className="h-4 w-4" aria-hidden="true" /></button>
+                <button type="button" aria-label={`Move ${page.label} down`} title="Move down in priority" disabled={index === siblings.length - 1} onClick={() => reorder(page, parentId, index + 1)} className={`${sortButtonClass} rounded-r-lg`}><ArrowDown className="h-4 w-4" aria-hidden="true" /></button>
+              </div>
+              <button type="button" aria-label={`Remove ${page.label}`} title="Remove page from your selections" onClick={() => commit(removePage(current, page.id), `${page.label} removed. Its child pages stay in the list.`)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-transparent text-[#778B98] transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
             </div>
+            <label className="col-span-2 col-start-2 row-start-3 flex min-w-0 flex-col gap-1.5 sm:col-span-3 sm:col-start-2 sm:row-start-2 sm:flex-row sm:items-center sm:gap-3">
+              <span className="shrink-0 text-[11px] font-medium text-[#566C75] sm:w-[66px]">Parent page<span className="sr-only"> for {page.label}</span></span>
+              <span className="relative block min-w-0 flex-1">
+                <select aria-label={`Parent page for ${page.label}`} title={parentId ? current.pages.find((item) => item.id === parentId)?.label : 'Top level (no parent)'} value={parentId || ''} onChange={(event) => reparent(page, event.target.value)} className={`${controlClass} w-full min-w-0 appearance-none border-[#DCE3E8] py-2 pl-3 pr-9`}>
+                  <option value="">Top level (no parent)</option>
+                  {current.pages.filter((item) => item.id !== page.id).map((parent) => <option key={parent.id} value={parent.id}>{parent.label}</option>)}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#778B98]" aria-hidden="true" />
+              </span>
+            </label>
           </div>
           {!parentId && page.children.length > 0 && (
             <Droppable droppableId={`page-organizer-${questionId}-children-${page.id}`} type={`children-${questionId}-${page.id}`}>
