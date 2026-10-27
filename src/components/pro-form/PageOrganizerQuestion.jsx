@@ -56,9 +56,9 @@ export default function PageOrganizerQuestion({
   const grouped = groupedOptions && Object.keys(groupedOptions).length > 0;
   const displayGrouped = optionGroups && Object.keys(optionGroups).length > 0;
   const catalogGroups = displayGrouped
-    ? Object.entries(optionGroups).map(([label, entries]) => ({ label, entries, selectableParent: false }))
+    ? Object.entries(optionGroups).map(([label, entries]) => ({ label, entries }))
     : grouped
-    ? Object.entries(groupedOptions).map(([label, entries]) => ({ label, entries, selectableParent: true }))
+    ? Object.entries(groupedOptions).map(([label, entries]) => ({ label, entries }))
     : [{ label: '', entries: options }];
   const rootDropId = `page-organizer-${questionId}-root`;
 
@@ -77,19 +77,19 @@ export default function PageOrganizerQuestion({
     );
   };
 
-  const makeCatalogPage = (label, kind) => createPageNode(questionId, label, {
+  const makeCatalogPage = (label) => createPageNode(questionId, label, {
     source: 'predefined',
-    catalogId: getPageCatalogId(questionId, label, kind)
+    catalogId: getPageCatalogId(questionId, label)
   });
 
-  const toggleCatalog = (label, kind = 'option') => {
-    const existing = selectedCatalog.get(getPageCatalogId(questionId, label, kind));
+  const toggleCatalog = (label) => {
+    const existing = selectedCatalog.get(getPageCatalogId(questionId, label));
     if (existing) {
       commit(removePage(current, existing.id), `${label} removed. Its child pages stay in the list.`);
       return;
     }
     try {
-      const next = addPage(current, makeCatalogPage(label, kind));
+      const next = addPage(current, makeCatalogPage(label));
       if (canAdd(next)) commit(next, `${label} added as a top-level page.`);
     } catch (issue) {
       setError(issue.message);
@@ -140,12 +140,12 @@ export default function PageOrganizerQuestion({
     reorder(page, parent?.id || null, destination.index);
   };
 
-  const catalogChoice = (label, kind = 'option') => {
-    const catalogId = getPageCatalogId(questionId, label, kind);
+  const catalogChoice = (label) => {
+    const catalogId = getPageCatalogId(questionId, label);
     const checked = selectedCatalog.has(catalogId);
     let disabled = false;
     try {
-      disabled = !checked && !canAdd(addPage(current, makeCatalogPage(label, kind)));
+      disabled = !checked && !canAdd(addPage(current, makeCatalogPage(label)));
     } catch {
       disabled = !checked;
     }
@@ -157,11 +157,10 @@ export default function PageOrganizerQuestion({
           type="checkbox"
           checked={checked}
           disabled={disabled}
-          onChange={() => toggleCatalog(label, kind)}
+          onChange={() => toggleCatalog(label)}
           className="h-4 w-4 shrink-0 accent-[#1C82DE] focus-visible:ring-2 focus-visible:ring-[#1C82DE]"
         />
         <span className="min-w-0 break-words">{label}</span>
-        {kind === 'parent' && <span className="ml-auto shrink-0 rounded bg-[#F0F8E8] px-1.5 py-0.5 text-[10px] font-medium text-[#456A1B]">Catalog parent</span>}
       </label>
     );
   };
@@ -239,15 +238,12 @@ export default function PageOrganizerQuestion({
             <input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="Search available pages…" className={`${controlClass} w-full py-2 pl-9 pr-3`} />
           </label>
           <div className="max-h-[340px] space-y-5 overflow-y-auto overscroll-contain pr-1">
-            {catalogGroups.map(({ label, entries, selectableParent }) => {
+            {catalogGroups.map(({ label, entries }) => {
               const matchesGroup = label.toLocaleLowerCase().includes(searchText);
               const visible = entries.filter((entry) => matchesGroup || entry.toLocaleLowerCase().includes(searchText));
               if (!matchesGroup && visible.length === 0) return null;
               return <div key={label || 'all'} role={label ? 'group' : undefined} aria-label={label || undefined} className="space-y-2">
-                {label && <div className="space-y-2">
-                  <h5 className="text-xs font-semibold uppercase tracking-wide text-[#566C75]">{label}</h5>
-                  {selectableParent && catalogChoice(label, 'parent')}
-                </div>}
+                {label && <h5 className="text-xs font-semibold uppercase tracking-wide text-[#566C75]">{label}</h5>}
                 <div className="grid gap-2 sm:grid-cols-2">{visible.map((entry) => catalogChoice(entry))}</div>
               </div>;
             })}
@@ -279,7 +275,7 @@ export default function PageOrganizerQuestion({
             <span className={`rounded-full px-3 py-1.5 ${countedSelections < (min || 0) || countedSelections > (max || Infinity) ? 'bg-[#FFF4E4] text-[#A45B00]' : 'bg-[#F0F8E8] text-[#456A1B]'}`}>{countedSelections}{max ? ` / ${max}` : ''} counted selections{min ? ` · min ${min}` : ''}</span>
           </div>
         </div>
-        {grouped && <p className="text-xs text-[#566C75]">Original catalog parent pages do not count toward the service limit. All other pages count, wherever you place them.</p>}
+        {String(questionId) === '3' && allPages.some((page) => page.source === 'predefined' && page.catalogId.startsWith('q3:parent:')) && <p className="text-xs text-[#566C75]">Previously saved catalog category pages do not count toward the service limit. All selected options and custom pages count, wherever you place them.</p>}
         {externalDisabled && <p className="rounded-lg bg-[#FFF4E4] px-3 py-2 text-xs text-[#A45B00]">The combined selection limit is reached. You can still reorder, move, or remove pages.</p>}
         {structure === undefined && allPages.length > 0 && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#C9DDEC] bg-[#F4F9FD] p-3">
           <p className="flex-1 text-xs leading-relaxed text-[#566C75]">This is a suggested layout of your existing answers. Choose “Organize pages” or make a change to save it.</p>

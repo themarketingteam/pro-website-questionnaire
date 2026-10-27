@@ -46,7 +46,8 @@ describe('PageOrganizerQuestion', () => {
 
     expect(screen.getByText('3 pages')).toBeInTheDocument();
     expect(screen.getByText('2 / 15 counted selections · min 1')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: /^Managed IT Services/ })).toBeChecked();
+    expect(screen.getByRole('heading', { name: 'Managed IT Services', exact: true })).toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /^Managed IT Services/ })).not.toBeInTheDocument();
     expect(onChange).not.toHaveBeenCalled();
     await user().click(screen.getByRole('button', { name: 'Organize pages' }));
 
@@ -134,17 +135,34 @@ describe('PageOrganizerQuestion', () => {
     const input = user();
     const onChange = vi.fn();
     const selected = custom('Custom Service');
-    render(<Controlled questionId="3" options={options} groupedOptions={services} structure={tree([selected])} onChange={onChange} max={1} externalDisabled remainingSelections={0} />);
+    const savedParent = predefined('Managed IT Services', 'parent');
+    render(<Controlled questionId="3" options={options} groupedOptions={services} structure={tree([selected, savedParent])} onChange={onChange} max={1} externalDisabled remainingSelections={0} />);
 
     expect(screen.getByRole('checkbox', { name: 'Managed IT' })).toBeDisabled();
-    expect(screen.getByRole('checkbox', { name: /^Managed IT Services/ })).toBeEnabled();
-    await input.click(screen.getByRole('checkbox', { name: /^Managed IT Services/ }));
-    const parentId = onChange.mock.lastCall[0].pages.find((page) => page.label === 'Managed IT Services').id;
-    await input.selectOptions(screen.getByRole('combobox', { name: 'Parent page for Custom Service' }), parentId);
+    expect(screen.queryByRole('checkbox', { name: /^Managed IT Services/ })).not.toBeInTheDocument();
+    await input.selectOptions(screen.getByRole('combobox', { name: 'Parent page for Custom Service' }), savedParent.id);
     expect(screen.getByText('1 / 1 counted selections')).toBeInTheDocument();
     expect(screen.getByText('2 pages')).toBeInTheDocument();
     await input.click(screen.getByRole('button', { name: 'Remove Custom Service' }));
     expect(countPageSelections(onChange.mock.lastCall[0], '3', services)).toBe(0);
+    expect(onChange.mock.lastCall[0].pages).toEqual([savedParent]);
+  });
+
+  it('uses Q3 categories only as headings and adds individual choices without creating category pages', async () => {
+    const input = user();
+    const onChange = vi.fn();
+    render(<Controlled questionId="3" options={options} groupedOptions={services} onChange={onChange} max={15} />);
+    await input.click(screen.getByRole('heading', { name: 'Managed IT Services', exact: true }));
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.queryByText('Catalog parent')).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: 'Managed IT Services', exact: true })).not.toBeInTheDocument();
+    await input.type(screen.getByRole('searchbox', { name: 'Search available pages' }), 'Managed IT Services');
+    expect(screen.getByRole('checkbox', { name: 'Managed IT', exact: true })).toBeInTheDocument();
+    await input.click(screen.getByRole('checkbox', { name: 'Managed IT', exact: true }));
+    const result = onChange.mock.lastCall[0];
+    expect(result.pages).toHaveLength(1);
+    expect(result.pages[0]).toMatchObject({ label: 'Managed IT', catalogId: 'q3:option:Managed%20IT', children: [] });
+    expect(countPageSelections(result, '3', services)).toBe(1);
   });
 
   it('uses remaining combined capacity to prevent additions without losing the entered custom label', async () => {

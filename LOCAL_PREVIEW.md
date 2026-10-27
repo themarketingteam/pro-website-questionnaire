@@ -41,6 +41,7 @@ Existing saved combined answers remain unchanged and count as one page until exp
 
 ## Agreed rules
 
+- Q3 and Q4 picker categories are nonselectable headings. Selecting an individual option never adds its catalog category as a page. Existing saved Q3 category pages remain editable and retain their original identities and counting rules; clients can create a new parent page with any selected option or custom page.
 - Two levels: parent and child. Standalone pages are allowed.
 - Every node is a page, including parent pages.
 - Removing a parent or moving it beneath another page promotes its existing children to the top level; no children are silently deleted.
