@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
+import { validateOrganizedPayload, validateOrganizedResponses } from '../../shared/pageOrganizerContract.js';
 
 const truncate = (value, max = 500) => String(value ?? '').slice(0, max);
 const safeJsonStringify = (value) => {
@@ -134,6 +135,9 @@ Deno.serve(async (req) => {
     if (!questionnaireSessionId || !sourceDraftId || !resumeCredential || !submissionAttemptId) {
       return Response.json({ success: false, received: false, usedFallback: true, error: { message: 'Missing secured draft submission context', failureKind: 'validation', status: 400, code: 'MISSING_DRAFT_CONTEXT' } }, { status: 400 });
     }
+
+    const organizerValidation = transformedPayload ? validateOrganizedPayload(transformedPayload) : validateOrganizedResponses(rawResponses || {});
+    if (!organizerValidation.ok) return Response.json({ success: false, received: false, code: organizerValidation.code, error: { message: organizerValidation.errors.join(' '), failureKind: 'validation' } }, { status: 400 });
 
     const normalizedPayload = transformedPayload && typeof transformedPayload === 'object'
       ? normalizePayload(transformedPayload, questionnaireSessionId, primaryError)
@@ -316,7 +320,7 @@ Deno.serve(async (req) => {
           submissionError?.response?.data?.code || submissionError?.code || '',
           200
         );
-        if (conflictStatus === 409 || conflictCode.startsWith('SUBMISSION_')) {
+        if (conflictStatus === 409 || conflictCode.startsWith('SUBMISSION_') || conflictCode.startsWith('ORGANIZER_')) {
           return Response.json({
             success: false,
             received: false,

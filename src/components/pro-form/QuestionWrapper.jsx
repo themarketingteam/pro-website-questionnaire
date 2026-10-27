@@ -32,13 +32,13 @@ export default function QuestionWrapper({
 
     // Use validation status if provided
     if (validationStatus === 'complete') {
-      return <img src="https://img.icons8.com/?size=100&id=ZBQJIdqe73bi&format=png&color=22C55E" alt="Complete" className="w-7 h-7" />;
+      return <CheckCircle2 aria-label="Complete" className="w-7 h-7 text-green-600" />;
     }
     if (validationStatus === 'needs_work') {
-      return <img src="https://img.icons8.com/?size=100&id=lwhK4j4bx2Zx&format=png&color=F59E0B" alt="Needs Work" className="w-7 h-7" />;
+      return <AlertTriangle aria-label="Needs Work" className="w-7 h-7 text-amber-500" />;
     }
     if (validationStatus === 'incomplete') {
-      return <img src="https://img.icons8.com/?size=100&id=iQ230Rs1gOvf&format=png&color=DC2626" alt="Incomplete" className="w-7 h-7" />;
+      return <AlertCircle aria-label="Incomplete" className="w-7 h-7 text-red-600" />;
     }
 
     // Fallback

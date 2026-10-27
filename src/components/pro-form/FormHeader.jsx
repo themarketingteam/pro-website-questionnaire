@@ -7,7 +7,7 @@ export default function FormHeader() {
       <div 
         className="absolute inset-0 bg-cover bg-center"
         style={{
-          backgroundImage: 'url(https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6925fec3678942d22522b010/972142ef3_banner.jpg)'
+          backgroundImage: import.meta.env.VITE_LOCAL_PREVIEW ? 'linear-gradient(120deg, #122947, #1c557a)' : 'url(https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6925fec3678942d22522b010/972142ef3_banner.jpg)'
         }}
       />
       

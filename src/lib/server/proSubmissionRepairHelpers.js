@@ -1,3 +1,4 @@
+import { validateOrganizedPayload, restoreOrganizedProjections } from '../../../base44/shared/pageOrganizerContract.js';
 /**
  * proSubmissionRepairHelpers.js
  *
@@ -5,12 +6,12 @@
  * utilities for Pro Questionnaire submissions.
  *
  * ─── IMPORTANT ───────────────────────────────────────────────────────────────
- * Base44 Deno functions are deployed independently and cannot import from other
- * local files at runtime. This file is the CANONICAL REFERENCE SOURCE. When
- * writing a new Deno function that needs these helpers, INLINE the relevant
- * functions directly into that function file.
+ * This src/ file is a reference used by local tests. Base44 function bundles
+ * cannot import files outside base44/. Their equivalent repair implementation
+ * stays in the function bundle; the page organizer contract is imported from
+ * base44/shared/, which is included with each function.
  *
- * Do NOT import this file from functions/ — it will cause a deployment failure.
+ * Do NOT import this src/ file from functions/.
  * ─────────────────────────────────────────────────────────────────────────────
  *
  * No eval. No browser APIs. No React/Vite aliases.
@@ -308,7 +309,8 @@ export function safeJsonStringify(value, fallback = '{}') {
  */
 export function repairSubmissionPayloadServer(rawPayload, context = {}) {
   const warnings = [];
-  const errors = [];
+  const organizerValidation = validateOrganizedPayload(rawPayload);
+  const errors = [...organizerValidation.errors];
   const changedPaths = [];
 
   const track = (path, beforeType, afterType, reason) =>
@@ -458,7 +460,8 @@ export function repairSubmissionPayloadServer(rawPayload, context = {}) {
     }
   }
 
-  const cleaned = stripUndefined(truncateStrings(p, MAX_STRING_LENGTH));
+  let cleaned = stripUndefined(truncateStrings(p, MAX_STRING_LENGTH));
+  if (organizerValidation.ok) cleaned = restoreOrganizedProjections(cleaned);
 
   return { payload: cleaned, ok: errors.length === 0, errors, warnings, changedPaths };
 }
@@ -468,7 +471,7 @@ export function repairSubmissionPayloadServer(rawPayload, context = {}) {
 // ---------------------------------------------------------------------------
 
 export function validateSubmissionPayloadServer(payload) {
-  const errors = [];
+  const errors = [...validateOrganizedPayload(payload).errors];
 
   if (!isPlainObject(payload)) {
     return { ok: false, errors: ['payload_must_be_object'] };

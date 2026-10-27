@@ -1,13 +1,13 @@
+import { validateOrganizedPayload, restoreOrganizedProjections } from '../../../shared/pageOrganizerContract.js';
 /**
  * proSubmissionRepair.js
  *
  * Backend-safe deterministic payload repair and validation utilities
  * for Pro Questionnaire submissions.
  *
- * IMPORTANT: Base44 Deno functions cannot import from other local files at
- * runtime. This file is a shared SOURCE MODULE intended to be INLINED into
- * consuming functions at authoring time. Do not add `import` statements that
- * reference local paths here.
+ * Historical repair reference. Function bundles include their own repair
+ * implementation and import the pure organizer contract from base44/shared/,
+ * the supported cross-function shared source directory.
  *
  * No eval. No browser APIs. No React/Vite aliases.
  */
@@ -340,7 +340,8 @@ function normalizeGeographicArea(item) {
  */
 export function repairSubmissionPayloadServer(rawPayload, context = {}) {
   const warnings = [];
-  const errors = [];
+  const organizerValidation = validateOrganizedPayload(rawPayload);
+  const errors = [...organizerValidation.errors];
   const changedPaths = [];
 
   const track = (path, beforeType, afterType, reason) => {
@@ -512,7 +513,8 @@ export function repairSubmissionPayloadServer(rawPayload, context = {}) {
 
   // --- strip undefined and truncate ---
   const truncated = truncateStrings(p, MAX_STRING_LENGTH);
-  const cleaned = stripUndefined(truncated);
+  let cleaned = stripUndefined(truncated);
+  if (organizerValidation.ok) cleaned = restoreOrganizedProjections(cleaned);
 
   return {
     payload: cleaned,
@@ -534,7 +536,7 @@ export function repairSubmissionPayloadServer(rawPayload, context = {}) {
  * Returns { ok: boolean, errors: string[] }
  */
 export function validateSubmissionPayloadServer(payload) {
-  const errors = [];
+  const errors = [...validateOrganizedPayload(payload).errors];
 
   if (!isPlainObject(payload)) {
     errors.push('payload_must_be_object');

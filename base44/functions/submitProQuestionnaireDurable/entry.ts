@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
+import { validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
 import {
   authorizeDraftSubmission,
   createSubmissionContentFingerprint,
@@ -57,6 +58,12 @@ Deno.serve(async (req) => {
         conflictFields: authorization.conflictFields || []
       }, authorization.status);
     }
+    let draftResponses = {};
+    try { draftResponses = JSON.parse(authorization.draft.responses_json || '{}'); } catch { /* The contract rejects incompatible payload structures below. */ }
+    const organizerValidation = validateOrganizedSubmission({
+      payload, responses: draftResponses, allowMissingPayload: action === 'authorize' && !payload
+    });
+    if (!organizerValidation.ok) return json({ success: false, code: organizerValidation.code, error: organizerValidation.errors.join(' ') }, organizerValidation.status);
     if (action === 'authorize') {
       return json({ success: true, authorized: true, draftId: authorization.draft.id });
     }

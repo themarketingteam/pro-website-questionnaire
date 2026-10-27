@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { 
-  setResponse, 
+  setResponse,
+  setMultipleResponses,
   setValidationStatus, 
   setTouchedQuestion, 
   setExpandedQuestion, 
@@ -22,6 +23,8 @@ import FormHeader from '@/components/pro-form/FormHeader';
 import QuestionWrapper from '@/components/pro-form/QuestionWrapper';
 import YesNoQuestion from '@/components/pro-form/YesNoQuestion';
 import CheckboxQuestion from '@/components/pro-form/CheckboxQuestion';
+import PageOrganizerQuestion from '@/components/pro-form/PageOrganizerQuestion';
+import { countPageSelections, projectPageStructure, validatePageStructure } from '@/lib/pageOrganizerModel';
 import RadioQuestion from '@/components/pro-form/RadioQuestion';
 import TextareaQuestion from '@/components/pro-form/TextareaQuestion';
 import MultiTextQuestion from '@/components/pro-form/MultiTextQuestion';
@@ -142,6 +145,8 @@ export default function ProQuestionnaire() {
     lastSavedAt,
     lastConfirmedRevision,
     hasLocalRecoveryCopy,
+    organizerRecoveryConflict,
+    downloadOrganizerRecoveryBackup,
     draftConnection,
     questionnaireSessionId,
     restoredQuestionId,
@@ -187,11 +192,12 @@ export default function ProQuestionnaire() {
   const otherServicesCount = Array.isArray(otherServices) 
     ? otherServices.filter(v => v?.trim()).length 
     : (otherServices?.trim() ? 1 : 0);
-  const servicesCount = countSelectedServiceChildren(
-    responses['3'],
-    SERVICE_OPTIONS_GROUPED
-  ) + otherServicesCount;
-  const industriesCount = (responses['4'] || []).length + (responses['4_other'] ? 1 : 0);
+  const servicesCount = responses['3_structure'] && validatePageStructure(responses['3_structure']).ok
+    ? countPageSelections(responses['3_structure'], '3', SERVICE_OPTIONS_GROUPED)
+    : countSelectedServiceChildren(responses['3'], SERVICE_OPTIONS_GROUPED) + otherServicesCount;
+  const industriesCount = responses['4_structure'] && validatePageStructure(responses['4_structure']).ok
+    ? countPageSelections(responses['4_structure'], '4')
+    : (responses['4'] || []).length + (Array.isArray(responses['4_other']) ? responses['4_other'].filter((entry) => String(entry || '').trim()).length : (responses['4_other'] ? 1 : 0));
   const regionsCount = Array.isArray(responses['5']) ? responses['5'].length : 0;
   const totalSelections = servicesCount + industriesCount + regionsCount;
   const isSpanLimitReached = totalSelections >= 25;
@@ -227,7 +233,7 @@ export default function ProQuestionnaire() {
     const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
     link.type = 'image/png';
     link.rel = 'icon';
-    link.href = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6925fec3678942d22522b010/96c140c55_kaseya-logo.png';
+    link.href = import.meta.env.VITE_LOCAL_PREVIEW ? 'data:,' : 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/6925fec3678942d22522b010/96c140c55_kaseya-logo.png';
     document.head.appendChild(link);
   }, []);
 
@@ -304,7 +310,7 @@ export default function ProQuestionnaire() {
       // Only revalidate if there's user data
       if (hasUserData) {
         Object.keys(responses).forEach(key => {
-          if (!key.includes('_other') && !key.includes('_primary') && responses[key]) {
+          if (!key.includes('_other') && !key.includes('_primary') && !key.endsWith('_structure') && responses[key]) {
             // Mark as touched if not already
             if (!touchedQuestions[key] && setTouchedQuestion) {
               dispatch(setTouchedQuestion({ questionId: key, touched: true }));
@@ -793,13 +799,17 @@ export default function ProQuestionnaire() {
             ? otherValue.filter(v => v?.trim()).length 
             : (otherValue.trim() ? 1 : 0);
         }
-        const totalCount = questionId === '3'
-          ? countSelectedServiceChildren(selections, SERVICE_OPTIONS_GROUPED) + otherCount
-          : selections.length + otherCount;
+        const organized = allResponses[`${questionId}_structure`];
+        if (Object.prototype.hasOwnProperty.call(allResponses, `${questionId}_structure`) && !validatePageStructure(organized).ok) { newStatus = 'incomplete'; break; }
+        const totalCount = organized && validatePageStructure(organized).ok
+          ? countPageSelections(organized, questionId, SERVICE_OPTIONS_GROUPED)
+          : questionId === '3'
+            ? countSelectedServiceChildren(selections, SERVICE_OPTIONS_GROUPED) + otherCount
+            : selections.length + otherCount;
         const min = question.limits?.min || 0;
         const max = question.limits?.max || Infinity;
-        const allSelectedParentsHaveChildren = questionId !== '3'
-          || getServiceParentsWithoutChildren(selections, SERVICE_OPTIONS_GROUPED).length === 0;
+        const allSelectedParentsHaveChildren = organized ? validatePageStructure(organized).ok : (questionId !== '3'
+          || getServiceParentsWithoutChildren(selections, SERVICE_OPTIONS_GROUPED).length === 0);
         newStatus = totalCount >= min && totalCount <= max && allSelectedParentsHaveChildren
           ? 'complete'
           : 'incomplete';
@@ -883,6 +893,13 @@ export default function ProQuestionnaire() {
   };
 
   const resetQuestion = (questionId) => {
+    if ((questionId === '3' || questionId === '4') && Object.prototype.hasOwnProperty.call(responses, `${questionId}_structure`)) {
+      const patch = { [questionId]: [], [`${questionId}_other`]: [], [`${questionId}_structure`]: { format: 'page-tree-v1', pages: [] } };
+      dispatch(setMultipleResponses(patch));
+      dispatch(setValidationStatus({ questionId, status: 'incomplete' }));
+      queueDraftSave(Object.keys(patch), { ...responses, ...patch }, { currentQuestionId: questionId, delayMs: 0, source: 'explicit_question_clear' });
+      return;
+    }
     const deletedKeys = [questionId, `${questionId}_other`, `${questionId}_primary`];
     const nextResponses = { ...responses };
     deletedKeys.forEach((key) => delete nextResponses[key]);
@@ -994,8 +1011,17 @@ export default function ProQuestionnaire() {
   };
 
   const handleConfirmClearAll = async () => {
-    const deletedKeys = Object.keys(responses);
+    const clearedResponses = {};
+    ['3', '4'].forEach((id) => {
+      if (Object.prototype.hasOwnProperty.call(responses, `${id}_structure`)) {
+        clearedResponses[id] = [];
+        clearedResponses[`${id}_other`] = [];
+        clearedResponses[`${id}_structure`] = { format: 'page-tree-v1', pages: [] };
+      }
+    });
+    const deletedKeys = Object.keys(responses).filter((key) => !Object.prototype.hasOwnProperty.call(clearedResponses, key));
     dispatch(resetForm());
+    dispatch(setMultipleResponses(clearedResponses));
     
     // Collapse all questions
     const collapsed = {};
@@ -1008,7 +1034,7 @@ export default function ProQuestionnaire() {
       }
     });
     dispatch(setAllExpanded(collapsed));
-    queueDraftSave(deletedKeys, {}, {
+    queueDraftSave([...deletedKeys, ...Object.keys(clearedResponses)], clearedResponses, {
       deletedKeys,
       expandedQuestions: collapsed,
       delayMs: 0,
@@ -1017,7 +1043,7 @@ export default function ProQuestionnaire() {
 
     try {
       await saveDraftNow({
-        responsesSnapshot: {},
+        responsesSnapshot: clearedResponses,
         validationStatusSnapshot: {},
         touchedQuestionsSnapshot: {},
         expandedQuestionsSnapshot: collapsed,
@@ -1063,7 +1089,7 @@ export default function ProQuestionnaire() {
 
     const hasPassingStatus = status === 'complete' || status === 'needs_work';
 
-    if (questionId !== '3' && !hasActiveRequiredChildren && hasPassingStatus) {
+    if (questionId !== '3' && questionId !== '4' && !hasActiveRequiredChildren && hasPassingStatus) {
       return true;
     }
 
@@ -1145,13 +1171,17 @@ export default function ProQuestionnaire() {
             otherCount = 1;
           }
         }
-        const totalCount = questionId === '3'
-          ? countSelectedServiceChildren(selections, SERVICE_OPTIONS_GROUPED) + otherCount
-          : selections.length + otherCount;
+        const organized = responses[`${questionId}_structure`];
+        if (Object.prototype.hasOwnProperty.call(responses, `${questionId}_structure`) && !validatePageStructure(organized).ok) return false;
+        const totalCount = organized && validatePageStructure(organized).ok
+          ? countPageSelections(organized, questionId, SERVICE_OPTIONS_GROUPED)
+          : questionId === '3'
+            ? countSelectedServiceChildren(selections, SERVICE_OPTIONS_GROUPED) + otherCount
+            : selections.length + otherCount;
         const min = question.limits?.min || 0;
         const max = question.limits?.max || Infinity;
-        const allSelectedParentsHaveChildren = questionId !== '3'
-          || getServiceParentsWithoutChildren(selections, SERVICE_OPTIONS_GROUPED).length === 0;
+        const allSelectedParentsHaveChildren = organized ? validatePageStructure(organized).ok : (questionId !== '3'
+          || getServiceParentsWithoutChildren(selections, SERVICE_OPTIONS_GROUPED).length === 0);
         return totalCount >= min && totalCount <= max && allSelectedParentsHaveChildren;
       }
       
@@ -1634,6 +1664,38 @@ export default function ProQuestionnaire() {
       }
       
       case 'checkbox':
+        if (question.id === '3' || question.id === '4') {
+          return (
+            <PageOrganizerQuestion
+              questionId={question.id}
+              options={question.options}
+              groupedOptions={question.id === '3' ? SERVICE_OPTIONS_GROUPED : {}}
+              value={responses[question.id] || []}
+              otherValue={responses[`${question.id}_other`] || ''}
+              structure={Object.prototype.hasOwnProperty.call(responses, `${question.id}_structure`) ? responses[`${question.id}_structure`] : undefined}
+              min={question.limits?.min}
+              max={question.limits?.max}
+              externalDisabled={isSpanLimitReached}
+              remainingSelections={Math.max(0, 25 - totalSelections)}
+              onChange={(nextStructure) => {
+                const projected = projectPageStructure(nextStructure);
+                const patch = {
+                  [question.id]: projected.selections,
+                  [`${question.id}_other`]: projected.otherValues,
+                  [`${question.id}_structure`]: nextStructure
+                };
+                const snapshot = { ...responses, ...patch };
+                dispatch(setMultipleResponses(patch));
+                dispatch(setTouchedQuestion({ questionId: question.id, touched: true }));
+                const count = countPageSelections(nextStructure, question.id, SERVICE_OPTIONS_GROUPED);
+                dispatch(setValidationStatus({ questionId: question.id, status:
+                  count >= question.limits.min && count <= question.limits.max ? 'complete' : 'incomplete' }));
+                queueDraftSave(Object.keys(patch), snapshot, { currentQuestionId: question.id, delayMs: 120 });
+                queueDraftEvent({ eventType: 'selection_changed', questionId: question.id, value: nextStructure });
+              }}
+            />
+          );
+        }
         return (
           <CheckboxQuestion
             options={question.options}
@@ -1861,6 +1923,10 @@ export default function ProQuestionnaire() {
         <ErrorBoundary>
           <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
             <FormHeader />
+      {organizerRecoveryConflict && <div role="alert" className="mx-auto my-5 max-w-5xl rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <strong>A local recovery copy needs review.</strong> Questions {organizerRecoveryConflict.questionIds.join(' and ')} changed in another tab. The saved version is shown; your recovery copy has been kept separately.
+        <button type="button" onClick={downloadOrganizerRecoveryBackup} className="ml-3 rounded border border-amber-500 px-3 py-2 font-semibold">Download recovery copy</button>
+      </div>}
             <main className="min-h-[55vh] flex items-center justify-center px-4 py-10" aria-live="polite">
               <div className="w-full max-w-2xl rounded-2xl border border-amber-200 bg-white p-6 sm:p-8 shadow-xl">
                 <div className="flex items-start gap-3">
@@ -1927,6 +1993,10 @@ export default function ProQuestionnaire() {
       <ErrorBoundary>
         <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
           <FormHeader />
+      {organizerRecoveryConflict && <div role="alert" className="mx-auto my-5 max-w-5xl rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <strong>A local recovery copy needs review.</strong> Questions {organizerRecoveryConflict.questionIds.join(' and ')} changed in another tab. The saved version is shown; your recovery copy has been kept separately.
+        <button type="button" onClick={downloadOrganizerRecoveryBackup} className="ml-3 rounded border border-amber-500 px-3 py-2 font-semibold">Download recovery copy</button>
+      </div>}
           <main className="min-h-[50vh] flex items-center justify-center px-6" aria-live="polite">
             <div className="max-w-lg rounded-2xl border border-slate-200 bg-white p-6 shadow-lg text-center">
               <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-full bg-blue-50">
@@ -1965,6 +2035,10 @@ export default function ProQuestionnaire() {
     <ErrorBoundary>
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <FormHeader />
+      {organizerRecoveryConflict && <div role="alert" className="mx-auto my-5 max-w-5xl rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <strong>A local recovery copy needs review.</strong> Questions {organizerRecoveryConflict.questionIds.join(' and ')} changed in another tab. The saved version is shown; your recovery copy has been kept separately.
+        <button type="button" onClick={downloadOrganizerRecoveryBackup} className="ml-3 rounded border border-amber-500 px-3 py-2 font-semibold">Download recovery copy</button>
+      </div>}
       
       <main className="px-4 sm:px-6 lg:px-6 py-8 md:py-12">
         <div className={standardContentClass}>

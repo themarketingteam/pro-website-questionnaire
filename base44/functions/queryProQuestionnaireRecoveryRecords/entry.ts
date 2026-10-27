@@ -1,3 +1,4 @@
+import { validateOrganizedSubmission, reconcileOrganizedRepairPayload } from '../../shared/pageOrganizerContract.js';
 import { createClientFromRequest } from "npm:@base44/sdk";
 
 const SECRET_NAME = 'DRAFT_RECOVERY_PASSWORD';
@@ -968,9 +969,12 @@ Deno.serve(async (req) => {
         lastChangedQuestionId: cleanText(snapshot.lastChangedQuestionId, 40),
         progressPercent: Math.max(0, Math.min(100, Number(snapshot.progressPercent) || 0))
       };
-      const payload = version.payload && typeof version.payload === 'object'
+      const versionPayload = version.payload && typeof version.payload === 'object'
         ? version.payload
         : {};
+      const organizerRecovery = reconcileOrganizedRepairPayload(versionPayload, responses);
+      if (!organizerRecovery.ok) return jsonResponse({ success: false, code: organizerRecovery.code, error: organizerRecovery.errors.join(' ') }, organizerRecovery.status);
+      const payload = organizerRecovery.payload;
       const created = await entity.create({
         session_id: sessionId,
         access_token_hash: await hashToken(secret),
@@ -1114,6 +1118,8 @@ Deno.serve(async (req) => {
       }
 
       const beforeUpdate = await entity.get(recordId);
+      const organizerValidation = validateOrganizedSubmission({ payload: safeParse(mappedPayload, {}), responses: safeParse(beforeUpdate?.responses_json, {}) });
+      if (!organizerValidation.ok) return jsonResponse({ success: false, code: organizerValidation.code, error: organizerValidation.errors.join(' ') }, organizerValidation.status);
       const updated = await entity.update(recordId, {
         business_name: cleanText(updates.business_name, 300),
         domain: cleanText(updates.domain, 500),

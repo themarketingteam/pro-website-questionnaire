@@ -1,4 +1,12 @@
 import { formatServiceSelectionLabel } from '@/lib/serviceSelectionModel';
+import { normalizePageStructure } from '@/lib/pageOrganizerModel';
+
+export const formatPageStructureForDisplay = (structure) => (
+  normalizePageStructure(structure).pages.flatMap((page, parentIndex) => [
+    `${parentIndex + 1}. ${page.label}`,
+    ...page.children.map((child, childIndex) => `    ${childIndex + 1}. ${child.label}`)
+  ]).join('\n')
+);
 
 const isEmpty = (value) => {
   if (value == null) return true;
@@ -121,6 +129,14 @@ export const formatAnswerForDisplay = (
   otherValue,
   allResponses = {}
 ) => {
+  const structureKey = `${questionId}_structure`;
+  if (['3', '4'].includes(String(questionId)) && Object.prototype.hasOwnProperty.call(allResponses, structureKey)) {
+    try {
+      return formatPageStructureForDisplay(allResponses[structureKey]) || 'Not answered';
+    } catch {
+      return 'Page organization needs review before it can be displayed.';
+    }
+  }
   if (isEmpty(answer) && isEmpty(otherValue)) return 'Not answered';
 
   let mainAnswer = '';

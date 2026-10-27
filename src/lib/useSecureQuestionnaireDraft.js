@@ -22,7 +22,7 @@ import {
   getStoredResumeCredential,
   persistResumeCredential
 } from '@/lib/sessionId';
-import { safeNowIso } from '@/lib/browserSafety';
+import { safeLocalStorageGet, safeLocalStorageSet, safeNowIso } from '@/lib/browserSafety';
 import { trackClarityEvent } from '@/lib/clarity';
 import {
   removeIncomingIdentityParams,
@@ -94,6 +94,7 @@ const calculateProgress = (responses, totalQuestionCount) => {
   const answered = Object.entries(responses || {}).filter(([key, value]) => (
     !key.endsWith('_other')
     && !key.endsWith('_primary')
+    && !key.endsWith('_structure')
     && isNonEmptyValue(value)
   )).length;
   return totalQuestionCount > 0
@@ -101,7 +102,33 @@ const calculateProgress = (responses, totalQuestionCount) => {
     : 0;
 };
 
-const mergeNewerLocalBackup = ({
+const organizerResponseKeys = (questionId) => [questionId, `${questionId}_other`, `${questionId}_structure`];
+const owns = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, key);
+
+const organizedBackupConflict = (serverDraft, localBackup) => {
+  if (!localBackup) return null;
+  const serverRevision = Number(serverDraft?.revision) || 0;
+  if (Number.isInteger(localBackup.baseRevision) && localBackup.baseRevision === serverRevision) return null;
+  const serverResponses = serverDraft?.responses || {};
+  const localResponses = localBackup.responses || {};
+  const changedKeys = Array.isArray(localBackup.changedKeys) ? localBackup.changedKeys : Object.keys(localResponses);
+  const deletedKeys = Array.isArray(localBackup.deletedKeys) ? localBackup.deletedKeys : [];
+  const questionIds = ['3', '4'].filter((id) => {
+    if (!owns(serverResponses, `${id}_structure`) && !owns(localResponses, `${id}_structure`)) return false;
+    return organizerResponseKeys(id).some((key) => (
+      (changedKeys.includes(key) && owns(localResponses, key) && !sameValue(serverResponses[key], localResponses[key]))
+      || (deletedKeys.includes(key) && owns(serverResponses, key))
+    ));
+  });
+  return questionIds.length ? {
+    questionIds,
+    baseRevision: localBackup.baseRevision ?? null,
+    serverRevision,
+    backup: JSON.parse(JSON.stringify(localBackup))
+  } : null;
+};
+
+export const mergeNewerLocalBackup = ({
   serverDraft,
   localBackup,
   currentLocalState,
@@ -110,6 +137,9 @@ const mergeNewerLocalBackup = ({
   const serverSavedAt = Date.parse(serverDraft?.lastSavedAt || '') || 0;
   const backupSavedAt = Date.parse(localBackup?.savedAt || '') || 0;
   const serverResponses = serverDraft?.responses || {};
+  const recoveryConflict = organizedBackupConflict(serverDraft, localBackup);
+  const blockedQuestions = new Set(recoveryConflict?.questionIds || []);
+  const blockedKeys = new Set([...blockedQuestions].flatMap(organizerResponseKeys));
   const mayUseCurrentStateAsLegacyMigration = (
     allowLegacyCurrentStateMigration
     &&
@@ -127,14 +157,15 @@ const mergeNewerLocalBackup = ({
         textValidationMeta: {}
       },
       changedKeys: [],
-      deletedKeys: []
+      deletedKeys: [],
+      recoveryConflict
     };
   }
 
   const local = useBackup ? localBackup : currentLocalState;
   const mergedResponses = { ...serverResponses };
   const changedKeys = [];
-  const deletedKeys = Array.isArray(local?.deletedKeys) ? local.deletedKeys : [];
+  const deletedKeys = (Array.isArray(local?.deletedKeys) ? local.deletedKeys : []).filter((key) => !blockedKeys.has(key));
   const explicitChangedKeys = Array.isArray(local?.changedKeys)
     ? local.changedKeys
     : Object.keys(local?.responses || {}).filter((key) => (
@@ -142,6 +173,7 @@ const mergeNewerLocalBackup = ({
       || !Object.prototype.hasOwnProperty.call(serverResponses, key)
     ));
   explicitChangedKeys.forEach((key) => {
+    if (blockedKeys.has(key)) return;
     if (!Object.prototype.hasOwnProperty.call(local?.responses || {}, key)) return;
     const value = local.responses[key];
     if (isNonEmptyValue(value) || !Object.prototype.hasOwnProperty.call(serverResponses, key)) {
@@ -154,26 +186,45 @@ const mergeNewerLocalBackup = ({
     delete mergedResponses[key];
   });
 
+  const mergeUiState = (key) => ({
+    ...(serverDraft?.[key] || {}),
+    ...Object.fromEntries(Object.entries(local?.[key] || {}).filter(([id]) => !blockedQuestions.has(id)))
+  });
   return {
     state: {
       responses: mergedResponses,
-      validationStatus: {
-        ...(serverDraft?.validationStatus || {}),
-        ...(local?.validationStatus || {})
-      },
-      touchedQuestions: {
-        ...(serverDraft?.touchedQuestions || {}),
-        ...(local?.touchedQuestions || {})
-      },
-      expandedQuestions: {
-        ...(serverDraft?.expandedQuestions || {}),
-        ...(local?.expandedQuestions || {})
-      },
+      validationStatus: mergeUiState('validationStatus'),
+      touchedQuestions: mergeUiState('touchedQuestions'),
+      expandedQuestions: mergeUiState('expandedQuestions'),
       textValidationMeta: currentLocalState?.textValidationMeta || {}
     },
     changedKeys: [...new Set(changedKeys)],
-    deletedKeys: [...new Set(deletedKeys)]
+    deletedKeys: [...new Set(deletedKeys)],
+    recoveryConflict
   };
+};
+
+const organizerRecoveryStorageKey = (sessionId) => `pro_questionnaire_organizer_recovery_${sessionId}`;
+
+export const readOrganizerRecoveryArchive = (sessionId) => {
+  if (!sessionId) return null;
+  try {
+    const archive = JSON.parse(safeLocalStorageGet(organizerRecoveryStorageKey(sessionId)) || 'null');
+    return archive?.format === 'page-organizer-recovery-v1' && archive.sessionId === sessionId && Array.isArray(archive.conflicts)
+      ? archive : null;
+  } catch {
+    return null;
+  }
+};
+
+export const preserveOrganizerRecoveryConflict = (sessionId, conflict) => {
+  const existing = readOrganizerRecoveryArchive(sessionId);
+  const archive = existing || { format: 'page-organizer-recovery-v1', sessionId, conflicts: [] };
+  if (!archive.conflicts.some((item) => sameValue(item.backup, conflict.backup))) {
+    archive.conflicts.push({ ...conflict, detectedAt: safeNowIso() });
+  }
+  // This separate append-only archive survives replacement of the normal outbox.
+  return { archive, storageSaved: safeLocalStorageSet(organizerRecoveryStorageKey(sessionId), JSON.stringify(archive)) };
 };
 
 export const useSecureQuestionnaireDraft = ({
@@ -197,6 +248,7 @@ export const useSecureQuestionnaireDraft = ({
   const [lastSavedAt, setLastSavedAt] = useState('');
   const [lastConfirmedRevision, setLastConfirmedRevision] = useState(0);
   const [hasLocalRecoveryCopy, setHasLocalRecoveryCopy] = useState(null);
+  const [organizerRecoveryConflict, setOrganizerRecoveryConflict] = useState(null);
   const [draftConnection, setDraftConnection] = useState({
     attempt: 0,
     error: '',
@@ -212,6 +264,8 @@ export const useSecureQuestionnaireDraft = ({
   }
   const clientSequenceRef = useRef(0);
   const revisionRef = useRef(0);
+  const organizerGenerationRef = useRef({ '3': 0, '4': 0 });
+  const authoritativeOrganizerRef = useRef({});
   const saveTimerRef = useRef(null);
   const saveRetryTimerRef = useRef(null);
   const bootstrapRetryTimerRef = useRef(null);
@@ -282,6 +336,29 @@ export const useSecureQuestionnaireDraft = ({
     return stored;
   }, [questionnaireSessionId]);
 
+  const archiveConcurrentOrganizerCopy = useCallback((questionIds, snapshot, changedKeys, deletedKeys, baseRevision, serverRevision) => {
+    const sessionId = resumeCredentialRef.current?.split('.')[0] || questionnaireSessionId;
+    const preserved = preserveOrganizerRecoveryConflict(sessionId, {
+      questionIds,
+      baseRevision,
+      serverRevision,
+      backup: {
+        session_id: sessionId,
+        ...snapshot,
+        changedKeys,
+        deletedKeys,
+        baseRevision,
+        savedAt: safeNowIso(),
+        source: 'concurrent_organizer_update'
+      }
+    });
+    setOrganizerRecoveryConflict({
+      questionIds: [...new Set(preserved.archive.conflicts.flatMap((conflict) => conflict.questionIds))],
+      archive: preserved.archive,
+      storageSaved: preserved.storageSaved
+    });
+  }, [questionnaireSessionId]);
+
   const executeSave = useCallback(({
     status = 'draft',
     submitError = '',
@@ -324,8 +401,10 @@ export const useSecureQuestionnaireDraft = ({
         }
       });
     }
-    const changedKeys = [...pendingChangedKeysRef.current];
-    const deletedKeys = [...pendingDeletedKeysRef.current];
+    let changedKeys = [...pendingChangedKeysRef.current];
+    let deletedKeys = [...pendingDeletedKeysRef.current];
+    const queuedOrganizerGeneration = { ...organizerGenerationRef.current };
+    const queuedBaseRevision = revisionRef.current;
     pendingChangedKeysRef.current.clear();
     pendingDeletedKeysRef.current.clear();
     const mutationId = randomMutationId();
@@ -336,6 +415,29 @@ export const useSecureQuestionnaireDraft = ({
 
     const operation = async () => {
       try {
+        const invalidatedQuestions = ['3', '4'].filter((id) => (
+          queuedOrganizerGeneration[id] !== organizerGenerationRef.current[id]
+          && (owns(snapshot.responses, `${id}_structure`) || owns(authoritativeOrganizerRef.current[id], `${id}_structure`))
+        ));
+        if (invalidatedQuestions.length) {
+          const changedOrganizers = invalidatedQuestions.filter((id) => organizerResponseKeys(id).some((key) => changedKeys.includes(key) || deletedKeys.includes(key)));
+          if (changedOrganizers.length) archiveConcurrentOrganizerCopy(changedOrganizers, snapshot, changedKeys, deletedKeys, queuedBaseRevision, revisionRef.current);
+          const blockedKeys = new Set(invalidatedQuestions.flatMap(organizerResponseKeys));
+          changedKeys = changedKeys.filter((key) => !blockedKeys.has(key));
+          deletedKeys = deletedKeys.filter((key) => !blockedKeys.has(key));
+          snapshot.responses = { ...snapshot.responses };
+          invalidatedQuestions.forEach((id) => {
+            organizerResponseKeys(id).forEach((key) => delete snapshot.responses[key]);
+            Object.assign(snapshot.responses, authoritativeOrganizerRef.current[id] || {});
+          });
+          unconfirmedMutationsRef.current.set(mutationId, { changedKeys, deletedKeys });
+          if (required) {
+            const error = new Error('The page organization changed in another tab. Review the current pages before submitting.');
+            error.status = 409;
+            error.code = 'ORGANIZER_SNAPSHOT_CHANGED';
+            throw error;
+          }
+        }
         const mappedPayload = transformResponsesToPayload(
           snapshot.responses,
           snapshot.credentials.businessName,
@@ -366,6 +468,58 @@ export const useSecureQuestionnaireDraft = ({
           mappedPayload,
           source
         });
+        const returnedResponses = result?.draft?.responses;
+        if (returnedResponses && typeof returnedResponses === 'object') {
+          const downgraded = ['3', '4'].filter((id) => owns(snapshot.responses, `${id}_structure`) && !owns(returnedResponses, `${id}_structure`));
+          if (downgraded.length) {
+            archiveConcurrentOrganizerCopy(downgraded, snapshot, changedKeys, deletedKeys, queuedBaseRevision, Number(result.draft.revision) || revisionRef.current);
+            const error = new Error('The draft service did not preserve the page organization. Your local copy is available for download.');
+            error.status = 409;
+            error.code = 'ORGANIZER_SERVER_SCHEMA_MISMATCH';
+            throw error;
+          }
+          const remoteChanges = ['3', '4'].filter((id) => (
+            (owns(returnedResponses, `${id}_structure`) || owns(snapshot.responses, `${id}_structure`))
+            && !sameValue(returnedResponses[`${id}_structure`], snapshot.responses[`${id}_structure`])
+          ));
+          const normalizedReturned = normalizePersistedStateV3({ responses: returnedResponses }).responses;
+          ['3', '4'].forEach((id) => {
+            authoritativeOrganizerRef.current[id] = Object.fromEntries(organizerResponseKeys(id)
+              .filter((key) => owns(normalizedReturned, key)).map((key) => [key, normalizedReturned[key]]));
+          });
+          if (remoteChanges.length) {
+            const pendingKeys = new Set([...pendingChangedKeysRef.current, ...pendingDeletedKeysRef.current]);
+            unconfirmedMutationsRef.current.forEach((mutation, id) => {
+              if (id !== mutationId) [...mutation.changedKeys, ...mutation.deletedKeys].forEach((key) => pendingKeys.add(key));
+            });
+            const conflictingLocal = remoteChanges.filter((id) => (
+              organizerResponseKeys(id).some((key) => pendingKeys.has(key))
+              && !sameValue(latestRef.current.responses?.[`${id}_structure`], returnedResponses[`${id}_structure`])
+            ));
+            if (conflictingLocal.length) archiveConcurrentOrganizerCopy(
+              conflictingLocal, latestRef.current, [...pendingChangedKeysRef.current, ...pendingKeys],
+              [...pendingDeletedKeysRef.current], revisionRef.current, Number(result.draft.revision) || revisionRef.current
+            );
+            const next = { ...latestRef.current, responses: { ...latestRef.current.responses } };
+            remoteChanges.forEach((id) => {
+              organizerGenerationRef.current[id] += 1;
+              organizerResponseKeys(id).forEach((key) => {
+                pendingChangedKeysRef.current.delete(key);
+                pendingDeletedKeysRef.current.delete(key);
+                delete next.responses[key];
+              });
+              Object.assign(next.responses, authoritativeOrganizerRef.current[id]);
+              ['validationStatus', 'touchedQuestions', 'expandedQuestions'].forEach((key) => {
+                next[key] = { ...next[key] };
+                if (owns(result.draft[key], id)) next[key][id] = result.draft[key][id];
+                else delete next[key][id];
+              });
+            });
+            latestRef.current = next;
+            dispatch(loadInitialState(next));
+          }
+        }
+        // Reconcile authoritative organization before a later save can use its revision.
         revisionRef.current = Number(result?.draft?.revision) || revisionRef.current;
         unconfirmedMutationsRef.current.delete(mutationId);
         setLastConfirmedRevision(revisionRef.current);
@@ -438,7 +592,7 @@ export const useSecureQuestionnaireDraft = ({
 
     saveChainRef.current = saveChainRef.current.catch(() => null).then(operation);
     return saveChainRef.current;
-  }, [base44.functions, effectiveCredentials, isTestMode, serviceOptionsGrouped, totalQuestionCount, writeLocalOutbox]);
+  }, [archiveConcurrentOrganizerCopy, base44.functions, dispatch, effectiveCredentials, isTestMode, serviceOptionsGrouped, totalQuestionCount, writeLocalOutbox]);
 
   executeSaveRef.current = executeSave;
 
@@ -617,6 +771,11 @@ export const useSecureQuestionnaireDraft = ({
         revisionRef.current = Number(serverDraft.revision) || 0;
         setLastConfirmedRevision(revisionRef.current);
         knownServerKeysRef.current = new Set(Object.keys(serverDraft.responses || {}));
+        ['3', '4'].forEach((id) => {
+          organizerGenerationRef.current[id] += 1;
+          authoritativeOrganizerRef.current[id] = Object.fromEntries(organizerResponseKeys(id)
+            .filter((key) => owns(serverDraft.responses, key)).map((key) => [key, serverDraft.responses[key]]));
+        });
         const localBackup = getDraftLocalBackup(sessionId);
         const merged = mergeNewerLocalBackup({
           serverDraft,
@@ -629,6 +788,15 @@ export const useSecureQuestionnaireDraft = ({
           allowLegacyCurrentStateMigration: !initialResumeCredential
             && !newClientLaunch.active
         });
+        const preservedRecovery = merged.recoveryConflict
+          ? preserveOrganizerRecoveryConflict(sessionId, merged.recoveryConflict)
+          : { archive: readOrganizerRecoveryArchive(sessionId), storageSaved: true };
+        const recoveryArchive = preservedRecovery.archive;
+        setOrganizerRecoveryConflict(recoveryArchive?.conflicts.length ? {
+          questionIds: [...new Set(recoveryArchive.conflicts.flatMap((conflict) => conflict.questionIds))],
+          archive: recoveryArchive,
+          storageSaved: preservedRecovery.storageSaved
+        } : null);
         const normalized = normalizePersistedStateV3(merged.state);
         const effectiveIdentity = effectiveCredentials();
         const mergedCredentials = {
@@ -875,12 +1043,26 @@ export const useSecureQuestionnaireDraft = ({
     if (bootstrapRetryTimerRef.current) clearTimeout(bootstrapRetryTimerRef.current);
   }, []);
 
+  const downloadOrganizerRecoveryBackup = useCallback(() => {
+    if (!organizerRecoveryConflict?.archive) return false;
+    const blob = new Blob([JSON.stringify(organizerRecoveryConflict.archive, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'questionnaire-page-recovery.json';
+    anchor.click();
+    URL.revokeObjectURL(url);
+    return true;
+  }, [organizerRecoveryConflict]);
+
   return {
     isDraftReady,
     draftSaveState,
     lastSavedAt,
     lastConfirmedRevision,
     hasLocalRecoveryCopy,
+    organizerRecoveryConflict,
+    downloadOrganizerRecoveryBackup,
     draftConnection,
     questionnaireSessionId,
     restoredQuestionId,

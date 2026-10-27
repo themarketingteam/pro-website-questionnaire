@@ -48,10 +48,12 @@ export const questionnaireResponsesFromSubmissionPayload = (payload) => {
     '2': yesNo(meetTheTeam.generate_page === true),
     '2.1': asString(meetTheTeam.team_introduction),
     '2.2': teamPhoto,
-    '3': normalizeServiceSelectionsForPayload(
+    '3': userdata.service_offerings_structure ? asArray(userdata.service_offerings) : normalizeServiceSelectionsForPayload(
       asArray(userdata.service_offerings),
       SERVICE_OPTIONS_GROUPED
     ),
+    ...(Object.prototype.hasOwnProperty.call(userdata, 'service_offerings_structure') ? { '3_structure': userdata.service_offerings_structure } : {}),
+    ...(Object.prototype.hasOwnProperty.call(userdata, 'target_industries_structure') ? { '4_structure': userdata.target_industries_structure } : {}),
     '3_other': asString(userdata.service_offerings_other),
     '4': asArray(userdata.target_industries),
     '4_other': asString(userdata.target_industries_other),

@@ -1,0 +1,225 @@
+{
+  "metadata": {
+    "business_name": "Scout Networks",
+    "businessDomain": "scoutnetworks.net",
+    "submission_datetime": "2026-10-27T04:50:56.131Z",
+    "service_type": "pro"
+  },
+  "userdata": {
+    "additional_pages_list": {
+      "why_choose_us_page": {
+        "generate_page": false,
+        "why_choose_us_description": ""
+      },
+      "meet_the_team_page": {
+        "generate_page": false,
+        "team_introduction": "",
+        "team_photo_with_tags": {
+          "imageUrl": "",
+          "imageName": "",
+          "taggedPeople": [],
+          "files": [],
+          "tags": [],
+          "notes": "",
+          "has_team_photo": false
+        }
+      }
+    },
+    "service_offerings": [
+      "Managed IT Services",
+      "Managed IT",
+      "Remote Monitoring & Management (RMM)",
+      "On-Site Support",
+      "IT Support Services",
+      "IT Help Desk",
+      "Cloud Solutions",
+      "Cloud Services",
+      "Modern Workplace & Productivity Solutions",
+      "Microsoft 365",
+      "Internet Services",
+      "Cybersecurity Services",
+      "EDR (Endpoint Detection & Response)",
+      "Email Security",
+      "Network & Infrastructure Services",
+      "Network Design & Implementation",
+      "Structured Cabling",
+      "Business Continuity Services",
+      "Backup Monitoring & Management",
+      "Data Backup & Disaster Recovery Services",
+      "Data Backup & Recovery",
+      "Physical Security Solutions",
+      "Video Surveillance Solutions",
+      "Access Control Systems"
+    ],
+    "service_offerings_other": "",
+    "target_industries": [
+      "Financial / Accounting / CPA",
+      "Healthcare / Medical",
+      "Legal Firms",
+      "Nonprofits / Education",
+      "Real Estate / Property Management",
+      "Retail / Hospitality",
+      "Manufacturing / Construction",
+      "Dental Practices",
+      "Insurance Agencies"
+    ],
+    "target_industries_other": "",
+    "geographic_areas": [
+      {
+        "geographic_area_meta": {
+          "name": "Greater Louisville Area",
+          "label": "Greater Louisville Area",
+          "lat": "38.2468618",
+          "lon": "-85.7663724",
+          "place_id": "ChIJEdVbsxoLaYgRMv1xICi009Q",
+          "source": "google",
+          "primary": true
+        }
+      }
+    ],
+    "company_description": "Scout Networks serves as the \"A1 partner for all your technology needs,\" acting as a one-stop business solutions provider. From the first connection to everyday support, \"one call brings it all together,\" effectively giving clients one point of contact to handle their entire technological ecosystem.",
+    "delivery_model": "Fully Managed IT Provider",
+    "delivery_model_other": "",
+    "pricing_packaging": [
+      "Flat-rate monthly service packages",
+      "Hourly / Project-based billing",
+      "Per-user pricing"
+    ],
+    "pricing_packaging_other": "",
+    "differentiation": "Scout Networks takes a unique \"business solutions provider\" approach rather than acting as a traditional MSP. They communicate without technical jargon (\"no geek speak\"), preferring to sit across the table from business owners and relate to their real-world operational and HR challenges. They apply best practices to ensure clients are fully leveraging their technology budgets, gaining the most efficient use out of their systems to actively fuel and protect the business.",
+    "company_goals": [
+      "Increase recurring revenue",
+      "Attract higher-value clients",
+      "Improve client retention"
+    ],
+    "company_goals_other": "",
+    "brand_tone": "Friendly & Approachable",
+    "brand_tone_other": "",
+    "certifications_partnerships": [
+      {
+        "cert_item_name": "Microsoft Gold Partner",
+        "cert_item_type": "partnership",
+        "cert_item_image_url": "https://base44.app/api/apps/6925fec3678942d22522b010/files/mp/public/6925fec3678942d22522b010/6c6419d35_img-a57989fb-fccb-4eaf-ad4d-5e71b5f97c75.png",
+        "cert_item_image_name": "img-a57989fb-fccb-4eaf-ad4d-5e71b5f97c75.png",
+        "cert_item_file_url": "",
+        "cert_item_file_name": "Microsoft Gold Partner",
+        "cert_item_files": []
+      },
+      {
+        "cert_item_name": "HIPAA Compliant",
+        "cert_item_type": "certification",
+        "cert_item_image_url": "https://base44.app/api/apps/6925fec3678942d22522b010/files/mp/public/6925fec3678942d22522b010/08baa0fe9_img-5319120a-4336-4a48-b57e-d1c0c600e0c5.png",
+        "cert_item_image_name": "img-5319120a-4336-4a48-b57e-d1c0c600e0c5.png",
+        "cert_item_file_url": "",
+        "cert_item_file_name": "HIPAA Compliant",
+        "cert_item_files": []
+      },
+      {
+        "cert_item_name": "Novell Administrator",
+        "cert_item_type": "certification",
+        "cert_item_image_url": "https://base44.app/api/apps/6925fec3678942d22522b010/files/mp/public/6925fec3678942d22522b010/f68d6f7b6_cna_logo.jpg",
+        "cert_item_image_name": "cna_logo.jpg",
+        "cert_item_file_url": "",
+        "cert_item_file_name": "Novell Administrator",
+        "cert_item_files": []
+      },
+      {
+        "cert_item_name": "CompTIA Network+",
+        "cert_item_type": "certification",
+        "cert_item_image_url": "https://base44.app/api/apps/6925fec3678942d22522b010/files/mp/public/6925fec3678942d22522b010/37354c591_img-a7ef51fe-b8d6-4c45-90f1-f492cce54ff4.png",
+        "cert_item_image_name": "img-a7ef51fe-b8d6-4c45-90f1-f492cce54ff4.png",
+        "cert_item_file_url": "",
+        "cert_item_file_name": "CompTIA Network+",
+        "cert_item_files": []
+      },
+      {
+        "cert_item_name": "CompTIA A+",
+        "cert_item_type": "certification",
+        "cert_item_image_url": "https://base44.app/api/apps/6925fec3678942d22522b010/files/mp/public/6925fec3678942d22522b010/dd466953b_img-3eb95f5f-d2fc-41f6-8fb1-cf9fa93f2c0b.png",
+        "cert_item_image_name": "img-3eb95f5f-d2fc-41f6-8fb1-cf9fa93f2c0b.png",
+        "cert_item_file_url": "",
+        "cert_item_file_name": "CompTIA A+",
+        "cert_item_files": []
+      },
+      {
+        "cert_item_name": "CompTIA Security+",
+        "cert_item_type": "certification",
+        "cert_item_image_url": "https://base44.app/api/apps/6925fec3678942d22522b010/files/mp/public/6925fec3678942d22522b010/81c158738_img-c17f567a-5833-4a02-a7ad-3414b7f3859b.png",
+        "cert_item_image_name": "img-c17f567a-5833-4a02-a7ad-3414b7f3859b.png",
+        "cert_item_file_url": "",
+        "cert_item_file_name": "CompTIA Security+",
+        "cert_item_files": []
+      },
+      {
+        "cert_item_name": "Bicsi",
+        "cert_item_type": "certification",
+        "cert_item_image_url": "https://base44.app/api/apps/6925fec3678942d22522b010/files/mp/public/6925fec3678942d22522b010/5aad94d0c_Biscsi.png",
+        "cert_item_image_name": "Biscsi.png",
+        "cert_item_file_url": "",
+        "cert_item_file_name": "Bicsi",
+        "cert_item_files": []
+      },
+      {
+        "cert_item_name": "Ubiquiti",
+        "cert_item_type": "certification",
+        "cert_item_image_url": "https://base44.app/api/apps/6925fec3678942d22522b010/files/mp/public/6925fec3678942d22522b010/9a9e29c61_img-d45cf6f7-3d7c-4a7e-b5af-5a599e8b3f39.png",
+        "cert_item_image_name": "img-d45cf6f7-3d7c-4a7e-b5af-5a599e8b3f39.png",
+        "cert_item_file_url": "",
+        "cert_item_file_name": "Ubiquiti",
+        "cert_item_files": []
+      },
+      {
+        "cert_item_name": "RingCentral Certified Sales Professional",
+        "cert_item_type": "certification",
+        "cert_item_image_url": "https://base44.app/api/apps/6925fec3678942d22522b010/files/mp/public/6925fec3678942d22522b010/417ef3e23_img-b5e45b63-07c1-4e8d-94c2-7148b89ff07b.png",
+        "cert_item_image_name": "img-b5e45b63-07c1-4e8d-94c2-7148b89ff07b.png",
+        "cert_item_file_url": "",
+        "cert_item_file_name": "RingCentral Certified Sales Professional",
+        "cert_item_files": []
+      }
+    ],
+    "sales_process": "The process is highly \"on-site driven\" (a \"cheeks in the seats\" philosophy). It begins with an initial phone call, quickly followed by an in-person site visit to physically evaluate the environment, assess network/Wi-Fi needs, and check machine security. From there, Scout Networks builds a highly detailed scope of work identifying every element and hour required, culminating in a custom proposal presented to the end user.",
+    "service_guarantee": false,
+    "service_guarantee_items": [],
+    "client_acquisition": "Referrals / Word of Mouth",
+    "client_acquisition_other": "",
+    "website_objectives": [
+      "Generate qualified leads",
+      "Strengthen credibility and authority",
+      "Support the sales process"
+    ],
+    "website_objectives_other": "",
+    "client_size": "5-50 employees",
+    "client_challenges": [
+      "Security incidents or data loss",
+      "Frequent downtime or outages",
+      "Poor responsiveness from current provider"
+    ],
+    "client_challenges_other": "",
+    "client_frustrations": "Incoming clients are highly frustrated by a lack of communication and agonizingly slow response times from their previous IT providers—sometimes waiting two or three days for help. They recognize that unaddressed downtime directly costs the business owner money, and they are frustrated by providers who do not treat their outages with urgency.",
+    "client_outcomes": [
+      "Faster response times",
+      "Stronger cybersecurity posture",
+      "Reliable systems and less downtime"
+    ],
+    "client_outcomes_other": "",
+    "value_description": "Clients frequently describe the team as \"responsive,\" \"knowledgeable,\" \"proactive,\" \"professional,\" and \"flawless\". They refer to Scout Networks as an \"extension of our team\" and a \"valuable resource\" that embraces current technologies to streamline workflows and secure data.",
+    "ideal_client": "The ideal client is a business owner looking for ways to spend their technology dollars more efficiently to achieve highly optimal outcomes. They are often organizations with unmanaged or neglected IT environments that need a trusted partner to identify gaps, secure their network, and properly manage their technology footprint.",
+    "avoided_clients": "",
+    "primary_cta": "Schedule a Consultation",
+    "primary_cta_other": "",
+    "additional_notes": "",
+    "team_photo_with_tags": {
+      "imageUrl": "",
+      "imageName": "",
+      "taggedPeople": [],
+      "files": [],
+      "tags": [],
+      "notes": "",
+      "has_team_photo": false
+    },
+    "industries": [],
+    "locations": [],
+    "service_areas": []
+  }
+}

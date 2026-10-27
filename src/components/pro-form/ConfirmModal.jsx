@@ -236,7 +236,7 @@ export default function ConfirmModal({
                   <div className="text-sm font-medium text-slate-700 mb-1">
                     Question {q.id}: {q.title}
                   </div>
-                  <div className="text-sm text-slate-600 whitespace-pre-line">
+                  <div className="text-sm text-slate-600 whitespace-pre-wrap">
                     {q.answer}
                   </div>
                 </div>

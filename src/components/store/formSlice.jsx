@@ -53,6 +53,7 @@ const formSlice = createSlice({
       delete state.responses[questionId];
       delete state.responses[`${questionId}_other`];
       delete state.responses[`${questionId}_primary`];
+      delete state.responses[`${questionId}_structure`];
       delete state.textValidationMeta[questionId];
       delete state.validationStatus[questionId];
       delete state.touchedQuestions[questionId];

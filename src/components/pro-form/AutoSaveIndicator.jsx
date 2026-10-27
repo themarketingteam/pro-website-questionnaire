@@ -100,7 +100,7 @@ export default function AutoSaveIndicator({
               className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-[#1E6BA8] hover:text-[#154f7d]"
             >
               <Link2 className="w-3.5 h-3.5" />
-              {copied ? 'Return link copied' : 'Copy return link for another device'}
+              {copied ? 'Return link copied' : (import.meta.env.VITE_LOCAL_PREVIEW ? 'Copy local return link' : 'Copy return link for another device')}
             </button>
           )}
         </div>

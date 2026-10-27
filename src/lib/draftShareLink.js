@@ -7,7 +7,7 @@ const isResumeCredential = (value) => (
 
 export const buildDraftShareUrl = (
   resumeCredential,
-  publicOrigin = import.meta.env.VITE_PRO_QUESTIONNAIRE_PUBLIC_ORIGIN || DEFAULT_PUBLIC_QUESTIONNAIRE_ORIGIN
+  publicOrigin = import.meta.env.VITE_LOCAL_PREVIEW ? window.location.origin : (import.meta.env.VITE_PRO_QUESTIONNAIRE_PUBLIC_ORIGIN || DEFAULT_PUBLIC_QUESTIONNAIRE_ORIGIN)
 ) => {
   if (!isResumeCredential(resumeCredential)) {
     throw new Error('The server did not return a valid draft link credential.');
@@ -19,7 +19,7 @@ export const buildDraftShareUrl = (
   } catch {
     throw new Error('The public questionnaire URL is not configured correctly.');
   }
-  if (url.protocol !== 'https:' && url.hostname !== 'localhost') {
+  if (url.protocol !== 'https:' && url.hostname !== 'localhost' && url.hostname !== '127.0.0.1') {
     throw new Error('The public questionnaire URL must use HTTPS.');
   }
 

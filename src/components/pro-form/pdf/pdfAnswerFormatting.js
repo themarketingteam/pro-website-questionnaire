@@ -1,4 +1,5 @@
 import { formatServiceSelectionLabel } from '@/lib/serviceSelectionModel';
+import { formatPageStructureForDisplay } from '../answerFormatting';
 
 const isObject = (value) => value !== null && typeof value === 'object';
 
@@ -392,6 +393,14 @@ export const formatAnswerForPdf = (
   allResponses = {}
 ) => {
   const normalizedQuestionId = cleanText(questionId);
+  const structureKey = `${normalizedQuestionId}_structure`;
+  if (['3', '4'].includes(normalizedQuestionId) && Object.prototype.hasOwnProperty.call(allResponses, structureKey)) {
+    try {
+      return formatPageStructureForDisplay(allResponses[structureKey]);
+    } catch {
+      return 'Page organization needs review before it can be displayed.';
+    }
+  }
   let mainAnswer = '';
 
   if (normalizedQuestionId === '3') {

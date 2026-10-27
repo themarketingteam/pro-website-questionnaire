@@ -29,3 +29,7 @@ dist-ssr
 
 .env
 base44/.app.jsonc
+
+# Isolated local preview (never production resources)
+.local-preview/
+dist-local/

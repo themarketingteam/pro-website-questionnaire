@@ -46,6 +46,14 @@
         "client_identity_fingerprint": {
           "type": "string",
           "description": "Server-computed fingerprint used to prevent cross-client submission reuse"
+        },
+        "questionnaire_payload_version": {
+          "type": "integer",
+          "enum": [
+            1,
+            2
+          ],
+          "description": "Absent or 1 is legacy; 2 means at least one question has an authoritative page-tree-v1 structure."
         }
       }
     },
@@ -363,6 +371,218 @@
         "additional_notes": {
           "type": "string",
           "description": "Q25.1: Additional notes or instructions (only if Q25 is yes)"
+        },
+        "service_offerings_structure": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "type": "string",
+              "enum": [
+                "page-tree-v1"
+              ]
+            },
+            "pages": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "predefined",
+                      "custom"
+                    ]
+                  },
+                  "catalogId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 2000
+                  },
+                  "children": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "predefined",
+                            "custom"
+                          ]
+                        },
+                        "catalogId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "maxLength": 2000
+                        },
+                        "children": {
+                          "type": "array",
+                          "maxItems": 0,
+                          "items": {
+                            "type": "object"
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label",
+                        "source",
+                        "catalogId",
+                        "children"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "label",
+                  "source",
+                  "catalogId",
+                  "children"
+                ]
+              }
+            }
+          },
+          "required": [
+            "format",
+            "pages"
+          ],
+          "description": "Optional authoritative page tree. Array position is priority among siblings; every node represents a website page."
+        },
+        "target_industries_structure": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "format": {
+              "type": "string",
+              "enum": [
+                "page-tree-v1"
+              ]
+            },
+            "pages": {
+              "type": "array",
+              "maxItems": 100,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "predefined",
+                      "custom"
+                    ]
+                  },
+                  "catalogId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 2000
+                  },
+                  "children": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160
+                        },
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 500
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "predefined",
+                            "custom"
+                          ]
+                        },
+                        "catalogId": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "maxLength": 2000
+                        },
+                        "children": {
+                          "type": "array",
+                          "maxItems": 0,
+                          "items": {
+                            "type": "object"
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label",
+                        "source",
+                        "catalogId",
+                        "children"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "id",
+                  "label",
+                  "source",
+                  "catalogId",
+                  "children"
+                ]
+              }
+            }
+          },
+          "required": [
+            "format",
+            "pages"
+          ],
+          "description": "Optional authoritative page tree. Array position is priority among siblings; every node represents a website page."
         }
       }
     },
@@ -425,7 +645,11 @@
         }
       ]
     },
-    "update": { "user_condition": { "role": "admin" } },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
     "delete": false
   }
 }

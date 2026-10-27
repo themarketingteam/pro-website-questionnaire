@@ -8,6 +8,34 @@ import { Sparkles, Loader2, CheckCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import { normalizeServiceSelectionsForPayload } from '@/lib/serviceSelectionModel';
+import { normalizePageStructure, projectPageStructure } from '@/lib/pageOrganizerModel';
+
+export const buildQuestionnaireAiFormContext = (responses = {}, credentials = {}) => {
+  const has = (key) => Object.prototype.hasOwnProperty.call(responses, key);
+  const serviceStructure = has('3_structure') ? normalizePageStructure(responses['3_structure']) : null;
+  const industryStructure = has('4_structure') ? normalizePageStructure(responses['4_structure']) : null;
+  const services = serviceStructure ? projectPageStructure(serviceStructure) : null;
+  const industries = industryStructure ? projectPageStructure(industryStructure) : null;
+  return {
+    businessName: credentials.businessName || 'the business',
+    responses: {
+      service_offerings: services ? services.selections : normalizeServiceSelectionsForPayload(responses['3'], SERVICE_OPTIONS_GROUPED),
+      target_industries: industries ? industries.selections : responses['4'] || [],
+      ...(serviceStructure ? {
+        service_offerings_structure: serviceStructure,
+        service_offerings_other: services.otherValues.join(', ')
+      } : {}),
+      ...(industryStructure ? {
+        target_industries_structure: industryStructure,
+        target_industries_other: industries.otherValues.join(', ')
+      } : {}),
+      additional_pages_list: responses['1.1'] || '',
+      company_description: responses['6'] || '',
+      ideal_client: responses['22'] || '',
+      client_size: responses['17'] || ''
+    }
+  };
+};
 
 export default function AIContentModal({ 
   open, 
@@ -57,20 +85,7 @@ export default function AIContentModal({
         credentials = JSON.parse(decodeURIComponent(cookies['pro_questionnaire_credentials']));
       }
 
-      return {
-        businessName: credentials.businessName || 'the business',
-        responses: {
-          service_offerings: normalizeServiceSelectionsForPayload(
-            responses['3'],
-            SERVICE_OPTIONS_GROUPED
-          ),
-          target_industries: responses['4'] || [],
-          additional_pages_list: responses['1.1'] || '',
-          company_description: responses['6'] || '',
-          ideal_client: responses['22'] || '',
-          client_size: responses['17'] || ''
-        }
-      };
+      return buildQuestionnaireAiFormContext(responses, credentials);
     } catch (e) {
       console.error('Failed to parse form context:', e);
     }

@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
+import { guardOrganizedDraftMutation, preserveOrganizedMappedPayload, validateOrganizedPayload, validateOrganizedResponses, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
 
 const MAX_REQUEST_BYTES = 2_250_000;
 const MAX_RESPONSE_KEYS = 160;
@@ -75,7 +76,7 @@ const isSessionId = (value: string) => /^[A-Za-z0-9_-]{20,120}$/.test(value);
 const isClientId = (value: string) => /^[A-Za-z0-9_-]{12,120}$/.test(value);
 const isMutationId = (value: string) => /^[A-Za-z0-9_-]{12,160}$/.test(value);
 const isNewClientRequestId = (value: string) => /^[A-Za-z0-9_-]{12,200}$/.test(value);
-const isAnswerKey = (value: string) => /^\d+(?:\.\d+)?(?:_(?:other|primary))?$/.test(value);
+const isAnswerKey = (value: string) => /^(?:\d+(?:\.\d+)?(?:_(?:other|primary))?|[34]_structure)$/.test(value);
 const forbiddenKey = (value: string) => /(?:password|authorization|access[_-]?token|refresh[_-]?token|api[_-]?key|secret)/i.test(value);
 
 const sanitizeJsonValue = (value: unknown, depth = 0): unknown => {
@@ -106,6 +107,8 @@ const sanitizeJsonValue = (value: unknown, depth = 0): unknown => {
 
 const sanitizeAnswerMap = (value: unknown) => {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? value as JsonRecord : {};
+  const organizerValidation = validateOrganizedResponses(source);
+  if (!organizerValidation.ok) throw new Error(organizerValidation.errors.join(' '));
   const entries = Object.entries(source).filter(([key]) => isAnswerKey(key));
   if (entries.length > MAX_RESPONSE_KEYS) throw new Error('Draft has too many response fields.');
   return entries.reduce((result, [key, item]) => {
@@ -320,9 +323,13 @@ const materializeDraft = async (base44: any, draft: any, rebuilt: any, lifecycle
   draft = latestDraft || draft;
   const snapshot = rebuilt.snapshot;
   const credentials = sanitizeCredentials(snapshot.credentials);
-  const mappedPayload = lifecycle.mappedPayload && typeof lifecycle.mappedPayload === 'object'
+  const suppliedMappedPayload = lifecycle.mappedPayload && typeof lifecycle.mappedPayload === 'object'
     ? sanitizeJsonValue(lifecycle.mappedPayload)
     : safeParse(draft.mapped_payload_json, {});
+  // Old tabs may save unrelated answers, but cannot erase adopted structures.
+  const mappedPayload = preserveOrganizedMappedPayload(suppliedMappedPayload, snapshot.responses);
+  const organizerValidation = validateOrganizedSubmission({ payload: mappedPayload, responses: snapshot.responses });
+  if (!organizerValidation.ok) throw new Error(organizerValidation.errors.join(' '));
   const metadata = mappedPayload && typeof mappedPayload === 'object' && !Array.isArray(mappedPayload)
     ? (mappedPayload as JsonRecord).metadata || {}
     : {};
@@ -711,6 +718,18 @@ Deno.serve(async (req) => {
       ? [...new Set(body.deletedKeys.filter((key: unknown) => typeof key === 'string' && isAnswerKey(key)))].slice(0, MAX_RESPONSE_KEYS)
       : [];
     const incomingResponses = sanitizeAnswerMap(body?.responses);
+    const organizerGuard = guardOrganizedDraftMutation({
+      currentResponses: rebuiltBefore.snapshot.responses,
+      incomingResponses, changedKeys, deletedKeys,
+      baseRevision: body?.baseRevision, currentRevision: rebuiltBefore.revision
+    });
+    if (!organizerGuard.ok) {
+      return jsonResponse({ success: false, code: organizerGuard.code, error: organizerGuard.errors.join(' ') }, organizerGuard.status);
+    }
+    if (body?.mappedPayload) {
+      const mappedValidation = validateOrganizedPayload(body.mappedPayload);
+      if (!mappedValidation.ok) return jsonResponse({ success: false, code: mappedValidation.code, error: mappedValidation.errors.join(' ') }, 400);
+    }
     const responseChanges = changedKeys.reduce((result, key) => {
       if (Object.prototype.hasOwnProperty.call(incomingResponses, key)) result[key] = incomingResponses[key];
       return result;
@@ -727,6 +746,9 @@ Deno.serve(async (req) => {
       progressPercent: Math.max(0, Math.min(100, Number(body?.progressPercent) || 0))
     };
     const resultSnapshot = applyChanges(structuredClone(rebuiltBefore.snapshot), changes);
+    const candidatePayload = preserveOrganizedMappedPayload(body?.mappedPayload || safeParse(draft.mapped_payload_json, {}), resultSnapshot.responses);
+    const candidateValidation = validateOrganizedSubmission({ payload: candidatePayload, responses: resultSnapshot.responses });
+    if (!candidateValidation.ok) return jsonResponse({ success: false, code: candidateValidation.code, error: candidateValidation.errors.join(' ') }, candidateValidation.status);
     const now = new Date().toISOString();
     const revision = await base44.asServiceRole.entities.ProFormDraftRevision.create({
       draft_id: draft.id,
@@ -772,7 +794,7 @@ Deno.serve(async (req) => {
       name: safeError.name,
       message: safeError.message.slice(0, 500)
     });
-    const isValidation = /invalid|too many|too large|too deep|required|exceeds|durable/i.test(safeError.message);
+    const isValidation = /invalid|too many|too large|too deep|required|exceeds|durable|structure|organized|page|payload version/i.test(safeError.message);
     return jsonResponse({
       success: false,
       error: isValidation ? safeError.message.slice(0, 500) : 'Unable to persist the questionnaire draft.'

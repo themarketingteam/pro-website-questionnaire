@@ -1,3 +1,4 @@
+import { validateOrganizedPayload, validateOrganizedSubmission, reconcileOrganizedRepairPayload, restoreOrganizedProjections } from '../../shared/pageOrganizerContract.js';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import { isMissingIdentityValue } from '../../shared/proIdentityResolution.ts';
 import { createIdentityResolverInternalGrant } from '../../shared/draftRecoveryAuthorization.ts';
@@ -125,6 +126,8 @@ const authorizeDraftRecoveryRequest = async (base44, body) => {
 // Deliver repair-and-retry payloads to the required Zapier workflow. Delivery
 // failures are returned to the admin UI instead of being reported as success.
 const sendToZapierSafe = async (payload) => {
+  const organizerValidation = validateOrganizedPayload(payload);
+  if (!organizerValidation.ok) return { ok: false, error: organizerValidation.errors.join(' ') };
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -270,7 +273,8 @@ const SCALAR_STRING_FIELDS = ['service_offerings_other','target_industries_other
 // scalar string fields that are objects → use label/name/value/text/title, not ""
 
 function repairSubmissionPayloadServer(payload, context = {}) {
-  const warnings = [], changedPaths = [], errors = [];
+  const organizerValidation = validateOrganizedPayload(payload);
+  const warnings = [], changedPaths = [], errors = [...organizerValidation.errors];
   const track = (path, bt, at, reason) => { changedPaths.push({ path, before_type: bt, after_type: at, reason }); warnings.push(`${path}: ${reason}`); };
 
   let p;
@@ -376,6 +380,7 @@ function repairSubmissionPayloadServer(payload, context = {}) {
   let cleaned = stripFileLike(p);
   cleaned = truncateStrings(cleaned, 5000);
   cleaned = stripUndefined(cleaned);
+  if (organizerValidation.ok) cleaned = restoreOrganizedProjections(cleaned);
 
   if (isMissingIdentityValue(cleaned?.metadata?.business_name)) errors.push('metadata.business_name is required');
   if (isMissingIdentityValue(cleaned?.metadata?.businessDomain)) errors.push('metadata.businessDomain is required');
@@ -384,7 +389,7 @@ function repairSubmissionPayloadServer(payload, context = {}) {
 }
 
 function validateSubmissionPayloadServer(payload) {
-  const errors = [];
+  const errors = [...validateOrganizedPayload(payload).errors];
   if (!isPlainObject(payload)) { errors.push('payload must be an object'); return { ok: false, errors }; }
   if (!isPlainObject(payload.metadata)) errors.push('metadata must be an object');
   if (!isPlainObject(payload.userdata)) errors.push('userdata must be an object');
@@ -475,7 +480,7 @@ function buildRepairPrompt({
     '  3. Do NOT rewrite any text field. Preserve all client-submitted values exactly.',
     '  4. Only fix JSON structure and types (arrays vs objects, missing wrappers, wrong field names).',
     '  5. Use raw_responses only to recover submitted structure, never to invent new answers.',
-    '  6. Return ONLY the strict JSON contract below — no markdown, no prose outside JSON.',
+    '  6. Preserve any page-tree-v1 structures and questionnaire_payload_version exactly. Do not invent, remove, relabel, reparent or reorder pages.\n  7. Return ONLY the strict JSON contract below — no markdown, no prose outside JSON.',
     '',
     `TRUSTED CONTEXT (do not override these):`,
     `  Business Name: ${context.businessName || '(unknown)'}`,
@@ -529,6 +534,15 @@ async function runRepairPipeline({
   sessionId,
   allowRetry
 }) {
+  // Structured page answers are deterministic content, never an AI repair target.
+  const rawResponseSource = safeJsonParse(rawResponsesRawString);
+  const structureValidation = reconcileOrganizedRepairPayload(rawPayload, rawResponseSource.ok ? rawResponseSource.value : {});
+  if (!structureValidation.ok) return {
+    source: 'organizer_validation', ok: false, payload: null,
+    report: sanitizeRepairReport({ decision: 'needs_human_review', confidence: 1, should_retry_submission: false, diagnosis: 'The saved page organization is invalid; automatic repair was not applied.', warnings: structureValidation.errors }),
+    errors: structureValidation.errors
+  };
+  rawPayload = structureValidation.payload;
   // Step 1: Deterministic repair (uses parsed rawPayload, ok if {})
   const detResult = repairSubmissionPayloadServer(rawPayload, context);
   const detValidation = validateSubmissionPayloadServer(detResult.payload);
@@ -588,6 +602,10 @@ async function runRepairPipeline({
   }
 
   // Validate agent output deterministically
+  // The agent may fix other fields, but cannot remove, relabel or reorder adopted pages.
+  const originalStructures = Object.fromEntries(['service_offerings', 'target_industries'].filter((field) => Object.prototype.hasOwnProperty.call(rawPayload?.userdata || {}, `${field}_structure`)).map((field) => [field === 'service_offerings' ? '3_structure' : '4_structure', rawPayload.userdata[`${field}_structure`]]));
+  const structureGuard = validateOrganizedSubmission({ payload: agentRepairedPayload, responses: originalStructures });
+  if (!structureGuard.ok) return { source: 'agent_invalid', ok: false, payload: null, report: agentReport, errors: structureGuard.errors };
   const agentDetResult = repairSubmissionPayloadServer(agentRepairedPayload, context);
   const agentValidation = validateSubmissionPayloadServer(agentDetResult.payload);
 

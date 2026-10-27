@@ -1,3 +1,5 @@
+import { normalizePageStructure, projectPageStructure } from '@/lib/pageOrganizerModel';
+import { validateOrganizedPayload } from '../../../base44/shared/pageOrganizerContract.js';
 import {
   asArray,
   asPlainObject,
@@ -178,9 +180,15 @@ export const transformResponsesToPayload = (
   serviceOptionsGrouped = {}
 ) => {
   const normalizedResponses = normalizeQuestionnaireResponses(responses);
-  const serviceSelections = normalizeServiceSelections(normalizedResponses['3'], serviceOptionsGrouped);
-  const serviceOfferingsOther = normalizeStringSelectionList(normalizedResponses['3_other']).join(', ');
-  const targetIndustriesOther = normalizeStringSelectionList(normalizedResponses['4_other']).join(', ');
+  const serviceStructure = Object.prototype.hasOwnProperty.call(responses || {}, '3_structure')
+    ? normalizePageStructure(responses['3_structure']) : null;
+  const industryStructure = Object.prototype.hasOwnProperty.call(responses || {}, '4_structure')
+    ? normalizePageStructure(responses['4_structure']) : null;
+  const serviceProjection = serviceStructure ? projectPageStructure(serviceStructure) : null;
+  const industryProjection = industryStructure ? projectPageStructure(industryStructure) : null;
+  const serviceSelections = serviceProjection?.selections || normalizeServiceSelections(normalizedResponses['3'], serviceOptionsGrouped);
+  const serviceOfferingsOther = (serviceProjection?.otherValues || normalizeStringSelectionList(normalizedResponses['3_other'])).join(', ');
+  const targetIndustriesOther = (industryProjection?.otherValues || normalizeStringSelectionList(normalizedResponses['4_other'])).join(', ');
   const clientChallengesOther = normalizeStringSelectionList(normalizedResponses['18_other']).join(', ');
   const clientOutcomesOther = normalizeStringSelectionList(normalizedResponses['20_other']).join(', ');
 
@@ -218,13 +226,16 @@ export const transformResponsesToPayload = (
       business_name: businessName,
       businessDomain: domain,
       submission_datetime: new Date().toISOString(),
-      service_type: 'pro'
+      service_type: 'pro',
+      ...((serviceStructure || industryStructure) ? { questionnaire_payload_version: 2 } : {})
     },
     userdata: {
       additional_pages_list: additionalPagesList,
       service_offerings: serviceSelections,
+      ...(serviceStructure ? { service_offerings_structure: serviceStructure } : {}),
+      ...(industryStructure ? { target_industries_structure: industryStructure } : {}),
       service_offerings_other: serviceOfferingsOther,
-      target_industries: normalizeIndustrySelections(normalizedResponses['4']),
+      target_industries: industryProjection?.selections || normalizeIndustrySelections(normalizedResponses['4']),
       target_industries_other: targetIndustriesOther,
       geographic_areas: geographicAreas,
       company_description: asTrimmedString(normalizedResponses['6']),
@@ -262,7 +273,7 @@ export const transformResponsesToPayload = (
 };
 
 export const validateSubmissionPayload = (payload) => {
-  const errors = [];
+  const errors = [...validateOrganizedPayload(payload).errors];
 
   if (!payload || typeof payload !== 'object') {
     errors.push('Payload must be an object.');

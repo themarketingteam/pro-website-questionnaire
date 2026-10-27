@@ -15,7 +15,7 @@ const readProjectFile = (path) => readFileSync(resolve(process.cwd(), path), 'ut
 
 const evaluateCanonicalResolver = (getEnv) => {
   const source = readProjectFile('base44/functions/sendToZapier/entry.ts');
-  const resolverSource = source.slice(0, source.indexOf('Deno.serve'));
+  const resolverSource = source.slice(0, source.indexOf('Deno.serve')).replace(/^import .*;\s*$/gm, '');
   const evaluate = new Function(
     'Deno',
     `${resolverSource}\nreturn { fallback: ZAPIER_WEBHOOK_FALLBACK_URL, resolved: ZAPIER_WEBHOOK_URL };`,

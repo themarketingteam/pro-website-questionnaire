@@ -9,6 +9,7 @@ const migrations = {
   2: (state) => normalizePersistedState(state),
   3: (state) => normalizePersistedStateV3(state),
   4: (state) => normalizePersistedStateV3(state),
+  5: (state) => normalizePersistedStateV3(state),
 };
 
 // This transform runs on EVERY rehydrate (not just migrations), ensuring
@@ -32,7 +33,7 @@ const normalizationTransform = createTransform(
 
 const persistConfig = {
   key: 'pro-questionnaire-root',
-  version: 4,
+  version: 5,
   storage,
   whitelist: ['responses', 'validationStatus', 'touchedQuestions', 'expandedQuestions', 'textValidationMeta'],
   migrate: createMigrate(migrations, { debug: false }),

@@ -1,3 +1,4 @@
+import { normalizePageStructure, projectPageStructure } from '@/lib/pageOrganizerModel';
 import { QUESTIONS, SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import {
   getAllQuestionIds,
@@ -28,6 +29,8 @@ export function normalizePersistedState(state) {
     allowedResponseKeys.add(`${id}_other`);
     allowedResponseKeys.add(`${id}_primary`);
   });
+
+  ['3_structure', '4_structure'].forEach((key) => allowedResponseKeys.add(key));
 
   const next = { ...state };
   next.responses = { ...(state.responses || {}) };
@@ -138,6 +141,19 @@ export function normalizePersistedState(state) {
       }
 
       case 'checkbox': {
+        // Organized questions are authoritative; never reapply fixed catalog grouping.
+        if ((id === '3' || id === '4') && Object.prototype.hasOwnProperty.call(next.responses, `${id}_structure`)) {
+          try {
+            const structure = normalizePageStructure(next.responses[`${id}_structure`]);
+            const projected = projectPageStructure(structure);
+            next.responses[`${id}_structure`] = structure;
+            next.responses[id] = projected.selections;
+            next.responses[`${id}_other`] = projected.otherValues;
+          } catch {
+            // Keep unsupported/malformed data intact for recovery; submit validation blocks it.
+          }
+          break;
+        }
         const opts = new Set(getOptions(id));
         const serviceParentNames = id === '3'
           ? new Set(Object.keys(SERVICE_OPTIONS_GROUPED))
@@ -154,7 +170,8 @@ export function normalizePersistedState(state) {
             keep.push(v);
             return;
           }
-          if (opts.has(v)) keep.push(v);
+          // Retired/custom historical labels must reach the organizer, not disappear on load.
+          if (opts.has(v) || id === '3' || id === '4') keep.push(v);
         });
         next.responses[id] = id === '3'
           ? canonicalizeServiceSelectionState(keep, SERVICE_OPTIONS_GROUPED)

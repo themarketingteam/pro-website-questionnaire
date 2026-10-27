@@ -1,3 +1,4 @@
+import { restoreOrganizedProjections, validateOrganizedPayload } from '../../base44/shared/pageOrganizerContract.js';
 import {
   asArray,
   asPlainObject,
@@ -259,6 +260,7 @@ const normalizeGeographicAreasForPayloadRepair = (value) => {
 
 export const repairProSubmissionPayload = (payload) => {
   const warnings = [];
+  const originalOrganizerValidation = validateOrganizedPayload(payload);
   const clonedPayload = cloneWithoutMutation(payload) || {};
   const repairedPayload = asPlainObject(clonedPayload);
 
@@ -363,8 +365,10 @@ export const repairProSubmissionPayload = (payload) => {
 
   const uploadCleanedPayload = removeUnsafeUploadLikeObjects(repairedPayload, warnings);
   const truncatedPayload = limitStringDeep(uploadCleanedPayload, 5000, warnings);
-  const cleanedPayload = stripUndefinedDeep(truncatedPayload);
-  const errors = validateRequiredSubmissionMetadata(cleanedPayload);
+  const cleanedPayload = originalOrganizerValidation.ok
+    ? restoreOrganizedProjections(stripUndefinedDeep(truncatedPayload))
+    : stripUndefinedDeep(truncatedPayload);
+  const errors = [...validateRequiredSubmissionMetadata(cleanedPayload), ...originalOrganizerValidation.errors, ...validateOrganizedPayload(cleanedPayload).errors];
 
   if (JSON.stringify(cleanedPayload).includes('undefined')) {
     warnings.push('undefined_values_removed');

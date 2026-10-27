@@ -1,3 +1,4 @@
+import { validateOrganizedPayload, validateOrganizedSubmission } from '../../../shared/pageOrganizerContract.js';
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 const parsePayload = (value) => {
@@ -141,6 +142,8 @@ const authorizeDraftRecoveryRequest = async (base44, body) => {
 // the caller. The admin UI must not report a successful retry when Zapier did
 // not accept the request.
 const sendToZapierSafe = async (payload) => {
+  const organizerValidation = validateOrganizedPayload(payload);
+  if (!organizerValidation.ok) return { ok: false, error: organizerValidation.errors.join(' ') };
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -248,6 +251,9 @@ Deno.serve(async (req) => {
         }, { status: 400 });
       }
 
+      const organizerValidation = validateOrganizedSubmission({ payload: draftPayload, responses: parsePayload(draft.responses_json) || {} });
+      if (!organizerValidation.ok) return Response.json({ success: false, code: organizerValidation.code, error: { message: organizerValidation.errors.join(' ') } }, { status: organizerValidation.status });
+
       const metadata = typeof draftPayload.metadata === 'object' && draftPayload.metadata ? draftPayload.metadata : {};
       const businessName = typeof metadata.business_name === 'string' ? metadata.business_name.trim() : '';
       const businessDomain = typeof metadata.businessDomain === 'string' ? metadata.businessDomain.trim() : '';
@@ -326,6 +332,18 @@ Deno.serve(async (req) => {
       return Response.json({ success: false, error: { message: 'Intake record not found' } }, { status: 404 });
     }
 
+    // Apply the same structure guard before early duplicate-delivery paths.
+    const storedIntakePayload = parsePayload(intake.transformed_payload_json);
+    if (storedIntakePayload) {
+      const storedValidation = validateOrganizedPayload(storedIntakePayload);
+      if (!storedValidation.ok) return Response.json({ success: false, code: storedValidation.code, error: { message: storedValidation.errors.join(' ') } }, { status: 400 });
+      if (intake.source_draft_id) {
+        const sourceDraft = await base44.asServiceRole.entities.ProFormDraft.get(intake.source_draft_id);
+        const sourceGuard = validateOrganizedSubmission({ payload: storedIntakePayload, responses: parsePayload(sourceDraft.responses_json) || {} });
+        if (!sourceGuard.ok) return Response.json({ success: false, code: sourceGuard.code, error: { message: sourceGuard.errors.join(' ') } }, { status: sourceGuard.status });
+      }
+    }
+
     if (intake.linked_submission_id && !forceRetry) {
       const earlyPayload = parsePayload(intake.transformed_payload_json);
       return await respondAfterZapierDelivery(earlyPayload, {
@@ -368,6 +386,14 @@ Deno.serve(async (req) => {
       });
 
       return Response.json({ success: false, error: { message: 'Malformed transformed payload JSON' }, intakeId: intake.id }, { status: 400 });
+    }
+
+    const organizerValidation = validateOrganizedPayload(transformedPayload);
+    if (!organizerValidation.ok) return Response.json({ success: false, code: organizerValidation.code, error: { message: organizerValidation.errors.join(' ') } }, { status: 400 });
+    if (intake.source_draft_id) {
+      const sourceDraft = await base44.asServiceRole.entities.ProFormDraft.get(intake.source_draft_id);
+      const submissionGuard = validateOrganizedSubmission({ payload: transformedPayload, responses: parsePayload(sourceDraft.responses_json) || {} });
+      if (!submissionGuard.ok) return Response.json({ success: false, code: submissionGuard.code, error: { message: submissionGuard.errors.join(' ') } }, { status: submissionGuard.status });
     }
 
     const metadata = typeof transformedPayload.metadata === 'object' && transformedPayload.metadata ? transformedPayload.metadata : {};

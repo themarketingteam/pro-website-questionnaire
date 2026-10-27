@@ -4,12 +4,18 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "vite --config vite.local.config.js",
+    "build": "vite build --config vite.local.config.js",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
-    "preview": "vite preview"
+    "preview": "npm run dev:local",
+    "dev:local": "vite --config vite.local.config.js",
+    "build:local": "vite build --config vite.local.config.js",
+    "local:start": "node scripts/local-preview-daemon.mjs start",
+    "local:stop": "node scripts/local-preview-daemon.mjs stop",
+    "local:status": "node scripts/local-preview-daemon.mjs status",
+    "test": "vitest run --config src/vitest.config.js --maxWorkers=2 --minWorkers=1"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.54",

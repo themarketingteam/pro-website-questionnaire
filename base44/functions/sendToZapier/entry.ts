@@ -1,3 +1,4 @@
+import { validateOrganizedPayload } from '../../shared/pageOrganizerContract.js';
 const ZAPIER_WEBHOOK_FALLBACK_URL = 'https://hooks.zapier.com/hooks/catch/23529934/uas7p60/';
 
 const isValidZapierWebhookUrl = (value) => {
@@ -43,6 +44,8 @@ Deno.serve(async (req) => {
 
   try {
     const payload = await req.json();
+    const organizerValidation = validateOrganizedPayload(payload);
+    if (!organizerValidation.ok) return Response.json({ success: false, code: organizerValidation.code, error: organizerValidation.errors.join(' ') }, { status: 400, headers: corsHeaders });
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
 
