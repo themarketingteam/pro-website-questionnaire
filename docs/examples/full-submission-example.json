@@ -1,0 +1,200 @@
+{
+  "metadata": {
+    "business_name": "Example IT",
+    "businessDomain": "example.com",
+    "submission_datetime": "2026-11-13T18:00:00.000Z",
+    "service_type": "pro",
+    "questionnaire_payload_version": 2,
+    "questionnaire_session_id": "example-session-20261113",
+    "source_draft_id": "example-draft-20261113",
+    "submission_attempt_id": "pro_submit_sA2ZarGfYv1IaH-i9CGIE1UF1ya8Y_8Napx12yCFYy8",
+    "submission_content_fingerprint": "sA2ZarGfYv1IaH-i9CGIE1UF1ya8Y_8Napx12yCFYy8"
+  },
+  "userdata": {
+    "additional_pages_list": {
+      "why_choose_us_page": {
+        "generate_page": true,
+        "why_choose_us_description": "Choose Example IT for responsive support, clear communication, and practical advice tailored to the needs of your business."
+      },
+      "meet_the_team_page": {
+        "generate_page": true,
+        "team_introduction": "Our team brings together experienced technicians and customer-focused account managers who work together to keep clients productive.",
+        "team_photo_with_tags": {
+          "imageUrl": "",
+          "imageName": "",
+          "taggedPeople": [],
+          "files": [],
+          "tags": [],
+          "notes": "",
+          "has_team_photo": false
+        }
+      }
+    },
+    "service_offerings": [
+      "Managed IT",
+      "IT Help Desk",
+      "Cloud Services"
+    ],
+    "service_offerings_structure": {
+      "format": "page-tree-v1",
+      "pages": [
+        {
+          "label": "Managed IT",
+          "source": "predefined",
+          "children": [
+            {
+              "label": "IT Help Desk",
+              "source": "predefined"
+            },
+            {
+              "label": "Security Reviews",
+              "source": "custom"
+            }
+          ]
+        },
+        {
+          "label": "Cloud Services",
+          "source": "predefined"
+        }
+      ]
+    },
+    "target_industries_structure": {
+      "format": "page-tree-v1",
+      "pages": [
+        {
+          "label": "Financial",
+          "source": "predefined",
+          "children": [
+            {
+              "label": "CPA",
+              "source": "predefined"
+            },
+            {
+              "label": "Accounting",
+              "source": "predefined"
+            }
+          ]
+        },
+        {
+          "label": "Vet Clinics",
+          "source": "custom"
+        }
+      ]
+    },
+    "service_offerings_other": "Security Reviews",
+    "target_industries": [
+      "Financial",
+      "CPA",
+      "Accounting"
+    ],
+    "target_industries_other": "Vet Clinics",
+    "geographic_areas": [
+      {
+        "geographic_area_meta": {
+          "name": "Chicago, IL",
+          "label": "Chicago, IL",
+          "lat": "",
+          "lon": "",
+          "place_id": "",
+          "source": "manual",
+          "primary": true
+        }
+      },
+      {
+        "geographic_area_meta": {
+          "name": "Evanston, IL",
+          "label": "Evanston, IL",
+          "lat": "",
+          "lon": "",
+          "place_id": "",
+          "source": "manual",
+          "primary": false
+        }
+      }
+    ],
+    "company_description": "Example IT helps small and midsize businesses keep their technology reliable and secure. We manage everyday IT support, maintain cloud systems, and help teams work efficiently without needing to run an internal IT department.",
+    "delivery_model": "Fully Managed IT Provider",
+    "delivery_model_other": "",
+    "pricing_packaging": [
+      "Flat-rate monthly service packages",
+      "Per-user pricing"
+    ],
+    "pricing_packaging_other": "",
+    "differentiation": "Clients work with a dedicated team that explains technology in plain language, responds promptly, and recommends improvements based on business priorities.",
+    "company_goals": [
+      "Increase recurring revenue",
+      "Expand into new markets or regions",
+      "Improve client retention"
+    ],
+    "company_goals_other": "",
+    "brand_tone": "Friendly & Approachable",
+    "brand_tone_other": "",
+    "certifications_partnerships": [
+      {
+        "cert_item_name": "Example Technical Certification",
+        "cert_item_type": "certification",
+        "cert_item_image_url": "",
+        "cert_item_image_name": "",
+        "cert_item_file_url": "https://example.com/files/technical-certification.pdf",
+        "cert_item_file_name": "technical-certification.pdf",
+        "cert_item_files": [
+          {
+            "url": "https://example.com/files/technical-certification.pdf",
+            "name": "technical-certification.pdf"
+          }
+        ]
+      }
+    ],
+    "sales_process": "We begin with a discovery call, assess the current environment, present a tailored proposal, and follow a documented onboarding plan with a dedicated point of contact.",
+    "service_guarantee": true,
+    "service_guarantee_items": [
+      {
+        "guarantee_name": "Response Time Commitment",
+        "guarantee_type": "sla",
+        "guarantee_file_url": "",
+        "guarantee_file_name": "",
+        "guarantee_description": "Our target initial response time for priority support requests is one business hour."
+      }
+    ],
+    "client_acquisition": "Referrals / Word of Mouth",
+    "client_acquisition_other": "",
+    "website_objectives": [
+      "Generate qualified leads",
+      "Strengthen credibility and authority",
+      "Support the sales process"
+    ],
+    "website_objectives_other": "",
+    "client_size": "5-50 employees",
+    "client_challenges": [
+      "Frequent downtime or outages",
+      "Security incidents or data loss",
+      "Poor responsiveness from current provider"
+    ],
+    "client_challenges_other": "",
+    "client_frustrations": "Clients are frustrated by slow responses, unclear explanations, and technology problems that interrupt their work. They want a dependable partner who takes ownership of issues.",
+    "client_outcomes": [
+      "Reduced downtime",
+      "Improved security",
+      "Predictable IT costs"
+    ],
+    "client_outcomes_other": "",
+    "value_description": "Clients describe us as responsive, dependable, approachable, and easy to work with.",
+    "ideal_client": "Our ideal client is a growing professional services business with 5 to 50 employees that values reliable technology and an ongoing IT partnership.",
+    "avoided_clients": "Businesses seeking only one-time consumer device repairs.",
+    "primary_cta": "Schedule a Consultation",
+    "primary_cta_other": "",
+    "additional_notes": "Use clear language, emphasize our local service area, and make it easy to request an introductory consultation.",
+    "team_photo_with_tags": {
+      "imageUrl": "",
+      "imageName": "",
+      "taggedPeople": [],
+      "files": [],
+      "tags": [],
+      "notes": "",
+      "has_team_photo": false
+    },
+    "industries": [],
+    "locations": [],
+    "service_areas": []
+  }
+}
