@@ -300,8 +300,7 @@ Deno.serve(async (req) => {
       }
 
       if (draft.final_submission_id) {
-        const linked = await base44.asServiceRole.entities.ProFormSubmission.get(draft.final_submission_id);
-        validateReceiptAgreement(linked, draftPayload);
+        const linked = validateReceiptAgreement(await base44.asServiceRole.entities.ProFormSubmission.get(draft.final_submission_id), draftPayload);
         return await respondAfterZapierDelivery(linked, {
           alreadySubmitted: true,
           linkedSubmissionId: draft.final_submission_id,

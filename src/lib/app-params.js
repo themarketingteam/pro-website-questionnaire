@@ -1,6 +1,9 @@
 const isNode = typeof window === 'undefined';
 const windowObj = isNode ? { localStorage: new Map() } : window;
-const storage = windowObj.localStorage;
+const storage = (() => {
+	try { return windowObj.localStorage; }
+	catch { return null; }
+})();
 
 const safeStorageGet = (key) => {
 	try {
@@ -33,6 +36,15 @@ const safeStorageRemove = (key) => {
 // browser entry path pointed at the correct Base44 application.
 export const DEFAULT_BASE44_APP_ID = '6925fec3678942d22522b010';
 export const DEFAULT_BASE44_BACKEND_URL = 'https://base44.app';
+
+const PUBLISHED_PRO_HOSTS = new Set([
+	'proform.tmtwebsiteresources.xyz',
+	'pro-website-questionnaire-2522b010.base44.app',
+]);
+
+export const isPublishedProHost = (hostname = '') => (
+	PUBLISHED_PRO_HOSTS.has(String(hostname).trim().toLowerCase())
+);
 
 const normalizeParamValue = (value) => {
 	if (value === null || value === undefined) return null;
@@ -101,6 +113,19 @@ const getAppParams = () => {
 		safeStorageRemove('base44_functions_version');
 		return null;
 	})();
+	if (!isNode && isPublishedProHost(window.location.hostname)) {
+		// Published questionnaires must never send recovery credentials or answers
+		// to an app/server selected by a URL or an earlier editor session.
+		safeStorageRemove('base44_app_id');
+		safeStorageRemove('base44_server_url');
+		return {
+			appId: DEFAULT_BASE44_APP_ID,
+			serverUrl: DEFAULT_BASE44_BACKEND_URL,
+			token: getAppParamValue('access_token', { removeFromUrl: true }),
+			fromUrl: window.location.href,
+			functionsVersion,
+		};
+	}
 	return {
 		appId: getAppParamValue("app_id", {
 			defaultValue: import.meta.env.VITE_BASE44_APP_ID || DEFAULT_BASE44_APP_ID

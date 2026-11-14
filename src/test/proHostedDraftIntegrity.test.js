@@ -338,4 +338,29 @@ describe('hosted Pro save and submission integrity', () => {
     expect(f.getDraft().status).toBe('draft');
   });
 
+  it('redelivers a finalized draft using the normalized schema-padded linked receipt', async () => {
+    const f = await fixture();
+    const selected = tree({ ...node('parent', 'Managed Services'), children: [node('child', 'Help Desk')] }, node('standalone', 'Cloud Services'));
+    f.setDraft({ responses_json: JSON.stringify({ ...project(selected), '6': 'Original description' }), mapped_payload_json: JSON.stringify(payloadFor(selected)) });
+    f.hydrateSubmissionReads(hydrateProSubmissionEntity);
+    const submitted = await f.submit(f.submission(selected));
+    expect(submitted.status).toBe(200);
+    expect(f.getDraft()).toMatchObject({ status: 'submitted', final_submission_id: submitted.body.submission.id });
+    const entityDto = await f.base44.asServiceRole.entities.ProFormSubmission.get(submitted.body.submission.id);
+    expect(entityDto.userdata.service_offerings_structure.pages[0].children[0]).toMatchObject({ id: null, catalogId: null, children: [] });
+    expect(contract.validateMappedPageStructure(entityDto.userdata.service_offerings_structure).ok).toBe(false);
+    f.base44.auth = { me: async () => ({ role: 'admin' }) };
+    const fetchImpl = vi.fn(async () => new Response('{}', { status: 200 }));
+    const retry = loadHosted('base44/functions/retryProQuestionnaireIntakeSubmission/entry.ts', f.base44, fetchImpl);
+    const result = await retry({ draftId: 'draft-hosted' });
+    expect(result).toMatchObject({ status: 200, body: { success: true, alreadySubmitted: true, zapierSent: true, linkedSubmissionId: submitted.body.submission.id } });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    const outbound = JSON.parse(fetchImpl.mock.calls[0][1].body);
+    expect(outbound.userdata.service_offerings_structure).toEqual(contract.serializePageStructure(selected));
+    expect(outbound.userdata).not.toHaveProperty('target_industries_structure');
+    expect(contract.validateOrganizedPayload(outbound).ok).toBe(true);
+    expect(f.submissions).toHaveLength(1);
+    expect(JSON.parse(f.getDraft().responses_json)['3_structure']).toEqual(selected);
+  });
+
 });
