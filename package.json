@@ -25,8 +25,8 @@
     "deploy:base44:functions": "node scripts/verify-deploy-source.mjs && npx base44 functions deploy"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.54",
-    "@base44/vite-plugin": "^1.0.47",
+    "@base44/sdk": "^0.8.61",
+    "@base44/vite-plugin": "^1.0.52",
     "@fontsource/figtree": "^5.3.0",
     "@fontsource/inter": "^5.2.8",
     "@fontsource/plus-jakarta-sans": "^5.3.0",
