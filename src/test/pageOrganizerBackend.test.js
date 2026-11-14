@@ -34,8 +34,21 @@ const loadFunction = (relativePath, { base44 = {}, modules = {}, expose = '', fe
   let handler;
   const exports = {};
   const require = (name) => {
+    if (modules[name]) return modules[name];
     if (name.startsWith('npm:@base44/sdk')) return { createClientFromRequest: () => base44 };
     if (name.endsWith('pageOrganizerContract.js')) return contract;
+    if (name.endsWith('/proDraftSubmissionAuthorization.ts')) {
+      const authExports = {};
+      const authSource = ts.transpileModule(readFileSync(resolve(process.cwd(), 'base44/shared/proDraftSubmissionAuthorization.ts'), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
+      new Function('require', 'exports', 'crypto', authSource)(require, authExports, webcrypto);
+      return authExports;
+    }
+    if (name.endsWith('entityLease.ts')) {
+      const leaseExports = {};
+      const leaseSource = ts.transpileModule(readFileSync(resolve(process.cwd(), 'base44/shared/entityLease.ts'), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
+      new Function('exports', 'crypto', leaseSource)(leaseExports, webcrypto);
+      return leaseExports;
+    }
     if (modules[name]) return modules[name];
     throw new Error(`Unexpected function dependency: ${name}`);
   };
@@ -206,7 +219,7 @@ describe('actual Base44 handlers with local SDK fakes', () => {
     let draft = { id: 'draft-1', session_id: session, access_token_hash: Buffer.from(await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(secret))).toString('base64url'), responses_json: JSON.stringify(initialResponses), mapped_payload_json: JSON.stringify(payload()), status: 'draft', business_name: 'Example', domain: 'example.test' };
     const revisions = [];
     const entities = {
-      ProFormDraft: { filter: vi.fn(async () => [clone(draft)]), get: vi.fn(async () => clone(draft)), update: vi.fn(async (_, update) => { draft = { ...draft, ...update }; return clone(draft); }) },
+      ProFormDraft: { filter: vi.fn(async () => [clone(draft)]), get: vi.fn(async () => clone(draft)), updateMany: vi.fn(async (query, update) => { if (Object.entries(query).every(([key, value]) => value && typeof value === 'object' && '$gt' in value ? draft[key] > value.$gt : value == null ? draft[key] == null : draft[key] === value)) { draft = { ...draft, ...update.$set }; return { updated: 1 }; } return { updated: 0 }; }), update: vi.fn(async (_, update) => { draft = { ...draft, ...update }; return clone(draft); }) },
       ProFormDraftRevision: { filter: vi.fn(async (query) => revisions.filter((item) => Object.entries(query).every(([key, value]) => item[key] === value))), create: vi.fn(async (data) => { const record = { ...data, id: `revision-${revisions.length + 1}` }; revisions.push(record); return record; }) }
     };
     const base44 = { asServiceRole: { entities } };
@@ -249,8 +262,10 @@ describe('actual Base44 handlers with local SDK fakes', () => {
 
   it('durably creates the exact supported tree and rejects legacy-only final payloads', async () => {
     const submissionEntity = { filter: vi.fn(async () => []), create: vi.fn(async (value) => ({ id: 'submission-local', ...value })) };
-    const authorization = { authorizeDraftSubmission: async () => ({ authorized: true, draft: { id: 'draft-1', session_id: 'local-session', responses_json: JSON.stringify(responses()) }, identity: {} }), createSubmissionContentFingerprint: async () => 'fingerprint', createSubmissionIdentityFingerprint: async () => 'identity' };
-    const { handler } = loadFunction('base44/functions/submitProQuestionnaireDurable/entry.ts', { base44: { asServiceRole: { entities: { ProFormSubmission: submissionEntity } } }, modules: { './proDraftSubmissionAuthorization.ts': authorization } });
+    let draft = { id: 'draft-1', session_id: 'local-session', responses_json: JSON.stringify(responses()), status: 'draft' };
+    const draftEntity = { get: async () => clone(draft), updateMany: async (query, update) => { if (Object.entries(query).every(([key, value]) => value && typeof value === 'object' && '$gt' in value ? draft[key] > value.$gt : value == null ? draft[key] == null : draft[key] === value)) { draft = { ...draft, ...update.$set }; return { updated: 1 }; } return { updated: 0 }; }, update: async (_, update) => { draft = { ...draft, ...update }; return clone(draft); } };
+    const authorization = { authorizeDraftSubmission: async () => ({ authorized: true, draft: clone(draft), identity: {} }), createSubmissionContentFingerprint: async () => 'fingerprint', createSubmissionIdentityFingerprint: async () => 'identity', getSubmissionIdentity: () => ({}) };
+    const { handler } = loadFunction('base44/functions/submitProQuestionnaireDurable/entry.ts', { base44: { asServiceRole: { entities: { ProFormSubmission: submissionEntity, ProFormDraft: draftEntity, ProFormDraftRevision: { filter: async () => [] } } } }, modules: { './proDraftSubmissionAuthorization.ts': authorization } });
     const body = { draftId: 'draft-1', submissionAttemptId: 'local_submission_attempt_12345', transformedPayload: payload() };
     const result = await handler(request(body));
     expect(result.status).toBe(200);

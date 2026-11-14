@@ -59,6 +59,10 @@
     "source": {
       "type": "string",
       "description": "Save trigger such as autosave, final_barrier, or explicit_clear"
+    },
+    "server_revision": {
+      "type": "number",
+      "description": "Monotonic authoritative replay order for new saves, allocated while the draft lease is held. Historical revisions retain their original replay semantics."
     }
   },
   "required": [

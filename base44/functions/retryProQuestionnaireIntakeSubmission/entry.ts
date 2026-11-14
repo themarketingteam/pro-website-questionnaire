@@ -1,5 +1,34 @@
-import { validateOrganizedPayload, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { samePageStructure, validateOrganizedPayload, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
+
+import { withEntityLease } from '../../shared/entityLease.ts';
+import { createSubmissionContentFingerprint, createSubmissionIdentityFingerprint, getSubmissionIdentity } from '../../shared/proDraftSubmissionAuthorization.ts';
+
+const stampSubmissionIdentity = async (payload: any, draftId: string, attemptId: string) => {
+  if (!draftId) return payload;
+  const identity = getSubmissionIdentity(payload);
+  return { ...payload, metadata: {
+    ...(payload.metadata || {}), source_draft_id: draftId,
+    submission_attempt_id: attemptId,
+    submission_content_fingerprint: await createSubmissionContentFingerprint({ payload, draftId, identity }),
+    client_identity_fingerprint: await createSubmissionIdentityFingerprint(identity)
+  } };
+};
+
+const validateReceiptAgreement = (receipt: any, expected: any) => {
+  if (!receipt?.id) throw Object.assign(new Error('The durable submission receipt is missing.'), { status: 409, code: 'SUBMISSION_RECEIPT_MISSING' });
+  if (expected?.metadata?.source_draft_id && receipt.metadata?.source_draft_id && expected.metadata.source_draft_id !== receipt.metadata.source_draft_id) throw Object.assign(new Error('The retained receipt belongs to a different source draft.'), { status: 409, code: 'SUBMISSION_IDENTITY_CONFLICT' });
+  const validation = validateOrganizedPayload(receipt);
+  if (!validation.ok) throw Object.assign(new Error(validation.errors.join(' ')), { status: 409, code: validation.code });
+  for (const field of ['service_offerings_structure', 'target_industries_structure']) {
+    const sent = Object.prototype.hasOwnProperty.call(expected?.userdata || {}, field);
+    const stored = Object.prototype.hasOwnProperty.call(receipt?.userdata || {}, field);
+    if (sent !== stored || (sent && !samePageStructure(expected.userdata[field], receipt.userdata[field]))) {
+      throw Object.assign(new Error('The retained submission pages differ from the selected recovery payload. Review the records before retrying.'), { status: 409, code: 'ORGANIZER_SUBMISSION_CONFLICT' });
+    }
+  }
+  return receipt;
+};
 
 const parsePayload = (value) => {
   if (!value) return null;
@@ -243,7 +272,11 @@ Deno.serve(async (req) => {
         return Response.json({ success: false, error: { message: 'Draft not found' } }, { status: 404 });
       }
 
-      const draftPayload = parsePayload(draft.mapped_payload_json);
+      return await withEntityLease({ entity: base44.asServiceRole.entities.ProFormDraft, entityId: draftId, purpose: 'pro-admin-draft-retry' }, async (lease) => {
+      draft = await base44.asServiceRole.entities.ProFormDraft.get(draftId);
+      const pending = await base44.asServiceRole.entities.ProFormDraftRevision.filter({ draft_id: draftId }, '-server_revision', 1);
+      if ((Number(pending?.[0]?.server_revision) || 0) > (Number(draft.save_revision) || 0)) return Response.json({ success: false, code: 'DRAFT_SAVE_PENDING', error: { message: 'A newer saved revision needs recovery before retrying.' } }, { status: 409 });
+      let draftPayload = parsePayload(draft.mapped_payload_json);
       if (!draftPayload) {
         return Response.json({
           success: false,
@@ -265,34 +298,41 @@ Deno.serve(async (req) => {
         }, { status: 400 });
       }
 
-      // Duplicate guard by session_id
-      const sessionId = draft.session_id;
-      if (sessionId && !forceRetry) {
-        const existingBySession = await base44.asServiceRole.entities.ProFormSubmission.filter({
-          'metadata.questionnaire_session_id': sessionId
-        });
-        if (Array.isArray(existingBySession) && existingBySession.length > 0) {
-          const existing = existingBySession[0];
-          await base44.asServiceRole.entities.ProFormDraft.update(draftId, {
-            status: 'submitted',
-            final_submission_id: existing.id,
-            submitted_at: new Date().toISOString()
-          });
-          return await respondAfterZapierDelivery(draftPayload, {
-            alreadySubmitted: true,
-            linkedSubmissionId: existing.id,
-            draftId
-          });
-        }
-      }
-
-      if (draft.final_submission_id && !forceRetry) {
-        return await respondAfterZapierDelivery(draftPayload, {
+      if (draft.final_submission_id) {
+        const linked = await base44.asServiceRole.entities.ProFormSubmission.get(draft.final_submission_id);
+        validateReceiptAgreement(linked, draftPayload);
+        return await respondAfterZapierDelivery(linked, {
           alreadySubmitted: true,
           linkedSubmissionId: draft.final_submission_id,
           draftId
         });
       }
+
+
+      // Duplicate guard by session_id
+      const sessionId = draft.session_id;
+      if (sessionId) {
+        const existingBySession = await base44.asServiceRole.entities.ProFormSubmission.filter({
+          'metadata.questionnaire_session_id': sessionId
+        });
+        if (Array.isArray(existingBySession) && existingBySession.length > 0) {
+          const candidates = existingBySession.filter((record) => !record.metadata?.source_draft_id || record.metadata.source_draft_id === draftId);
+          const existing = candidates[0] ? validateReceiptAgreement(candidates[0], draftPayload) : null;
+          if (existing) {
+          await lease.update({
+            status: 'submitted',
+            final_submission_id: existing.id,
+            submitted_at: new Date().toISOString()
+          });
+          return await respondAfterZapierDelivery(existing, {
+            alreadySubmitted: true,
+            linkedSubmissionId: existing.id,
+            draftId
+          });
+          }
+        }
+      }
+
 
       // Stamp session_id onto payload metadata for deduplication
       if (sessionId) {
@@ -303,15 +343,18 @@ Deno.serve(async (req) => {
         };
       }
 
-      const submission = await base44.asServiceRole.entities.ProFormSubmission.create(draftPayload);
-      await base44.asServiceRole.entities.ProFormDraft.update(draftId, {
+      draftPayload = await stampSubmissionIdentity(draftPayload, draftId, `admin_draft_${crypto.randomUUID().replace(/-/g, '')}`);
+      await lease.assertActive();
+      const submission = validateReceiptAgreement(await base44.asServiceRole.entities.ProFormSubmission.create(draftPayload), draftPayload);
+      await lease.update({
         status: 'submitted',
         final_submission_id: submission.id,
         submitted_at: new Date().toISOString()
       });
-      return await respondAfterZapierDelivery(draftPayload, {
+      return await respondAfterZapierDelivery(submission, {
         linkedSubmissionId: submission.id,
         draftId
+      });
       });
     }
 
@@ -324,14 +367,20 @@ Deno.serve(async (req) => {
       ? await base44.asServiceRole.entities.ProFormSubmissionIntake.filter({ id: intakeId })
       : await base44.asServiceRole.entities.ProFormSubmissionIntake.filter({ questionnaire_session_id: questionnaireSessionId });
 
-    const intake = Array.isArray(intakeList) && intakeList.length > 0
+    const intakeRecord = Array.isArray(intakeList) && intakeList.length > 0
       ? [...intakeList].sort((a, b) => new Date(String(b.created_at_server || b.created_date || 0)).getTime() - new Date(String(a.created_at_server || a.created_date || 0)).getTime())[0]
       : null;
 
-    if (!intake) {
+    if (!intakeRecord) {
       return Response.json({ success: false, error: { message: 'Intake record not found' } }, { status: 404 });
     }
 
+    return await withEntityLease({
+      entity: intakeRecord.source_draft_id ? base44.asServiceRole.entities.ProFormDraft : base44.asServiceRole.entities.ProFormSubmissionIntake,
+      entityId: intakeRecord.source_draft_id || intakeRecord.id, purpose: 'pro-admin-intake-retry'
+    }, async (lease) => {
+    const intake = await base44.asServiceRole.entities.ProFormSubmissionIntake.get(intakeRecord.id);
+    if (!intake?.id) return Response.json({ success: false, error: { message: 'Intake record not found' } }, { status: 404 });
     // Apply the same structure guard before early duplicate-delivery paths.
     const storedIntakePayload = parsePayload(intake.transformed_payload_json);
     if (storedIntakePayload) {
@@ -346,7 +395,8 @@ Deno.serve(async (req) => {
 
     if (intake.linked_submission_id && !forceRetry) {
       const earlyPayload = parsePayload(intake.transformed_payload_json);
-      return await respondAfterZapierDelivery(earlyPayload, {
+      const linked = validateReceiptAgreement(await base44.asServiceRole.entities.ProFormSubmission.get(intake.linked_submission_id), earlyPayload);
+      return await respondAfterZapierDelivery(linked, {
         alreadySubmitted: true,
         linkedSubmissionId: intake.linked_submission_id,
         intakeId: intake.id
@@ -358,7 +408,9 @@ Deno.serve(async (req) => {
         'metadata.questionnaire_session_id': intake.questionnaire_session_id
       });
       if (Array.isArray(existingSubmissions) && existingSubmissions.length > 0 && !forceRetry) {
-        const existingSubmission = existingSubmissions[0];
+        const candidates = existingSubmissions.filter((record) => !intake.source_draft_id || !record.metadata?.source_draft_id || record.metadata.source_draft_id === intake.source_draft_id);
+        const existingSubmission = candidates[0] ? validateReceiptAgreement(candidates[0], storedIntakePayload) : null;
+        if (existingSubmission) {
         await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
           status: 'retry_success',
           linked_submission_id: existingSubmission.id,
@@ -366,16 +418,16 @@ Deno.serve(async (req) => {
           last_retry_at: new Date().toISOString(),
           retry_count: incrementRetryCount(intake.retry_count)
         });
-        const earlyPayload = parsePayload(intake.transformed_payload_json);
-        return await respondAfterZapierDelivery(earlyPayload, {
+        return await respondAfterZapierDelivery(existingSubmission, {
           alreadySubmitted: true,
           linkedSubmissionId: existingSubmission.id,
           intakeId: intake.id
         });
+        }
       }
     }
 
-    const transformedPayload = parsePayload(intake.transformed_payload_json);
+    let transformedPayload = parsePayload(intake.transformed_payload_json);
 
     if (!transformedPayload) {
       await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
@@ -414,7 +466,8 @@ Deno.serve(async (req) => {
     if (intake.linked_submission_id && forceRetry) {
       const linkedList = await base44.asServiceRole.entities.ProFormSubmission.filter({ id: intake.linked_submission_id });
       if (Array.isArray(linkedList) && linkedList.length > 0) {
-        return await respondAfterZapierDelivery(transformedPayload, {
+        const linked = validateReceiptAgreement(linkedList[0], transformedPayload);
+        return await respondAfterZapierDelivery(linked, {
           alreadySubmitted: true,
           linkedSubmissionId: intake.linked_submission_id,
           intakeId: intake.id
@@ -428,7 +481,9 @@ Deno.serve(async (req) => {
         questionnaire_session_id: intake.questionnaire_session_id || questionnaireSessionId || '',
         source_intake_id: intake.id
       };
-      const submission = await base44.asServiceRole.entities.ProFormSubmission.create(transformedPayload);
+      transformedPayload = await stampSubmissionIdentity(transformedPayload, intake.source_draft_id, intake.submission_attempt_id || `admin_intake_${intake.id}`);
+      await lease.assertActive();
+      const submission = validateReceiptAgreement(await base44.asServiceRole.entities.ProFormSubmission.create(transformedPayload), transformedPayload);
       await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
         status: 'retry_success',
         linked_submission_id: submission.id,
@@ -437,7 +492,8 @@ Deno.serve(async (req) => {
         retry_count: incrementRetryCount(intake.retry_count)
       });
 
-      return await respondAfterZapierDelivery(transformedPayload, {
+      if (intake.source_draft_id) await lease.update({ status: 'submitted', final_submission_id: submission.id, submitted_at: new Date().toISOString() });
+      return await respondAfterZapierDelivery(submission, {
         linkedSubmissionId: submission.id,
         intakeId: intake.id
       });
@@ -450,9 +506,10 @@ Deno.serve(async (req) => {
         retry_count: incrementRetryCount(intake.retry_count)
       });
 
-      return Response.json({ success: false, error: serialized, intakeId: intake.id }, { status: 500 });
+      return Response.json({ success: false, error: serialized, intakeId: intake.id }, { status: serialized.status || 500 });
     }
+    });
   } catch (error) {
-    return Response.json({ success: false, error: safeError(error) }, { status: 500 });
+    return Response.json({ success: false, code: error?.code || '', error: safeError(error) }, { status: error?.status || 500 });
   }
 });

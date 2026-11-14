@@ -1,3 +1,4 @@
+import { canonicalSubmissionContent } from '../../base44/shared/pageOrganizerContract.js';
 const stableValue = (value) => {
   if (Array.isArray(value)) return value.map(stableValue);
   if (value && typeof value === 'object') {
@@ -40,7 +41,7 @@ export const createClientSubmissionFingerprint = async ({
   businessName: normalizeBusinessName(businessName),
   domain: normalizeDomain(domain),
   content: payload?.userdata && typeof payload.userdata === 'object'
-    ? payload.userdata
+    ? canonicalSubmissionContent(payload.userdata)
     : rawResponses && typeof rawResponses === 'object'
       ? rawResponses
       : {}

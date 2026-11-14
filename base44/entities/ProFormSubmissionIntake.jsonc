@@ -199,6 +199,18 @@
     "retention_restore_source_id": {
       "type": "string",
       "description": "Original record ID when this intake was restored from an independent backup"
+    },
+    "idempotency_lock_token": {
+      "type": "string",
+      "description": "Server-only compare-and-set lease for serialized administrator retry."
+    },
+    "idempotency_lock_key": {
+      "type": "string",
+      "description": "Server-only compare-and-set lease for serialized administrator retry."
+    },
+    "idempotency_lock_expires_at": {
+      "type": "string",
+      "description": "Server-only compare-and-set lease for serialized administrator retry."
     }
   },
   "required": [

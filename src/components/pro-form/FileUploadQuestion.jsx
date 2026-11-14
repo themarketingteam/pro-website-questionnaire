@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Upload, X, Image, FileText, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { Upload, X, FileText, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 
 export default function FileUploadQuestion({ value, onChange, accept = ".jpg,.jpeg,.png" }) {

@@ -17,6 +17,22 @@ const controlClass = 'min-h-[40px] rounded-md border border-[#C1C6C8] bg-white t
 const sortButtonClass = 'relative inline-flex h-11 w-11 shrink-0 items-center justify-center bg-white text-[#456078] transition-colors hover:bg-[#E8F3FC] hover:text-[#176BB7] focus:outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-[#1C82DE] disabled:cursor-not-allowed disabled:bg-[#F7F9FB] disabled:text-[#B4C0C9]';
 const sameLabel = (left, right) => left.trim().toLocaleLowerCase() === right.trim().toLocaleLowerCase();
 
+/**
+ * @param {object} props
+ * @param {string | number} props.questionId
+ * @param {ReadonlyArray<string>} [props.options]
+ * @param {ReadonlyArray<string>} [props.legacyOptions]
+ * @param {Record<string, ReadonlyArray<string>>} [props.groupedOptions]
+ * @param {Record<string, ReadonlyArray<string>>} [props.optionGroups]
+ * @param {any[]} [props.value]
+ * @param {string | any[]} [props.otherValue]
+ * @param {object} [props.structure]
+ * @param {(structure: object) => void} props.onChange
+ * @param {number} [props.min]
+ * @param {number} [props.max]
+ * @param {boolean} [props.externalDisabled]
+ * @param {number} [props.remainingSelections]
+ */
 export default function PageOrganizerQuestion({
   questionId,
   options = [],

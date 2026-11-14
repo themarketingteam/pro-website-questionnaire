@@ -1,7 +1,9 @@
-import { validateOrganizedPayload, samePageStructure, reconcileOrganizedRepairPayload, restoreOrganizedProjections } from '../../shared/pageOrganizerContract.js';
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { validateOrganizedPayload, validateOrganizedSubmission, samePageStructure, reconcileOrganizedRepairPayload, restoreOrganizedProjections } from '../../shared/pageOrganizerContract.js';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
 import { isMissingIdentityValue } from '../../shared/proIdentityResolution.ts';
 import { createIdentityResolverInternalGrant } from '../../shared/draftRecoveryAuthorization.ts';
+
+import { withEntityLease } from '../../shared/entityLease.ts';
 
 // ─── Local repair helpers ────────────────────────────────────────────────────
 
@@ -812,7 +814,20 @@ Deno.serve(async (req) => {
           domain: repairResult.payload.metadata?.businessDomain || draft.domain || ''
         } : {})
       };
-      await base44.asServiceRole.entities.ProFormDraft.update(draft.id, updateData);
+      const reconciliation = await withEntityLease({ entity: base44.asServiceRole.entities.ProFormDraft, entityId: draft.id, purpose: 'pro-admin-repair' }, async (lease) => {
+        const current = await base44.asServiceRole.entities.ProFormDraft.get(draft.id);
+        if (current.status === 'submitted' && repairResult.ok && repairResult.payload) {
+          return { ok: false, error: 'Create a recovery copy before applying repairs to a submitted questionnaire.' };
+        }
+        if (repairResult.ok && repairResult.payload) {
+          const parsed = safeJsonParse(current.responses_json || '{}');
+          const guard = validateOrganizedSubmission({ payload: repairResult.payload, responses: parsed.ok ? parsed.value : {} });
+          if (!guard.ok) return { ok: false, error: 'The page organization changed while repair was running. Review the current draft before applying the repair.' };
+        }
+        await lease.update(updateData);
+        return { ok: true };
+      });
+      if (!reconciliation.ok) return Response.json({ success: false, code: 'ORGANIZER_REPAIR_CONFLICT', sourceRecordChanged: false, error: { message: reconciliation.error } }, { status: 409 });
 
       // Never retry with the original payload when repair fails or times out. A
       // retry is safe only when the repair pipeline produced a validated payload.

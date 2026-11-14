@@ -23,6 +23,6 @@ describe('draft share-link backend security contract', () => {
 
     expect(syncSource).toContain('const draftAcceptsAccessHash');
     expect(syncSource).toContain('primaryMatches || sharedMatches');
-    expect(syncSource).toContain('candidates.find((candidate)');
+    expect(syncSource).toContain('candidates.filter((candidate)');
   });
 });

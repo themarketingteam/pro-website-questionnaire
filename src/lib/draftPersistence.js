@@ -1,3 +1,4 @@
+import { validatePageStructure } from '@/lib/pageOrganizerModel';
 import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
 import {
   safeGetUserAgent,
@@ -25,6 +26,44 @@ export const isRetryableDraftError = (error) => {
   return !status || /network|timeout|timed out|failed to fetch|load failed|offline/.test(message);
 };
 
+/**
+ * @param {any} data
+ * @param {string} action
+ * @param {{resumeCredential?: string, changedKeys?: string[], deletedKeys?: string[], responses?: Record<string, unknown>}} [request]
+ */
+export const validateDraftAcknowledgement = (data, action, request = {}) => {
+  if (!['bootstrap', 'save'].includes(action)) return;
+  const draft = data?.draft;
+  const validObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+  if (!validObject(draft) || typeof draft.draftId !== 'string' || !draft.draftId
+    || !validObject(draft.responses) || !Number.isInteger(draft.revision) || draft.revision < 0
+    || (action === 'bootstrap' && (typeof draft.sessionId !== 'string' || !draft.sessionId))) {
+    throw Object.assign(new Error('The draft service did not return a complete saved snapshot. Your local answers have been retained.'), { status: 502, code: 'INVALID_DRAFT_ACKNOWLEDGEMENT' });
+  }
+  const expectedSession = String(request.resumeCredential || '').split('.')[0];
+  const returnedSession = String(data.resumeCredential || '').split('.')[0];
+  if ((expectedSession && draft.sessionId !== expectedSession)
+    || (action === 'bootstrap' && returnedSession && draft.sessionId !== returnedSession)) {
+    throw Object.assign(new Error('The saved snapshot belongs to a different recovery session. Your local answers have been retained.'), { status: 502, code: 'INVALID_DRAFT_ACKNOWLEDGEMENT' });
+  }
+  for (const id of ['3', '4']) {
+    if (Object.prototype.hasOwnProperty.call(draft.responses, `${id}_structure`)
+      && !validatePageStructure(draft.responses[`${id}_structure`]).ok) {
+      throw Object.assign(new Error('The draft service returned invalid page organization. Your local answers have been retained.'), { status: 502, code: 'INVALID_DRAFT_ACKNOWLEDGEMENT' });
+    }
+  }
+  if (action === 'save' && (data.finalized || data.ignored)) {
+    const changed = (request.changedKeys || []).some((key) => (
+      Object.prototype.hasOwnProperty.call(request.responses || {}, key)
+      && JSON.stringify(request.responses[key]) !== JSON.stringify(draft.responses[key])
+    ));
+    const deleted = (request.deletedKeys || []).some((key) => Object.prototype.hasOwnProperty.call(draft.responses, key));
+    if (changed || deleted) {
+      throw Object.assign(new Error('This questionnaire was already submitted. These additional edits were kept locally and were not saved over the completed submission.'), { status: 409, code: 'DRAFT_ALREADY_SUBMITTED' });
+    }
+  }
+};
+
 const invokeDraftFunction = async (functions, payload, { attempts = MAX_ATTEMPTS } = {}) => {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -35,6 +74,7 @@ const invokeDraftFunction = async (functions, payload, { attempts = MAX_ATTEMPTS
         error.status = response?.status || 500;
         throw error;
       }
+      validateDraftAcknowledgement(response.data, payload.action, payload);
       return response.data;
     } catch (error) {
       lastError = error;

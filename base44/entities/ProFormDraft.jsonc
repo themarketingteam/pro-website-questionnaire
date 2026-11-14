@@ -251,15 +251,39 @@
     "retention_restore_source_id": {
       "type": "string",
       "description": "Original record ID when this draft was restored from an independent backup"
+    },
+    "idempotency_lock_token": {
+      "type": "string",
+      "description": "Server-only cross-instance save/submission lease; never exposed in public draft responses."
+    },
+    "idempotency_lock_key": {
+      "type": "string",
+      "description": "Server-only cross-instance save/submission lease; never exposed in public draft responses."
+    },
+    "idempotency_lock_expires_at": {
+      "type": "string",
+      "description": "Server-only cross-instance save/submission lease; never exposed in public draft responses."
     }
   },
   "required": [
     "session_id"
   ],
   "rls": {
-    "create": { "user_condition": { "role": "admin" } },
-    "read": { "user_condition": { "role": "admin" } },
-    "update": { "user_condition": { "role": "admin" } },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
     "delete": false
   }
 }

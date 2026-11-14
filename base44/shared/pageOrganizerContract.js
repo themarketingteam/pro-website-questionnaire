@@ -181,7 +181,9 @@ export const validateOrganizedPayload = (payload) => {
   return outcome(errors, organizedQuestions);
 };
 
-/** Missing fields are never a request to downgrade an adopted question. */
+/** Missing fields are never a request to downgrade an adopted question.
+ * @param {{currentResponses?: Record<string, any>, incomingResponses?: Record<string, any>, changedKeys?: string[], deletedKeys?: string[], baseRevision?: number, currentRevision?: number}} args
+ */
 export const guardOrganizedDraftMutation = ({
   currentResponses = {}, incomingResponses = {}, changedKeys = [], deletedKeys = [], baseRevision, currentRevision
 }) => {
@@ -283,4 +285,14 @@ export const reconcileOrganizedRepairPayload = (payload, responses = {}) => {
     }
   }
   return { ...outcome([], [...new Set([...sourceValidation.organizedQuestions, ...payloadValidation.organizedQuestions])]), payload: preserveOrganizedMappedPayload(payload, responses) };
+};
+
+/** IDs are draft-only and must not turn the same mapped pages into a new submission. */
+export const canonicalSubmissionContent = (content) => {
+  if (!plain(content)) return content;
+  const next = { ...content };
+  for (const question of ORGANIZER_QUESTIONS) {
+    if (own(next, question.structureField)) next[question.structureField] = serializePageStructure(next[question.structureField]);
+  }
+  return next;
 };

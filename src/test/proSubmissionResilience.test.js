@@ -20,7 +20,8 @@ import {
   createProFormSubmissionResilient,
   createProFormSubmissionWithFallback,
   isRetryableSubmitError,
-  serializeSubmitError
+  serializeSubmitError,
+  validateSubmissionReceipt
 } from '@/lib/proSubmissionResilience';
 
 describe('proSubmissionResilience', () => {
@@ -76,6 +77,26 @@ describe('proSubmissionResilience', () => {
     expect(isRetryableSubmitError({ message: 'Failed to fetch' })).toBe(true);
     expect(isRetryableSubmitError({ status: 503, message: 'Service unavailable' })).toBe(true);
     expect(isRetryableSubmitError({ status: 429, message: 'Too many requests' })).toBe(true);
+  });
+
+  it('requires a real receipt and rejects missing or reordered organized pages', () => {
+    const tree = { format: 'page-tree-v1', pages: [{ label: 'First', source: 'custom' }, { label: 'Second', source: 'custom' }] };
+    const payload = { metadata: { questionnaire_payload_version: 2 }, userdata: { service_offerings_structure: tree, service_offerings: [], service_offerings_other: 'First, Second' } };
+    expect(() => validateSubmissionReceipt(null, payload)).toThrow(/receipt/);
+    expect(() => validateSubmissionReceipt({ id: 'receipt' }, payload)).toThrow(/pages/);
+    expect(validateSubmissionReceipt({ id: 'receipt', ...payload }, payload).id).toBe('receipt');
+    const reordered = structuredClone(payload);
+    reordered.userdata.service_offerings_structure.pages.reverse();
+    reordered.userdata.service_offerings_other = 'Second, First';
+    expect(() => validateSubmissionReceipt({ id: 'receipt', ...reordered }, payload)).toThrow(/pages/);
+  });
+
+  it('never bypasses secured submission for an organized payload with missing draft context', async () => {
+    const payload = { metadata: { questionnaire_payload_version: 2 }, userdata: { service_offerings_structure: { format: 'page-tree-v1', pages: [] }, service_offerings: [], service_offerings_other: '' } };
+    const result = await createProFormSubmissionWithFallback(payload);
+    expect(result).toMatchObject({ ok: false, attempts: 0, error: { code: 'DRAFT_CONTEXT_REQUIRED' } });
+    expect(base44.entities.ProFormSubmission.create).not.toHaveBeenCalled();
+    expect(base44.functions.invoke).not.toHaveBeenCalled();
   });
 
   it('retries transient failures and succeeds', async () => {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Lock, AlertCircle } from 'lucide-react';
 
 export default function NumericRangeQuestion({

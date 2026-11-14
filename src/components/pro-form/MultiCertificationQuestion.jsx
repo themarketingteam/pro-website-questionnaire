@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Plus, X, Upload, FileText, Image, Check, Edit, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState } from 'react';
+import { Plus, X, Upload, FileText, Image, Check, Edit, ChevronUp } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { toast } from 'sonner';
 

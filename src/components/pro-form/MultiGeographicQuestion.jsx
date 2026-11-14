@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
-import { MapPin, X, Plus, Star } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { X, Plus, Star } from "lucide-react";
 
 const PLACE_FIELDS = ["id", "displayName", "formattedAddress", "location", "addressComponents"];
 

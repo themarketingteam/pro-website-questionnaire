@@ -395,11 +395,10 @@ export const submitProQuestionnaire = async ({
       domain,
       serviceOptionsGrouped
     );
-    transformedPayload.metadata = {
-      ...(transformedPayload.metadata || {}),
+    Object.assign(transformedPayload.metadata, {
       questionnaire_session_id: questionnaireSessionId,
       source_draft_id: activeDraftId
-    };
+    });
     await recordSubmitStage('payload_transform_success', {
       payloadSizeChars: safePayloadSize(transformedPayload)
     });

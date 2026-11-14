@@ -1,5 +1,7 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.52';
-import { validateOrganizedPayload, validateOrganizedResponses } from '../../shared/pageOrganizerContract.js';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
+import { validateOrganizedPayload, validateOrganizedResponses, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
+
+import { withEntityLease } from '../../shared/entityLease.ts';
 
 const truncate = (value, max = 500) => String(value ?? '').slice(0, max);
 const safeJsonStringify = (value) => {
@@ -53,8 +55,15 @@ const getIntakeBySession = async (base44, questionnaireSessionId, submissionAtte
   return Array.isArray(matches) && matches.length ? matches[0] : null;
 };
 
-const upsertIntake = async (base44, questionnaireSessionId, submissionAttemptId, nextData) => {
+const upsertIntake = async (base44, questionnaireSessionId, submissionAttemptId, nextData) => withEntityLease({ entity: base44.asServiceRole.entities.ProFormDraft, entityId: nextData.source_draft_id, purpose: 'pro-fallback-intake' }, async (lease) => {
   const existing = await getIntakeBySession(base44, questionnaireSessionId, submissionAttemptId);
+  if (existing?.source_draft_id && existing.source_draft_id !== nextData.source_draft_id) {
+    throw Object.assign(new Error('This intake attempt belongs to a different draft.'), { status: 409 });
+  }
+  if (existing?.submission_content_fingerprint && nextData.submission_content_fingerprint
+    && existing.submission_content_fingerprint !== nextData.submission_content_fingerprint) {
+    throw Object.assign(new Error('This intake attempt belongs to different questionnaire content.'), { status: 409 });
+  }
   const retryCount = Number(existing?.retry_count || 0) + 1;
   const payload = {
     ...nextData,
@@ -62,16 +71,21 @@ const upsertIntake = async (base44, questionnaireSessionId, submissionAttemptId,
     submission_attempt_id: submissionAttemptId,
     created_at_server: existing?.created_at_server || nowIso(),
     last_retry_at: nowIso(),
-    retry_count: retryCount
+    retry_count: retryCount,
+    ...(existing?.linked_submission_id && nextData.status !== 'submitted'
+      ? { status: existing.status, linked_submission_id: existing.linked_submission_id }
+      : {})
   };
 
-  if (existing?.id) {
-    const updated = await base44.asServiceRole.entities.ProFormSubmissionIntake.update(existing.id, payload);
-    return updated;
+  await lease.assertActive();
+  const stored = existing?.id
+    ? await base44.asServiceRole.entities.ProFormSubmissionIntake.update(existing.id, payload)
+    : await base44.asServiceRole.entities.ProFormSubmissionIntake.create(payload);
+  if (!stored?.id || stored.raw_responses_json !== payload.raw_responses_json || stored.transformed_payload_json !== payload.transformed_payload_json) {
+    throw new Error('The intake service did not retain the complete questionnaire snapshot.');
   }
-
-  return await base44.asServiceRole.entities.ProFormSubmissionIntake.create(payload);
-};
+  return stored;
+});
 
 const buildIntakePayload = ({
   questionnaireSessionId,
@@ -118,7 +132,7 @@ Deno.serve(async (req) => {
     const base44 = createClientFromRequest(req);
     const body = await req.json();
     const transformedPayload = body?.transformedPayload;
-    const rawResponses = body?.rawResponses || body?.responseSnapshot || null;
+    let rawResponses = body?.rawResponses || body?.responseSnapshot || null;
     const questionnaireSessionId = body?.questionnaireSessionId;
     const sourceDraftId = truncate(body?.draftId || '', 300);
     const resumeCredential = truncate(body?.resumeCredential || '', 400);
@@ -147,6 +161,7 @@ Deno.serve(async (req) => {
       const authorizationResponse = await base44.asServiceRole.functions.invoke('submitProQuestionnaireDurable', {
         action: 'authorize',
         transformedPayload: normalizedPayload,
+        rawResponses,
         questionnaireSessionId,
         draftId: sourceDraftId,
         resumeCredential,
@@ -167,7 +182,20 @@ Deno.serve(async (req) => {
             status: 409,
             code: authorization?.code || 'DRAFT_AUTHORIZATION_REJECTED'
           }
-        }, { status: authorization?.code === 'SUBMISSION_IDENTITY_CONFLICT' ? 409 : 401 });
+        }, { status: /^(?:SUBMISSION_|ORGANIZER_|DRAFT_SAVE_PENDING)/.test(authorization?.code || '') ? 409 : 401 });
+      }
+      if (authorization.responses && typeof authorization.responses === 'object') {
+        rawResponses = { ...authorization.responses, ...(rawResponses || {}) };
+        for (const id of ['3', '4']) {
+          if (!Object.prototype.hasOwnProperty.call(authorization.responses, `${id}_structure`)) continue;
+          for (const key of [id, `${id}_other`, `${id}_structure`]) rawResponses[key] = authorization.responses[key];
+        }
+      }
+      const rawValidation = validateOrganizedResponses(rawResponses || {});
+      if (!rawValidation.ok) return Response.json({ success: false, received: false, code: rawValidation.code, error: { message: rawValidation.errors.join(' ') } }, { status: 400 });
+      if (normalizedPayload) {
+        const agreement = validateOrganizedSubmission({ payload: normalizedPayload, responses: rawResponses || {} });
+        if (!agreement.ok) return Response.json({ success: false, received: false, code: agreement.code, error: { message: agreement.errors.join(' ') } }, { status: agreement.status });
       }
     } catch (authorizationError) {
       const status = authorizationError?.response?.status || authorizationError?.status || 500;
@@ -276,9 +304,7 @@ Deno.serve(async (req) => {
         });
         const durableResult = durableResponse?.data ?? durableResponse;
         if (!durableResult?.success || !durableResult?.submission) {
-          const durableError = new Error(durableResult?.error || 'Durable submission failed');
-          durableError.status = 500;
-          durableError.code = durableResult?.code || '';
+          const durableError = Object.assign(new Error(durableResult?.error || 'Durable submission failed'), { status: 500, code: durableResult?.code || '' });
           throw durableError;
         }
         const submission = durableResult.submission;

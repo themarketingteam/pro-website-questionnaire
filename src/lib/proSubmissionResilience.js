@@ -1,3 +1,4 @@
+import { samePageStructure, validateOrganizedPayload } from '../../base44/shared/pageOrganizerContract.js';
 import { base44 } from '@/api/base44Client';
 
 const DEFAULT_TIMEOUT_MS = 15000;
@@ -208,6 +209,24 @@ const invokeSubmitFallbackWithRetry = async (body, options = {}) => {
   throw lastError || new Error('Fallback submission failed');
 };
 
+export const validateSubmissionReceipt = (submission, payload) => {
+  if (!submission?.id) {
+    throw Object.assign(new Error('The submission service did not return a durable receipt.'), { status: 502, code: 'INVALID_SUBMISSION_RECEIPT' });
+  }
+  const fields = ['service_offerings_structure', 'target_industries_structure'];
+  const organized = fields.some((key) => Object.prototype.hasOwnProperty.call(payload?.userdata || {}, key));
+  if (!organized) return submission;
+  const valid = validateOrganizedPayload(submission);
+  if (!valid.ok || fields.some((key) => {
+    const sent = Object.prototype.hasOwnProperty.call(payload.userdata, key);
+    const retained = Object.prototype.hasOwnProperty.call(submission.userdata || {}, key);
+    return sent !== retained || (sent && !samePageStructure(payload.userdata[key], submission.userdata[key]));
+  })) {
+    throw Object.assign(new Error('The submission receipt did not retain the organized pages. Your answers remain in the draft.'), { status: 502, code: 'INVALID_SUBMISSION_RECEIPT' });
+  }
+  return submission;
+};
+
 export const createProFormSubmissionResilient = async (payload, options = {}) => {
   const {
     maxAttempts = 3,
@@ -238,6 +257,7 @@ export const createProFormSubmissionResilient = async (payload, options = {}) =>
         timeoutMs
       );
 
+      validateSubmissionReceipt(submission, payload);
       return {
         ok: true,
         submission,
@@ -453,6 +473,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
         };
       }
       if (data?.success && data?.submission) {
+        validateSubmissionReceipt(data.submission, payload);
         return {
           ok: true,
           submission: data.submission,
@@ -492,6 +513,11 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
   const useDurableSubmission = Boolean(
     resumeCredential && draftId && submissionAttemptId && submissionContentFingerprint
   );
+  const organized = ['service_offerings_structure', 'target_industries_structure'].some((key) => Object.prototype.hasOwnProperty.call(payload.userdata || {}, key));
+  if (organized && !useDurableSubmission) {
+    const error = serializeSubmitError(Object.assign(new Error('Save the organized questionnaire draft before submitting.'), { status: 409, code: 'DRAFT_CONTEXT_REQUIRED' }));
+    return { ok: false, submission: null, error, attempts: 0, usedFallback: false, failureKind: error.failureKind, primaryError: null };
+  }
   const primaryResult = await createProFormSubmissionResilient(payload, {
     ...resilientOptions,
     debugFailureMode,
@@ -578,6 +604,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
     }
 
     if (data?.success && data?.submission) {
+      validateSubmissionReceipt(data.submission, payload);
       const result = {
         ok: true,
         submission: data.submission,

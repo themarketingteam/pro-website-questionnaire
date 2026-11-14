@@ -36,11 +36,27 @@ describe('secure draft persistence client contract', () => {
     expect(getStoredResumeCredential()).toBe('');
   });
 
+  it.each([null, {}, { draftId: 'draft-1', revision: 0, responses: null }, { draftId: 'draft-1', revision: -1, responses: {} }])('rejects a success flag without a complete saved snapshot (%#)', async (draft) => {
+    const functions = { invoke: vi.fn(async () => ({ data: { success: true, draft } })) };
+    await expect(saveServerDraftMutation({ functions, mutationId: 'same-id', responses: { '6': 'Retain this answer' } })).rejects.toMatchObject({ status: 502, code: 'INVALID_DRAFT_ACKNOWLEDGEMENT' });
+    expect(functions.invoke).toHaveBeenCalledTimes(3);
+    expect(functions.invoke.mock.calls.every(([, value]) => value.mutationId === 'same-id')).toBe(true);
+  });
+
+  it('does not call ignored post-submit edits saved, while allowing identical durable receipt-link retries', async () => {
+    const functions = { invoke: vi.fn(async () => ({ data: { success: true, finalized: true, ignored: true, draft: { draftId: 'draft-1', sessionId: CREDENTIAL.split('.')[0], revision: 3, responses: { '6': 'Submitted answer' } } } })) };
+    const request = { functions, resumeCredential: CREDENTIAL, changedKeys: ['6'], responses: { '6': 'Edited after submitting' } };
+    await expect(saveServerDraftMutation(request)).rejects.toMatchObject({ status: 409, code: 'DRAFT_ALREADY_SUBMITTED' });
+    expect(functions.invoke).toHaveBeenCalledTimes(1);
+    await expect(saveServerDraftMutation({ ...request, changedKeys: [], deletedKeys: ['6'] })).rejects.toMatchObject({ status: 409, code: 'DRAFT_ALREADY_SUBMITTED' });
+    await expect(saveServerDraftMutation({ ...request, responses: { '6': 'Submitted answer' } })).resolves.toMatchObject({ success: true, finalized: true });
+  });
+
   it('bootstraps through the backend rather than reading the draft entity publicly', async () => {
     const functions = {
       invoke: vi.fn(async () => ({
         status: 200,
-        data: { success: true, resumeCredential: CREDENTIAL, draft: { draftId: 'draft-1' } }
+        data: { success: true, resumeCredential: CREDENTIAL, draft: { draftId: 'draft-1', sessionId: CREDENTIAL.split('.')[0], revision: 0, responses: {} } }
       }))
     };
 
@@ -66,7 +82,7 @@ describe('secure draft persistence client contract', () => {
           status: 200,
           data: {
             success: true,
-            draft: { draftId: 'draft-1', revision: 9, responses: { '6': 'newest' } }
+            draft: { draftId: 'draft-1', sessionId: CREDENTIAL.split('.')[0], revision: 9, responses: { '6': 'newest' } }
           }
         })
     };

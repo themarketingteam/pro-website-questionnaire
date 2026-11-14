@@ -16,7 +16,7 @@ const clone = (value) => JSON.parse(JSON.stringify(value));
 const createBackend = () => {
   const initialTree = createPageStructure('3', ['Managed IT'], ['Original standalone'], GROUPS);
   const draft = {
-    sessionId: SESSION_ID, revision: 0, responses: { ...projection(initialTree), '6': 'Original description' },
+    draftId: 'concurrent-test-draft', sessionId: SESSION_ID, revision: 0, responses: { ...projection(initialTree), '6': 'Original description' },
     validationStatus: {}, touchedQuestions: {}, expandedQuestions: {}, credentials: { businessName: '', domain: '' }, lastSavedAt: new Date().toISOString()
   };
   let holdDescriptionResponse = false;
@@ -89,6 +89,21 @@ describe('live organized draft reconciliation across two mounted tabs', () => {
     await waitFor(() => expect(backend.draft.revision).toBe(3));
     expect(backend.draft.responses['3_structure']).toEqual(reordered);
     expect(flattenPageStructure(backend.draft.responses['3_structure']).some((page) => page.label === 'Added in tab A')).toBe(true);
+  });
+
+  it('keeps a newly saved tree when a delayed unrelated validation callback carries an older full snapshot', async () => {
+    const backend = createBackend();
+    const tab = mountTab(backend);
+    await waitFor(() => expect(tab.result.current.api.isDraftReady).toBe(true));
+    const staleSnapshot = clone(tab.result.current.form.responses);
+    const changed = addPage(staleSnapshot['3_structure'], createPageNode('3', 'Newest page'));
+    act(() => queue(tab, projection(changed), ['3', '3_other', '3_structure'], 'new-page'));
+    await waitFor(() => expect(tab.result.current.api.lastConfirmedRevision).toBe(1));
+    act(() => tab.result.current.api.queueDraftSave(['6'], { ...staleSnapshot, '6': 'Delayed validated description' }, { source: 'delayed-validation' }));
+    await waitFor(() => expect(tab.result.current.api.lastConfirmedRevision).toBe(2));
+    expect(backend.draft.responses['3_structure']).toEqual(changed);
+    expect(tab.result.current.form.responses['3_structure']).toEqual(changed);
+    expect(tab.result.current.api.organizerRecoveryConflict).toBeNull();
   });
 
   it('archives and invalidates a stale reorder already queued behind an unrelated save response', async () => {

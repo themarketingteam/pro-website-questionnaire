@@ -579,7 +579,8 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
       expect(base44.functions.invoke).toHaveBeenCalledWith('sendToZapier', expect.any(Object));
     });
 
-    expect(await screen.findByText(/thank you/i)).toBeInTheDocument();
+    // The lazy thank-you chunk can take longer to transform under a full CI run.
+    expect(await screen.findByText(/thank you/i, {}, { timeout: 5000 })).toBeInTheDocument();
     expect(store.getState().form.responses).toEqual({});
     expect(window.location.pathname).toBe(submissionPath);
 

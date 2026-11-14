@@ -11,7 +11,12 @@ const deliveryFiles = [
   'base44/functions/repairProQuestionnaireIntakeSubmission/entry.ts',
 ];
 
-const readProjectFile = (path) => readFileSync(resolve(process.cwd(), path), 'utf8');
+const readProjectFile = (path) => {
+  const source = readFileSync(resolve(process.cwd(), path), 'utf8');
+  return source.includes("import '../entry.ts';")
+    ? readFileSync(resolve(process.cwd(), path, '../../entry.ts'), 'utf8')
+    : source;
+};
 
 const evaluateCanonicalResolver = (getEnv) => {
   const source = readProjectFile('base44/functions/sendToZapier/entry.ts');
@@ -25,6 +30,12 @@ const evaluateCanonicalResolver = (getEnv) => {
 };
 
 describe('Zapier webhook fallback contract', () => {
+  it.each(['sendToZapier', 'retryProQuestionnaireIntakeSubmission'])('keeps the separately packaged legacy %s entry on the same guarded implementation', (name) => {
+    const modern = readFileSync(resolve(process.cwd(), `base44/functions/${name}/entry.ts`), 'utf8');
+    const legacy = readFileSync(resolve(process.cwd(), `base44/functions/${name}/entry/entry.ts`), 'utf8');
+    expect(legacy.replaceAll("'../../../shared/", "'../../shared/")).toBe(modern);
+  });
+
   it.each(deliveryFiles)('%s has the validated hardcoded fallback', (path) => {
     const source = readProjectFile(path);
 

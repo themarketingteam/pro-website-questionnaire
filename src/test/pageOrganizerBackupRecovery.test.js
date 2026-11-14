@@ -75,6 +75,16 @@ describe('organized offline backup revision safety', () => {
     expect(result.recoveryConflict.questionIds).toEqual(['4']);
   });
 
+  it('never treats a matching revision as permission to downgrade or replay a flat-only organized edit', () => {
+    const deletion = merge(backup({ baseRevision: 8, responses: {}, changedKeys: [], deletedKeys: ['4_structure', '4', '4_other'] }));
+    expect(deletion.recoveryConflict.questionIds).toEqual(['4']);
+    expect(deletion.state.responses['4_structure']).toEqual(serverTree());
+    const oldTab = merge(backup({ baseRevision: 8, responses: { '4': ['Old custom choice'] }, changedKeys: ['4'], deletedKeys: [] }));
+    expect(oldTab.recoveryConflict.questionIds).toEqual(['4']);
+    expect(oldTab.recoveryConflict.backup.responses['4']).toEqual(['Old custom choice']);
+    expect(oldTab.state.responses['4_structure']).toEqual(serverTree());
+  });
+
   it('blocks stale local adoption and does not add it to an unorganized server question', () => {
     const serverDraft = server();
     delete serverDraft.responses['4_structure'];

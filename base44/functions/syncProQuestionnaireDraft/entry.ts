@@ -1,5 +1,7 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.41';
-import { guardOrganizedDraftMutation, preserveOrganizedMappedPayload, validateOrganizedPayload, validateOrganizedResponses, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
+import { guardOrganizedDraftMutation, projectOrganizedPages, preserveOrganizedMappedPayload, validateOrganizedPayload, validateOrganizedResponses, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
+
+import { withEntityLease, type EntityLease } from '../../shared/entityLease.ts';
 
 const MAX_REQUEST_BYTES = 2_250_000;
 const MAX_RESPONSE_KEYS = 160;
@@ -36,6 +38,18 @@ const safeParse = (value: unknown, fallback: unknown) => {
   } catch {
     return fallback;
   }
+};
+
+const parseStoredObject = (value: unknown, field: string): JsonRecord => {
+  if (value == null || value === '') return {};
+  let parsed: unknown;
+  try { parsed = typeof value === 'string' ? JSON.parse(value) : value; } catch {
+    throw Object.assign(new Error(`Stored ${field} is invalid and requires recovery before saving.`), { status: 409, code: 'DRAFT_SNAPSHOT_INVALID' });
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw Object.assign(new Error(`Stored ${field} is invalid and requires recovery before saving.`), { status: 409, code: 'DRAFT_SNAPSHOT_INVALID' });
+  }
+  return parsed as JsonRecord;
 };
 
 const safeStringify = (value: unknown, fallback = '{}') => {
@@ -203,12 +217,14 @@ const draftAcceptsAccessHash = (draft: any, suppliedHash: string) => {
   return primaryMatches || sharedMatches;
 };
 
-const authorizeDraft = async (entity: any, credentialValue: unknown) => {
+const authorizeDraft = async (entity: any, credentialValue: unknown, expectedDraftId = '') => {
   const credential = parseCredential(credentialValue);
   if (!credential) return { error: 'A valid draft recovery credential is required.', status: 401 };
   const suppliedHash = await hashToken(credential.secret);
   const candidates = await findDraftCandidates(entity, credential.sessionId);
-  const draft = candidates.find((candidate) => candidate?.id && draftAcceptsAccessHash(candidate, suppliedHash));
+  const matching = candidates.filter((candidate) => candidate?.id && (!expectedDraftId || candidate.id === expectedDraftId) && draftAcceptsAccessHash(candidate, suppliedHash));
+  if (matching.length > 1) return { error: 'This recovery credential matches more than one draft. Contact support to select the retained copy.', status: 409 };
+  const draft = matching[0];
   if (!draft?.id) return { error: 'Draft recovery credential was not recognized.', status: 401 };
   if (cleanText(draft.soft_deleted_at, 100)) {
     return { error: 'This questionnaire draft was removed by an administrator.', status: 410 };
@@ -217,7 +233,7 @@ const authorizeDraft = async (entity: any, credentialValue: unknown) => {
 };
 
 const baselineFromDraft = (draft: any) => ({
-  responses: sanitizeAnswerMap(safeParse(draft?.responses_json, {})),
+  responses: sanitizeAnswerMap(parseStoredObject(draft?.responses_json, 'responses_json')),
   validationStatus: sanitizeStateMap(safeParse(draft?.validation_status_json, {}), 'validation'),
   touchedQuestions: sanitizeStateMap(safeParse(draft?.touched_questions_json, {}), 'boolean'),
   expandedQuestions: sanitizeStateMap(safeParse(draft?.expanded_questions_json, {}), 'boolean'),
@@ -234,9 +250,12 @@ const baselineFromDraft = (draft: any) => ({
 });
 
 const getBaseline = (draft: any) => {
-  const stored = safeParse(draft?.history_baseline_json, null);
+  const stored = draft?.history_baseline_json ? parseStoredObject(draft.history_baseline_json, 'history_baseline_json') : null;
   if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
     const source = stored as JsonRecord;
+    if (!source.responses || typeof source.responses !== 'object' || Array.isArray(source.responses)) {
+      throw Object.assign(new Error('Stored history baseline responses are invalid and require recovery before saving.'), { status: 409, code: 'DRAFT_SNAPSHOT_INVALID' });
+    }
     return {
       responses: sanitizeAnswerMap(source.responses),
       validationStatus: sanitizeStateMap(source.validationStatus, 'validation'),
@@ -274,6 +293,14 @@ const applyChanges = (snapshot: any, changeRecord: any) => {
   if (Number.isFinite(Number(changes.progressPercent))) {
     snapshot.progressPercent = Math.max(0, Math.min(100, Number(changes.progressPercent)));
   }
+  // Rich trees are authoritative for their legacy compatibility fields too.
+  // Persist the projection atomically even when a caller changed only the tree.
+  for (const id of ['3', '4']) {
+    if (!Object.prototype.hasOwnProperty.call(snapshot.responses, `${id}_structure`)) continue;
+    const projection = projectOrganizedPages(snapshot.responses[`${id}_structure`]);
+    snapshot.responses[id] = projection.selections;
+    snapshot.responses[`${id}_other`] = projection.otherValues;
+  }
   return snapshot;
 };
 
@@ -299,6 +326,14 @@ const rebuildSnapshot = async (base44: any, draft: any) => {
   const snapshot = getBaseline(draft);
   const revisions = await listDraftRevisions(base44, draft.id);
   const ordered = (Array.isArray(revisions) ? revisions : []).sort((left, right) => {
+    // Keep the already-established historical order. New revisions are applied
+    // afterwards in server acceptance order, never the caller's wall clock.
+    const leftServerOrder = Number(left.server_revision);
+    const rightServerOrder = Number(right.server_revision);
+    const leftOrdered = Number.isInteger(leftServerOrder) && leftServerOrder > 0;
+    const rightOrdered = Number.isInteger(rightServerOrder) && rightServerOrder > 0;
+    if (leftOrdered !== rightOrdered) return leftOrdered ? 1 : -1;
+    if (leftOrdered && leftServerOrder !== rightServerOrder) return leftServerOrder - rightServerOrder;
     const timeDifference = (Date.parse(left.client_changed_at || left.server_received_at || left.created_date || '') || 0)
       - (Date.parse(right.client_changed_at || right.server_received_at || right.created_date || '') || 0);
     if (timeDifference !== 0) return timeDifference;
@@ -311,13 +346,13 @@ const rebuildSnapshot = async (base44: any, draft: any) => {
     const sequence = Math.max(0, Math.floor(Number(revision.client_sequence) || 0));
     if (!clientId || sequence <= (sequences[clientId] || 0)) continue;
     sequences[clientId] = sequence;
-    applyChanges(snapshot, safeParse(revision.changes_json, {}));
+    applyChanges(snapshot, parseStoredObject(revision.changes_json, 'revision changes_json'));
     applied += 1;
   }
   return { snapshot, sequences, revision: applied, latestRevision: ordered[ordered.length - 1] || null };
 };
 
-const materializeDraft = async (base44: any, draft: any, rebuilt: any, lifecycle: any = {}) => {
+const materializeDraft = async (base44: any, draft: any, rebuilt: any, lifecycle: any = {}, lease: EntityLease) => {
   const now = new Date().toISOString();
   const latestDraft = await base44.asServiceRole.entities.ProFormDraft.get(draft.id).catch(() => draft);
   draft = latestDraft || draft;
@@ -349,6 +384,13 @@ const materializeDraft = async (base44: any, draft: any, rebuilt: any, lifecycle
     : cleanText(draft.final_submission_id, 300);
   if (status === 'submitted' && !finalSubmissionId) {
     throw new Error('A durable final submission ID is required before marking a draft submitted.');
+  }
+  if (status === 'submitted' && currentStatus !== 'submitted') {
+    const receipt = await base44.asServiceRole.entities.ProFormSubmission.get(finalSubmissionId).catch(() => null);
+    if (!receipt?.id || receipt.metadata?.source_draft_id !== draft.id
+      || !validateOrganizedSubmission({ payload: receipt, responses: snapshot.responses }).ok) {
+      throw Object.assign(new Error('The final submission receipt does not match the saved questionnaire.'), { status: 409, code: 'SUBMISSION_RECEIPT_CONFLICT' });
+    }
   }
   const intakeId = status === 'received_intake'
     ? cleanText(lifecycle.intakeId || draft.intake_id, 300)
@@ -392,7 +434,11 @@ const materializeDraft = async (base44: any, draft: any, rebuilt: any, lifecycle
     archived_at: '',
     archive_reason: ''
   };
-  const updated = await base44.asServiceRole.entities.ProFormDraft.update(draft.id, update);
+  const updated = await lease.update(update);
+  if (updated?.responses_json !== update.responses_json || Number(updated?.save_revision) !== rebuilt.revision
+    || updated?.mapped_payload_json !== update.mapped_payload_json) {
+    throw new Error('The draft storage service did not retain the complete snapshot.');
+  }
   if (cleanText(draft.archived_at, 100)) {
     await base44.asServiceRole.entities.ProFormRecoveryLifecycleEvent.create({
       record_type: 'draft',
@@ -566,15 +612,14 @@ Deno.serve(async (req) => {
           );
         }
 
-        const rebuilt = await rebuildSnapshot(base44, draft);
-        const materialized = draft.status === 'submitted'
-          ? draft
-          : await materializeDraft(base44, draft, rebuilt, { changed: false });
-        return jsonResponse({
-          success: true,
-          resumeCredential,
-          newClientRequestConfirmed: true,
-          draft: publicDraft(materialized, rebuilt)
+        return await withEntityLease({ entity: draftEntity, entityId: draft.id, purpose: 'pro-draft-bootstrap' }, async (lease) => {
+          draft = await draftEntity.get(draft.id);
+          const rebuilt = await rebuildSnapshot(base44, draft);
+          await lease.assertActive();
+          const materialized = draft.status === 'submitted'
+            ? draft
+            : await materializeDraft(base44, draft, rebuilt, { changed: false }, lease);
+          return jsonResponse({ success: true, resumeCredential, newClientRequestConfirmed: true, draft: publicDraft(materialized, rebuilt) });
         });
       }
 
@@ -612,6 +657,12 @@ Deno.serve(async (req) => {
         }
       }
 
+      return await withEntityLease({ entity: draftEntity, entityId: draft.id, purpose: 'pro-draft-bootstrap' }, async (lease) => {
+      if (suppliedCredential) {
+        const lockedAuthorization = await authorizeDraft(draftEntity, suppliedCredential.raw, draft.id);
+        if ('error' in lockedAuthorization) return jsonResponse({ success: false, error: lockedAuthorization.error }, lockedAuthorization.status);
+        draft = lockedAuthorization.draft;
+      } else draft = await draftEntity.get(draft.id);
       const rebuilt = await rebuildSnapshot(base44, draft);
       const identityConflict = identityConflictFields(
         body?.incomingIdentity,
@@ -643,13 +694,15 @@ Deno.serve(async (req) => {
           draft: publicDraft(draft, rebuilt)
         });
       }
+      await lease.assertActive();
       const materialized = draft.status === 'submitted'
         ? draft
-        : await materializeDraft(base44, draft, rebuilt, { changed: false });
+        : await materializeDraft(base44, draft, rebuilt, { changed: false }, lease);
       return jsonResponse({
         success: true,
         resumeCredential,
         draft: publicDraft(materialized, rebuilt)
+      });
       });
     }
 
@@ -678,7 +731,12 @@ Deno.serve(async (req) => {
 
     if (action !== 'save') return jsonResponse({ success: false, error: 'Unsupported draft action.' }, 400);
 
-    if (cleanText(draft.status, 40) === 'submitted' && cleanText(body?.status, 40) !== 'submitted') {
+    return await withEntityLease({ entity: draftEntity, entityId: draft.id, purpose: 'pro-draft-save' }, async (lease) => {
+      const lockedAuthorization = await authorizeDraft(draftEntity, body?.resumeCredential, draft.id);
+      if ('error' in lockedAuthorization) return jsonResponse({ success: false, error: lockedAuthorization.error }, lockedAuthorization.status);
+      draft = lockedAuthorization.draft;
+
+    if (cleanText(draft.status, 40) === 'submitted') {
       const rebuilt = await rebuildSnapshot(base44, draft);
       return jsonResponse({
         success: true,
@@ -701,21 +759,23 @@ Deno.serve(async (req) => {
     }, '-created_date', 1);
     if (Array.isArray(duplicates) && duplicates.length > 0) {
       const rebuilt = await rebuildSnapshot(base44, draft);
-      draft = await materializeDraft(base44, draft, rebuilt, { changed: false });
+      await lease.assertActive();
+      draft = await materializeDraft(base44, draft, rebuilt, { changed: false }, lease);
       return jsonResponse({ success: true, duplicate: true, draft: publicDraft(draft, rebuilt) });
     }
 
     const rebuiltBefore = await rebuildSnapshot(base44, draft);
     if (clientSequence <= (rebuiltBefore.sequences[clientInstanceId] || 0)) {
-      draft = await materializeDraft(base44, draft, rebuiltBefore, { changed: false });
+      await lease.assertActive();
+      draft = await materializeDraft(base44, draft, rebuiltBefore, { changed: false }, lease);
       return jsonResponse({ success: true, stale: true, draft: publicDraft(draft, rebuiltBefore) });
     }
 
-    const changedKeys = Array.isArray(body?.changedKeys)
-      ? [...new Set(body.changedKeys.filter((key: unknown) => typeof key === 'string' && isAnswerKey(key)))].slice(0, MAX_RESPONSE_KEYS)
+    const changedKeys: string[] = Array.isArray(body?.changedKeys)
+      ? [...new Set((body.changedKeys as unknown[]).filter((key): key is string => typeof key === 'string' && isAnswerKey(key)))].slice(0, MAX_RESPONSE_KEYS)
       : [];
-    const deletedKeys = Array.isArray(body?.deletedKeys)
-      ? [...new Set(body.deletedKeys.filter((key: unknown) => typeof key === 'string' && isAnswerKey(key)))].slice(0, MAX_RESPONSE_KEYS)
+    const deletedKeys: string[] = Array.isArray(body?.deletedKeys)
+      ? [...new Set((body.deletedKeys as unknown[]).filter((key): key is string => typeof key === 'string' && isAnswerKey(key)))].slice(0, MAX_RESPONSE_KEYS)
       : [];
     const incomingResponses = sanitizeAnswerMap(body?.responses);
     const organizerGuard = guardOrganizedDraftMutation({
@@ -750,13 +810,18 @@ Deno.serve(async (req) => {
     const candidateValidation = validateOrganizedSubmission({ payload: candidatePayload, responses: resultSnapshot.responses });
     if (!candidateValidation.ok) return jsonResponse({ success: false, code: candidateValidation.code, error: candidateValidation.errors.join(' ') }, candidateValidation.status);
     const now = new Date().toISOString();
+    // Revisions are separate entities, so this append cannot share the draft's
+    // CAS transaction. Guard immediately before append; lease.update fences the
+    // materialization, and a retained append is recovered by an idempotent retry.
+    await lease.assertActive();
     const revision = await base44.asServiceRole.entities.ProFormDraftRevision.create({
       draft_id: draft.id,
       session_id: draft.session_id,
       mutation_id: mutationId,
       client_instance_id: clientInstanceId,
       client_sequence: clientSequence,
-      base_revision: Math.max(0, Math.floor(Number(body?.baseRevision) || rebuiltBefore.revision)),
+      base_revision: Number.isInteger(Number(body?.baseRevision)) && Number(body?.baseRevision) >= 0 ? Number(body.baseRevision) : rebuiltBefore.revision,
+      server_revision: rebuiltBefore.revision + 1,
       changed_keys_json: safeStringify(changedKeys, '[]'),
       deleted_keys_json: safeStringify(deletedKeys, '[]'),
       changes_json: safeStringify(changes),
@@ -773,7 +838,13 @@ Deno.serve(async (req) => {
       source: cleanText(body?.source, 80) || 'autosave'
     });
 
+    if (!revision?.id || revision.changes_json !== safeStringify(changes)
+      || revision.result_snapshot_json !== safeStringify(resultSnapshot)
+      || revision.server_revision !== rebuiltBefore.revision + 1) {
+      throw new Error('The draft revision service did not retain the complete snapshot.');
+    }
     const rebuiltAfter = await rebuildSnapshot(base44, draft);
+    await lease.assertActive();
     draft = await materializeDraft(base44, draft, rebuiltAfter, {
       changed: changedKeys.length > 0 || deletedKeys.length > 0,
       status: body?.status,
@@ -781,11 +852,12 @@ Deno.serve(async (req) => {
       finalSubmissionId: body?.finalSubmissionId,
       intakeId: body?.intakeId,
       mappedPayload: body?.mappedPayload
-    });
+    }, lease);
     return jsonResponse({
       success: true,
       revisionId: revision?.id || '',
       draft: publicDraft(draft, rebuiltAfter)
+    });
     });
   } catch (error) {
     const safeError = error instanceof Error ? error : new Error('Unknown draft persistence error.');
@@ -797,7 +869,8 @@ Deno.serve(async (req) => {
     const isValidation = /invalid|too many|too large|too deep|required|exceeds|durable|structure|organized|page|payload version/i.test(safeError.message);
     return jsonResponse({
       success: false,
+      code: (error as any)?.code || '',
       error: isValidation ? safeError.message.slice(0, 500) : 'Unable to persist the questionnaire draft.'
-    }, isValidation ? 400 : 500);
+    }, Number((error as any)?.status) || (isValidation ? 400 : 500));
   }
 });

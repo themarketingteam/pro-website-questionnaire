@@ -40,4 +40,16 @@ describe('submission identity and idempotency', () => {
 
     expect(new Set(fingerprints).size).toBe(fingerprints.length);
   });
+
+  it('treats historical rich mapped pages and compact pages as one submission while retaining hierarchy and priority', async () => {
+    const page = (id, label) => ({ id, label, source: 'custom', catalogId: null, children: [] });
+    const rich = { format: 'page-tree-v1', pages: [page('one', 'First'), page('two', 'Second')] };
+    const compact = { format: 'page-tree-v1', pages: [{ label: 'First', source: 'custom' }, { label: 'Second', source: 'custom' }] };
+    const base = { draftId: 'draft-1', businessName: 'Example', domain: 'example.test' };
+    const first = await createClientSubmissionFingerprint({ ...base, payload: { userdata: { service_offerings_structure: rich } } });
+    const second = await createClientSubmissionFingerprint({ ...base, payload: { userdata: { service_offerings_structure: compact } } });
+    expect(first).toBe(second);
+    compact.pages.reverse();
+    expect(await createClientSubmissionFingerprint({ ...base, payload: { userdata: { service_offerings_structure: compact } } })).not.toBe(first);
+  });
 });

@@ -1,4 +1,3 @@
-import React from 'react';
 import QuestionnaireIntakeRecovery from '@/components/admin/QuestionnaireIntakeRecovery';
 
 export default function QuestionnaireIntakeRecoveryPage() {

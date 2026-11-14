@@ -1,5 +1,7 @@
 import { validateOrganizedSubmission, reconcileOrganizedRepairPayload } from '../../shared/pageOrganizerContract.js';
-import { createClientFromRequest } from "npm:@base44/sdk";
+import { createClientFromRequest } from "npm:@base44/sdk@0.8.54";
+
+import { withEntityLease } from '../../shared/entityLease.ts';
 
 const SECRET_NAME = 'DRAFT_RECOVERY_PASSWORD';
 const GRANT_SCOPE = 'draft-recovery';
@@ -1117,10 +1119,14 @@ Deno.serve(async (req) => {
         return badRequest('The mapped payload must be valid JSON.', { action, recordType });
       }
 
+      return await withEntityLease({ entity, entityId: recordId, purpose: 'pro-admin-payload-edit' }, async (lease) => {
       const beforeUpdate = await entity.get(recordId);
+      if (beforeUpdate?.status === 'submitted') return jsonResponse({ success: false, code: 'DRAFT_ALREADY_SUBMITTED', error: 'Create an editable recovery copy before changing a submitted questionnaire.' }, 409);
+      const pending = await base44.asServiceRole.entities.ProFormDraftRevision.filter({ draft_id: recordId }, '-server_revision', 1);
+      if ((Number(pending?.[0]?.server_revision) || 0) > (Number(beforeUpdate?.save_revision) || 0)) return jsonResponse({ success: false, code: 'DRAFT_SAVE_PENDING', error: 'A newer saved revision needs recovery before editing this payload.' }, 409);
       const organizerValidation = validateOrganizedSubmission({ payload: safeParse(mappedPayload, {}), responses: safeParse(beforeUpdate?.responses_json, {}) });
       if (!organizerValidation.ok) return jsonResponse({ success: false, code: organizerValidation.code, error: organizerValidation.errors.join(' ') }, organizerValidation.status);
-      const updated = await entity.update(recordId, {
+      const updated = await lease.update({
         business_name: cleanText(updates.business_name, 300),
         domain: cleanText(updates.domain, 500),
         user_email: cleanText(updates.user_email, 320),
@@ -1137,6 +1143,7 @@ Deno.serve(async (req) => {
         ...snapshotFromDraft(updated),
         mappedPayload: safeParse(mappedPayload, {})
       };
+      await lease.assertActive();
       const revision = await base44.asServiceRole.entities.ProFormDraftRevision.create({
         draft_id: updated.id,
         session_id: updated.session_id,
@@ -1144,6 +1151,7 @@ Deno.serve(async (req) => {
         client_instance_id: adminInstanceId,
         client_sequence: 1,
         base_revision: Math.max(0, Number(beforeUpdate?.save_revision) || 0),
+        server_revision: Math.max(0, Number(beforeUpdate?.save_revision) || 0) + 1,
         changed_keys_json: '[]',
         deleted_keys_json: '[]',
         changes_json: safeStringify({
@@ -1163,10 +1171,11 @@ Deno.serve(async (req) => {
         client_changed_at: now,
         source: 'admin_payload_edit'
       });
-      const materialized = await entity.update(recordId, {
+      const materialized = await lease.update({
         save_revision: Math.max(0, Number(beforeUpdate?.save_revision) || 0) + 1
       });
       return jsonResponse({ success: true, record: materialized, revisionId: revision?.id || '' });
+      });
     }
 
     return badRequest('Unsupported recovery action.', { action: action || '(missing)', recordType });

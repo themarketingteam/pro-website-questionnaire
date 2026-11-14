@@ -52,7 +52,7 @@ describe('questionnaire draft version history', () => {
     const source = readProjectFile('base44/functions/syncProQuestionnaireDraft/entry.ts');
 
     expect(source).toContain("cleanText(draft.status, 40) === 'submitted'");
-    expect(source).toContain("cleanText(body?.status, 40) !== 'submitted'");
+    expect(source).not.toContain("cleanText(draft.status, 40) === 'submitted' &&");
     expect(source).toContain('finalized: true');
     expect(source).toContain('ignored: true');
   });

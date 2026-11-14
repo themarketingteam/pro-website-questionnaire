@@ -23,6 +23,7 @@ import {
   persistResumeCredential
 } from '@/lib/sessionId';
 import { safeLocalStorageGet, safeLocalStorageSet, safeNowIso } from '@/lib/browserSafety';
+import { validatePageStructure } from '@/lib/pageOrganizerModel';
 import { trackClarityEvent } from '@/lib/clarity';
 import {
   removeIncomingIdentityParams,
@@ -108,13 +109,24 @@ const owns = (value, key) => Object.prototype.hasOwnProperty.call(value || {}, k
 const organizedBackupConflict = (serverDraft, localBackup) => {
   if (!localBackup) return null;
   const serverRevision = Number(serverDraft?.revision) || 0;
-  if (Number.isInteger(localBackup.baseRevision) && localBackup.baseRevision === serverRevision) return null;
+  const matchingRevision = Number.isInteger(localBackup.baseRevision) && localBackup.baseRevision === serverRevision;
   const serverResponses = serverDraft?.responses || {};
   const localResponses = localBackup.responses || {};
   const changedKeys = Array.isArray(localBackup.changedKeys) ? localBackup.changedKeys : Object.keys(localResponses);
   const deletedKeys = Array.isArray(localBackup.deletedKeys) ? localBackup.deletedKeys : [];
   const questionIds = ['3', '4'].filter((id) => {
-    if (!owns(serverResponses, `${id}_structure`) && !owns(localResponses, `${id}_structure`)) return false;
+    const structureKey = `${id}_structure`;
+    const adopted = owns(serverResponses, structureKey);
+    const supplied = owns(localResponses, structureKey);
+    if (!adopted && !supplied) return false;
+    if (supplied && !validatePageStructure(localResponses[structureKey]).ok) return true;
+    if (adopted && deletedKeys.includes(structureKey)) return true;
+    const legacyChanged = [id, `${id}_other`].some((key) => (
+      (changedKeys.includes(key) && owns(localResponses, key) && !sameValue(serverResponses[key], localResponses[key]))
+      || deletedKeys.includes(key)
+    ));
+    if (adopted && legacyChanged && (!supplied || !changedKeys.includes(structureKey))) return true;
+    if (matchingRevision) return false;
     return organizerResponseKeys(id).some((key) => (
       (changedKeys.includes(key) && owns(localResponses, key) && !sameValue(serverResponses[key], localResponses[key]))
       || (deletedKeys.includes(key) && owns(serverResponses, key))
@@ -432,9 +444,7 @@ export const useSecureQuestionnaireDraft = ({
           });
           unconfirmedMutationsRef.current.set(mutationId, { changedKeys, deletedKeys });
           if (required) {
-            const error = new Error('The page organization changed in another tab. Review the current pages before submitting.');
-            error.status = 409;
-            error.code = 'ORGANIZER_SNAPSHOT_CHANGED';
+            const error = Object.assign(new Error('The page organization changed in another tab. Review the current pages before submitting.'), { status: 409, code: 'ORGANIZER_SNAPSHOT_CHANGED' });
             throw error;
           }
         }
@@ -473,9 +483,7 @@ export const useSecureQuestionnaireDraft = ({
           const downgraded = ['3', '4'].filter((id) => owns(snapshot.responses, `${id}_structure`) && !owns(returnedResponses, `${id}_structure`));
           if (downgraded.length) {
             archiveConcurrentOrganizerCopy(downgraded, snapshot, changedKeys, deletedKeys, queuedBaseRevision, Number(result.draft.revision) || revisionRef.current);
-            const error = new Error('The draft service did not preserve the page organization. Your local copy is available for download.');
-            error.status = 409;
-            error.code = 'ORGANIZER_SERVER_SCHEMA_MISMATCH';
+            const error = Object.assign(new Error('The draft service did not preserve the page organization. Your local copy is available for download.'), { status: 409, code: 'ORGANIZER_SERVER_SCHEMA_MISMATCH' });
             throw error;
           }
           const remoteChanges = ['3', '4'].filter((id) => (
@@ -493,7 +501,7 @@ export const useSecureQuestionnaireDraft = ({
               if (id !== mutationId) [...mutation.changedKeys, ...mutation.deletedKeys].forEach((key) => pendingKeys.add(key));
             });
             const conflictingLocal = remoteChanges.filter((id) => (
-              organizerResponseKeys(id).some((key) => pendingKeys.has(key))
+              (organizerResponseKeys(id).some((key) => pendingKeys.has(key)) || changedKeys.includes(`${id}_structure`))
               && !sameValue(latestRef.current.responses?.[`${id}_structure`], returnedResponses[`${id}_structure`])
             ));
             if (conflictingLocal.length) archiveConcurrentOrganizerCopy(
@@ -601,7 +609,20 @@ export const useSecureQuestionnaireDraft = ({
     const keys = Array.isArray(changedQuestionIds) ? changedQuestionIds : [changedQuestionIds];
     keys.filter(Boolean).forEach((key) => pendingChangedKeysRef.current.add(key));
     (options.deletedKeys || []).forEach((key) => pendingDeletedKeysRef.current.add(key));
-    if (nextResponses) latestRef.current.responses = nextResponses;
+    if (nextResponses) {
+      const next = { ...nextResponses };
+      // Delayed validation/UI callbacks carry full snapshots. They only own the
+      // declared changed keys and must not reinstate an older organizer tree.
+      ['3', '4'].forEach((id) => {
+        if (organizerResponseKeys(id).some((key) => keys.includes(key) || (options.deletedKeys || []).includes(key))) return;
+        if (!owns(latestRef.current.responses, `${id}_structure`) && !owns(next, `${id}_structure`)) return;
+        organizerResponseKeys(id).forEach((key) => {
+          delete next[key];
+          if (owns(latestRef.current.responses, key)) next[key] = latestRef.current.responses[key];
+        });
+      });
+      latestRef.current.responses = next;
+    }
     if (options.validationStatus) latestRef.current.validationStatus = options.validationStatus;
     if (options.touchedQuestions) latestRef.current.touchedQuestions = options.touchedQuestions;
     if (options.expandedQuestions) latestRef.current.expandedQuestions = options.expandedQuestions;

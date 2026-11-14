@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 
 export default function ThankYou() {

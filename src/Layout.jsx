@@ -1,4 +1,3 @@
-import React from 'react';
 import HotjarTracking from './components/HotjarTracking';
 import ReduxProvider from './components/ReduxProvider';
 

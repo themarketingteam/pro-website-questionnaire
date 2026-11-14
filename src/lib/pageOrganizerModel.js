@@ -24,7 +24,9 @@ export const getPageCatalogId = (questionId, label, kind = 'option') => {
   return `q${id}:${kind}:${encodeURIComponent(label.trim())}`;
 };
 
-export function createPageNode(questionId, label, { source = 'custom', catalogId = null, id } = {}) {
+/** @param {{source?: string, catalogId?: string | null, id?: string}} [options] */
+export function createPageNode(questionId, label, options = {}) {
+  const { source = 'custom', catalogId = null, id } = options;
   requireQuestionId(questionId);
   const node = { id: id || newPageId(), label: typeof label === 'string' ? label.trim() : label, source, catalogId, children: [] };
   const result = validatePageStructure({ format: PAGE_STRUCTURE_FORMAT, pages: [node] });
@@ -134,6 +136,13 @@ const legacyHash = (value) => {
   return (hash >>> 0).toString(36);
 };
 
+/**
+ * @param {string | number} questionId
+ * @param {any[]} [selections]
+ * @param {string | any[]} [other]
+ * @param {Record<string, ReadonlyArray<string>> | ReadonlyArray<string>} [groupedOptions]
+ * @param {ReadonlyArray<string>} [options]
+ */
 export function createPageStructure(questionId, selections = [], other = [], groupedOptions = {}, options = []) {
   const id = requireQuestionId(questionId);
   if (isRecord(selections) && 'format' in selections) return normalizePageStructure(selections);
