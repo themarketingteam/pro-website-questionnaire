@@ -131,6 +131,72 @@ export const serializePageStructure = (structure) => {
   };
 };
 
+/**
+ * Entity reads may hydrate optional schema fields with null IDs and empty leaf
+ * arrays. Accept that DTO padding only here; incoming wire/editor validators
+ * above remain strict, and partially populated real identities remain invalid.
+ */
+export const serializeStoredPageStructure = (structure) => {
+  if (validateMappedPageStructure(structure).ok) return serializePageStructure(structure);
+  const seen = new Set();
+  const storedError = () => Object.assign(new Error('The stored page structure contains invalid identities or unsupported data.'), { code: 'INVALID_PAGE_STRUCTURE', status: 400 });
+  const normalizeNode = (node, depth) => {
+    if (!plain(node)) return node;
+    if (seen.has(node)) throw storedError();
+    seen.add(node);
+    if ((own(node, 'id') && node.id !== null) || (own(node, 'catalogId') && node.catalogId !== null)) throw storedError();
+    const next = { ...node };
+    if (node.id === null) delete next.id;
+    if (node.catalogId === null) delete next.catalogId;
+    if (Array.isArray(node.children) && node.children.length === 0) delete next.children;
+    else if (depth === 1 && Array.isArray(node.children)) next.children = node.children.map((child) => normalizeNode(child, 2));
+    return next;
+  };
+  const candidate = plain(structure) && Array.isArray(structure.pages)
+    ? { ...structure, pages: structure.pages.map((node) => normalizeNode(node, 1)) }
+    : structure;
+  return serializePageStructure(candidate);
+};
+
+// A DTO may also pad omitted optional userdata properties. A receipt comparison
+// knows the exact submitted shape: remove only extra null/empty-array padding,
+// while retaining every provided field and every meaningful extra value so the
+// caller's content fingerprint still detects changes or missing data.
+const alignStoredOptionalFields = (stored, submitted) => {
+  if (Array.isArray(stored) && Array.isArray(submitted)) return stored.map((value, index) => index < submitted.length ? alignStoredOptionalFields(value, submitted[index]) : value);
+  if (!plain(stored) || !plain(submitted)) return stored;
+  return Object.entries(stored).reduce((next, [key, value]) => {
+    if (own(submitted, key)) next[key] = alignStoredOptionalFields(value, submitted[key]);
+    else if (value !== null && !(Array.isArray(value) && value.length === 0)) next[key] = value;
+    return next;
+  }, {});
+};
+
+/** Normalize a persisted Pro submission DTO, never raw responses or requests.
+ * @param {any} record
+ * @param {any} [submittedPayload]
+ */
+export const normalizeStoredOrganizedRecord = (record, submittedPayload = null) => {
+  if (!plain(record)) throw Object.assign(new Error('A stored submission record is required.'), { code: 'INVALID_PAGE_STRUCTURE', status: 400 });
+  const next = { ...record };
+  if (plain(record.metadata)) {
+    next.metadata = { ...record.metadata };
+    if (next.metadata.questionnaire_payload_version === null) delete next.metadata.questionnaire_payload_version;
+  }
+  if (plain(record.userdata)) {
+    next.userdata = { ...record.userdata };
+    for (const question of ORGANIZER_QUESTIONS) {
+      if (!own(next.userdata, question.structureField)) continue;
+      if (next.userdata[question.structureField] === null) delete next.userdata[question.structureField];
+      else next.userdata[question.structureField] = serializeStoredPageStructure(next.userdata[question.structureField]);
+    }
+  }
+  const validation = validateOrganizedPayload(next);
+  if (!validation.ok) throw Object.assign(new Error(validation.errors.join(' ')), { code: validation.code, status: validation.status });
+  if (plain(next.userdata) && plain(submittedPayload?.userdata)) next.userdata = alignStoredOptionalFields(next.userdata, submittedPayload.userdata);
+  return next;
+};
+
 /** Invalid or unknown formats never compare equal, even to themselves. */
 export const samePageStructure = (left, right) => {
   try { return same(serializePageStructure(left), serializePageStructure(right)); }

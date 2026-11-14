@@ -1,7 +1,14 @@
-import { validateOrganizedSubmission, reconcileOrganizedRepairPayload } from '../../shared/pageOrganizerContract.js';
-import { createClientFromRequest } from "npm:@base44/sdk@0.8.54";
+import { normalizeStoredOrganizedRecord, validateOrganizedSubmission, reconcileOrganizedRepairPayload } from '../../shared/pageOrganizerContract.js';
+import { createClientFromRequest } from "npm:@base44/sdk@0.8.61";
 
 import { withEntityLease } from '../../shared/entityLease.ts';
+
+// Invalid retained payloads must remain inspectable in recovery. Only the
+// supported entity DTO padding is normalized; submit/retry guards still reject
+// malformed content before any mutation or delivery.
+const normalizeStoredRecordForReview = (record: any) => {
+  try { return normalizeStoredOrganizedRecord(record); } catch { return record; }
+};
 
 const SECRET_NAME = 'DRAFT_RECOVERY_PASSWORD';
 const GRANT_SCOPE = 'draft-recovery';
@@ -613,7 +620,7 @@ const buildVersionCatalog = async (base44: any, anchor: any, mode: string) => {
   [...sessionSubmissions, ...(Array.isArray(linkedSubmissions) ? linkedSubmissions : [])]
     .forEach((record) => { if (record?.id) submissions.set(record.id, record); });
   const submissionVersions = await Promise.all([...submissions.values()].map(async (submission) => {
-    const payload = { metadata: submission.metadata || {}, userdata: submission.userdata || {} };
+    const payload = normalizeStoredRecordForReview({ metadata: submission.metadata || {}, userdata: submission.userdata || {} });
     return {
       versionId: `submission:${submission.id}`,
       kind: 'final_submission',
@@ -752,7 +759,7 @@ const publicVersionDetail = async (base44: any, anchor: any, versionId: string) 
     const submissionSessionId = submission?.metadata?.questionnaire_session_id || '';
     const submissionDraftId = submission?.metadata?.source_draft_id || '';
     if (!submission?.id || (!relatedSessionIds.has(submissionSessionId) && !relatedDraftIds.has(submissionDraftId))) return null;
-    const payload = { metadata: submission.metadata || {}, userdata: submission.userdata || {} };
+    const payload = normalizeStoredRecordForReview({ metadata: submission.metadata || {}, userdata: submission.userdata || {} });
     return {
       versionId,
       sourceType: 'submission',
@@ -1102,7 +1109,8 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'get') {
-      const record = await entity.get(recordId);
+      const storedRecord = await entity.get(recordId);
+      const record = recordType === 'submission' && storedRecord ? normalizeStoredRecordForReview(storedRecord) : storedRecord;
       if (recordType === 'draft' && record?.final_submission_id) {
         const linked = await base44.asServiceRole.entities.ProFormSubmission.get(record.final_submission_id).catch(() => null);
         record.link_integrity_status = linked ? 'ok' : 'missing_submission';

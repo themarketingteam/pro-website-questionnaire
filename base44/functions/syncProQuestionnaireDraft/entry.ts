@@ -1,5 +1,5 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
-import { guardOrganizedDraftMutation, projectOrganizedPages, preserveOrganizedMappedPayload, validateOrganizedPayload, validateOrganizedResponses, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.61';
+import { normalizeStoredOrganizedRecord, guardOrganizedDraftMutation, projectOrganizedPages, preserveOrganizedMappedPayload, validateOrganizedPayload, validateOrganizedResponses, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
 
 import { withEntityLease, type EntityLease } from '../../shared/entityLease.ts';
 
@@ -386,7 +386,8 @@ const materializeDraft = async (base44: any, draft: any, rebuilt: any, lifecycle
     throw new Error('A durable final submission ID is required before marking a draft submitted.');
   }
   if (status === 'submitted' && currentStatus !== 'submitted') {
-    const receipt = await base44.asServiceRole.entities.ProFormSubmission.get(finalSubmissionId).catch(() => null);
+    const receiptDto = await base44.asServiceRole.entities.ProFormSubmission.get(finalSubmissionId).catch(() => null);
+    const receipt = receiptDto ? normalizeStoredOrganizedRecord(receiptDto, mappedPayload) : null;
     if (!receipt?.id || receipt.metadata?.source_draft_id !== draft.id
       || !validateOrganizedSubmission({ payload: receipt, responses: snapshot.responses }).ok) {
       throw Object.assign(new Error('The final submission receipt does not match the saved questionnaire.'), { status: 409, code: 'SUBMISSION_RECEIPT_CONFLICT' });

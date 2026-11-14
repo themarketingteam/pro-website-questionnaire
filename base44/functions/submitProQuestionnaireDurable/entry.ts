@@ -1,5 +1,5 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
-import { samePageStructure, validateOrganizedResponses, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.61';
+import { normalizeStoredOrganizedRecord, samePageStructure, validateOrganizedResponses, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
 import {
   authorizeDraftSubmission,
   createSubmissionContentFingerprint,
@@ -113,6 +113,8 @@ Deno.serve(async (req) => {
     const identityFingerprint = await createSubmissionIdentityFingerprint(authorization.identity);
     const submissions = base44.asServiceRole.entities.ProFormSubmission;
     const confirmReceipt = async (submission: any) => {
+      try { submission = normalizeStoredOrganizedRecord(submission, payload); }
+      catch { throw Object.assign(new Error('The durable submission service returned an invalid stored page structure.'), { status: 502, code: 'SUBMISSION_STORAGE_INVALID' }); }
       if (!submission?.id || submission.metadata?.source_draft_id !== draftId) {
         throw new Error('The durable submission service did not retain its receipt identity.');
       }
@@ -159,7 +161,8 @@ Deno.serve(async (req) => {
     }
 
     if (authorization.draft.final_submission_id) {
-      const linked = await submissions.get(authorization.draft.final_submission_id).catch(() => null);
+      const linkedDto = await submissions.get(authorization.draft.final_submission_id).catch(() => null);
+      const linked = linkedDto ? normalizeStoredOrganizedRecord(linkedDto, payload) : null;
       if (linked?.metadata?.source_draft_id === draftId
         && await createSubmissionContentFingerprint({ payload: linked, draftId, identity: authorization.identity }) === contentFingerprint) {
         return json({ success: true, reused: true, submission: await confirmReceipt(linked) });

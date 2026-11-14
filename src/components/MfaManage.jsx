@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, Smartphone, MessageSquare } from "lucide-react";
 import MfaMethodSetup from "@/components/MfaMethodSetup";

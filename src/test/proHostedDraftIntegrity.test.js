@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it, vi } from 'vitest';
 import * as contract from '../../base44/shared/pageOrganizerContract.js';
+import { hydrateProSubmissionEntity } from './utils/base44SubmissionHydration.js';
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const session = 'hosted_integrity_session_12345';
@@ -11,8 +12,8 @@ const secret = 'hosted_integrity_secret_abcdefghijklmnopqrstuvwxyz';
 const credential = `${session}.${secret}`;
 const node = (id, label) => ({ id, label, source: 'custom', catalogId: null, children: [] });
 const tree = (...pages) => ({ format: 'page-tree-v1', pages });
-const project = (value) => ({ '3_structure': value, '3': [], '3_other': contract.projectOrganizedPages(value).otherValues });
-const payloadFor = (value, description = 'Original description') => ({ metadata: { business_name: 'Test', businessDomain: 'example.test', questionnaire_payload_version: 2 }, userdata: { service_offerings_structure: contract.serializePageStructure(value), service_offerings: [], service_offerings_other: contract.projectOrganizedPages(value).other, business_description: description } });
+const project = (value) => ({ '3_structure': value, '3': contract.projectOrganizedPages(value).selections, '3_other': contract.projectOrganizedPages(value).otherValues });
+const payloadFor = (value, description = 'Original description') => ({ metadata: { business_name: 'Test', businessDomain: 'example.test', questionnaire_payload_version: 2 }, userdata: { service_offerings_structure: contract.serializePageStructure(value), service_offerings: contract.projectOrganizedPages(value).selections, service_offerings_other: contract.projectOrganizedPages(value).other, company_description: description } });
 const request = (body) => new Request('http://localhost/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 // Actual deployed sources, including their authorization and CAS lease. The SDK
@@ -50,6 +51,7 @@ const fixture = async () => {
   let beforeRevision = async () => {};
   let beforeSubmission = async () => {};
   let storedSubmission = (value) => value;
+  let hydrateSubmission = (value) => value;
   let beforeDraftMutation = async () => {};
   const pathValue = (value, path) => path.split('.').reduce((current, key) => current?.[key], value);
   const matches = (value, query) => Object.entries(query).every(([key, expected]) => {
@@ -78,9 +80,9 @@ const fixture = async () => {
       create: vi.fn(async (value) => { await beforeRevision(); const record = { ...clone(value), id: `revision-${revisions.length + 1}` }; revisions.push(record); return clone(record); })
     },
     ProFormSubmission: {
-      filter: vi.fn(async (query) => clone(submissions.filter((value) => matches(value, query)))),
-      get: vi.fn(async (id) => clone(submissions.find((value) => value.id === id))),
-      create: vi.fn(async (value) => { await beforeSubmission(); const record = storedSubmission({ ...clone(value), id: `submission-${submissions.length + 1}` }); submissions.push(record); return clone(record); })
+      filter: vi.fn(async (query) => submissions.filter((value) => matches(value, query)).map((value) => hydrateSubmission(clone(value)))),
+      get: vi.fn(async (id) => hydrateSubmission(clone(submissions.find((value) => value.id === id)))),
+      create: vi.fn(async (value) => { await beforeSubmission(); const record = storedSubmission({ ...clone(value), id: `submission-${submissions.length + 1}` }); submissions.push(record); return hydrateSubmission(clone(record)); })
     }
   } } };
   const save = loadHosted('base44/functions/syncProQuestionnaireDraft/entry.ts', base44);
@@ -103,6 +105,7 @@ const fixture = async () => {
     original, revisions, submissions, base44, save, submit, getDraft: () => clone(draft), setDraft: (patch) => { draft = { ...draft, ...patch }; },
     beforeDraftMutation: (fn) => { beforeDraftMutation = fn; },
     holdRevision: (fn) => { beforeRevision = fn; }, holdSubmission: (fn) => { beforeSubmission = fn; },
+    hydrateSubmissionReads: (fn) => { hydrateSubmission = fn; },
     transformStoredSubmission: (fn) => { storedSubmission = fn; },
     mutation: (value, overrides = {}) => ({ action: 'save', resumeCredential: credential, clientInstanceId: 'hosted_test_client_1234567', mutationId: 'hosted_mutation_12345678901', clientSequence: 1, baseRevision: 0, responses: project(value), changedKeys: ['3', '3_other', '3_structure'], deletedKeys: [], mappedPayload: payloadFor(value), ...overrides }),
     submission: (value, overrides = {}) => ({ draftId: 'draft-hosted', resumeCredential: credential, submissionAttemptId: 'hosted_submission_attempt_123456', transformedPayload: payloadFor(value), ...overrides })
@@ -179,6 +182,41 @@ describe('hosted Pro save and submission integrity', () => {
     expect(f.submissions).toHaveLength(1);
   });
 
+  it('normalizes Base44 optional DTO padding on create and duplicate reads without changing stored wire or raw identities', async () => {
+    const f = await fixture();
+    const selected = tree({ ...node('cloud', 'Cloud Services'), source: 'predefined', catalogId: 'q3:option:Cloud%20Services', children: [node('child', 'Custom cloud, with comma')] }, node('standalone', 'Standalone'));
+    f.setDraft({ responses_json: JSON.stringify({ ...project(selected), '6': 'Original description' }), mapped_payload_json: JSON.stringify(payloadFor(selected)) });
+    f.hydrateSubmissionReads(hydrateProSubmissionEntity);
+    const submitted = await f.submit(f.submission(selected));
+    expect(submitted.status).toBe(200);
+    expect(submitted.body.submission.userdata.service_offerings_structure).toEqual(contract.serializePageStructure(selected));
+    expect(submitted.body.submission.userdata).not.toHaveProperty('target_industries_structure');
+    const duplicate = await f.submit(f.submission(selected));
+    expect(duplicate).toMatchObject({ status: 200, body: { success: true, duplicate: true } });
+    expect(duplicate.body.submission.id).toBe(submitted.body.submission.id);
+    expect(f.submissions).toHaveLength(1);
+    expect(f.submissions[0].userdata.service_offerings_structure).toEqual(contract.serializePageStructure(selected));
+    expect(JSON.parse(f.getDraft().responses_json)['3_structure']).toEqual(selected);
+  });
+
+  it('does not accept entity-padded structures as incoming submissions or discard meaningful DTO corruption', async () => {
+    const incoming = await fixture();
+    const hydratedPayload = hydrateProSubmissionEntity(payloadFor(incoming.original));
+    expect((await incoming.submit(incoming.submission(incoming.original, { transformedPayload: hydratedPayload }))).status).toBe(400);
+    expect(incoming.submissions).toHaveLength(0);
+    for (const mutate of [
+      (value) => { value.userdata.company_description = 'Changed stored answer'; },
+      (value) => { value.userdata.meaningful_extra = 'Unexpected content must remain visible'; }
+    ]) {
+      const f = await fixture();
+      f.hydrateSubmissionReads((record) => { const dto = hydrateProSubmissionEntity(record); mutate(dto); return dto; });
+      const rejected = await f.submit(f.submission(f.original));
+      expect(rejected.status).toBe(500);
+      expect(rejected.body.success).toBe(false);
+      expect(f.getDraft().status).toBe('draft');
+    }
+  });
+
   it('holds concurrent saves until the durable receipt is linked', async () => {
     const f = await fixture();
     const held = gate(); f.holdSubmission(held.hold);
@@ -199,7 +237,7 @@ describe('hosted Pro save and submission integrity', () => {
         else delete value.metadata.questionnaire_payload_version;
         return value;
       });
-      expect((await f.submit(f.submission(f.original))).status).toBe(500);
+      expect(await f.submit(f.submission(f.original))).toMatchObject({ status: 502, body: { success: false } });
       expect(f.getDraft().status).toBe('draft');
     }
   });

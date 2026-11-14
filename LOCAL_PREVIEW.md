@@ -2,7 +2,7 @@
 
 Open **http://localhost:5173**. The server is bound to this computer's loopback interface.
 
-This checkout is on branch `codex/local-page-organizer`. The original checkout and published Base44 app were not modified. No commits were pushed and no Base44 resources were deployed.
+The explicit local preview remains isolated from Base44 and Zapier after the production release. Production deployment is documented separately in `docs/RELEASE_2026_11_14.md`. Use the existing local worktree launcher to retain the local drafts already saved there.
 
 ## Start or stop
 
@@ -14,7 +14,7 @@ npm run local:status
 npm run local:stop
 ```
 
-Double-click `Start Local Questionnaire.command` to start it and open the page. `npm run dev` also runs the isolated preview in the foreground. `npm run preview` uses the same supported local API, rather than a static server without draft saving.
+Double-click `Start Local Questionnaire.command` to start it and open the page. `npm run dev:local` runs the isolated preview in the foreground. Standard dev/build/preview commands use the production configuration; use the explicit local commands for testing without remote writes.
 
 The existing dependencies are reused through a `node_modules` symlink to the original checkout. If that checkout moves, remove the broken symlink and run `npm ci` in this checkout to install independent dependencies. No Base44 login is required for this preview.
 

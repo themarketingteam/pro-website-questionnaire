@@ -1,5 +1,5 @@
 import { validateOrganizedPayload, validateOrganizedSubmission, samePageStructure, reconcileOrganizedRepairPayload, restoreOrganizedProjections } from '../../shared/pageOrganizerContract.js';
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.61';
 import { isMissingIdentityValue } from '../../shared/proIdentityResolution.ts';
 import { createIdentityResolverInternalGrant } from '../../shared/draftRecoveryAuthorization.ts';
 

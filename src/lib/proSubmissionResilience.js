@@ -1,4 +1,4 @@
-import { samePageStructure, validateOrganizedPayload } from '../../base44/shared/pageOrganizerContract.js';
+import { normalizeStoredOrganizedRecord, samePageStructure, validateOrganizedPayload } from '../../base44/shared/pageOrganizerContract.js';
 import { base44 } from '@/api/base44Client';
 
 const DEFAULT_TIMEOUT_MS = 15000;
@@ -210,6 +210,7 @@ const invokeSubmitFallbackWithRetry = async (body, options = {}) => {
 };
 
 export const validateSubmissionReceipt = (submission, payload) => {
+  if (submission) submission = normalizeStoredOrganizedRecord(submission, payload);
   if (!submission?.id) {
     throw Object.assign(new Error('The submission service did not return a durable receipt.'), { status: 502, code: 'INVALID_SUBMISSION_RECEIPT' });
   }
@@ -252,12 +253,12 @@ export const createProFormSubmissionResilient = async (payload, options = {}) =>
         throw new TimeoutError('DEV_ONLY_SIMULATED_SUBMIT_FAILURE: network_timeout');
       }
 
-      const submission = await withTimeout(
+      let submission = await withTimeout(
         () => createSubmission(payload),
         timeoutMs
       );
 
-      validateSubmissionReceipt(submission, payload);
+      submission = validateSubmissionReceipt(submission, payload);
       return {
         ok: true,
         submission,
@@ -473,7 +474,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
         };
       }
       if (data?.success && data?.submission) {
-        validateSubmissionReceipt(data.submission, payload);
+        data.submission = validateSubmissionReceipt(data.submission, payload);
         return {
           ok: true,
           submission: data.submission,
@@ -604,7 +605,7 @@ export const createProFormSubmissionWithFallback = async (payload, options = {})
     }
 
     if (data?.success && data?.submission) {
-      validateSubmissionReceipt(data.submission, payload);
+      data.submission = validateSubmissionReceipt(data.submission, payload);
       const result = {
         ok: true,
         submission: data.submission,

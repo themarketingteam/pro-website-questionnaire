@@ -1,5 +1,5 @@
-import { samePageStructure, validateOrganizedPayload, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
+import { normalizeStoredOrganizedRecord, samePageStructure, validateOrganizedPayload, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.61';
 
 import { withEntityLease } from '../../shared/entityLease.ts';
 import { createSubmissionContentFingerprint, createSubmissionIdentityFingerprint, getSubmissionIdentity } from '../../shared/proDraftSubmissionAuthorization.ts';
@@ -16,6 +16,7 @@ const stampSubmissionIdentity = async (payload: any, draftId: string, attemptId:
 };
 
 const validateReceiptAgreement = (receipt: any, expected: any) => {
+  receipt = normalizeStoredOrganizedRecord(receipt, expected);
   if (!receipt?.id) throw Object.assign(new Error('The durable submission receipt is missing.'), { status: 409, code: 'SUBMISSION_RECEIPT_MISSING' });
   if (expected?.metadata?.source_draft_id && receipt.metadata?.source_draft_id && expected.metadata.source_draft_id !== receipt.metadata.source_draft_id) throw Object.assign(new Error('The retained receipt belongs to a different source draft.'), { status: 409, code: 'SUBMISSION_IDENTITY_CONFLICT' });
   const validation = validateOrganizedPayload(receipt);

@@ -1,4 +1,4 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.54';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.61';
 import { validateOrganizedPayload, validateOrganizedResponses, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
 
 import { withEntityLease } from '../../shared/entityLease.ts';

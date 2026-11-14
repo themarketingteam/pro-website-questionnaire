@@ -2,7 +2,7 @@ import { SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import { QUESTIONNAIRE_PDF_TEMPLATE_REVISION } from '@/components/pro-form/pdf/questionnairePdfTheme';
 import { normalizeServiceSelectionsForPayload } from '@/lib/serviceSelectionModel';
 import { normalizePageStructure } from '@/lib/pageOrganizerModel';
-import { serializePageStructure } from '../../base44/shared/pageOrganizerContract.js';
+import { normalizeStoredOrganizedRecord, serializePageStructure } from '../../base44/shared/pageOrganizerContract.js';
 
 const isPlainObject = (value) => (
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -30,7 +30,10 @@ const yesNo = (condition) => condition ? 'yes' : 'no';
 // stays compact; editor identities and catalog provenance cannot be recovered
 // from its labels and must never be invented here.
 export const questionnaireResponsesFromSubmissionPayload = (payload) => {
-  const safePayload = asObject(payload);
+  // This boundary renders stored mapped data and never hydrates the editor.
+  // Keep unsupported retained content available for the existing review display.
+  let safePayload = asObject(payload);
+  try { safePayload = normalizeStoredOrganizedRecord(safePayload); } catch { /* Display flags malformed structures for review. */ }
   const userdata = asObject(safePayload.userdata);
   const additionalPages = asObject(userdata.additional_pages_list);
   const whyChooseUs = asObject(additionalPages.why_choose_us_page);
