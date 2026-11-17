@@ -263,6 +263,26 @@
     "idempotency_lock_expires_at": {
       "type": "string",
       "description": "Server-only cross-instance save/submission lease; never exposed in public draft responses."
+    },
+    "source_draft_id": {
+      "type": "string",
+      "description": "Original completed draft retained when this editable client revision was created."
+    },
+    "source_submission_id": {
+      "type": "string",
+      "description": "Immutable original submission retained when this editable client revision was created."
+    },
+    "revision_request_hash": {
+      "type": "string",
+      "description": "One-way, source-capability-scoped idempotency hash for an explicit client revision request."
+    },
+    "revision_started_at": {
+      "type": "string",
+      "description": "When the client explicitly created this working revision."
+    },
+    "source_receipt_status": {
+      "type": "string",
+      "description": "Original receipt verification when this client revision was created: verified, missing_link, unavailable, or mismatch. An unverified receipt is never copied or redelivered."
     }
   },
   "required": [

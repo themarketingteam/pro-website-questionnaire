@@ -18,6 +18,11 @@ const delay = (ms) => new Promise((resolve) => getTimerApi().setTimeout(resolve,
 export const getDraftErrorStatus = (error) => Number(
   error?.status || error?.response?.status || 0
 );
+export const getDraftErrorCode = (error) => String(error?.response?.data?.code || error?.code || '');
+export const reloadForDraftRevision = () => window.location.reload();
+const stableJsonValue = (value) => Array.isArray(value) ? value.map(stableJsonValue)
+  : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableJsonValue(value[key])])) : value;
+const canonicalJson = (value) => JSON.stringify(stableJsonValue(value));
 
 export const isRetryableDraftError = (error) => {
   const status = getDraftErrorStatus(error);
@@ -32,19 +37,26 @@ export const isRetryableDraftError = (error) => {
  * @param {{resumeCredential?: string, changedKeys?: string[], deletedKeys?: string[], responses?: Record<string, unknown>}} [request]
  */
 export const validateDraftAcknowledgement = (data, action, request = {}) => {
-  if (!['bootstrap', 'save'].includes(action)) return;
+  if (!['bootstrap', 'save', 'start_revision'].includes(action)) return;
+  const startingRevision = action === 'start_revision';
   const draft = data?.draft;
   const validObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
   if (!validObject(draft) || typeof draft.draftId !== 'string' || !draft.draftId
     || !validObject(draft.responses) || !Number.isInteger(draft.revision) || draft.revision < 0
-    || (action === 'bootstrap' && (typeof draft.sessionId !== 'string' || !draft.sessionId))) {
+    || (action !== 'save' && (typeof draft.sessionId !== 'string' || !draft.sessionId))) {
     throw Object.assign(new Error('The draft service did not return a complete saved snapshot. Your local answers have been retained.'), { status: 502, code: 'INVALID_DRAFT_ACKNOWLEDGEMENT' });
   }
   const expectedSession = String(request.resumeCredential || '').split('.')[0];
   const returnedSession = String(data.resumeCredential || '').split('.')[0];
-  if ((expectedSession && draft.sessionId !== expectedSession)
-    || (action === 'bootstrap' && returnedSession && draft.sessionId !== returnedSession)) {
+  if ((!startingRevision && expectedSession && draft.sessionId !== expectedSession)
+    || (action !== 'save' && returnedSession && draft.sessionId !== returnedSession)) {
     throw Object.assign(new Error('The saved snapshot belongs to a different recovery session. Your local answers have been retained.'), { status: 502, code: 'INVALID_DRAFT_ACKNOWLEDGEMENT' });
+  }
+  const retainedAdvancedRevision = startingRevision && data.reused === true && draft.revision > 1;
+  if (startingRevision && (!returnedSession || draft.sessionId === expectedSession
+    || !['draft', ...(retainedAdvancedRevision ? ['submitted'] : [])].includes(draft.status)
+    || (!retainedAdvancedRevision && canonicalJson(draft.responses) !== canonicalJson(request.responses || {})))) {
+    throw Object.assign(new Error('The new working draft did not confirm the complete revision snapshot. Your original answers and recovery link were retained.'), { status: 502, code: 'INVALID_REVISION_ACKNOWLEDGEMENT' });
   }
   for (const id of ['3', '4']) {
     if (Object.prototype.hasOwnProperty.call(draft.responses, `${id}_structure`)
@@ -59,7 +71,7 @@ export const validateDraftAcknowledgement = (data, action, request = {}) => {
     ));
     const deleted = (request.deletedKeys || []).some((key) => Object.prototype.hasOwnProperty.call(draft.responses, key));
     if (changed || deleted) {
-      throw Object.assign(new Error('This questionnaire was already submitted. These additional edits were kept locally and were not saved over the completed submission.'), { status: 409, code: 'DRAFT_ALREADY_SUBMITTED' });
+      throw Object.assign(new Error('This questionnaire was already submitted. These additional edits were kept locally and were not saved over the completed submission.'), { status: 409, code: 'DRAFT_ALREADY_SUBMITTED', draft, finalized: true });
     }
   }
 };
@@ -72,6 +84,7 @@ const invokeDraftFunction = async (functions, payload, { attempts = MAX_ATTEMPTS
       if (!response?.data?.success) {
         const error = new Error(response?.data?.error || 'Draft persistence failed.');
         error.status = response?.status || 500;
+        Object.assign(error, { code: response?.data?.code || '' });
         throw error;
       }
       validateDraftAcknowledgement(response.data, payload.action, payload);
@@ -104,6 +117,10 @@ export const bootstrapServerDraft = async ({
   newClient: Boolean(newClient),
   newClientRequestId,
   identityDecision
+});
+
+export const startServerDraftRevision = ({ functions, ...payload }) => invokeDraftFunction(functions, {
+  ...payload, action: 'start_revision'
 });
 
 export const createServerDraftMutationPayload = ({
@@ -393,6 +410,8 @@ export const writeDraftFailureBackup = ({
         changedKeys,
         deletedKeys,
         baseRevision,
+        outboxVersion: 2,
+        pending: changedKeys.length > 0 || deletedKeys.length > 0,
         error,
         savedAt: safeNowIso()
       }

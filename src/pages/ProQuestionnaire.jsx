@@ -125,6 +125,7 @@ export default function ProQuestionnaire() {
   const expandLinkedQuestionDelayMs = isTestMode ? 0 : 500;
   const clearAllReloadDelayMs = isTestMode ? 0 : 100;
   const hasFinalSubmittedRef = useRef(false);
+  const [includePreservedEdits, setIncludePreservedEdits] = useState(false);
   const clearAllButtonRef = useRef(null);
   const newClientIdentityPromptOpenedRef = useRef(false);
 
@@ -151,6 +152,12 @@ export default function ProQuestionnaire() {
     questionnaireSessionId,
     restoredQuestionId,
     identityConflict,
+    completedDraft,
+    isStartingRevision,
+    revisionStartError,
+    revisionRetryPending,
+    startRevision,
+    downloadCompletedRecoveryBackup,
     queueDraftSave,
     saveDraftNow,
     updateDraftIdentity,
@@ -523,6 +530,7 @@ export default function ProQuestionnaire() {
   // No more cookie saving - Redux persist handles everything automatically
 
   const updateResponse = useCallback((questionId, value) => {
+    if (completedDraft || isStartingRevision) return;
     if (!hasTrackedStart) {
       trackClarityEvent('pro_questionnaire_started', {
         first_question_id: questionId
@@ -672,6 +680,8 @@ export default function ProQuestionnaire() {
     dispatch(setTouchedQuestion({ questionId, touched: true }));
   }, [
     dispatch,
+    completedDraft,
+    isStartingRevision,
     responses,
     expandedQuestions,
     hasTrackedStart,
@@ -893,6 +903,7 @@ export default function ProQuestionnaire() {
   };
 
   const resetQuestion = (questionId) => {
+    if (completedDraft || isStartingRevision) return;
     if ((questionId === '3' || questionId === '4') && Object.prototype.hasOwnProperty.call(responses, `${questionId}_structure`)) {
       const patch = { [questionId]: [], [`${questionId}_other`]: [], [`${questionId}_structure`]: { format: 'page-tree-v1', pages: [] } };
       dispatch(setMultipleResponses(patch));
@@ -1007,6 +1018,7 @@ export default function ProQuestionnaire() {
   };
 
   const clearAll = () => {
+    if (completedDraft || isStartingRevision) return;
     setShowClearAllModal(true);
   };
 
@@ -1476,6 +1488,7 @@ export default function ProQuestionnaire() {
   };
 
   const handleSubmitClick = async () => {
+    if (completedDraft || isStartingRevision) return;
     const finalValidationPassed = await runFinalValidations();
 
     if (!finalValidationPassed) {
@@ -1495,6 +1508,7 @@ export default function ProQuestionnaire() {
 
 
   const handleConfirmSubmit = async (businessName, domain) => {
+    if (completedDraft || isStartingRevision) return;
     if (finalSubmitInFlightRef.current) {
       if (import.meta.env.DEV) {
         console.warn('[ProQuestionnaire] Final submit blocked — already in flight.');
@@ -1649,7 +1663,9 @@ export default function ProQuestionnaire() {
     return acc;
   }, {});
 
-  const renderQuestion = (question) => {
+  const renderQuestion = (question) => <fieldset disabled={Boolean(completedDraft) || isStartingRevision} ref={(element) => { if (element) element.inert = Boolean(completedDraft) || isStartingRevision; }} className="min-w-0">{renderEditableQuestion(question)}</fieldset>;
+
+  const renderEditableQuestion = (question) => {
     const commonProps = {
       value: responses[question.id],
       onChange: (val) => updateResponse(question.id, val)
@@ -1680,6 +1696,7 @@ export default function ProQuestionnaire() {
               externalDisabled={isSpanLimitReached}
               remainingSelections={Math.max(0, 25 - totalSelections)}
               onChange={(nextStructure) => {
+                if (completedDraft || isStartingRevision) return;
                 const projected = projectPageStructure(nextStructure);
                 const patch = {
                   [question.id]: projected.selections,
@@ -2043,6 +2060,21 @@ export default function ProQuestionnaire() {
       </div>}
       
       <main className="px-4 sm:px-6 lg:px-6 py-8 md:py-12">
+
+        {completedDraft && <section role="status" aria-label="Submitted questionnaire" className="mx-auto mb-6 max-w-5xl rounded-xl border border-blue-300 bg-blue-50 p-5 text-[#122947]">
+          <h2 className="text-lg font-semibold">This questionnaire has been submitted</h2>
+          <p className="mt-2 text-sm">The submitted answers are shown below. Start a new working revision to make changes; the submitted copy stays preserved.</p>
+          {completedDraft.hasUnsavedChanges && !revisionRetryPending && <div className="mt-3 text-sm">
+            <p>Your browser also contains edits that were not saved to the submitted copy. They have been kept separately.</p>
+            <label className="mt-3 flex items-start gap-2"><input type="checkbox" checked={includePreservedEdits} disabled={isStartingRevision} onChange={(event) => setIncludePreservedEdits(event.target.checked)} className="mt-1" />Include my preserved browser edits in the new revision</label>
+          </div>}
+          {revisionRetryPending && <p className="mt-3 text-sm">Retrying resumes the same retained revision request and its original chosen copy.</p>}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button type="button" disabled={isStartingRevision} onClick={() => startRevision({ includePreservedEdits })} className="min-h-11 rounded-md bg-[#176BB7] px-4 py-2 font-semibold text-white disabled:opacity-50">{isStartingRevision ? 'Creating working revision…' : 'Start a revision'}</button>
+            <button type="button" onClick={downloadCompletedRecoveryBackup} className="min-h-11 rounded-md border border-[#176BB7] bg-white px-4 py-2 font-semibold">Download preserved copy</button>
+          </div>
+          {revisionStartError && <p role="alert" className="mt-3 text-sm text-red-800">{revisionStartError}</p>}
+        </section>}
         <div className={standardContentClass}>
         {/* Validation Status Guide - Collapsible */}
         <ValidationGuideCollapsible />
@@ -2182,7 +2214,7 @@ export default function ProQuestionnaire() {
               <button
                 type="button"
                 onClick={handleSubmitClick}
-                disabled={isSubmitting || isValidating}
+                disabled={isSubmitting || isValidating || Boolean(completedDraft) || isStartingRevision}
                 className={`flex-1 py-4 text-sm font-bold rounded transition-all flex items-center justify-center uppercase tracking-wide min-h-[52px] ${
                   isSubmitting || isValidating
                     ? 'bg-[#A9B3B7] text-white cursor-not-allowed'
@@ -2209,6 +2241,7 @@ export default function ProQuestionnaire() {
                 ref={clearAllButtonRef}
                 type="button"
                 onClick={clearAll}
+                disabled={Boolean(completedDraft) || isStartingRevision}
                 className={`w-full sm:w-auto px-8 sm:px-12 py-4 bg-white text-[#4A5F8C] border-2 border-[#4A5F8C] hover:bg-[#F0F2F5] active:bg-[#E0E4EC] rounded transition-all uppercase text-sm font-bold tracking-wide min-h-[52px] ${
                   clearAllHighlightVersion > 0 ? 'pro-clear-all-attention' : ''
                 }`}
@@ -2255,7 +2288,7 @@ export default function ProQuestionnaire() {
               </Suspense>
               </div>
               </div>
-              </main>
+                            </main>
 
       <AutoSaveIndicator
         show={showAutoSave}

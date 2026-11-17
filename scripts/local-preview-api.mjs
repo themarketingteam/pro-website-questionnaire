@@ -54,7 +54,7 @@ export const createLocalApi = (root, { dataDirectory = path.join(root, '.local-p
       persistencePending = false;
     }
   };
-  const publicDraft = (draft) => Object.fromEntries(Object.entries(draft).filter(([key]) => !['resumeCredential', 'revisions', 'mutations', 'clientSequences'].includes(key)));
+  const publicDraft = (draft) => ({ ...Object.fromEntries(Object.entries(draft).filter(([key]) => !['resumeCredential', 'revisions', 'mutations', 'clientSequences', 'revisionRequestHash'].includes(key))), draftId: draft.id });
   const createDraft = (fixture = 'blank', credentials = {}) => {
     const seed = fixture === 'scout' ? loadScoutFixture(root) : { responses: {}, credentials, mappedPayload: null };
     const id = randomId('localdraft');
@@ -107,6 +107,7 @@ export const createLocalApi = (root, { dataDirectory = path.join(root, '.local-p
       persist();
       return { success: true, submission: previous, zapierSent: false, localOnly: true, duplicate: true };
     }
+    if (draft.status === 'submitted' || draft.finalSubmissionId) fail('Start a revision before changing a completed questionnaire.', 409, 'DRAFT_ALREADY_SUBMITTED');
     const submission = { ...clone(payload), id: randomId('localsubmission'), created_date: now(), local_fingerprint: fingerprint, local_draft_id: draft.id, raw_responses: clone(draft.responses) };
     state.submissions.push(submission);
     draft.status = 'submitted'; draft.finalSubmissionId = submission.id;
@@ -123,8 +124,38 @@ export const createLocalApi = (root, { dataDirectory = path.join(root, '.local-p
         return { success: true, resumeCredential: draft.resumeCredential, draft: publicDraft(draft), newClientRequestConfirmed: Boolean(body.newClient) };
       }
       const draft = requireDraft(body.resumeCredential);
+      if (body.action === 'start_revision') {
+        if (!/^[A-Za-z0-9_-]{16,200}$/.test(String(body.newRevisionRequestId || ''))) fail('A stable revision request identifier is required.', 400, 'REVISION_REQUEST_REQUIRED');
+        if (draft.status !== 'submitted') fail('Only a completed questionnaire can start a revision.', 409, 'REVISION_SOURCE_NOT_SUBMITTED');
+        const receipt = state.submissions.find((item) => item.id === draft.finalSubmissionId && item.local_draft_id === draft.id);
+        if (!body.responses || typeof body.responses !== 'object' || Array.isArray(body.responses) || !body.mappedPayload?.metadata || !body.mappedPayload?.userdata) fail('Complete visible answers and mapped payload are required.', 400, 'REVISION_SEED_REQUIRED');
+        const responses = clone(body.responses);
+        const sourceKeys = Object.keys(draft.responses);
+        assertResult(guardOrganizedDraftMutation({ currentResponses: draft.responses, incomingResponses: responses, changedKeys: [...new Set([...sourceKeys, ...Object.keys(responses)])], deletedKeys: sourceKeys.filter((key) => !Object.hasOwn(responses, key)), baseRevision: draft.revision, currentRevision: draft.revision }));
+        const normalizeName = (value) => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        const normalizeDomain = (value) => String(value || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0];
+        if (normalizeName(body.mappedPayload.metadata.business_name) !== normalizeName(draft.mappedPayload?.metadata?.business_name || draft.credentials.businessName) || normalizeDomain(body.mappedPayload.metadata.businessDomain) !== normalizeDomain(draft.mappedPayload?.metadata?.businessDomain || draft.credentials.domain)) fail('A revision must remain connected to the same client.', 409, 'REVISION_IDENTITY_CONFLICT');
+        const payload = preserveOrganizedMappedPayload(clone(body.mappedPayload), responses);
+        assertResult(validateOrganizedSubmission({ payload, responses }));
+        const sourceReceiptStatus = receipt && JSON.stringify(receipt.userdata) === JSON.stringify(draft.mappedPayload?.userdata) ? 'verified' : !draft.finalSubmissionId ? 'missing_link' : receipt ? 'mismatch' : 'unavailable';
+        const sourceSubmissionId = sourceReceiptStatus === 'verified' ? draft.finalSubmissionId : '';
+        const requestHash = crypto.createHash('sha256').update(`${draft.id}:${body.resumeCredential}:${body.newRevisionRequestId}`).digest('hex');
+        let child = Object.values(state.drafts).find((item) => item.revisionRequestHash === requestHash);
+        const reused = Boolean(child);
+        if (child && (child.status !== 'draft' || child.finalSubmissionId)) fail('This retained revision is no longer editable.', 409, 'REVISION_COPY_CONFLICT');
+        if (!child) {
+          child = createDraft('blank', clone(draft.credentials));
+          Object.assign(child, { responses, mappedPayload: payload, sourceDraftId: draft.id, sourceSubmissionId, sourceReceiptStatus, revisionRequestHash: requestHash, revisionStartedAt: now(), revision: 1,
+            validationStatus: clone(body.validationStatus || {}), touchedQuestions: clone(body.touchedQuestions || {}), expandedQuestions: clone(body.expandedQuestions || {}), currentQuestionId: body.currentQuestionId || '' });
+          child.revisions.push({ revision: 1, savedAt: child.lastSavedAt, responses: clone(responses), mappedPayload: clone(payload), credentials: clone(child.credentials), source: 'client_revision_seed' });
+        }
+        state.activeDraftId = child.id;
+        persist();
+        return { success: true, revisionStarted: true, reused, sourceDraftId: draft.id, sourceSubmissionId: child.sourceSubmissionId, sourceReceiptStatus: child.sourceReceiptStatus, resumeCredential: child.resumeCredential, draft: publicDraft(child) };
+      }
       if (body.action === 'event') { state.events.push({ ...body.event, id: randomId('event'), created_date: now(), draft_id: draft.id }); persist(); return { success: true }; }
       if (body.action !== 'save') fail(`Unsupported local draft action: ${body.action}`, 400);
+      if (draft.status === 'submitted') return { success: true, finalized: true, ignored: true, draft: publicDraft(draft) };
       if (!body.mutationId || !body.clientInstanceId || !Number.isInteger(body.clientSequence)) fail('A local draft save requires mutation and client sequence identifiers.');
       if (draft.mutations[body.mutationId]) {
         persist();

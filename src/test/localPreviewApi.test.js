@@ -461,3 +461,74 @@ describe('isolated local preview network boundaries', () => {
     expect(navigator.sendBeacon('/_local/analytics', 'sample')).toBe(false);
   });
 });
+
+describe('local completed questionnaire revisions', () => {
+  const completed = () => {
+    const api = createLocalApi(fixtureRoot, { dataDirectory });
+    const session = bootstrap(api);
+    save(api, session, { ...organize(session.draft.responses), ...organize(session.draft.responses, '4') });
+    const draft = currentDraft(api, session);
+    const result = api.invoke('submitProQuestionnaireDurable', { resumeCredential: session.resumeCredential, draftId: draft.id, transformedPayload: mapped(draft.responses) });
+    return { api, session, submission: clone(result.submission), source: clone(currentDraft(api, session)) };
+  };
+  const revisionBody = (f) => {
+    const responses = { ...clone(f.source.responses), '6': 'Preserved edits for the new revision.' };
+    return { action: 'start_revision', resumeCredential: f.session.resumeCredential, newRevisionRequestId: 'local_revision_request_12345', responses, mappedPayload: mapped(responses) };
+  };
+  it('returns hosted draft identity and holds edits to completed copies', () => {
+    const f = completed();
+    expect(bootstrap(f.api, f.session.resumeCredential).draft.draftId).toBe(f.source.id);
+    const held = save(f.api, f.session, { '6': 'This must not replace the submitted copy.' });
+    expect(held).toMatchObject({ finalized: true, ignored: true });
+    expect(currentDraft(f.api, f.session)).toEqual(f.source);
+  });
+  it('retains the copied seed before ACK and reuses the same revision after restart', () => {
+    const f = completed();
+    const body = revisionBody(f);
+    const first = f.api.invoke('syncProQuestionnaireDraft', body);
+    expect(first).toMatchObject({ revisionStarted: true, reused: false, sourceDraftId: f.source.id, sourceSubmissionId: f.submission.id });
+    expect(first.draft).toMatchObject({ status: 'draft', revision: 1, responses: body.responses });
+    expect(first.draft.draftId).not.toBe(f.source.id);
+    const restarted = createLocalApi(fixtureRoot, { dataDirectory });
+    const retry = restarted.invoke('syncProQuestionnaireDraft', { ...body, responses: { ...body.responses, '6': 'Changed retry must not overwrite the retained seed.' } });
+    expect(retry.reused).toBe(true);
+    expect(retry.resumeCredential).toBe(first.resumeCredential);
+    expect(retry.draft.responses).toEqual(body.responses);
+    expect(restarted.state.drafts[f.source.id]).toEqual(f.source);
+    expect(restarted.state.submissions).toEqual([f.submission]);
+    expect(restarted.state.captures).toHaveLength(1);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('keeps the source and disk state intact when copying cannot be committed', () => {
+    const f = completed();
+    const before = fs.readFileSync(f.api.statePath, 'utf8');
+    const originalWrite = fs.writeFileSync;
+    const write = vi.spyOn(fs, 'writeFileSync').mockImplementation((filename, ...args) => {
+      if (filename === `${f.api.statePath}.tmp`) throw new Error('Simulated revision disk failure.');
+      return originalWrite(filename, ...args);
+    });
+    try { expect(() => f.api.invoke('syncProQuestionnaireDraft', revisionBody(f))).toThrow(/revision disk failure/); }
+    finally { write.mockRestore(); }
+    expect(fs.readFileSync(f.api.statePath, 'utf8')).toBe(before);
+    expect(Object.keys(f.api.state.drafts)).toEqual([f.source.id]);
+    expect(f.api.invoke('syncProQuestionnaireDraft', revisionBody(f)).revisionStarted).toBe(true);
+  });
+  it('copies authenticated answers even when a historical receipt link is absent', () => {
+    const f = completed();
+    f.api.state.drafts[f.source.id].finalSubmissionId = '';
+    const result = f.api.invoke('syncProQuestionnaireDraft', revisionBody(f));
+    expect(result).toMatchObject({ revisionStarted: true, sourceDraftId: f.source.id, sourceSubmissionId: '', sourceReceiptStatus: 'missing_link' });
+    expect(result.draft.responses['6']).toBe('Preserved edits for the new revision.');
+    expect(f.api.state.submissions).toEqual([f.submission]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it('requires a completed authorized source and keeps identity fixed', () => {
+    const f = completed();
+    const body = revisionBody(f);
+    expect(() => f.api.invoke('syncProQuestionnaireDraft', { ...body, resumeCredential: 'invalid' })).toThrow(/credential/);
+    const wrong = clone(body); wrong.mappedPayload.metadata.businessDomain = 'other-client.invalid';
+    expect(() => f.api.invoke('syncProQuestionnaireDraft', wrong)).toThrow(/same client/);
+    expect(Object.keys(f.api.state.drafts)).toEqual([f.source.id]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});

@@ -9,13 +9,13 @@ export default function AutoSaveIndicator({
   lastConfirmedRevision = 0,
   hasLocalRecoveryCopy = null
 }) {
-  const activeStatus = ['pending', 'saving', 'retrying', 'error'].includes(status);
+  const activeStatus = ['pending', 'saving', 'retrying', 'error', 'completed'].includes(status);
   const [visible, setVisible] = useState(activeStatus);
   const [copied, setCopied] = useState(false);
   const isTestMode = import.meta.env.MODE === 'test';
 
   useEffect(() => {
-    if (['pending', 'saving', 'retrying', 'error'].includes(status)) {
+    if (['pending', 'saving', 'retrying', 'error', 'completed'].includes(status)) {
       setVisible(true);
       return undefined;
     }
@@ -41,6 +41,7 @@ export default function AutoSaveIndicator({
   const isPending = status === 'pending';
   const isRetrying = status === 'retrying';
   const isError = status === 'error';
+  const isCompleted = status === 'completed';
   const savedTime = lastSavedAt && Number.isFinite(Date.parse(lastSavedAt))
     ? new Date(lastSavedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     : '';
@@ -73,6 +74,8 @@ export default function AutoSaveIndicator({
                 ? 'Retrying secure backup…'
                 : isSaving
                   ? 'Saving answers…'
+                  : isCompleted
+                    ? 'Submitted copy preserved'
                   : isError
                     ? 'Unable to save'
                     : 'Database backup confirmed'}
@@ -84,6 +87,8 @@ export default function AutoSaveIndicator({
                 ? hasLocalRecoveryCopy
                   ? 'The database has not confirmed this change yet. A temporary browser copy is retained while automatic retries continue.'
                   : 'The database has not confirmed this change, and browser storage is unavailable. Keep this page open while retries continue.'
+                : isCompleted
+                  ? 'Use “Start a revision” to save further changes. The submitted questionnaire remains unchanged.'
                 : isError
               ? hasLocalRecoveryCopy
                 ? 'The database has not confirmed this change. A temporary browser copy is retained; keep this page open and edit any answer to try again.'

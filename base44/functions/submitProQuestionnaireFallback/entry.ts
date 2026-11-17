@@ -127,10 +127,15 @@ const buildIntakePayload = ({
   notes: ''
 });
 
-Deno.serve(async (req) => {
+// Export the handler explicitly so registration does not depend on the hosted
+// runtime intercepting Deno.serve during module evaluation.
+export default async function handler(req: Request) {
+  if (req.method !== 'POST') return Response.json({ success: false, received: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed.' } }, { status: 405 });
+  let body: any;
+  try { body = await req.json(); }
+  catch { return Response.json({ success: false, received: false, error: { code: 'INVALID_JSON_REQUEST', message: 'Invalid JSON request.' } }, { status: 400 }); }
   try {
     const base44 = createClientFromRequest(req);
-    const body = await req.json();
     const transformedPayload = body?.transformedPayload;
     let rawResponses = body?.rawResponses || body?.responseSnapshot || null;
     const questionnaireSessionId = body?.questionnaireSessionId;
@@ -477,4 +482,4 @@ Deno.serve(async (req) => {
       }
     }, { status: 500 });
   }
-});
+}

@@ -54,7 +54,7 @@ const loadFunction = (relativePath, { base44 = {}, modules = {}, expose = '', fe
   };
   const deno = { serve: (fn) => { handler = fn; }, env: { get: () => '' } };
   new Function('require', 'exports', 'Deno', 'crypto', 'fetch', 'console', compiled)(require, exports, deno, webcrypto, fetch, { warn: vi.fn(), info: vi.fn(), error: vi.fn() });
-  return { handler, exposed: exports.organizerTest, fetch };
+  return { handler: handler || exports.default, exposed: exports.organizerTest, fetch };
 };
 const request = (body) => new Request('http://localhost/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 

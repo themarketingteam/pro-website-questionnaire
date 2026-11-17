@@ -35,7 +35,8 @@ const loadHosted = (relativePath, base44, fetchImpl = vi.fn(async () => { throw 
     new Function('require', 'exports', 'Deno', 'crypto', 'console', 'fetch', source)(require, exports, { serve: (fn) => { handler = fn; }, env: { get: () => '' } }, webcrypto, { error: vi.fn(), warn: vi.fn(), info: vi.fn() }, fetchImpl);
     return exports;
   };
-  load(resolve(process.cwd(), relativePath));
+  const entry = load(resolve(process.cwd(), relativePath));
+  handler ||= entry.default;
   return async (body) => {
     const response = await handler(request(body));
     return { status: response.status, body: await response.json() };
@@ -46,6 +47,7 @@ const fixture = async () => {
   const original = tree(node('original', 'Original service'));
   const accessHash = Buffer.from(await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(secret))).toString('base64url');
   let draft = { id: 'draft-hosted', session_id: session, access_token_hash: accessHash, status: 'draft', save_revision: 0, business_name: 'Test', domain: 'example.test', responses_json: JSON.stringify({ ...project(original), '6': 'Original description' }), mapped_payload_json: JSON.stringify(payloadFor(original)) };
+  const workingDrafts = [];
   const revisions = [];
   const submissions = [];
   let beforeRevision = async () => {};
@@ -59,15 +61,18 @@ const fixture = async () => {
     return expected == null ? pathValue(value, key) == null : pathValue(value, key) === expected;
   });
   const draftEntity = {
-    get: vi.fn(async () => clone(draft)),
-    filter: vi.fn(async (query) => matches(draft, query) ? [clone(draft)] : []),
+    get: vi.fn(async (id) => clone([draft, ...workingDrafts].find((value) => value.id === id) || null)),
+    filter: vi.fn(async (query) => [draft, ...workingDrafts].filter((value) => matches(value, query)).map(clone)),
+    create: vi.fn(async (value) => { const record = { ...clone(value), id: `draft-working-${workingDrafts.length + 1}` }; workingDrafts.push(record); return clone(record); }),
     updateMany: vi.fn(async (query, update) => {
       await beforeDraftMutation(query, update);
-      if (!matches(draft, query)) return { updated: 0 };
-      draft = { ...draft, ...update.$set };
+      const selected = [draft, ...workingDrafts].find((value) => matches(value, query));
+      if (!selected) return { updated: 0 };
+      if (selected.id === draft.id) draft = { ...draft, ...update.$set };
+      else Object.assign(selected, clone(update.$set));
       return { updated: 1 };
     }),
-    update: vi.fn(async (_, update) => { draft = { ...draft, ...update }; return clone(draft); })
+    update: vi.fn(async (id, update) => { if (id === draft.id) { draft = { ...draft, ...update }; return clone(draft); } const selected = workingDrafts.find((value) => value.id === id); Object.assign(selected, clone(update)); return clone(selected); })
   };
   const base44 = { asServiceRole: { entities: {
     ProFormDraft: draftEntity,
@@ -102,7 +107,7 @@ const fixture = async () => {
   const fallback = loadHosted('base44/functions/submitProQuestionnaireFallback/entry.ts', base44);
   return {
     fallback, intakes,
-    original, revisions, submissions, base44, save, submit, getDraft: () => clone(draft), setDraft: (patch) => { draft = { ...draft, ...patch }; },
+    original, revisions, submissions, workingDrafts, base44, save, submit, getDraft: () => clone(draft), setDraft: (patch) => { draft = { ...draft, ...patch }; },
     beforeDraftMutation: (fn) => { beforeDraftMutation = fn; },
     holdRevision: (fn) => { beforeRevision = fn; }, holdSubmission: (fn) => { beforeSubmission = fn; },
     hydrateSubmissionReads: (fn) => { hydrateSubmission = fn; },
@@ -361,6 +366,135 @@ describe('hosted Pro save and submission integrity', () => {
     expect(contract.validateOrganizedPayload(outbound).ok).toBe(true);
     expect(f.submissions).toHaveLength(1);
     expect(JSON.parse(f.getDraft().responses_json)['3_structure']).toEqual(selected);
+  });
+
+  it('starts a durably seeded editable revision while retaining the completed draft and receipt', async () => {
+    const f = await fixture();
+    f.setDraft({ client_identity_id: 'same-client-identity' });
+    expect((await f.submit(f.submission(f.original))).status).toBe(200);
+    const original = f.getDraft();
+    const oldReceipt = clone(f.submissions[0]);
+    const visible = tree(...f.original.pages, node('unsaved', 'Unsaved service'));
+    const seed = { ...project(visible), '6': 'Unsaved description' };
+    const requestBody = { action: 'start_revision', resumeCredential: credential, newRevisionRequestId: 'explicit_revision_request_12345', responses: seed, mappedPayload: payloadFor(visible, 'Unsaved description'), validationStatus: { '6': 'complete' }, touchedQuestions: { '3': true }, expandedQuestions: { '3': true }, credentials: { businessName: 'Test', domain: 'example.test' }, progressPercent: 75 };
+    const started = await f.save(requestBody);
+    expect(started).toMatchObject({ status: 200, body: { success: true, revisionStarted: true, sourceDraftId: original.id, sourceSubmissionId: oldReceipt.id, draft: { status: 'draft', revision: 1, responses: seed } } });
+    expect(started.body.draft.draftId).not.toBe(original.id);
+    expect(started.body.draft.sessionId).not.toBe(original.session_id);
+    expect(started.body.resumeCredential).not.toBe(credential);
+    expect(f.workingDrafts).toHaveLength(1);
+    expect(f.workingDrafts[0]).toMatchObject({ client_identity_id: 'same-client-identity', source_draft_id: original.id, source_submission_id: oldReceipt.id, status: 'draft', final_submission_id: '', intake_id: '', save_revision: 1 });
+    expect(JSON.parse(f.workingDrafts[0].mapped_payload_json).userdata).toEqual(payloadFor(visible, 'Unsaved description').userdata);
+    expect(f.revisions.filter((value) => value.draft_id === started.body.draft.draftId)).toMatchObject([{ source: 'client_revision_seed', result_snapshot_json: expect.any(String) }]);
+    expect(f.getDraft().responses_json).toBe(original.responses_json);
+    expect(f.getDraft().mapped_payload_json).toBe(original.mapped_payload_json);
+    expect(f.getDraft().final_submission_id).toBe(oldReceipt.id);
+    expect(f.submissions).toEqual([oldReceipt]);
+    const again = await f.save(requestBody);
+    expect(again).toMatchObject({ status: 200, body: { reused: true, draft: { draftId: started.body.draft.draftId, responses: seed } } });
+    expect(f.workingDrafts).toHaveLength(1);
+    expect(f.revisions.filter((value) => value.draft_id === started.body.draft.draftId)).toHaveLength(1);
+    const edited = tree(...visible.pages, node('later', 'Later working edit'));
+    const saved = await f.save(f.mutation(edited, { resumeCredential: again.body.resumeCredential, baseRevision: 1, mappedPayload: payloadFor(edited, 'Unsaved description') }));
+    expect(saved.status).toBe(200);
+    expect(saved.body.draft.responses).toMatchObject({ ...project(edited), '6': 'Unsaved description' });
+    const reopened = await f.save(requestBody);
+    expect(reopened.body.draft.responses).toMatchObject({ ...project(edited), '6': 'Unsaved description' });
+    const final = await f.submit(f.submission(edited, { draftId: started.body.draft.draftId, resumeCredential: reopened.body.resumeCredential, submissionAttemptId: 'working_revision_submit_12345678', transformedPayload: payloadFor(edited, 'Unsaved description') }));
+    expect(final.status).toBe(200);
+    expect(f.submissions).toHaveLength(2);
+    expect(f.submissions[0]).toEqual(oldReceipt);
+    expect((await f.save(f.mutation(edited))).body).toMatchObject({ finalized: true, ignored: true });
+  });
+
+  it('requires a submitted authorized source and explicit valid full seed without changing damaged receipts', async () => {
+    const f = await fixture();
+    const body = { action: 'start_revision', resumeCredential: credential, newRevisionRequestId: 'explicit_revision_validation_123', responses: project(f.original), mappedPayload: payloadFor(f.original) };
+    expect((await f.save(body)).body.code).toBe('REVISION_SOURCE_NOT_SUBMITTED');
+    expect((await f.submit(f.submission(f.original))).status).toBe(200);
+    expect((await f.save({ ...body, resumeCredential: '' })).status).toBe(401);
+    expect((await f.save({ ...body, newRevisionRequestId: '' })).status).toBe(400);
+    expect((await f.save({ ...body, responses: null })).status).toBe(400);
+    expect((await f.save({ ...body, mappedPayload: null })).status).toBe(400);
+    expect((await f.save({ ...body, credentials: { businessName: 'Different client', domain: 'different.test' } })).body.code).toBe('REVISION_IDENTITY_CONFLICT');
+    expect((await f.save({ ...body, responses: { '3': ['Old flat service'] } })).status).toBe(409);
+    f.submissions[0].userdata.company_description = 'Damaged receipt';
+    const copied = await f.save(body);
+    expect(copied).toMatchObject({ status: 200, body: { sourceSubmissionId: '', sourceSubmissionVerified: false, draft: { sourceReceiptStatus: 'mismatch' } } });
+    expect(f.submissions[0].userdata.company_description).toBe('Damaged receipt');
+    expect(f.workingDrafts).toHaveLength(1);
+  });
+
+  it('allows incomplete answers in a revision seed and verifies checkpoints before acknowledging', async () => {
+    const f = await fixture();
+    expect((await f.submit(f.submission(f.original))).status).toBe(200);
+    const empty = tree();
+    const body = { action: 'start_revision', resumeCredential: credential, newRevisionRequestId: 'explicit_revision_retry_123456', responses: { ...project(empty), '6': '' }, mappedPayload: payloadFor(empty, '') };
+    let failed = false;
+    f.holdRevision(async () => { if (!failed) { failed = true; throw new Error('Synthetic checkpoint outage'); } });
+    const rejected = await f.save(body);
+    expect(rejected.status).toBe(500);
+    expect(rejected.body.success).toBe(false);
+    expect(f.workingDrafts).toHaveLength(1);
+    expect(f.revisions).toHaveLength(0);
+    const retained = f.workingDrafts[0].responses_json;
+    const recovered = await f.save(body);
+    expect(recovered).toMatchObject({ status: 200, body: { success: true, reused: true, draft: { status: 'draft', revision: 1, responses: { ...project(empty), '6': '' } } } });
+    expect(f.workingDrafts).toHaveLength(1);
+    expect(f.workingDrafts[0].responses_json).toBe(retained);
+    expect(f.getDraft().status).toBe('submitted');
+  });
+
+  it('serializes duplicate revision clicks into one working copy and does not acknowledge dropped seed data', async () => {
+    const f = await fixture();
+    expect((await f.submit(f.submission(f.original))).status).toBe(200);
+    const body = { action: 'start_revision', resumeCredential: credential, newRevisionRequestId: 'explicit_revision_parallel_123', responses: project(f.original), mappedPayload: payloadFor(f.original) };
+    const [first, second] = await Promise.all([f.save(body), f.save(body)]);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(first.body.draft.draftId).toBe(second.body.draft.draftId);
+    expect(f.workingDrafts).toHaveLength(1);
+    const broken = await fixture();
+    expect((await broken.submit(broken.submission(broken.original))).status).toBe(200);
+    const create = broken.base44.asServiceRole.entities.ProFormDraft.create;
+    broken.base44.asServiceRole.entities.ProFormDraft.create = vi.fn(async (value) => { const record = await create(value); broken.workingDrafts[0].responses_json = '{}'; return record; });
+    const rejected = await broken.save({ ...body, newRevisionRequestId: 'explicit_revision_corrupt_12345' });
+    expect(rejected.status).toBe(502);
+    expect(rejected.body.code).toBe('REVISION_SEED_UNVERIFIED');
+    expect(broken.getDraft().status).toBe('submitted');
+  });
+
+
+  it('copies authenticated historical submitted answers even when the original receipt cannot be verified', async () => {
+    for (const historical of ['missing_link', 'unavailable', 'unreadable_mapping']) {
+      const f = await fixture();
+      expect((await f.submit(f.submission(f.original))).status).toBe(200);
+      if (historical === 'missing_link') f.setDraft({ final_submission_id: '' });
+      if (historical === 'unavailable') f.base44.asServiceRole.entities.ProFormSubmission.get = vi.fn(async () => null);
+      if (historical === 'unreadable_mapping') f.setDraft({ mapped_payload_json: '{bad mapping' });
+      const originalRaw = f.getDraft().responses_json;
+      const copied = await f.save({ action: 'start_revision', resumeCredential: credential, newRevisionRequestId: `historical_revision_${historical}_12345`, responses: { ...project(f.original), '6': 'Visible unsaved answer' }, mappedPayload: payloadFor(f.original, 'Visible unsaved answer') });
+      expect(copied).toMatchObject({ status: 200, body: { success: true, sourceSubmissionId: '', sourceSubmissionVerified: false, draft: { status: 'draft', responses: { ...project(f.original), '6': 'Visible unsaved answer' } } } });
+      expect(f.getDraft().responses_json).toBe(originalRaw);
+      expect(f.getDraft().status).toBe('submitted');
+      expect(f.submissions).toHaveLength(1);
+      expect(f.workingDrafts[0].source_receipt_status).toBe(historical === 'missing_link' ? 'missing_link' : 'unavailable');
+    }
+  });
+
+  it('reports an unverified revision echo without acknowledging or discarding its retained changes', async () => {
+    const f = await fixture();
+    const create = f.base44.asServiceRole.entities.ProFormDraftRevision.create;
+    f.base44.asServiceRole.entities.ProFormDraftRevision.create = vi.fn(async (value) => { const record = await create(value); delete record.server_revision; return record; });
+    const changed = tree(...f.original.pages, node('diagnostic', 'Retained pending answer'));
+    const rejected = await f.save(f.mutation(changed));
+    expect(rejected).toMatchObject({ status: 502, body: { success: false, code: 'DRAFT_REVISION_UNVERIFIED' } });
+    expect(JSON.parse(f.getDraft().responses_json)['3_structure']).toEqual(f.original);
+    expect(f.revisions).toHaveLength(1);
+    const recovered = await f.save(f.mutation(changed));
+    expect(recovered.status).toBe(200);
+    expect(recovered.body.draft.responses['3_structure']).toEqual(changed);
+    expect(f.revisions).toHaveLength(1);
   });
 
 });
