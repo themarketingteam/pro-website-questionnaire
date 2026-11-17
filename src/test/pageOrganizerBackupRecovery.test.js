@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPageStructure, movePage, projectPageStructure } from '@/lib/pageOrganizerModel';
 import { mergeNewerLocalBackup, preserveOrganizerRecoveryConflict, readOrganizerRecoveryArchive } from '@/lib/useSecureQuestionnaireDraft';
 
@@ -37,6 +37,16 @@ const merge = (localBackup, serverDraft = server()) => mergeNewerLocalBackup({ s
 
 describe('organized offline backup revision safety', () => {
   beforeEach(() => localStorage.clear());
+
+  it('retains earlier memory-only conflict copies when browser storage is unavailable', () => {
+    vi.spyOn(localStorage, 'setItem').mockImplementation(() => { throw new Error('Quota exceeded'); });
+    const first = preserveOrganizerRecoveryConflict('local-session', merge(backup()).recoveryConflict);
+    const another = backup({ responses: { ...backup().responses, '6': 'A second distinct browser answer' } });
+    const second = preserveOrganizerRecoveryConflict('local-session', merge(another).recoveryConflict, first.archive);
+    expect(first.storageSaved).toBe(false); expect(second.storageSaved).toBe(false);
+    expect(second.archive.conflicts).toHaveLength(2);
+    expect(second.archive.conflicts[0].backup.responses['6']).toBe('New offline company description');
+  });
 
   it('keeps a newer server tree and its UI status while recovering unrelated legacy changes', () => {
     const localBackup = backup();
