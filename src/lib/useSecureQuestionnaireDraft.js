@@ -63,6 +63,16 @@ const sameValue = (left, right) => {
   }
 };
 
+const canonicalResponseValue = (value) => Array.isArray(value) ? value.map(canonicalResponseValue)
+  : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalResponseValue(value[key])])) : value;
+
+export const equivalentCompletedResponses = (left, right) => {
+  try {
+    const normalize = (responses) => canonicalResponseValue(normalizePersistedStateV3({ responses: responses || {} }).responses);
+    return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
+  } catch { return false; }
+};
+
 const normalizeIdentityValue = (value, type = 'text') => {
   const normalized = String(value || '').trim().toLowerCase();
   if (type !== 'domain') return normalized.replace(/\s+/g, ' ');
@@ -421,7 +431,7 @@ export const useSecureQuestionnaireDraft = ({
     const completed = {
       draftId: serverDraft.draftId, sessionId, finalSubmissionId: serverDraft.finalSubmissionId || '',
       status: 'submitted', lastSavedAt: serverDraft.lastSavedAt || '',
-      hasUnsavedChanges: !sameValue(retained.responses, serverDraft.responses || {})
+      hasUnsavedChanges: !equivalentCompletedResponses(retained.responses, serverDraft.responses)
     };
     completedDraftRef.current = completed;
     setCompletedDraft(completed);

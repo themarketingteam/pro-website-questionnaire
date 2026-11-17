@@ -2,7 +2,7 @@ import { useReducer } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import formReducer, { setMultipleResponses } from '@/components/store/formSlice';
-import { useSecureQuestionnaireDraft, readOrganizerRecoveryArchive, mergeNewerLocalBackup } from '@/lib/useSecureQuestionnaireDraft';
+import { useSecureQuestionnaireDraft, readOrganizerRecoveryArchive, mergeNewerLocalBackup, equivalentCompletedResponses } from '@/lib/useSecureQuestionnaireDraft';
 import { createPageNode, addPage, createPageStructure, projectPageStructure } from '@/lib/pageOrganizerModel';
 import { getDraftLocalBackup, writeDraftFailureBackup } from '@/lib/draftPersistence';
 import * as persistence from '@/lib/draftPersistence';
@@ -23,6 +23,22 @@ const edit = (tab, patch, keys = Object.keys(patch), deletedKeys = []) => {
 };
 describe('actual hosted draft incident recovery', () => {
   beforeEach(() => { vi.spyOn(persistence, 'reloadForDraftRevision').mockImplementation(() => {}); localStorage.clear(); window.history.replaceState({}, '', '/'); persistResumeCredential(INCIDENT_CREDENTIAL); });
+  it('does not call routine normalization browser edits on a fresh completed hydration with no outbox', async () => {
+    const backend = await hostedDraftIncidentBackend({ responses: initial(), status: 'submitted', groups });
+    const tab = mount(backend);
+    await waitFor(() => expect(tab.result.current.api.completedDraft).not.toBeNull());
+    expect(tab.result.current.api.completedDraft.hasUnsavedChanges).toBe(false);
+    expect(backend.calls.some(call => call.action === 'save')).toBe(false);
+  });
+  it('compares logical completed answers independently of object key order while retaining real value and priority differences', () => {
+    const saved = initial();
+    const reordered = Object.fromEntries(Object.entries(saved).reverse());
+    reordered['3_structure'] = { pages: saved['3_structure'].pages.map(page => Object.fromEntries(Object.entries(page).reverse())), format: 'page-tree-v1' };
+    expect(equivalentCompletedResponses(saved, reordered)).toBe(true);
+    expect(equivalentCompletedResponses(saved, { ...reordered, '6': 'A genuine pending browser edit' })).toBe(false);
+    const withStandalone = { ...saved, ...projection(addPage(saved['3_structure'], createPageNode('3', 'Standalone page'))) };
+    expect(equivalentCompletedResponses(withStandalone, { ...withStandalone, '3_structure': { ...withStandalone['3_structure'], pages: [...withStandalone['3_structure'].pages].reverse() } })).toBe(false);
+  });
   it('refreshes a direct stale organizer rejection and saves pending unrelated text/deletion', async () => {
     const backend = await hostedDraftIncidentBackend({ responses: initial(), groups });
     const a = mount(backend), b = mount(backend);

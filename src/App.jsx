@@ -6,7 +6,8 @@ import { queryClientInstance } from '@/lib/query-client'
 import VisualEditAgent from '@/lib/VisualEditAgent'
 import NavigationTracker from '@/lib/NavigationTracker'
 import { pagesConfig } from './pages.config'
-import { BrowserRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import QuestionnaireAliasRedirect from '@/components/QuestionnaireAliasRedirect';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -103,7 +104,7 @@ const AuthenticatedApp = () => {
           path={`/${path}`}
           element={
             path === 'Home' || path === 'ProQuestionnaire'
-              ? <Navigate to="/" replace />
+              ? <QuestionnaireAliasRedirect />
               : (
                 <LayoutWrapper currentPageName={path}>
                   <Page />
