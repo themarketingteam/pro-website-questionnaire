@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { CheckCircle2, Download, Loader2 } from 'lucide-react';
 import { useQuestionnairePdfDownload } from './pdf/useQuestionnairePdfDownload';
 
-export default function ThankYouModal({ businessName, domain, formData }) {
+export default function ThankYouModal({ businessName, domain, formData, onViewAnswers = undefined, onCopyLink = undefined, receiptPending = false }) {
   const { isGeneratingPDF, downloadPDF: handleDownloadPDF } =
     useQuestionnairePdfDownload({ formData, businessName, domain });
 
@@ -28,7 +28,7 @@ export default function ThankYouModal({ businessName, domain, formData }) {
         <div className="space-y-2">
           <h1 className="text-4xl font-bold text-gray-900">Thank You!</h1>
           <p className="text-lg text-gray-600">
-            We've received your questionnaire for <span className="font-semibold text-gray-900">{businessName}</span>
+            {receiptPending ? 'Your answers were safely received for processing. Final submission confirmation is pending for ' : "We've received your questionnaire for "}<span className="font-semibold text-gray-900">{businessName}</span>
           </p>
         </div>
 
@@ -51,6 +51,11 @@ export default function ThankYouModal({ businessName, domain, formData }) {
               </>
             )}
           </button>
+        </div>
+
+        <div className="flex flex-wrap justify-center gap-3">
+          {onViewAnswers && <button type="button" onClick={onViewAnswers} className="min-h-11 rounded-lg bg-blue-800 px-5 py-3 font-semibold text-white">{receiptPending ? 'View saved answers' : 'View submitted answers'}</button>}
+          {onCopyLink && <button type="button" onClick={onCopyLink} className="min-h-11 rounded-lg border border-blue-800 bg-white px-5 py-3 font-semibold text-blue-900">Copy questionnaire link</button>}
         </div>
 
         {/* What Happens Next Card */}

@@ -18,7 +18,6 @@ const DEFAULT_PAGE_SIZE = 25;
 const MAX_PAGE_SIZE = 50;
 const RETENTION_DAYS = 1095;
 const RETENTION_POLICY_VERSION = 'three-year-active-v1';
-const MAX_ACTIVE_SHARE_LINKS = 20;
 const VERSION_QUERY_PAGE_SIZE = 500;
 const VERSION_QUERY_MAX_RECORDS = 25_000;
 const VERSION_SESSION_GAP_MS = 30 * 60 * 1000;
@@ -1065,16 +1064,21 @@ Deno.serve(async (req) => {
 
       const secret = randomToken();
       const tokenHash = await hashToken(secret);
-      const previousHashes = parseSharedAccessHashes(draft.shared_access_token_hashes_json);
-      const nextHashes = [...previousHashes, tokenHash].slice(-MAX_ACTIVE_SHARE_LINKS);
       const now = new Date().toISOString();
       const actorIdentifier = isAdmin ? (adminIdentifier || 'base44-admin') : 'password-recovery-grant';
-
-      await entity.update(recordId, {
-        shared_access_token_hashes_json: JSON.stringify(nextHashes),
-        shared_access_link_created_at: now,
-        shared_access_link_created_by: actorIdentifier,
-        shared_access_link_generation_count: Math.max(0, Number(draft.shared_access_link_generation_count) || 0) + 1
+      await withEntityLease({ entity, entityId: recordId, purpose: 'pro-draft-share-link' }, async (lease) => {
+        const current = await entity.get(recordId);
+        if (!current?.id || cleanText(current.soft_deleted_at, 100)) {
+          throw Object.assign(new Error('This draft is unavailable for client access.'), { status: 410 });
+        }
+        // Issuing another link must preserve every previously shared link.
+        const nextHashes = [...new Set([...parseSharedAccessHashes(current.shared_access_token_hashes_json), tokenHash])];
+        await lease.update({
+          shared_access_token_hashes_json: JSON.stringify(nextHashes),
+          shared_access_link_created_at: now,
+          shared_access_link_created_by: actorIdentifier,
+          shared_access_link_generation_count: Math.max(0, Number(current.shared_access_link_generation_count) || 0) + 1
+        });
       });
 
       try {

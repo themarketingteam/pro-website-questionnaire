@@ -13,8 +13,6 @@ import {
   getDraftLocalBackup,
   isRetryableDraftError,
   saveServerDraftMutation,
-  startServerDraftRevision,
-  reloadForDraftRevision,
   writeDraftFailureBackup
 } from '@/lib/draftPersistence';
 import {
@@ -295,13 +293,8 @@ export const useSecureQuestionnaireDraft = ({
   const [restoredQuestionId, setRestoredQuestionId] = useState('');
   const [identityConflict, setIdentityConflict] = useState(null);
   const [completedDraft, setCompletedDraft] = useState(null);
-  const [isStartingRevision, setIsStartingRevision] = useState(false);
-  const [revisionStartError, setRevisionStartError] = useState('');
-  const [revisionRetryPending, setRevisionRetryPending] = useState(false);
   const completedDraftRef = useRef(null);
   const completedRecoveryRef = useRef(null);
-  const revisionAttemptRef = useRef(null);
-  const revisionInFlightRef = useRef(false);
   const authoritativeReadyRef = useRef(false);
   const organizerArchiveRef = useRef(null);
   const resumeCredentialRef = useRef(getStoredResumeCredential());
@@ -435,10 +428,6 @@ export const useSecureQuestionnaireDraft = ({
     };
     completedDraftRef.current = completed;
     setCompletedDraft(completed);
-    try {
-      const attempt = JSON.parse(safeLocalStorageGet(`pro_questionnaire_revision_attempt_${sessionId}`) || 'null');
-      setRevisionRetryPending(Boolean(attempt && attempt.draftId === completed.draftId && !attempt.acknowledged));
-    } catch { setRevisionRetryPending(false); }
     setDraftSaveState('completed');
     if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
     if (saveRetryTimerRef.current) { clearTimeout(saveRetryTimerRef.current); saveRetryTimerRef.current = null; }
@@ -451,7 +440,7 @@ export const useSecureQuestionnaireDraft = ({
   const refreshOrganizerConflict = useCallback(async (snapshot, changedKeys, deletedKeys, baseRevision) => {
     const result = await bootstrapServerDraft({ functions: base44.functions, resumeCredential: resumeCredentialRef.current, legacySessionId: '', credentials: {}, incomingIdentity: {} });
     const serverDraft = result.draft;
-    if (serverDraft.status === 'submitted') { holdCompletedDraft(serverDraft); return false; }
+    if (serverDraft.status === 'submitted' || serverDraft.finalSubmissionId) { holdCompletedDraft(serverDraft); return false; }
     const returned = normalizePersistedStateV3({ responses: serverDraft.responses }).responses;
     const differs = (left, right, id) => organizerResponseKeys(id).some((key) => !sameValue(left?.[key], right?.[key]));
     const invalidated = ['3', '4'].filter((id) => (
@@ -551,7 +540,7 @@ export const useSecureQuestionnaireDraft = ({
 
     const operation = async () => {
       try {
-        if (completedDraftRef.current) throw Object.assign(new Error('Start a new revision before editing this submitted questionnaire.'), { status: 409, code: 'DRAFT_ALREADY_SUBMITTED' });
+        if (completedDraftRef.current) throw Object.assign(new Error('This questionnaire has been submitted and is read-only. Contact your team for changes.'), { status: 409, code: 'DRAFT_ALREADY_SUBMITTED' });
         const invalidatedQuestions = ['3', '4'].filter((id) => (
           queuedOrganizerGeneration[id] !== organizerGenerationRef.current[id]
           && (owns(snapshot.responses, `${id}_structure`) || owns(authoritativeOrganizerRef.current[id], `${id}_structure`))
@@ -668,7 +657,7 @@ export const useSecureQuestionnaireDraft = ({
         setLastSavedAt(result?.draft?.lastSavedAt || safeNowIso());
         setDraftSaveState('saved');
         writeLocalOutbox('');
-        if (result?.draft?.status === 'submitted') holdCompletedDraft(result.draft);
+        if (result?.draft?.status === 'submitted' || result?.draft?.finalSubmissionId) holdCompletedDraft(result.draft);
         saveRetryAttemptRef.current = 0;
         if (saveRetryTimerRef.current) {
           clearTimeout(saveRetryTimerRef.current);
@@ -1005,7 +994,7 @@ export const useSecureQuestionnaireDraft = ({
 
         merged.changedKeys.forEach((key) => pendingChangedKeysRef.current.add(key));
         merged.deletedKeys.forEach((key) => pendingDeletedKeysRef.current.add(key));
-        if (serverDraft.status === 'submitted') holdCompletedDraft(serverDraft);
+        if (serverDraft.status === 'submitted' || serverDraft.finalSubmissionId) holdCompletedDraft(serverDraft);
         else if (merged.changedKeys.length > 0 || merged.deletedKeys.length > 0) {
           await executeSave({ source: 'local_recovery_merge' });
         }
@@ -1239,56 +1228,11 @@ export const useSecureQuestionnaireDraft = ({
     return true;
   }, []);
 
-  const startRevision = useCallback(async ({ includePreservedEdits = false } = {}) => {
-    if (!completedDraftRef.current || revisionInFlightRef.current) return null;
-    revisionInFlightRef.current = true;
-    setIsStartingRevision(true); setRevisionStartError('');
-    try {
-      // Capture once; retrying a timeout uses the same request ID and seed.
-      if (!revisionAttemptRef.current) {
-        const storageKey = `pro_questionnaire_revision_attempt_${completedDraftRef.current.sessionId}`;
-        let previous;
-        try { previous = JSON.parse(safeLocalStorageGet(storageKey) || 'null'); } catch { previous = null; }
-        const pending = previous?.draftId === completedDraftRef.current.draftId && !previous.acknowledged;
-        const include = pending ? previous.includePreservedEdits : includePreservedEdits;
-        const selected = include && completedRecoveryRef.current ? completedRecoveryRef.current : latestRef.current;
-        const snapshot = pending ? previous.snapshot : structuredClone({ responses: selected.responses, validationStatus: selected.validationStatus, touchedQuestions: selected.touchedQuestions, expandedQuestions: selected.expandedQuestions, credentials: selected.credentials || latestRef.current.credentials });
-        const requestId = pending ? previous.requestId : crypto.randomUUID();
-        revisionAttemptRef.current = { requestId, resumeCredential: resumeCredentialRef.current, snapshot, includePreservedEdits: include };
-        safeLocalStorageSet(storageKey, { requestId, draftId: completedDraftRef.current.draftId, snapshot, includePreservedEdits: include, acknowledged: false });
-      }
-      setRevisionRetryPending(true);
-      const attempt = revisionAttemptRef.current;
-      const snapshot = attempt.snapshot;
-      writeLocalOutbox('starting_explicit_revision');
-      const result = await startServerDraftRevision({
-        functions: base44.functions, resumeCredential: attempt.resumeCredential, newRevisionRequestId: attempt.requestId,
-        ...snapshot, currentQuestionId: lastChangedQuestionIdRef.current || '', lastChangedQuestionId: lastChangedQuestionIdRef.current || '',
-        progressPercent: calculateProgress(snapshot.responses, totalQuestionCount),
-        mappedPayload: transformResponsesToPayload(snapshot.responses, snapshot.credentials.businessName, snapshot.credentials.domain, serviceOptionsGrouped)
-      });
-      const draft = result.draft;
-      if (!mountedRef.current || resumeCredentialRef.current !== attempt.resumeCredential) return null;
-      if (draft.draftId === completedDraftRef.current?.draftId || (result.sourceDraftId && result.sourceDraftId !== completedDraftRef.current?.draftId)) {
-        throw new Error('The new revision did not confirm a separate working draft. The original recovery link was retained.');
-      }
-      const normalized = normalizePersistedStateV3(draft);
-      // Seed agreement is verified by the client contract before replacing any
-      // original URL, refs, or browser answers. The original recovery copy stays.
-      const credential = persistResumeCredential(result.resumeCredential);
-      if (!credential) throw new Error('The new draft did not return a valid recovery link.');
-      writeDraftFailureBackup({ questionnaireSessionId: draft.sessionId, ...normalized, changedKeys: [], deletedKeys: [], baseRevision: draft.revision, error: '' });
-      safeLocalStorageSet(`pro_questionnaire_revision_attempt_${completedDraftRef.current.sessionId}`, { requestId: attempt.requestId, draftId: completedDraftRef.current.draftId, acknowledged: true, targetDraftId: draft.draftId, acknowledgedAt: safeNowIso() });
-      removeNewClientLaunchParams();
-      // Keep every mounted callback scoped to the old completed capability.
-      // A fresh document bootstraps the new session from its confirmed seed.
-      reloadForDraftRevision();
-      return draft;
-    } catch (error) {
-      setRevisionStartError(error?.message || 'The new revision could not be confirmed. Your existing copy is retained.');
-      return null;
-    } finally { revisionInFlightRef.current = false; if (mountedRef.current) setIsStartingRevision(false); }
-  }, [base44.functions, dispatch, serviceOptionsGrouped, totalQuestionCount, writeLocalOutbox]);
+  const markSubmitted = useCallback(({ responses, credentials, draftId = '', finalSubmissionId = '' }) => {
+    holdCompletedDraft({ draftId: draftId || completedDraftRef.current?.draftId || '', sessionId: resumeCredentialRef.current?.split('.')[0] || questionnaireSessionId,
+      status: 'submitted', finalSubmissionId, responses, credentials, validationStatus: latestRef.current.validationStatus,
+      touchedQuestions: latestRef.current.touchedQuestions, expandedQuestions: latestRef.current.expandedQuestions, lastSavedAt: safeNowIso() });
+  }, [holdCompletedDraft, questionnaireSessionId]);
 
   return {
     isDraftReady,
@@ -1303,10 +1247,7 @@ export const useSecureQuestionnaireDraft = ({
     restoredQuestionId,
     identityConflict,
     completedDraft,
-    isStartingRevision,
-    revisionStartError,
-    revisionRetryPending,
-    startRevision,
+    markSubmitted,
     downloadCompletedRecoveryBackup,
     queueDraftSave,
     saveDraftNow,

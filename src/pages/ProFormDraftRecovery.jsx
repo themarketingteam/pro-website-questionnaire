@@ -552,6 +552,54 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
         </CardContent>
       </button>
 
+      {expanded && <div className="brand-expanded-panel p-4">
+          <section
+            aria-label="Draft Link"
+            className="brand-draft-link-panel rounded-lg border px-4 py-3"
+          >
+            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-4">
+              <div className="shrink-0 text-sm"><p className="font-semibold text-slate-900">Draft Link</p><p className="mt-1 text-xs text-slate-600">{localDraft.business_name || 'Original questionnaire'} · {localDraft.status === 'submitted' || localDraft.final_submission_id ? 'Submitted · read-only' : 'Current draft'}</p></div>
+              {localDraft.soft_deleted_at ? (
+                <p className="text-sm text-slate-600">
+                  Restore this deleted draft before creating a client link.
+                </p>
+              ) : draftShareUrl ? (
+                <a
+                  href={draftShareUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  referrerPolicy="no-referrer"
+                  className="brand-draft-link-panel__link min-w-0 break-all text-sm"
+                  title="Open this client draft link in a new tab"
+                >
+                  {draftShareUrl}
+                </a>
+              ) : (
+                <p className="text-sm text-slate-600" aria-live="polite">
+                  Select Copy Draft Link below to generate and display a secure client link.
+                </p>
+              )}
+            </div>
+            {isHistoricalVersion && <p className="mt-2 text-xs text-slate-600">This link opens the original questionnaire for this recovery record. The history selector changes the preview below; it does not change this link.</p>}
+            <div className="mt-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="brand-button-secondary gap-2"
+                  onClick={handleCopyDraftLink}
+                  disabled={isWorking || Boolean(localDraft.soft_deleted_at)}
+                  title={localDraft.soft_deleted_at
+                    ? 'Restore this deleted draft before creating a client link.'
+                    : 'Copies the original questionnaire link. Submitted answers open read-only.'}
+                >
+                  {copyingDraftLink ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
+                  {copyingDraftLink ? 'Copying...' : 'Copy Draft Link'}
+                </Button>
+            </div>
+          </section>
+      </div>}
+
       {expanded && detailLoading && (
         <div className="brand-expanded-panel flex items-center gap-2 p-4 text-sm text-slate-600">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
@@ -634,7 +682,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
               <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">
                 <p className="font-semibold">Read-only historical version</p>
                 <p className="mt-1">
-                  Editing, retrying, AI repair, and client-link actions are disabled so this retained snapshot cannot overwrite the active draft.
+                  Editing, retrying, and AI repair are disabled so this retained snapshot cannot overwrite the active draft.
                 </p>
                 {selectedVersion?.sourceType !== 'submission' && (
                   <Button
@@ -731,59 +779,13 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
             disabled={isWorking}
           />
 
-          <section
-            aria-label="Draft Link"
-            className="brand-draft-link-panel rounded-lg border px-4 py-3"
-          >
-            <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-4">
-              <p className="shrink-0 text-sm font-semibold text-slate-900">Draft Link</p>
-              {isHistoricalVersion ? (
-                <p className="text-sm text-slate-600">
-                  Historical snapshots are read-only. Create an editable recovery copy to generate a new client link from this version.
-                </p>
-              ) : localDraft.soft_deleted_at ? (
-                <p className="text-sm text-slate-600">
-                  Restore this deleted draft before creating a client link.
-                </p>
-              ) : draftShareUrl ? (
-                <a
-                  href={draftShareUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  referrerPolicy="no-referrer"
-                  className="brand-draft-link-panel__link min-w-0 break-all text-sm"
-                  title="Open this client draft link in a new tab"
-                >
-                  {draftShareUrl}
-                </a>
-              ) : (
-                <p className="text-sm text-slate-600" aria-live="polite">
-                  Select Copy Draft Link below to generate and display a secure client link.
-                </p>
-              )}
-            </div>
-          </section>
+
 
           <div className="space-y-4">
             <section aria-label="Actions" className="space-y-2">
               <p className="brand-action-label text-xs uppercase">Actions</p>
               <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="brand-button-secondary gap-2"
-                  onClick={handleCopyDraftLink}
-                  disabled={isWorking || isHistoricalVersion || Boolean(localDraft.soft_deleted_at)}
-                  title={localDraft.soft_deleted_at
-                    ? 'Restore this deleted draft before creating a client link.'
-                    : isHistoricalVersion
-                      ? 'Create an editable recovery copy before generating a client link from a historical version.'
-                    : 'Copies a secure link that lets the client continue this saved questionnaire.'}
-                >
-                  {copyingDraftLink ? <Loader2 className="w-3 h-3 animate-spin" /> : <Link2 className="w-3 h-3" />}
-                  {copyingDraftLink ? 'Copying...' : 'Copy Draft Link'}
-                </Button>
+
 
                 {/* Edit Draft — always available */}
                 {!editing && (

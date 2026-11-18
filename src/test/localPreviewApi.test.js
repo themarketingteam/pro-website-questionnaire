@@ -482,52 +482,12 @@ describe('local completed questionnaire revisions', () => {
     expect(held).toMatchObject({ finalized: true, ignored: true });
     expect(currentDraft(f.api, f.session)).toEqual(f.source);
   });
-  it('retains the copied seed before ACK and reuses the same revision after restart', () => {
+  it('rejects public revision attempts without changing completed records or making requests', () => {
     const f = completed();
-    const body = revisionBody(f);
-    const first = f.api.invoke('syncProQuestionnaireDraft', body);
-    expect(first).toMatchObject({ revisionStarted: true, reused: false, sourceDraftId: f.source.id, sourceSubmissionId: f.submission.id });
-    expect(first.draft).toMatchObject({ status: 'draft', revision: 1, responses: body.responses });
-    expect(first.draft.draftId).not.toBe(f.source.id);
-    const restarted = createLocalApi(fixtureRoot, { dataDirectory });
-    const retry = restarted.invoke('syncProQuestionnaireDraft', { ...body, responses: { ...body.responses, '6': 'Changed retry must not overwrite the retained seed.' } });
-    expect(retry.reused).toBe(true);
-    expect(retry.resumeCredential).toBe(first.resumeCredential);
-    expect(retry.draft.responses).toEqual(body.responses);
-    expect(restarted.state.drafts[f.source.id]).toEqual(f.source);
-    expect(restarted.state.submissions).toEqual([f.submission]);
-    expect(restarted.state.captures).toHaveLength(1);
-    expect(fetch).not.toHaveBeenCalled();
-  });
-  it('keeps the source and disk state intact when copying cannot be committed', () => {
-    const f = completed();
-    const before = fs.readFileSync(f.api.statePath, 'utf8');
-    const originalWrite = fs.writeFileSync;
-    const write = vi.spyOn(fs, 'writeFileSync').mockImplementation((filename, ...args) => {
-      if (filename === `${f.api.statePath}.tmp`) throw new Error('Simulated revision disk failure.');
-      return originalWrite(filename, ...args);
-    });
-    try { expect(() => f.api.invoke('syncProQuestionnaireDraft', revisionBody(f))).toThrow(/revision disk failure/); }
-    finally { write.mockRestore(); }
-    expect(fs.readFileSync(f.api.statePath, 'utf8')).toBe(before);
-    expect(Object.keys(f.api.state.drafts)).toEqual([f.source.id]);
-    expect(f.api.invoke('syncProQuestionnaireDraft', revisionBody(f)).revisionStarted).toBe(true);
-  });
-  it('copies authenticated answers even when a historical receipt link is absent', () => {
-    const f = completed();
-    f.api.state.drafts[f.source.id].finalSubmissionId = '';
-    const result = f.api.invoke('syncProQuestionnaireDraft', revisionBody(f));
-    expect(result).toMatchObject({ revisionStarted: true, sourceDraftId: f.source.id, sourceSubmissionId: '', sourceReceiptStatus: 'missing_link' });
-    expect(result.draft.responses['6']).toBe('Preserved edits for the new revision.');
+    const original = clone(f.source);
+    expect(() => f.api.invoke('syncProQuestionnaireDraft', revisionBody(f))).toThrow(/read-only/);
+    expect(f.api.state.drafts[f.source.id]).toEqual(original);
     expect(f.api.state.submissions).toEqual([f.submission]);
-    expect(fetch).not.toHaveBeenCalled();
-  });
-  it('requires a completed authorized source and keeps identity fixed', () => {
-    const f = completed();
-    const body = revisionBody(f);
-    expect(() => f.api.invoke('syncProQuestionnaireDraft', { ...body, resumeCredential: 'invalid' })).toThrow(/credential/);
-    const wrong = clone(body); wrong.mappedPayload.metadata.businessDomain = 'other-client.invalid';
-    expect(() => f.api.invoke('syncProQuestionnaireDraft', wrong)).toThrow(/same client/);
     expect(Object.keys(f.api.state.drafts)).toEqual([f.source.id]);
     expect(fetch).not.toHaveBeenCalled();
   });

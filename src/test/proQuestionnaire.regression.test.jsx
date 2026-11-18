@@ -506,7 +506,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     });
   });
 
-  it('does not block success on Zapier failure and retains responseSnapshot after Redux reset', async () => {
+  it('does not block success on Zapier failure and retains submitted answers for read-only review', async () => {
     window.history.replaceState(
       {},
       '',
@@ -581,7 +581,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
 
     // The lazy thank-you chunk can take longer to transform under a full CI run.
     expect(await screen.findByText(/thank you/i, {}, { timeout: 5000 })).toBeInTheDocument();
-    expect(store.getState().form.responses).toEqual({});
+    expect(store.getState().form.responses).toEqual(submittedResponses);
     expect(window.location.pathname).toBe(submissionPath);
 
     fireEvent.click(
@@ -597,6 +597,10 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
         'snapshot.example'
       );
     });
+    fireEvent.click(screen.getByRole('button', { name: 'View submitted answers' }));
+    expect(await screen.findByRole('status', { name: 'Submitted questionnaire' })).toBeVisible();
+    expect(screen.getByRole('button', { name: /submit questionnaire/i })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Start a revision' })).not.toBeInTheDocument();
   });
 
   it('prevents duplicate draft creation by reusing the saved draft record id', async () => {

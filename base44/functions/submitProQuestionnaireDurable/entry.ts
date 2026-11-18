@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
       }
     }
     if (action === 'authorize') {
-      return json({ success: true, authorized: true, draftId: authorization.draft.id, responses: draftResponses });
+      return json({ success: true, authorized: true, finalized: authorization.draft.status === 'submitted' || Boolean(authorization.draft.final_submission_id), draftId: authorization.draft.id, responses: draftResponses });
     }
     if (!payload || typeof payload !== 'object' || Array.isArray(payload) || !payload.userdata || typeof payload.userdata !== 'object') {
       return json({ success: false, code: 'INVALID_SUBMISSION_PAYLOAD', error: 'A valid transformed questionnaire payload is required.' }, 400);

@@ -162,6 +162,16 @@ export default async function handler(req: Request) {
       ? normalizePayload(transformedPayload, questionnaireSessionId, primaryError)
       : null;
 
+    const shouldSkipFinalCreate =
+      transformFailed ||
+      validationFailed ||
+      !normalizedPayload?.metadata?.business_name ||
+      !normalizedPayload?.metadata?.businessDomain ||
+      !normalizedPayload?.userdata ||
+      typeof normalizedPayload.userdata !== 'object' ||
+      Array.isArray(normalizedPayload.userdata);
+    let sourceFinalized = false;
+
     try {
       const authorizationResponse = await base44.asServiceRole.functions.invoke('submitProQuestionnaireDurable', {
         action: 'authorize',
@@ -188,6 +198,10 @@ export default async function handler(req: Request) {
             code: authorization?.code || 'DRAFT_AUTHORIZATION_REJECTED'
           }
         }, { status: /^(?:SUBMISSION_|ORGANIZER_|DRAFT_SAVE_PENDING)/.test(authorization?.code || '') ? 409 : 401 });
+      }
+      sourceFinalized = Boolean(authorization.finalized);
+      if (sourceFinalized && shouldSkipFinalCreate) {
+        return Response.json({ success: false, received: false, usedFallback: true, code: 'DRAFT_ALREADY_SUBMITTED', error: { message: 'This questionnaire has already been submitted and is read-only.', status: 409, code: 'DRAFT_ALREADY_SUBMITTED' } }, { status: 409 });
       }
       if (authorization.responses && typeof authorization.responses === 'object') {
         rawResponses = { ...authorization.responses, ...(rawResponses || {}) };
@@ -218,15 +232,6 @@ export default async function handler(req: Request) {
         }
       }, { status });
     }
-
-    const shouldSkipFinalCreate =
-      transformFailed ||
-      validationFailed ||
-      !normalizedPayload?.metadata?.business_name ||
-      !normalizedPayload?.metadata?.businessDomain ||
-      !normalizedPayload?.userdata ||
-      typeof normalizedPayload.userdata !== 'object' ||
-      Array.isArray(normalizedPayload.userdata);
 
     if (shouldSkipFinalCreate) {
       const fallbackError =
@@ -313,7 +318,7 @@ export default async function handler(req: Request) {
           throw durableError;
         }
         const submission = durableResult.submission;
-        await upsertIntake(
+        if (!sourceFinalized) await upsertIntake(
           base44,
           questionnaireSessionId,
           submissionAttemptId,
@@ -351,7 +356,7 @@ export default async function handler(req: Request) {
           submissionError?.response?.data?.code || submissionError?.code || '',
           200
         );
-        if (conflictStatus === 409 || conflictCode.startsWith('SUBMISSION_') || conflictCode.startsWith('ORGANIZER_')) {
+        if (sourceFinalized || conflictStatus === 409 || conflictCode.startsWith('SUBMISSION_') || conflictCode.startsWith('ORGANIZER_')) {
           return Response.json({
             success: false,
             received: false,

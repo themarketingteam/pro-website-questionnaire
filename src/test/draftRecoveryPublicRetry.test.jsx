@@ -529,4 +529,43 @@ describe('public draft recovery actions', () => {
       );
     });
   });
+  it('keeps the original Draft Link available when submitted history is selected without creating an editable copy', async () => {
+    draftRecords = [{ id: 'submitted-original', session_id: 'secure_share_session_1234567890', business_name: 'Completed Link Client', domain: 'completed.example.test', status: 'submitted', final_submission_id: 'receipt-original', responses_json: JSON.stringify({ '6': 'Saved original answers' }) }];
+    const originalInvoke = base44.functions.invoke.getMockImplementation();
+    base44.functions.invoke.mockImplementation(async (name, payload) => {
+      const result = await originalInvoke(name, payload);
+      if (payload?.action === 'list_versions') {
+        result.data.versions = result.data.versions.map(version => ({ ...version, current: false, submitted: true, kind: 'submitted', versionId: 'submitted:original-receipt' }));
+        result.data.defaultVersionId = 'submitted:original-receipt';
+      }
+      if (payload?.action === 'get_version') result.data.version = { ...result.data.version, current: false, submitted: true, kind: 'submitted', status: 'submitted' };
+      return result;
+    });
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn(async () => {}) } });
+    renderRecoveryPage();
+    fireEvent.click(await screen.findByText('Completed Link Client'));
+    const copy = await screen.findByRole('button', { name: 'Copy Draft Link' });
+    await waitFor(() => expect(screen.getByText(/history selector changes the preview/)).toBeInTheDocument());
+    expect(copy).toBeEnabled();
+    fireEvent.click(copy);
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1));
+    expect(screen.getByRole('region', { name: 'Draft Link' })).toHaveTextContent('Submitted · read-only');
+    expect(base44.functions.invoke.mock.calls.some(([, payload]) => payload?.action === 'create_version_copy')).toBe(false);
+  });
+
+  it('keeps Draft Link usable when version history cannot load', async () => {
+    draftRecords = [{ id: 'history-error-original', session_id: 'secure_share_session_1234567890', business_name: 'History Error Link Client', status: 'submitted', responses_json: '{}' }];
+    const invoke = base44.functions.invoke.getMockImplementation();
+    base44.functions.invoke.mockImplementation(async (name, payload) => {
+      if (payload?.action === 'list_versions') throw new Error('Synthetic history unavailable');
+      return invoke(name, payload);
+    });
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn(async () => {}) } });
+    renderRecoveryPage(); fireEvent.click(await screen.findByText('History Error Link Client'));
+    expect(await screen.findByText('Synthetic history unavailable')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Copy Draft Link' }));
+    await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledOnce());
+    expect(base44.functions.invoke.mock.calls.some(([, body]) => body?.action === 'create_version_copy')).toBe(false);
+  });
+
 });

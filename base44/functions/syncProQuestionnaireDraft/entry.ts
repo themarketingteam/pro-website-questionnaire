@@ -2,7 +2,6 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.61';
 import { normalizeStoredOrganizedRecord, guardOrganizedDraftMutation, projectOrganizedPages, preserveOrganizedMappedPayload, validateOrganizedPayload, validateOrganizedResponses, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
 
 import { withEntityLease, type EntityLease } from '../../shared/entityLease.ts';
-import { createSubmissionContentFingerprint, createSubmissionIdentityFingerprint, getSubmissionIdentity } from '../../shared/proDraftSubmissionAuthorization.ts';
 
 const MAX_REQUEST_BYTES = 2_250_000;
 const MAX_RESPONSE_KEYS = 160;
@@ -562,108 +561,6 @@ const createDraft = async (
   });
 };
 
-const revisionFault = (code: string = 'INVALID_REVISION_SEED', message: string, status = 409) => Object.assign(new Error(message), { code, status });
-
-const startDraftRevision = async (base44: any, body: any) => {
-  const requestId = cleanText(body?.newRevisionRequestId, 200);
-  if (!isNewClientRequestId(requestId)) throw revisionFault('REVISION_REQUEST_REQUIRED', 'A stable revision request identifier is required.', 400);
-  const drafts = base44.asServiceRole.entities.ProFormDraft;
-  const initialAuthorization = await authorizeDraft(drafts, body?.resumeCredential);
-  if ('error' in initialAuthorization) return jsonResponse({ success: false, error: initialAuthorization.error }, initialAuthorization.status);
-  return withEntityLease({ entity: drafts, entityId: initialAuthorization.draft.id, purpose: 'pro-start-revision' }, async (sourceLease) => {
-    const authorization = await authorizeDraft(drafts, body?.resumeCredential, initialAuthorization.draft.id);
-    if ('error' in authorization) return jsonResponse({ success: false, error: authorization.error }, authorization.status);
-    const source = authorization.draft;
-    if (source.status !== 'submitted') throw revisionFault('REVISION_SOURCE_NOT_SUBMITTED', 'Only a completed questionnaire can start an editable revision.');
-    const sourceRebuilt = await rebuildSnapshot(base44, source);
-    let verifiedSubmissionId = '';
-    let sourceReceiptStatus = cleanText(source.final_submission_id, 300) ? 'unavailable' : 'missing_link';
-    if (cleanText(source.final_submission_id, 300)) {
-      try {
-        const sourcePayload: any = parseStoredObject(source.mapped_payload_json, 'mapped_payload_json');
-        const sourceAgreement = validateOrganizedSubmission({ payload: sourcePayload, responses: sourceRebuilt.snapshot.responses });
-        const receiptDto = await base44.asServiceRole.entities.ProFormSubmission.get(source.final_submission_id);
-        const receipt = normalizeStoredOrganizedRecord(receiptDto, sourcePayload);
-        const receiptSource = cleanText(receipt?.metadata?.source_draft_id, 300);
-        const receiptSession = cleanText(receipt?.metadata?.questionnaire_session_id, 120);
-        const sourceIdentity = { businessName: sourceRebuilt.snapshot.credentials.businessName, domain: sourceRebuilt.snapshot.credentials.domain };
-        const matches = sourceAgreement.ok && Boolean(receipt?.id)
-          && (receiptSource ? receiptSource === source.id : receiptSession === source.session_id)
-          && await createSubmissionIdentityFingerprint(getSubmissionIdentity(receipt)) === await createSubmissionIdentityFingerprint(sourceIdentity)
-          && await createSubmissionContentFingerprint({ payload: receipt, draftId: source.id, identity: sourceIdentity }) === await createSubmissionContentFingerprint({ payload: sourcePayload, draftId: source.id, identity: sourceIdentity });
-        sourceReceiptStatus = matches ? 'verified' : 'mismatch';
-        if (matches) verifiedSubmissionId = receipt.id;
-      } catch {
-        // Copying authenticated answers does not authorize changing or sending
-        // a damaged historical receipt. Preserve that distinction in lineage.
-      }
-    }
-    const object = (value: unknown) => value && typeof value === 'object' && !Array.isArray(value);
-    if (!object(body.responses) || !object(body.mappedPayload) || !object(body.mappedPayload.metadata) || !object(body.mappedPayload.userdata)) throw revisionFault('REVISION_SEED_REQUIRED', 'The complete visible answers and mapped payload are required to retain an editable revision.', 400);
-    const responses = sanitizeAnswerMap(body.responses);
-    const sourceKeys = Object.keys(sourceRebuilt.snapshot.responses);
-    const organizedGuard = guardOrganizedDraftMutation({ currentResponses: sourceRebuilt.snapshot.responses, incomingResponses: responses, changedKeys: [...new Set([...sourceKeys, ...Object.keys(responses)])], deletedKeys: sourceKeys.filter((key) => !Object.prototype.hasOwnProperty.call(responses, key)), baseRevision: sourceRebuilt.revision, currentRevision: sourceRebuilt.revision });
-    if (!organizedGuard.ok) throw revisionFault(organizedGuard.code, organizedGuard.errors.join(' '), organizedGuard.status);
-    const requestedCredentials = sanitizeCredentials(body.credentials);
-    if (identityConflictFields(requestedCredentials, sourceRebuilt.snapshot.credentials).fields.length) throw revisionFault('REVISION_IDENTITY_CONFLICT', 'An editable revision must remain connected to the same client.');
-    const credentials = sanitizeCredentials(Object.fromEntries(Object.entries(sourceRebuilt.snapshot.credentials).map(([key, value]) => [key, requestedCredentials[key as keyof typeof requestedCredentials] || value])));
-    let mappedPayload: any = preserveOrganizedMappedPayload(sanitizeJsonValue(body.mappedPayload), responses);
-    if (identityConflictFields({ businessName: mappedPayload.metadata?.business_name, domain: mappedPayload.metadata?.businessDomain }, credentials).fields.length) throw revisionFault('REVISION_IDENTITY_CONFLICT', 'The revision payload must remain connected to the same client.');
-    const mappedAgreement = validateOrganizedSubmission({ payload: mappedPayload, responses });
-    if (!mappedAgreement.ok) throw revisionFault(mappedAgreement.code, mappedAgreement.errors.join(' '), mappedAgreement.status);
-    const initialSnapshot = { responses, validationStatus: sanitizeStateMap(body.validationStatus, 'validation'), touchedQuestions: sanitizeStateMap(body.touchedQuestions, 'boolean'), expandedQuestions: sanitizeStateMap(body.expandedQuestions, 'boolean'), credentials, currentQuestionId: cleanText(body.currentQuestionId, 40), lastChangedQuestionId: cleanText(body.lastChangedQuestionId, 40), progressPercent: Math.max(0, Math.min(100, Number(body.progressPercent) || 0)) };
-    const requestHash = await hashToken(`pro-start-revision:${source.id}:${await hashToken(authorization.credential.secret)}:${requestId}`);
-    const prior = await drafts.filter({ revision_request_hash: requestHash }, 'created_date', 2);
-    if (prior?.length > 1) throw revisionFault('REVISION_REQUEST_AMBIGUOUS', 'This revision request has multiple retained copies and requires recovery review.');
-    let child: any = prior?.[0] || null;
-    const reused = Boolean(child);
-    const secret = randomToken();
-    if (!child) {
-      const sessionId = crypto.randomUUID();
-      const metadata = { ...mappedPayload.metadata, business_name: credentials.businessName, businessDomain: credentials.domain, questionnaire_session_id: sessionId };
-      for (const key of ['source_draft_id', 'source_intake_id', 'submission_attempt_id', 'submission_content_fingerprint', 'client_identity_fingerprint']) delete metadata[key];
-      mappedPayload = { ...mappedPayload, metadata };
-      await sourceLease.assertActive();
-      child = await createDraft(base44, sessionId, await hashToken(secret), credentials, { initialSnapshot, initialPayload: mappedPayload, clientIdentityId: typeof source.client_identity_id === 'string' ? source.client_identity_id : '', sourceDraftId: source.id, sourceSubmissionId: verifiedSubmissionId, sourceReceiptStatus, revisionRequestHash: requestHash });
-      if (!child?.id) throw revisionFault('REVISION_SEED_UNVERIFIED', 'The revision service did not retain the new working draft.', 502);
-    }
-    return withEntityLease({ entity: drafts, entityId: child.id, purpose: 'pro-revision-seed' }, async (childLease) => {
-      child = await drafts.get(child.id);
-      if (child.source_draft_id !== source.id || child.revision_request_hash !== requestHash || child.status !== 'draft' || child.final_submission_id) throw revisionFault('REVISION_COPY_CONFLICT', 'The retained working revision is no longer available for this request.');
-      const seed: any = parseStoredObject(child.history_baseline_json, 'revision history_baseline_json');
-      if (!seed.responses || typeof seed.responses !== 'object' || Array.isArray(seed.responses)) throw revisionFault('REVISION_SEED_UNVERIFIED', 'The retained revision seed requires recovery review.', 502);
-      const seedRawValidation = validateOrganizedResponses(seed.responses);
-      if (!seedRawValidation.ok) throw revisionFault(seedRawValidation.code, seedRawValidation.errors.join(' '));
-      if (!reused && (child.source_submission_id !== verifiedSubmissionId || child.source_receipt_status !== sourceReceiptStatus || child.client_identity_id !== (typeof source.client_identity_id === 'string' ? source.client_identity_id : '') || child.session_id === source.session_id || child.responses_json !== safeStringify(initialSnapshot.responses) || child.history_baseline_json !== safeStringify(initialSnapshot) || child.mapped_payload_json !== safeStringify(mappedPayload) || child.access_token_hash !== await hashToken(secret))) throw revisionFault('REVISION_SEED_UNVERIFIED', 'The revision service did not retain the complete visible seed.', 502);
-      const seedMutationId = `revision_seed_${requestHash.slice(0, 40)}`;
-      const seedClientId = `revision_seed_${requestHash.slice(0, 40)}`;
-      const seedChanges = { ...seed, deletedKeys: [] };
-      const checkpoints = await base44.asServiceRole.entities.ProFormDraftRevision.filter({ draft_id: child.id, mutation_id: seedMutationId }, '-created_date', 2);
-      if (checkpoints?.length > 1) throw revisionFault('REVISION_SEED_UNVERIFIED', 'The retained revision seed has ambiguous checkpoints.', 502);
-      if (checkpoints?.[0] && (checkpoints[0].changes_json !== safeStringify(seedChanges) || checkpoints[0].result_snapshot_json !== safeStringify(seed) || checkpoints[0].server_revision !== 1 || checkpoints[0].session_id !== child.session_id)) throw revisionFault('REVISION_SEED_UNVERIFIED', 'The retained revision checkpoint requires recovery review.', 502);
-      if (!checkpoints?.length) {
-        const seedAgreement = validateOrganizedSubmission({ payload: parseStoredObject(child.mapped_payload_json, 'revision mapped_payload_json'), responses: seed.responses });
-        if (!seedAgreement.ok) throw revisionFault(seedAgreement.code, seedAgreement.errors.join(' '));
-        if ((await listDraftRevisions(base44, child.id)).length) throw revisionFault('REVISION_SEED_UNVERIFIED', 'The working revision is missing its initial checkpoint.', 502);
-        const now = new Date().toISOString();
-        const changes = seedChanges;
-        await childLease.assertActive();
-        const checkpoint = await base44.asServiceRole.entities.ProFormDraftRevision.create({ draft_id: child.id, session_id: child.session_id, mutation_id: seedMutationId, client_instance_id: seedClientId, client_sequence: 1, base_revision: 0, server_revision: 1, changed_keys_json: safeStringify(Object.keys(seed.responses), '[]'), deleted_keys_json: '[]', changes_json: safeStringify(changes), result_snapshot_json: safeStringify(seed), status: 'draft', server_received_at: now, client_changed_at: now, source: 'client_revision_seed' });
-        if (!checkpoint?.id || checkpoint.changes_json !== safeStringify(changes) || checkpoint.result_snapshot_json !== safeStringify(seed) || checkpoint.server_revision !== 1) throw revisionFault('REVISION_SEED_UNVERIFIED', 'The revision checkpoint did not retain the complete seed.', 502);
-      }
-      if (reused) {
-        const hashes = [...parseSharedAccessHashes(child.shared_access_token_hashes_json), await hashToken(secret)].slice(-8);
-        child = await childLease.update({ shared_access_token_hashes_json: safeStringify(hashes, '[]') });
-      }
-      const rebuilt = await rebuildSnapshot(base44, child);
-      const workingPayload: any = preserveOrganizedMappedPayload(parseStoredObject(child.mapped_payload_json, 'revision mapped_payload_json'), rebuilt.snapshot.responses);
-      workingPayload.metadata = { ...workingPayload.metadata, questionnaire_session_id: child.session_id, source_draft_id: child.id };
-      child = await materializeDraft(base44, child, rebuilt, { mappedPayload: workingPayload, changed: false }, childLease);
-      return jsonResponse({ success: true, revisionStarted: true, reused, resumeCredential: `${child.session_id}.${secret}`, sourceDraftId: source.id, sourceSubmissionId: child.source_submission_id || '', sourceSubmissionVerified: child.source_receipt_status === 'verified', draft: publicDraft(child, rebuilt) });
-    });
-  });
-};
-
 Deno.serve(async (req) => {
   if (req.method !== 'POST') return jsonResponse({ success: false, error: 'Method not allowed.' }, 405);
   const contentLength = Number(req.headers.get('content-length') || 0);
@@ -684,7 +581,7 @@ Deno.serve(async (req) => {
   const draftEntity = base44.asServiceRole.entities.ProFormDraft;
 
   try {
-    if (action === 'start_revision') return await startDraftRevision(base44, body);
+    if (action === 'start_revision') return jsonResponse({ success: false, code: 'REVISION_REQUIRES_TEAM', error: 'Submitted questionnaires are read-only. Contact your team to start a separate revision.' }, 403);
     if (action === 'bootstrap') {
       const explicitNewClient = body?.newClient === true;
       if (explicitNewClient) {
@@ -724,9 +621,10 @@ Deno.serve(async (req) => {
           const secret = randomToken();
           resumeCredential = `${draft.session_id}.${secret}`;
           const tokenHash = await hashToken(secret);
-          const sharedHashes = [...parseSharedAccessHashes(draft.shared_access_token_hashes_json), tokenHash].slice(-8);
-          draft = await draftEntity.update(draft.id, {
-            shared_access_token_hashes_json: safeStringify(sharedHashes, '[]')
+          draft = await withEntityLease({ entity: draftEntity, entityId: draft.id, purpose: 'pro-draft-resume-link' }, async (lease) => {
+            const current = await draftEntity.get(draft.id);
+            const sharedHashes = [...new Set([...parseSharedAccessHashes(current.shared_access_token_hashes_json), tokenHash])];
+            return lease.update({ shared_access_token_hashes_json: safeStringify(sharedHashes, '[]') });
           });
         } else {
           const sessionId = crypto.randomUUID();
@@ -745,7 +643,7 @@ Deno.serve(async (req) => {
           draft = await draftEntity.get(draft.id);
           const rebuilt = await rebuildSnapshot(base44, draft);
           await lease.assertActive();
-          const materialized = draft.status === 'submitted'
+          const materialized = draft.status === 'submitted' || Boolean(draft.final_submission_id)
             ? draft
             : await materializeDraft(base44, draft, rebuilt, { changed: false }, lease);
           return jsonResponse({ success: true, resumeCredential, newClientRequestConfirmed: true, draft: publicDraft(materialized, rebuilt) });
@@ -824,7 +722,7 @@ Deno.serve(async (req) => {
         });
       }
       await lease.assertActive();
-      const materialized = draft.status === 'submitted'
+      const materialized = draft.status === 'submitted' || Boolean(draft.final_submission_id)
         ? draft
         : await materializeDraft(base44, draft, rebuilt, { changed: false }, lease);
       return jsonResponse({
@@ -865,7 +763,7 @@ Deno.serve(async (req) => {
       if ('error' in lockedAuthorization) return jsonResponse({ success: false, error: lockedAuthorization.error }, lockedAuthorization.status);
       draft = lockedAuthorization.draft;
 
-    if (cleanText(draft.status, 40) === 'submitted') {
+    if (cleanText(draft.status, 40) === 'submitted' || Boolean(draft.final_submission_id)) {
       const rebuilt = await rebuildSnapshot(base44, draft);
       return jsonResponse({
         success: true,

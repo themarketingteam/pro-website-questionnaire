@@ -473,6 +473,7 @@ export const submitProQuestionnaire = async ({
       await recordSubmitStage('submit_success', { usedFallback: true });
       if (typeof onFinalSubmitSuccess === 'function') {
         onFinalSubmitSuccess({
+      draftId: activeDraftId,
           savedSubmission: fallbackResult.submission,
           intakeId: fallbackResult.intakeId || '',
           receivedViaIntake: Boolean(fallbackResult.receivedViaIntake),
@@ -650,6 +651,7 @@ export const submitProQuestionnaire = async ({
       await recordSubmitStage('submit_success', { usedFallback: true });
       if (typeof onFinalSubmitSuccess === 'function') {
         onFinalSubmitSuccess({
+      draftId: activeDraftId,
           savedSubmission: fallbackResult.submission,
           intakeId: fallbackResult.intakeId || '',
           receivedViaIntake: Boolean(fallbackResult.receivedViaIntake),
@@ -870,6 +872,7 @@ export const submitProQuestionnaire = async ({
 
   if (typeof onFinalSubmitSuccess === 'function') {
     onFinalSubmitSuccess({
+      draftId: activeDraftId,
       savedSubmission,
       intakeId,
       receivedViaIntake,

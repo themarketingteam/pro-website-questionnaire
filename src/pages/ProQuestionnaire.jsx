@@ -19,6 +19,9 @@ import { toast } from "sonner";
 import { Loader2, AlertCircle } from 'lucide-react';
 
 
+import SubmittedAnswer from '@/components/pro-form/SubmittedAnswer';
+import SubmittedQuestionnaireActions from '@/components/pro-form/SubmittedQuestionnaireActions';
+import { buildDraftShareUrl, copyTextToClipboard } from '@/lib/draftShareLink';
 import FormHeader from '@/components/pro-form/FormHeader';
 import QuestionWrapper from '@/components/pro-form/QuestionWrapper';
 import YesNoQuestion from '@/components/pro-form/YesNoQuestion';
@@ -104,6 +107,7 @@ export default function ProQuestionnaire() {
   const [showAutoSave, setShowAutoSave] = useState(0);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showThankYouModal, setShowThankYouModal] = useState(false);
+  const [submittedReceiptPending, setSubmittedReceiptPending] = useState(false);
   const [submittedBusinessName, setSubmittedBusinessName] = useState('');
   const [submittedDomain, setSubmittedDomain] = useState('');
   const [submittedFormData, setSubmittedFormData] = useState({});
@@ -125,7 +129,6 @@ export default function ProQuestionnaire() {
   const expandLinkedQuestionDelayMs = isTestMode ? 0 : 500;
   const clearAllReloadDelayMs = isTestMode ? 0 : 100;
   const hasFinalSubmittedRef = useRef(false);
-  const [includePreservedEdits, setIncludePreservedEdits] = useState(false);
   const clearAllButtonRef = useRef(null);
   const newClientIdentityPromptOpenedRef = useRef(false);
 
@@ -153,10 +156,7 @@ export default function ProQuestionnaire() {
     restoredQuestionId,
     identityConflict,
     completedDraft,
-    isStartingRevision,
-    revisionStartError,
-    revisionRetryPending,
-    startRevision,
+    markSubmitted,
     downloadCompletedRecoveryBackup,
     queueDraftSave,
     saveDraftNow,
@@ -193,6 +193,14 @@ export default function ProQuestionnaire() {
     setBrowserResetIdentity({ businessName: '', domain: '' });
     setShowNewClientIdentityModal(true);
   }, [isDraftReady, newClientLaunch.active, newClientLaunch.promptForIdentity]);
+
+  useEffect(() => {
+    if (!completedDraft) return;
+    setShowConfirmModal(false);
+    setShowClearAllModal(false);
+    setShowBrowserResetModal(false);
+    setShowNewClientIdentityModal(false);
+  }, [completedDraft]);
 
   // Calculate span totals for Q3-Q5
   const otherServices = responses['3_other'];
@@ -530,7 +538,7 @@ export default function ProQuestionnaire() {
   // No more cookie saving - Redux persist handles everything automatically
 
   const updateResponse = useCallback((questionId, value) => {
-    if (completedDraft || isStartingRevision) return;
+    if (completedDraft) return;
     if (!hasTrackedStart) {
       trackClarityEvent('pro_questionnaire_started', {
         first_question_id: questionId
@@ -681,7 +689,6 @@ export default function ProQuestionnaire() {
   }, [
     dispatch,
     completedDraft,
-    isStartingRevision,
     responses,
     expandedQuestions,
     hasTrackedStart,
@@ -903,7 +910,7 @@ export default function ProQuestionnaire() {
   };
 
   const resetQuestion = (questionId) => {
-    if (completedDraft || isStartingRevision) return;
+    if (completedDraft) return;
     if ((questionId === '3' || questionId === '4') && Object.prototype.hasOwnProperty.call(responses, `${questionId}_structure`)) {
       const patch = { [questionId]: [], [`${questionId}_other`]: [], [`${questionId}_structure`]: { format: 'page-tree-v1', pages: [] } };
       dispatch(setMultipleResponses(patch));
@@ -1018,7 +1025,7 @@ export default function ProQuestionnaire() {
   };
 
   const clearAll = () => {
-    if (completedDraft || isStartingRevision) return;
+    if (completedDraft) return;
     setShowClearAllModal(true);
   };
 
@@ -1488,7 +1495,7 @@ export default function ProQuestionnaire() {
   };
 
   const handleSubmitClick = async () => {
-    if (completedDraft || isStartingRevision) return;
+    if (completedDraft) return;
     const finalValidationPassed = await runFinalValidations();
 
     if (!finalValidationPassed) {
@@ -1508,7 +1515,7 @@ export default function ProQuestionnaire() {
 
 
   const handleConfirmSubmit = async (businessName, domain) => {
-    if (completedDraft || isStartingRevision) return;
+    if (completedDraft) return;
     if (finalSubmitInFlightRef.current) {
       if (import.meta.env.DEV) {
         console.warn('[ProQuestionnaire] Final submit blocked — already in flight.');
@@ -1534,7 +1541,7 @@ export default function ProQuestionnaire() {
         saveDraftNow,
         createDraftEvent,
         serviceOptionsGrouped: SERVICE_OPTIONS_GROUPED,
-        onFinalSubmitSuccess: ({ responseSnapshot }) => {
+        onFinalSubmitSuccess: ({ responseSnapshot, savedSubmission, draftId, receivedViaIntake }) => {
           hasFinalSubmittedRef.current = true;
 
           // Preserve the exact submitted values for post-reset PDF generation.
@@ -1546,8 +1553,10 @@ export default function ProQuestionnaire() {
           setSubmittedDomain(submittedDomainSnapshot);
           setSubmittedFormData(submittedResponseSnapshot);
           setShowConfirmModal(false);
+          setSubmittedReceiptPending(Boolean(receivedViaIntake));
           setShowThankYouModal(true);
-          dispatch(resetForm());
+          if (!receivedViaIntake) setIsSubmitting(false);
+          if (!receivedViaIntake) markSubmitted({ draftId: draftId || savedSubmission?.metadata?.source_draft_id || '', responses: responseSnapshot, credentials: { ...credentials, businessName, domain }, finalSubmissionId: savedSubmission?.id || '' });
           toast.success('Questionnaire submitted successfully!');
         },
         onFinalSubmitFailure: () => {}
@@ -1569,6 +1578,7 @@ export default function ProQuestionnaire() {
   };
 
   const handleDraftIdentityChange = useCallback(({ businessName, domain }) => {
+    if (completedDraft) return;
     const nextCredentials = {
       ...credentials,
       businessName,
@@ -1576,9 +1586,10 @@ export default function ProQuestionnaire() {
     };
     dispatch(setCredentials(nextCredentials));
     updateDraftIdentity(nextCredentials, { delayMs: 300 });
-  }, [credentials, dispatch, updateDraftIdentity]);
+  }, [completedDraft, credentials, dispatch, updateDraftIdentity]);
 
   const openBrowserReset = () => {
+    if (completedDraft) return;
     setBrowserResetIdentity({ businessName: '', domain: '' });
     setShowBrowserResetModal(true);
   };
@@ -1663,7 +1674,9 @@ export default function ProQuestionnaire() {
     return acc;
   }, {});
 
-  const renderQuestion = (question) => <fieldset disabled={Boolean(completedDraft) || isStartingRevision} ref={(element) => { if (element) element.inert = Boolean(completedDraft) || isStartingRevision; }} className="min-w-0">{renderEditableQuestion(question)}</fieldset>;
+  const renderQuestion = (question) => completedDraft
+    ? <SubmittedAnswer question={question} responses={responses} />
+    : renderEditableQuestion(question);
 
   const renderEditableQuestion = (question) => {
     const commonProps = {
@@ -1696,7 +1709,7 @@ export default function ProQuestionnaire() {
               externalDisabled={isSpanLimitReached}
               remainingSelections={Math.max(0, 25 - totalSelections)}
               onChange={(nextStructure) => {
-                if (completedDraft || isStartingRevision) return;
+                if (completedDraft) return;
                 const projected = projectPageStructure(nextStructure);
                 const patch = {
                   [question.id]: projected.selections,
@@ -1915,7 +1928,7 @@ export default function ProQuestionnaire() {
               isExpanded={expandedQuestions[child.id] !== false}
               onToggle={() => toggleQuestion(child.id)}
               required={child.requiredIfParentYes}
-              onReset={() => resetQuestion(child.id)}
+              onReset={completedDraft ? undefined : () => resetQuestion(child.id)}
               hasAnswer={!!responses[child.id] || !!responses[`${child.id}_other`]}
               isComplete={isQuestionComplete(child.id)}
               wasTouched={touchedQuestions[child.id]}
@@ -2063,17 +2076,12 @@ export default function ProQuestionnaire() {
 
         {completedDraft && <section role="status" aria-label="Submitted questionnaire" className="mx-auto mb-6 max-w-5xl rounded-xl border border-blue-300 bg-blue-50 p-5 text-[#122947]">
           <h2 className="text-lg font-semibold">This questionnaire has been submitted</h2>
-          <p className="mt-2 text-sm">The submitted answers are shown below. Start a new working revision to make changes; the submitted copy stays preserved.</p>
-          {completedDraft.hasUnsavedChanges && !revisionRetryPending && <div className="mt-3 text-sm">
-            <p>Your browser also contains edits that were not saved to the submitted copy. They have been kept separately.</p>
-            <label className="mt-3 flex items-start gap-2"><input type="checkbox" checked={includePreservedEdits} disabled={isStartingRevision} onChange={(event) => setIncludePreservedEdits(event.target.checked)} className="mt-1" />Include my preserved browser edits in the new revision</label>
+          <p className="mt-2 text-sm">These submitted answers are read-only. Your team can create a separate revision if changes are needed.</p>
+          <SubmittedQuestionnaireActions formData={responses} businessName={credentials.businessName || businessNameParam} domain={credentials.domain || domainParam} resumeCredential={getDraftResumeCredential()} />
+          {completedDraft.hasUnsavedChanges && <div className="mt-3 text-sm">
+            <p>Your browser also contains unsubmitted edits, preserved separately for your team to review.</p>
+            <button type="button" onClick={downloadCompletedRecoveryBackup} className="mt-2 min-h-11 rounded-md border border-[#176BB7] bg-white px-4 py-2 font-semibold">Download unsubmitted browser recovery copy</button>
           </div>}
-          {revisionRetryPending && <p className="mt-3 text-sm">Retrying resumes the same retained revision request and its original chosen copy.</p>}
-          <div className="mt-4 flex flex-wrap gap-3">
-            <button type="button" disabled={isStartingRevision} onClick={() => startRevision({ includePreservedEdits })} className="min-h-11 rounded-md bg-[#176BB7] px-4 py-2 font-semibold text-white disabled:opacity-50">{isStartingRevision ? 'Creating working revision…' : 'Start a revision'}</button>
-            <button type="button" onClick={downloadCompletedRecoveryBackup} className="min-h-11 rounded-md border border-[#176BB7] bg-white px-4 py-2 font-semibold">Download preserved copy</button>
-          </div>
-          {revisionStartError && <p role="alert" className="mt-3 text-sm text-red-800">{revisionStartError}</p>}
         </section>}
         <div className={standardContentClass}>
         {/* Validation Status Guide - Collapsible */}
@@ -2128,7 +2136,7 @@ export default function ProQuestionnaire() {
                                   isCollapsible={true}
                                   isExpanded={expandedQuestions[q.id] !== false}
                                   onToggle={() => toggleQuestion(q.id)}
-                                  onReset={() => resetQuestion(q.id)}
+                                  onReset={completedDraft ? undefined : () => resetQuestion(q.id)}
                                   hasAnswer={!!responses[q.id] || !!responses[`${q.id}_other`]}
                                   isComplete={isQuestionComplete(q.id)}
                                   wasTouched={touchedQuestions[q.id]}
@@ -2191,7 +2199,7 @@ export default function ProQuestionnaire() {
                       isCollapsible={true}
                       isExpanded={expandedQuestions[question.id] !== false}
                       onToggle={() => toggleQuestion(question.id)}
-                      onReset={() => resetQuestion(question.id)}
+                      onReset={completedDraft ? undefined : () => resetQuestion(question.id)}
                       hasAnswer={!!responses[question.id] || !!responses[`${question.id}_other`]}
                       isComplete={isQuestionComplete(question.id)}
                       wasTouched={touchedQuestions[question.id]}
@@ -2214,7 +2222,7 @@ export default function ProQuestionnaire() {
               <button
                 type="button"
                 onClick={handleSubmitClick}
-                disabled={isSubmitting || isValidating || Boolean(completedDraft) || isStartingRevision}
+                disabled={isSubmitting || isValidating || Boolean(completedDraft)}
                 className={`flex-1 py-4 text-sm font-bold rounded transition-all flex items-center justify-center uppercase tracking-wide min-h-[52px] ${
                   isSubmitting || isValidating
                     ? 'bg-[#A9B3B7] text-white cursor-not-allowed'
@@ -2241,7 +2249,7 @@ export default function ProQuestionnaire() {
                 ref={clearAllButtonRef}
                 type="button"
                 onClick={clearAll}
-                disabled={Boolean(completedDraft) || isStartingRevision}
+                disabled={Boolean(completedDraft)}
                 className={`w-full sm:w-auto px-8 sm:px-12 py-4 bg-white text-[#4A5F8C] border-2 border-[#4A5F8C] hover:bg-[#F0F2F5] active:bg-[#E0E4EC] rounded transition-all uppercase text-sm font-bold tracking-wide min-h-[52px] ${
                   clearAllHighlightVersion > 0 ? 'pro-clear-all-attention' : ''
                 }`}
@@ -2274,6 +2282,7 @@ export default function ProQuestionnaire() {
             <button
               type="button"
               onClick={openBrowserReset}
+              disabled={Boolean(completedDraft)}
               className="text-left text-sm font-medium text-[#60738F] underline decoration-1 underline-offset-4 transition-colors hover:text-red-600 focus-visible:rounded-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-red-600 sm:text-base"
             >
               Having trouble? Reset saved browser data
@@ -2321,6 +2330,9 @@ export default function ProQuestionnaire() {
             businessName={submittedBusinessName} 
             domain={submittedDomain}
             formData={submittedFormData}
+            receiptPending={submittedReceiptPending}
+            onViewAnswers={() => { if (submittedReceiptPending) window.location.reload(); else setShowThankYouModal(false); }}
+            onCopyLink={async () => { try { await copyTextToClipboard(buildDraftShareUrl(getDraftResumeCredential())); toast.success('Questionnaire link copied.'); } catch (error) { toast.error(error.message); } }}
           />
         </Suspense>
       )}
