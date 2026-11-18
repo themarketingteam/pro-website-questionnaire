@@ -538,7 +538,7 @@ describe('public draft recovery actions', () => {
         result.data.versions = result.data.versions.map(version => ({ ...version, current: false, submitted: true, kind: 'submitted', versionId: 'submitted:original-receipt' }));
         result.data.defaultVersionId = 'submitted:original-receipt';
       }
-      if (payload?.action === 'get_version') result.data.version = { ...result.data.version, current: false, submitted: true, kind: 'submitted', status: 'submitted' };
+      if (payload?.action === 'get_version') result.data.version = { ...result.data.version, current: false, submitted: true, kind: 'final_submission', sourceType: 'submission', status: 'submitted' };
       return result;
     });
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn(async () => {}) } });
@@ -547,6 +547,7 @@ describe('public draft recovery actions', () => {
     const copy = await screen.findByRole('button', { name: 'Copy Draft Link' });
     await waitFor(() => expect(screen.getByText(/history selector changes the preview/)).toBeInTheDocument());
     expect(copy).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Create Editable Recovery Copy' })).toBeEnabled();
     fireEvent.click(copy);
     await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1));
     expect(screen.getByRole('region', { name: 'Draft Link' })).toHaveTextContent('Submitted · read-only');

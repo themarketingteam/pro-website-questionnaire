@@ -2,6 +2,7 @@ import { normalizeStoredOrganizedRecord, validateOrganizedSubmission, reconcileO
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.61";
 
 import { withEntityLease } from '../../shared/entityLease.ts';
+import { createSubmissionContentFingerprint, createSubmissionIdentityFingerprint } from '../../shared/proDraftSubmissionAuthorization.ts';
 
 // Invalid retained payloads must remain inspectable in recovery. Only the
 // supported entity DTO padding is normalized; submit/retry guards still reject
@@ -941,20 +942,40 @@ Deno.serve(async (req) => {
       const anchor = await entity.get(recordId).catch(() => null);
       if (!anchor?.id) return jsonResponse({ success: false, error: 'Questionnaire draft not found.' }, 404);
       const versionId = cleanText(body?.versionId, 300);
-      const version = await publicVersionDetail(base44, anchor, versionId);
+      let version = await publicVersionDetail(base44, anchor, versionId);
       if (!version) return jsonResponse({ success: false, error: 'Questionnaire version not found.' }, 404);
+      let rawSourceVersionId = versionId;
+      let sourceSubmissionId = '';
+      if (version.sourceType === 'submission') {
+        const receipt = version;
+        const relatedDrafts = await findRelatedDrafts(base44, anchor);
+        // A final receipt stores the mapped payload, not the raw questionnaire.
+        // Use only its exact, still-linked submitted source; never another
+        // related client's session or a newer unrelated working revision.
+        const candidates = relatedDrafts.filter((draft) => (
+          draft.id === receipt.draftId
+          && Boolean(receipt.sessionId)
+          && draft.session_id === receipt.sessionId
+          && draft.final_submission_id === receipt.sourceRecordId
+          && !cleanText(draft.soft_deleted_at, 100)
+        ));
+        if (candidates.length !== 1) return jsonResponse({ success: false, code: 'SUBMITTED_RAW_SOURCE_UNAVAILABLE', error: 'This final submission has no uniquely linked saved questionnaire answers available for an editable copy.' }, 409);
+        const source = candidates[0];
+        const rawVersion = await publicVersionDetail(base44, anchor, `current:${source.id}`);
+        const identity = { businessName: cleanText(source.business_name, 300), domain: normalizeDomain(source.domain) };
+        const receiptIdentity = { businessName: cleanText(receipt.payload?.metadata?.business_name, 300), domain: normalizeDomain(receipt.payload?.metadata?.businessDomain || receipt.payload?.metadata?.business_domain) };
+        const matchesReceipt = rawVersion && responseCount(rawVersion.snapshot?.responses) > 0
+          && await createSubmissionIdentityFingerprint(identity) === await createSubmissionIdentityFingerprint(receiptIdentity)
+          && await createSubmissionContentFingerprint({ payload: rawVersion.payload, draftId: source.id, identity }) === await createSubmissionContentFingerprint({ payload: receipt.payload, draftId: source.id, identity: receiptIdentity });
+        if (!matchesReceipt) return jsonResponse({ success: false, code: 'SUBMITTED_RAW_SOURCE_MISMATCH', error: 'The saved questionnaire answers could not be verified against this final submission. No editable copy was created.' }, 409);
+        rawSourceVersionId = rawVersion.versionId;
+        sourceSubmissionId = receipt.sourceRecordId;
+        version = rawVersion;
+      }
       const snapshot = version.snapshot && typeof version.snapshot === 'object' ? version.snapshot : {};
       const responses = snapshot.responses && typeof snapshot.responses === 'object' && !Array.isArray(snapshot.responses)
         ? snapshot.responses
         : {};
-      if (Object.keys(responses).length === 0 && version.sourceType === 'submission') {
-        return badRequest('Final submissions do not contain the raw answer map required to create an editable draft copy.', {
-          action,
-          recordType,
-          recordId,
-          versionId
-        });
-      }
       const credentials = snapshot.credentials && typeof snapshot.credentials === 'object'
         ? snapshot.credentials
         : {};
@@ -1011,8 +1032,10 @@ Deno.serve(async (req) => {
         draft_metadata_json: safeStringify({
           app: 'pro_questionnaire',
           source: 'recovery_version_copy',
-          source_draft_id: anchor.id,
-          source_version_id: versionId
+          source_draft_id: version.draftId || anchor.id,
+          source_version_id: versionId,
+          raw_source_version_id: rawSourceVersionId,
+          source_submission_id: sourceSubmissionId
         }),
         last_changed_at: now,
         last_saved_at: now,
@@ -1030,7 +1053,7 @@ Deno.serve(async (req) => {
         event_type: 'recovery_version_copy_created',
         question_id: '',
         question_type: 'administrative_recovery',
-        value_json: safeStringify({ source_draft_id: anchor.id, source_version_id: versionId }),
+        value_json: safeStringify({ source_draft_id: version.draftId || anchor.id, source_version_id: versionId, raw_source_version_id: rawSourceVersionId, source_submission_id: sourceSubmissionId }),
         value_summary: 'An administrator created an editable recovery copy from a retained questionnaire version.',
         value_length: 0,
         selected_option_count: 0,
@@ -1044,7 +1067,8 @@ Deno.serve(async (req) => {
         recordId: created?.id || '',
         sessionId,
         resumeCredential: `${sessionId}.${secret}`,
-        sourceVersionId: versionId
+        sourceVersionId: versionId,
+        rawSourceVersionId
       });
     }
 

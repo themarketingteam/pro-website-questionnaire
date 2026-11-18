@@ -58,6 +58,7 @@ const fixture = async () => {
   const pathValue = (value, path) => path.split('.').reduce((current, key) => current?.[key], value);
   const matches = (value, query) => Object.entries(query).every(([key, expected]) => {
     if (expected && typeof expected === 'object' && '$gt' in expected) return pathValue(value, key) > expected.$gt;
+    if (expected && typeof expected === 'object' && '$in' in expected) return expected.$in.includes(pathValue(value, key));
     return expected == null ? pathValue(value, key) == null : pathValue(value, key) === expected;
   });
   const draftEntity = {
@@ -416,6 +417,50 @@ describe('hosted Pro save and submission integrity', () => {
     expect(f.getDraft().responses_json).toBe(original.responses_json);
     expect(f.getDraft().final_submission_id).toBe(original.final_submission_id);
     expect(f.workingDrafts).toHaveLength(0);
+  });
+
+  it('creates a protected team copy from the default completed receipt using its verified exact raw source', async () => {
+    const f = await fixture();
+    expect((await f.submit(f.submission(f.original))).status).toBe(200);
+    const original = f.getDraft(), receipt = clone(f.submissions[0]);
+    f.base44.auth = { me: async () => ({ role: 'admin' }) };
+    f.base44.asServiceRole.entities.ProFormDraftEvent = { create: async () => ({ id: 'audit-copy' }) };
+    const recovery = loadHosted('base44/functions/queryProQuestionnaireRecoveryRecords/entry.ts', f.base44);
+    const catalog = await recovery({ action: 'list_versions', recordType: 'draft', recordId: original.id });
+    expect(catalog.status).toBe(200);
+    expect(catalog.body.defaultVersionId).toBe(`submission:${receipt.id}`);
+    const copied = await recovery({ action: 'create_version_copy', recordType: 'draft', recordId: original.id, versionId: catalog.body.defaultVersionId });
+    expect(copied).toMatchObject({ status: 200, body: { success: true, rawSourceVersionId: `current:${original.id}` } });
+    expect(f.workingDrafts).toHaveLength(1);
+    expect(f.workingDrafts[0].status).toBe('draft');
+    expect(f.workingDrafts[0].responses_json).toBe(original.responses_json);
+    expect(f.workingDrafts[0].session_id).not.toBe(original.session_id);
+    expect(JSON.parse(f.workingDrafts[0].draft_metadata_json)).toMatchObject({ source_draft_id: original.id, source_version_id: `submission:${receipt.id}`, source_submission_id: receipt.id });
+    expect(f.getDraft().responses_json).toBe(original.responses_json);
+    expect(f.getDraft().final_submission_id).toBe(original.final_submission_id);
+    expect(f.submissions).toEqual([receipt]);
+    expect((await f.save({ action: 'bootstrap', resumeCredential: copied.body.resumeCredential })).status).toBe(200);
+  });
+
+  it('refuses completed team copies without privilege or exact receipt, session and mapped-answer agreement', async () => {
+    for (const fault of ['public', 'missing_source', 'wrong_source', 'wrong_session', 'wrong_receipt', 'changed_payload', 'deleted_source']) {
+      const f = await fixture();
+      expect((await f.submit(f.submission(f.original))).status).toBe(200);
+      const original = f.getDraft(), receipt = clone(f.submissions[0]);
+      if (fault !== 'public') f.base44.auth = { me: async () => ({ role: 'admin' }) };
+      if (fault === 'missing_source') delete f.submissions[0].metadata.source_draft_id;
+      if (fault === 'wrong_source') f.submissions[0].metadata.source_draft_id = 'unrelated-draft';
+      if (fault === 'deleted_source') f.setDraft({ soft_deleted_at: new Date().toISOString() });
+      if (fault === 'wrong_session') f.submissions[0].metadata.questionnaire_session_id = 'unrelated_session_1234567890';
+      if (fault === 'wrong_receipt') f.setDraft({ final_submission_id: 'another-receipt' });
+      if (fault === 'changed_payload') f.setDraft({ mapped_payload_json: JSON.stringify(payloadFor(f.original, 'An unrelated newer description')) });
+      const recovery = loadHosted('base44/functions/queryProQuestionnaireRecoveryRecords/entry.ts', f.base44);
+      const result = await recovery({ action: 'create_version_copy', recordType: 'draft', recordId: original.id, versionId: `submission:${receipt.id}` });
+      expect(result.status).toBeGreaterThanOrEqual(400);
+      expect(f.workingDrafts).toHaveLength(0);
+      expect(f.getDraft().responses_json).toBe(original.responses_json);
+      expect(f.submissions).toHaveLength(1);
+    }
   });
 
   it('reports an unverified revision echo without acknowledging or discarding its retained changes', async () => {

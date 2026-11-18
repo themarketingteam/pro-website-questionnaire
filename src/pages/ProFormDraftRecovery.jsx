@@ -684,19 +684,17 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
                 <p className="mt-1">
                   Editing, retrying, and AI repair are disabled so this retained snapshot cannot overwrite the active draft.
                 </p>
-                {selectedVersion?.sourceType !== 'submission' && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="brand-button-secondary mt-3 gap-2"
-                    onClick={handleCreateVersionCopy}
-                    disabled={isWorking}
-                  >
-                    {creatingVersionCopy ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitBranch className="h-3 w-3" />}
-                    {creatingVersionCopy ? 'Creating Copy...' : 'Create Editable Recovery Copy'}
-                  </Button>
-                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="brand-button-secondary mt-3 gap-2"
+                  onClick={handleCreateVersionCopy}
+                  disabled={isWorking}
+                >
+                  {creatingVersionCopy ? <Loader2 className="h-3 w-3 animate-spin" /> : <GitBranch className="h-3 w-3" />}
+                  {creatingVersionCopy ? 'Creating Copy...' : 'Create Editable Recovery Copy'}
+                </Button>
               </div>
             )}
           </section>
