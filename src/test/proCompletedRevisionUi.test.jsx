@@ -17,6 +17,8 @@ describe('completed Pro questionnaire UI', () => {
     const banner = await screen.findByRole('status', { name: 'Submitted questionnaire' });
     expect(within(banner).getByText('This questionnaire has been submitted')).toBeInTheDocument();
     expect(screen.queryByText('Unable to save')).not.toBeInTheDocument();
+    expect(screen.getByText('Submitted answers are read-only. Contact your team if changes are needed.')).toBeVisible();
+    expect(screen.queryByText(/Use.*Start a revision/)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Submit Questionnaire' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Clear All Answers' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Having trouble? Reset saved browser data' })).toBeDisabled();

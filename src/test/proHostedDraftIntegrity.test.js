@@ -442,8 +442,28 @@ describe('hosted Pro save and submission integrity', () => {
     expect((await f.save({ action: 'bootstrap', resumeCredential: copied.body.resumeCredential })).status).toBe(200);
   });
 
+  it('verifies padded Base44 receipt DTOs against the exact saved shape before team copying', async () => {
+    const f = await fixture();
+    expect((await f.submit(f.submission(f.original))).status).toBe(200);
+    const original = f.getDraft(), receipt = clone(f.submissions[0]);
+    f.hydrateSubmissionReads(hydrateProSubmissionEntity);
+    const padded = hydrateProSubmissionEntity(receipt);
+    expect(padded.userdata).toHaveProperty('target_industries_structure', null);
+    expect(padded.userdata.service_offerings_structure.pages[0]).toHaveProperty('id', null);
+    f.base44.auth = { me: async () => ({ role: 'admin' }) };
+    f.base44.asServiceRole.entities.ProFormDraftEvent = { create: async () => ({ id: 'audit-padded-copy' }) };
+    const recovery = loadHosted('base44/functions/queryProQuestionnaireRecoveryRecords/entry.ts', f.base44);
+    const catalog = await recovery({ action: 'list_versions', recordType: 'draft', recordId: original.id });
+    const copied = await recovery({ action: 'create_version_copy', recordType: 'draft', recordId: original.id, versionId: catalog.body.defaultVersionId });
+    expect(copied).toMatchObject({ status: 200, body: { success: true } });
+    expect(f.workingDrafts).toHaveLength(1);
+    expect(f.workingDrafts[0].responses_json).toBe(original.responses_json);
+    expect(f.getDraft().responses_json).toBe(original.responses_json);
+    expect(f.submissions).toEqual([receipt]);
+  });
+
   it('refuses completed team copies without privilege or exact receipt, session and mapped-answer agreement', async () => {
-    for (const fault of ['public', 'missing_source', 'wrong_source', 'wrong_session', 'wrong_receipt', 'changed_payload', 'deleted_source']) {
+    for (const fault of ['public', 'missing_source', 'wrong_source', 'wrong_session', 'wrong_receipt', 'changed_payload', 'meaningful_padding', 'deleted_source']) {
       const f = await fixture();
       expect((await f.submit(f.submission(f.original))).status).toBe(200);
       const original = f.getDraft(), receipt = clone(f.submissions[0]);
@@ -454,6 +474,7 @@ describe('hosted Pro save and submission integrity', () => {
       if (fault === 'wrong_session') f.submissions[0].metadata.questionnaire_session_id = 'unrelated_session_1234567890';
       if (fault === 'wrong_receipt') f.setDraft({ final_submission_id: 'another-receipt' });
       if (fault === 'changed_payload') f.setDraft({ mapped_payload_json: JSON.stringify(payloadFor(f.original, 'An unrelated newer description')) });
+      if (fault === 'meaningful_padding') { f.submissions[0].userdata.target_industries = ['Unexpected industry value']; f.hydrateSubmissionReads(hydrateProSubmissionEntity); }
       const recovery = loadHosted('base44/functions/queryProQuestionnaireRecoveryRecords/entry.ts', f.base44);
       const result = await recovery({ action: 'create_version_copy', recordType: 'draft', recordId: original.id, versionId: `submission:${receipt.id}` });
       expect(result.status).toBeGreaterThanOrEqual(400);

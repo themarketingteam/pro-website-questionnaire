@@ -962,11 +962,17 @@ Deno.serve(async (req) => {
         if (candidates.length !== 1) return jsonResponse({ success: false, code: 'SUBMITTED_RAW_SOURCE_UNAVAILABLE', error: 'This final submission has no uniquely linked saved questionnaire answers available for an editable copy.' }, 409);
         const source = candidates[0];
         const rawVersion = await publicVersionDetail(base44, anchor, `current:${source.id}`);
+        // Entity reads pad omitted optional fields with null/empty arrays.
+        // Compare against the exact saved payload shape while retaining every
+        // unexpected nonempty value, just as durable receipt verification does.
+        let comparableReceipt: any;
+        try { comparableReceipt = normalizeStoredOrganizedRecord(receipt.payload, rawVersion?.payload); }
+        catch { return jsonResponse({ success: false, code: 'SUBMITTED_RAW_SOURCE_MISMATCH', error: 'The stored receipt could not be verified for an editable copy.' }, 409); }
         const identity = { businessName: cleanText(source.business_name, 300), domain: normalizeDomain(source.domain) };
         const receiptIdentity = { businessName: cleanText(receipt.payload?.metadata?.business_name, 300), domain: normalizeDomain(receipt.payload?.metadata?.businessDomain || receipt.payload?.metadata?.business_domain) };
         const matchesReceipt = rawVersion && responseCount(rawVersion.snapshot?.responses) > 0
           && await createSubmissionIdentityFingerprint(identity) === await createSubmissionIdentityFingerprint(receiptIdentity)
-          && await createSubmissionContentFingerprint({ payload: rawVersion.payload, draftId: source.id, identity }) === await createSubmissionContentFingerprint({ payload: receipt.payload, draftId: source.id, identity: receiptIdentity });
+          && await createSubmissionContentFingerprint({ payload: rawVersion.payload, draftId: source.id, identity }) === await createSubmissionContentFingerprint({ payload: comparableReceipt, draftId: source.id, identity: receiptIdentity });
         if (!matchesReceipt) return jsonResponse({ success: false, code: 'SUBMITTED_RAW_SOURCE_MISMATCH', error: 'The saved questionnaire answers could not be verified against this final submission. No editable copy was created.' }, 409);
         rawSourceVersionId = rawVersion.versionId;
         sourceSubmissionId = receipt.sourceRecordId;

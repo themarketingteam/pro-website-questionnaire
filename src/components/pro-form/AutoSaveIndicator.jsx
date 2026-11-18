@@ -88,7 +88,7 @@ export default function AutoSaveIndicator({
                   ? 'The database has not confirmed this change yet. A temporary browser copy is retained while automatic retries continue.'
                   : 'The database has not confirmed this change, and browser storage is unavailable. Keep this page open while retries continue.'
                 : isCompleted
-                  ? 'Use “Start a revision” to save further changes. The submitted questionnaire remains unchanged.'
+                  ? 'Submitted answers are read-only. Contact your team if changes are needed.'
                 : isError
               ? hasLocalRecoveryCopy
                 ? 'The database has not confirmed this change. A temporary browser copy is retained; keep this page open and edit any answer to try again.'
