@@ -21,12 +21,15 @@ import {
   getOrCreateDraftClientInstanceId,
   getOrCreateQuestionnaireSessionId,
   getStoredResumeCredential,
-  persistResumeCredential
+  persistResumeCredential,
+  readDraftEntryReference
 } from '@/lib/sessionId';
 import { safeLocalStorageGet, safeLocalStorageSet, safeNowIso } from '@/lib/browserSafety';
 import { validatePageStructure } from '@/lib/pageOrganizerModel';
 import { trackClarityEvent } from '@/lib/clarity';
 import {
+  createNewClientRequestId,
+  navigateToNewClientLaunch,
   removeIncomingIdentityParams,
   removeNewClientLaunchParams
 } from '@/lib/clientIdentityLaunch';
@@ -278,6 +281,14 @@ export const useSecureQuestionnaireDraft = ({
   totalQuestionCount,
   isTestMode = false
 }) => {
+  const [entryReference] = useState(() => readDraftEntryReference());
+  const [entryCredentials] = useState(() => {
+    const params = new URLSearchParams(window.location.search || '');
+    return Object.fromEntries(['userId', 'userName', 'userEmail'].map((key) => [key, params.get(key) || '']));
+  });
+  const rolloverLaunchRef = useRef(null);
+  const rolloverNavigatingRef = useRef(false);
+  const bootstrapRequestRef = useRef(null);
   const [isDraftReady, setIsDraftReady] = useState(false);
   const [draftSaveState, setDraftSaveState] = useState('loading');
   const [lastSavedAt, setLastSavedAt] = useState('');
@@ -864,7 +875,12 @@ export const useSecureQuestionnaireDraft = ({
     let attemptCount = 0;
 
     const initialize = async ({ immediate = false, identityDecision = '' } = {}) => {
-      if (cancelled || bootstrapInFlight) return;
+      if (cancelled || bootstrapInFlight || rolloverNavigatingRef.current) return;
+      if (!newClientLaunch.active && entryReference.explicit && !entryReference.credential) {
+        setDraftSaveState('error');
+        setDraftConnection({ attempt: 0, error: 'This saved questionnaire link is incomplete or invalid. Open the complete return link to access its answers.', nextRetryAt: '' });
+        return;
+      }
       if (bootstrapRetryTimerRef.current) {
         clearTimeout(bootstrapRetryTimerRef.current);
         bootstrapRetryTimerRef.current = null;
@@ -889,17 +905,41 @@ export const useSecureQuestionnaireDraft = ({
           businessName: blockedUrlIdentityFieldsRef.current.has('businessName') ? '' : businessNameParam,
           domain: blockedUrlIdentityFieldsRef.current.has('domain') ? '' : domainParam
         };
-        let result = await bootstrapServerDraft({
+        const freshCredentials = { ...entryCredentials, ...incomingUrlIdentity };
+        const bootstrapOptions = {
           functions: base44.functions,
           resumeCredential: initialResumeCredential,
           legacySessionId,
-          credentials: effectiveCredentials(latestRef.current.credentials),
+          credentials: newClientLaunch.active ? freshCredentials : effectiveCredentials(latestRef.current.credentials),
           incomingIdentity: incomingUrlIdentity,
           newClient: newClientLaunch.active,
           newClientRequestId: newClientLaunch.requestId,
           identityDecision
-        });
+        };
+        const requestKey = JSON.stringify({ ...bootstrapOptions, functions: undefined });
+        // React's setup replay must await the same initial request, rather than
+        // race two server-side new-client creations before either is confirmed.
+        if (bootstrapRequestRef.current?.key !== requestKey) {
+          bootstrapRequestRef.current = { key: requestKey, promise: bootstrapServerDraft(bootstrapOptions) };
+        }
+        const result = await bootstrapRequestRef.current.promise;
         if (cancelled) return;
+        if (!authoritativeReadyRef.current && !newClientLaunch.active && !entryReference.explicit
+          && (result.draft?.status === 'submitted' || result.draft?.finalSubmissionId)) {
+          // A bare URL asks to start again after a completed browser draft.
+          // Keep its credential/outbox intact; the new document bootstraps a
+          // separate blank client through the existing idempotent launch path.
+          rolloverLaunchRef.current ||= {
+            ...entryCredentials,
+            requestId: createNewClientRequestId(),
+            businessName: incomingUrlIdentity.businessName,
+            domain: incomingUrlIdentity.domain,
+            promptForIdentity: !incomingUrlIdentity.businessName && !incomingUrlIdentity.domain
+          };
+          rolloverNavigatingRef.current = navigateToNewClientLaunch(rolloverLaunchRef.current);
+          if (!rolloverNavigatingRef.current) throw new Error('The new questionnaire could not be opened. Your saved submission is unchanged.');
+          return;
+        }
         const persistedCredential = persistResumeCredential(result.resumeCredential);
         if (!persistedCredential) throw new Error('The draft service did not return a valid recovery credential.');
         resumeCredentialRef.current = persistedCredential;
@@ -961,7 +1001,7 @@ export const useSecureQuestionnaireDraft = ({
           storageSaved: preservedRecovery.storageSaved
         } : null);
         const normalized = normalizePersistedStateV3(merged.state);
-        const effectiveIdentity = effectiveCredentials();
+        const effectiveIdentity = newClientLaunch.active ? freshCredentials : effectiveCredentials();
         const mergedCredentials = {
           ...(serverDraft.credentials || {}),
           ...Object.fromEntries(Object.entries(effectiveIdentity).filter(([field, value]) => (
@@ -1001,17 +1041,9 @@ export const useSecureQuestionnaireDraft = ({
       } catch (error) {
         if (cancelled) return;
         const summary = safeErrorSummary(error);
-        const invalidStoredCredential = ['401', '410'].includes(String(summary.status))
-          && Boolean(getStoredResumeCredential());
-        if (invalidStoredCredential) {
-          clearQuestionnaireSessionId();
-          resumeCredentialRef.current = '';
-          trackClarityEvent('pro_questionnaire_draft_credential_recovered', {
-            attempt: attemptCount
-          });
-        }
+        const accessDenied = ['401', '403', '410'].includes(String(summary.status));
         const retryDelayMs = isTestMode ? 1000 : retryDelayForAttempt(attemptCount);
-        const nextRetryAt = new Date(Date.now() + retryDelayMs).toISOString();
+        const nextRetryAt = accessDenied ? '' : new Date(Date.now() + retryDelayMs).toISOString();
         setDraftSaveState('error');
         setIsDraftReady(false);
         setDraftConnection({
@@ -1025,12 +1057,13 @@ export const useSecureQuestionnaireDraft = ({
           status: summary.status,
           name: summary.name
         });
-        bootstrapRetryTimerRef.current = setTimeout(() => {
+        if (!accessDenied) bootstrapRetryTimerRef.current = setTimeout(() => {
           bootstrapRetryTimerRef.current = null;
           initialize();
         }, retryDelayMs);
       } finally {
         bootstrapInFlight = false;
+        if (!cancelled) bootstrapRequestRef.current = null;
       }
     };
     bootstrapRunnerRef.current = initialize;
@@ -1038,6 +1071,7 @@ export const useSecureQuestionnaireDraft = ({
 
     return () => {
       cancelled = true;
+      initializedRef.current = false;
       bootstrapRunnerRef.current = null;
       if (bootstrapRetryTimerRef.current) {
         clearTimeout(bootstrapRetryTimerRef.current);
@@ -1201,11 +1235,14 @@ export const useSecureQuestionnaireDraft = ({
     };
   }, [flushDraftKeepalive, isDraftReady, retryDraftBootstrap]);
 
-  useEffect(() => () => {
-    mountedRef.current = false;
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    if (saveRetryTimerRef.current) clearTimeout(saveRetryTimerRef.current);
-    if (bootstrapRetryTimerRef.current) clearTimeout(bootstrapRetryTimerRef.current);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (saveRetryTimerRef.current) clearTimeout(saveRetryTimerRef.current);
+      if (bootstrapRetryTimerRef.current) clearTimeout(bootstrapRetryTimerRef.current);
+    };
   }, []);
 
   const downloadOrganizerRecoveryBackup = useCallback(() => {

@@ -66,6 +66,9 @@ export const buildNewClientLaunchUrl = ({
   windowObject = typeof window !== 'undefined' ? window : null,
   businessName = '',
   domain = '',
+  userId = '',
+  userName = '',
+  userEmail = '',
   promptForIdentity = false,
   requestId = createNewClientRequestId()
 } = {}) => {
@@ -77,6 +80,9 @@ export const buildNewClientLaunchUrl = ({
   if (String(businessName || '').trim()) params.set('businessName', String(businessName).trim());
   const normalizedDomain = normalizeClientDomain(domain);
   if (normalizedDomain) params.set('domainName', normalizedDomain);
+  Object.entries({ userId, userName, userEmail }).forEach(([key, value]) => {
+    if (String(value || '').trim()) params.set(key, String(value).trim());
+  });
   return `${pathname}?${params.toString()}`;
 };
 

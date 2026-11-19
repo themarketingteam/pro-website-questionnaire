@@ -43,6 +43,19 @@ const readFragmentCredential = () => {
 
 export const getFragmentResumeCredential = () => readFragmentCredential();
 
+// Capture URL intent before bootstrap writes a cached credential into the hash.
+// An explicit but invalid link must never silently fall back to another client.
+export const readDraftEntryReference = () => {
+  try {
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const search = new URLSearchParams(window.location.search || '');
+    return {
+      explicit: fragment.has(FRAGMENT_KEY) || search.has(FRAGMENT_KEY),
+      credential: readFragmentCredential()
+    };
+  } catch { return { explicit: false, credential: '' }; }
+};
+
 export const getStoredResumeCredential = () => {
   const fragmentValue = readFragmentCredential();
   if (fragmentValue) return fragmentValue;
