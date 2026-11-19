@@ -569,4 +569,36 @@ describe('public draft recovery actions', () => {
     expect(base44.functions.invoke.mock.calls.some(([, body]) => body?.action === 'create_version_copy')).toBe(false);
   });
 
+  it('shows 11 / 15, 9 / 10, 5 / 5 and 25 / 25 from the displayed final receipt without borrowing current raw answers', async () => {
+    draftRecords = [{ id: 'seo-counts-root', session_id: 'secure_share_session_1234567890', business_name: 'SEO Counts Client', status: 'submitted', responses_json: JSON.stringify({ '3': ['Managed IT'], '4': ['Healthcare'], '5': ['Root location'] }) }];
+    const invoke = base44.functions.invoke.getMockImplementation();
+    base44.functions.invoke.mockImplementation(async (name, payload) => {
+      const result = await invoke(name, payload);
+      if (payload?.action === 'get_version') result.data.version = { ...result.data.version, current: false, sourceType: 'submission', snapshot: { responses: {} }, payload: { userdata: { service_offerings: Array.from({ length: 11 }, (_, index) => `Saved service ${index}`), service_offerings_other: '', target_industries: Array.from({ length: 9 }, (_, index) => `Saved industry ${index}`), target_industries_other: '', geographic_areas: Array.from({ length: 5 }, (_, index) => ({ geographic_area_meta: { name: `Saved place ${index}` } })) } } };
+      return result;
+    });
+    renderRecoveryPage(); fireEvent.click(await screen.findByText('SEO Counts Client'));
+    expect(await screen.findByLabelText('Services count')).toHaveTextContent('11 / 15');
+    expect(screen.getByLabelText('Industries count')).toHaveTextContent('9 / 10');
+    expect(screen.getByLabelText('Locations count')).toHaveTextContent('5 / 5');
+    expect(screen.getByLabelText('Total SEO count')).toHaveTextContent('25 / 25');
+    expect(screen.getByRole('button', { name: 'Copy Draft Link' })).toBeEnabled();
+    expect(base44.functions.invoke.mock.calls.some(([, body]) => ['save', 'update', 'create_version_copy'].includes(body?.action))).toBe(false);
+  });
+
+  it('shows unknown counts for missing selected history instead of showing the current draft totals', async () => {
+    draftRecords = [{ id: 'seo-counts-missing', business_name: 'Missing Counts History', status: 'submitted', responses_json: JSON.stringify({ '3': ['Managed IT'], '4': ['Healthcare'], '5': ['Root location'] }) }];
+    const invoke = base44.functions.invoke.getMockImplementation();
+    base44.functions.invoke.mockImplementation(async (name, payload) => {
+      const result = await invoke(name, payload);
+      if (payload?.action === 'get_version') result.data.version = { ...result.data.version, current: false, sourceType: 'revision', snapshot: {}, payload: {} };
+      return result;
+    });
+    renderRecoveryPage(); fireEvent.click(await screen.findByText('Missing Counts History'));
+    expect(await screen.findByLabelText('Services count')).toHaveTextContent('— / 15');
+    expect(screen.getByLabelText('Industries count')).toHaveTextContent('— / 10');
+    expect(screen.getByLabelText('Locations count')).toHaveTextContent('— / 5');
+    expect(screen.getByLabelText('Total SEO count')).toHaveTextContent('— / 25');
+  });
+
 });

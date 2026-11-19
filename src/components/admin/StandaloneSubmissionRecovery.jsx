@@ -5,6 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import AdminQuestionnairePdfSection from '@/components/admin/AdminQuestionnairePdfSection';
+import ProRecoverySeoCounts from '@/components/admin/ProRecoverySeoCounts';
+import { countProRecoverySeoAnswers } from '@/lib/proRecoverySeoCounts';
+import { SERVICE_OPTIONS_GROUPED } from '@/components/pro-form/questionData';
 import RecoveryLifecycleActions from '@/components/admin/RecoveryLifecycleActions';
 import { getRecoveryRecord, listRecoveryRecords } from '@/lib/draftRecoveryApi';
 
@@ -40,6 +43,7 @@ function SubmissionRow({ summary, expanded, onToggle, recoveryGrant, onChanged }
     ? record
     : { metadata, userdata: record?.userdata || {} };
   const submissionDate = metadata.submission_datetime || record.created_date;
+  const seoCounts = countProRecoverySeoAnswers({ responses: isLegacySubmission ? record.responses : undefined, payload: submissionPayload }, SERVICE_OPTIONS_GROUPED);
 
   return (
     <Card className={`brand-record-card ${expanded ? 'brand-record-card--expanded' : ''}`}>
@@ -95,6 +99,7 @@ function SubmissionRow({ summary, expanded, onToggle, recoveryGrant, onChanged }
               <p><span className="font-medium">Business Name:</span> {metadata.business_name || '—'}</p>
               <p><span className="font-medium">Domain:</span> {metadata.businessDomain || '—'}</p>
               <p><span className="font-medium">Submission ID:</span> {record.id}</p>
+              <ProRecoverySeoCounts counts={seoCounts} />
             </div>
             <div className="space-y-2">
               <p><span className="font-medium">Submitted At:</span> {formatDate(submissionDate)}</p>

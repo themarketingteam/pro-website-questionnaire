@@ -13,6 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Wrench, Pencil, Stethoscope, Loader2, Link2, History, GitBranch } from 'lucide-react';
 import DraftEditPanel from '@/components/admin/DraftEditPanel';
+import ProRecoverySeoCounts from '@/components/admin/ProRecoverySeoCounts';
+import { proRecoverySeoCountsForVersion } from '@/lib/proRecoverySeoCounts';
 import { toast } from 'sonner';
 import QuestionnaireIntakeRecovery from '@/components/admin/QuestionnaireIntakeRecovery';
 import AdminQuestionnairePdfSection from '@/components/admin/AdminQuestionnairePdfSection';
@@ -266,6 +268,10 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
   const parsedResponses = selectedSnapshot?.responses && typeof selectedSnapshot.responses === 'object'
     ? selectedSnapshot.responses
     : safeJsonParse(localDraft.responses_json, {});
+  const seoCounts = useMemo(() => proRecoverySeoCountsForVersion({
+    selectedVersion: selectedVersionId ? (selectedVersion?.versionId === selectedVersionId ? selectedVersion : {}) : null,
+    draft: localDraft
+  }, SERVICE_OPTIONS_GROUPED), [selectedVersion, selectedVersionId, localDraft]);
   const selectedCredentials = selectedSnapshot?.credentials || {};
   const displayDraft = selectedVersion ? {
     ...localDraft,
@@ -726,6 +732,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
               <p><span className="font-medium">User Email:</span> {displayDraft.user_email || '—'}</p>
               <p><span className="font-medium">User ID:</span> {displayDraft.user_id || '—'}</p>
               <p><span className="font-medium">Final Submission ID:</span> {localDraft.final_submission_id || '—'}</p>
+              <ProRecoverySeoCounts counts={seoCounts} />
             </div>
             <div className="space-y-2 text-sm">
               <p><span className="font-medium">Submit Attempted:</span> {formatDate(localDraft.submit_attempted_at)}</p>
