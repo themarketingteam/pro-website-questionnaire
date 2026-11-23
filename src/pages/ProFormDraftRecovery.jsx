@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Copy, ChevronDown, ChevronUp, AlertTriangle, RefreshCw, Wrench, Pencil, Stethoscope, Loader2, Link2, History, GitBranch } from 'lucide-react';
 import DraftEditPanel from '@/components/admin/DraftEditPanel';
 import ProRecoverySeoCounts from '@/components/admin/ProRecoverySeoCounts';
+import ProAutomaticRetryStatus from '@/components/admin/ProAutomaticRetryStatus';
 import { proRecoverySeoCountsForVersion } from '@/lib/proRecoverySeoCounts';
 import { toast } from 'sonner';
 import QuestionnaireIntakeRecovery from '@/components/admin/QuestionnaireIntakeRecovery';
@@ -318,7 +319,7 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
       // If mapped_payload_json is set (manually edited), use direct draft-based retry.
       // Otherwise fall back to session-based intake lookup.
       const params = localDraft.mapped_payload_json
-        ? { draftId: localDraft.id, recoveryGrant }
+        ? { draftId: localDraft.id, recoveryGrant, forceRetry: true }
         : {
             questionnaireSessionId: localDraft.session_id,
             session_id: localDraft.session_id,
@@ -770,6 +771,8 @@ function DraftRow({ draft, expanded, onToggle, hasDuplicateSession, onRetrySucce
               onCancel={() => setEditing(false)}
             />
           ) : null}
+
+          <ProAutomaticRetryStatus recordId={selectedVersion ? selectedVersion.draftId || '' : localDraft.id} recoveryGrant={recoveryGrant} />
 
           <AdminQuestionnairePdfSection
             sourceType="draft"

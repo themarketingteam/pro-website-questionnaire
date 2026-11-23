@@ -2,6 +2,7 @@ import { normalizeStoredOrganizedRecord, validateOrganizedSubmission, reconcileO
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.61";
 
 import { withEntityLease } from '../../shared/entityLease.ts';
+import { retryJobSummary } from '../../shared/proSubmissionRetries.ts';
 import { createSubmissionContentFingerprint, createSubmissionIdentityFingerprint } from '../../shared/proDraftSubmissionAuthorization.ts';
 
 // Invalid retained payloads must remain inspectable in recovery. Only the
@@ -918,6 +919,11 @@ Deno.serve(async (req) => {
     const recordId = cleanText(body?.recordId, 200);
     if (!recordId) {
       return badRequest('A recovery record ID is required.', { action, recordType });
+    }
+
+    if (action === 'retry_jobs' && ['draft','intake'].includes(recordType)) {
+      const values = await base44.asServiceRole.entities.ProSubmissionRetryJob.filter({ [recordType === 'draft' ? 'source_draft_id' : 'source_intake_id']: recordId }, '-created_date', 20);
+      return jsonResponse({ success: true, jobs: (Array.isArray(values) ? values : []).map(retryJobSummary) });
     }
 
     if (recordType === 'draft' && action === 'list_versions') {

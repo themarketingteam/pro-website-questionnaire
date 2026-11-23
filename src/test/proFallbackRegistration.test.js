@@ -11,6 +11,7 @@ function loadDefaultHandler() {
   const require = (name) => {
     if (name.startsWith('npm:@base44/sdk')) return { createClientFromRequest };
     if (name.endsWith('pageOrganizerContract.js')) return {};
+    if (name.endsWith('proSubmissionRetries.ts')) return {};
     if (name.endsWith('entityLease.ts')) return {};
     throw new Error(`Unexpected import ${name}`);
   };

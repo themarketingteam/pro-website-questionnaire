@@ -163,7 +163,7 @@ export const sendZapierSafe = async (transformedPayload, options = {}) => {
 
   try {
     const response = await withClientTimeout(
-      () => base44.functions.invoke('sendToZapier', transformedPayload),
+      () => base44.functions.invoke('sendToZapier', { payload: transformedPayload, draftId: options.draftId || transformedPayload?.metadata?.source_draft_id, resumeCredential: options.resumeCredential || '', submissionId: options.submissionId || '' }),
       timeoutMs
     );
 
@@ -331,6 +331,10 @@ export const submitProQuestionnaire = async ({
 
   let activeDraftId = '';
   try {
+    const intent = await base44.functions.invoke('registerProSubmissionIntent', { resumeCredential: draftResumeCredential, responses: responseSnapshot, submitContext: { business_name: submissionCredentials.businessName, domain: submissionCredentials.domain } });
+    if (!intent?.data?.success || !intent.data.intentConfirmed || !intent.data.draftId) throw new Error('The server did not confirm the submission retry checkpoint.');
+    activeDraftId = intent.data.draftId;
+
     const durableDraft = await saveDraftNow({
       status: 'submit_attempted',
       responsesSnapshot: responseSnapshot,
@@ -345,6 +349,7 @@ export const submitProQuestionnaire = async ({
     if (!activeDraftId) throw new Error('The database did not confirm the final draft save.');
   } catch (error) {
     const serializedError = serializeSubmitError(error);
+    try { await base44.functions.invoke('registerProSubmissionIntent', { resumeCredential: draftResumeCredential, responses: responseSnapshot, failure: serializedError, submitContext: { business_name: submissionCredentials.businessName, domain: submissionCredentials.domain } }); } catch { /* Browser recovery remains necessary when the backend cannot be reached. */ }
     throw new SubmitFlowError({
       userMessage: `Your answers are still on this page, but the database did not confirm the final save. Please try again before submitting. Recovery code: ${recoveryCode}`,
       recoveryCode,
@@ -852,7 +857,7 @@ export const submitProQuestionnaire = async ({
     // Keep the public page alive until the backend accepts or rejects delivery.
     // Fire-and-forget requests can be cancelled when the thank-you view replaces
     // the questionnaire immediately after submission on the published site.
-    const zapierResult = await sendZapierSafe(transformedPayload, { timeoutMs: 10000 });
+    const zapierResult = await sendZapierSafe(transformedPayload, { timeoutMs: 10000, draftId: activeDraftId, resumeCredential: draftResumeCredential, submissionId: savedSubmission?.id || '' });
     if (!zapierResult.ok) {
       await createDraftEventSafe({
         createDraftEvent,

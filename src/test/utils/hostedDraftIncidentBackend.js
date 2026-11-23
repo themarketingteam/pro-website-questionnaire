@@ -1,3 +1,4 @@
+import { memoryEntity } from './memoryEntities';
 import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
@@ -18,6 +19,7 @@ export async function hostedDraftIncidentBackend({ responses = {}, status = 'dra
   records.set(original.id, original);
   const matches = (record, query) => Object.entries(query).every(([key, value]) => value && typeof value === 'object' && '$gt' in value ? record[key] > value.$gt : value == null ? record[key] == null : record[key] === value);
   const sdk = { asServiceRole: { entities: {
+    ProSubmissionRetryJob: memoryEntity('retryJob'),
     ProFormDraft: {
       get: async id => clone(records.get(id)),
       filter: async (query, _sort, limit = 500, skip = 0) => [...records.values()].filter(record => matches(record, query)).slice(skip, skip + limit).map(clone),

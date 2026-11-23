@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { loadBackend } from './utils/loadBackend';
 
 const functionPaths = [
   'base44/functions/retryProQuestionnaireIntakeSubmission/entry.ts',
@@ -40,23 +39,24 @@ const issueGrant = async (secret, overrides = {}) => {
 };
 
 const loadAuthorizationHelpers = (path, configuredPassword) => {
-  const source = readFileSync(resolve(process.cwd(), path), 'utf8');
-  const start = source.indexOf("const DRAFT_RECOVERY_SECRET_NAME = 'DRAFT_RECOVERY_PASSWORD';");
-  const end = source.indexOf('// Deliver', start);
-  const helperSource = source.slice(start, end);
-  const evaluate = new Function(
-    'Deno',
-    `${helperSource}\nreturn { verifyDraftRecoveryGrant, authorizeDraftRecoveryRequest };`,
-  );
-
-  return evaluate({
-    env: {
-      get: (name) => name === 'DRAFT_RECOVERY_PASSWORD' ? configuredPassword : undefined,
-    },
+  const shared = path.includes('/retryPro');
+  const { exposed } = loadBackend(shared ? 'base44/shared/draftRecoveryAuthorization.ts' : path, {
+    env: { DRAFT_RECOVERY_PASSWORD: configuredPassword },
+    expose: shared ? 'authorizeRecoveryRequest' : 'authorizeDraftRecoveryRequest',
   });
+  return { authorizeDraftRecoveryRequest: async (base44, body) => {
+    const result = shared
+      ? await exposed.authorizeRecoveryRequest(base44, body)
+      : await exposed.authorizeDraftRecoveryRequest(base44, body);
+    return shared ? result.actorMode : result;
+  } };
 };
 
 describe.each(functionPaths)('%s public recovery authorization', (path) => {
+  it('rejects an unauthenticated endpoint request before accessing any records', async () => {
+    const { send } = loadBackend(path, { base44: { auth: { me: async () => null } } });
+    expect((await send({ draftId: 'untrusted-draft', mode: 'repair_and_retry' })).status).toBe(403);
+  });
   it('accepts the same signed grant issued by the password gate', async () => {
     const secret = 'test-recovery-password';
     const token = await issueGrant(secret);
@@ -83,12 +83,16 @@ describe.each(functionPaths)('%s public recovery authorization', (path) => {
       expiresAt: Math.floor(Date.now() / 1000) - 3600,
     });
     const wrongScopeToken = await issueGrant(secret, { scope: 'other-scope' });
+    const [payloadPart, signaturePart] = validToken.split('.');
+    // Changing the first character changes signature bytes. Changing only the
+    // last Base64url character can leave its unused padding bits equivalent.
+    const tamperedToken = `${payloadPart}.${signaturePart[0] === 'A' ? 'B' : 'A'}${signaturePart.slice(1)}`;
     const { authorizeDraftRecoveryRequest } = loadAuthorizationHelpers(path, secret);
     const anonymousBase44 = { auth: { me: async () => { throw new Error('Unauthorized'); } } };
 
     await expect(authorizeDraftRecoveryRequest(anonymousBase44, {})).resolves.toBe('');
     await expect(authorizeDraftRecoveryRequest(anonymousBase44, {
-      recoveryGrant: `${validToken.slice(0, -1)}x`,
+      recoveryGrant: tamperedToken,
     })).resolves.toBe('');
     await expect(authorizeDraftRecoveryRequest(anonymousBase44, {
       recoveryGrant: expiredToken,

@@ -85,6 +85,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     base44.functions.invoke.mockImplementation(async (name, payload = {}) => {
+      if (name === 'registerProSubmissionIntent') return { data: { success: true, intentConfirmed: true, draftId: 'draft-1' } };
       if (name === 'syncProQuestionnaireDraft') return secureDraftMockResponse(payload);
       if (name === 'sendToZapier') return { status: 200, data: { success: true } };
       if (name === 'validateQuestionText') return { status: 200, data: { status: 'complete' } };
@@ -312,6 +313,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
 
     const invoke = base44.functions.invoke;
     invoke.mockImplementation(async (name, payload) => {
+      if (name === 'registerProSubmissionIntent') return { data: { success: true, intentConfirmed: true, draftId: 'draft-1' } };
       if (name === 'syncProQuestionnaireDraft') return secureDraftMockResponse(payload);
       if (name === 'validateQuestionText') {
         return { status: 200, data: { status: 'incomplete' } };
@@ -378,6 +380,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
 
     const invoke = base44.functions.invoke;
     invoke.mockImplementation(async (name, payload) => {
+      if (name === 'registerProSubmissionIntent') return { data: { success: true, intentConfirmed: true, draftId: 'draft-1' } };
       if (name === 'syncProQuestionnaireDraft') return secureDraftMockResponse(payload);
       if (name === 'validateQuestionText') {
         throw new Error('network down');
@@ -466,6 +469,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
   it('writes a recoverable local backup when the database draft save fails', async () => {
     const invoke = base44.functions.invoke;
     invoke.mockImplementation(async (name, payload) => {
+      if (name === 'registerProSubmissionIntent') return { data: { success: true, intentConfirmed: true, draftId: 'draft-1' } };
       if (name === 'syncProQuestionnaireDraft') {
         if (payload?.action === 'bootstrap') return secureDraftMockResponse(payload);
         throw Object.assign(new Error('draft database unavailable'), { status: 503 });
@@ -518,6 +522,7 @@ describe('ProQuestionnaire regression: Q23/Q23.1 and Q25/25.1', () => {
     });
     const invoke = base44.functions.invoke;
     invoke.mockImplementation(async (name, payload) => {
+      if (name === 'registerProSubmissionIntent') return { data: { success: true, intentConfirmed: true, draftId: 'draft-1' } };
       if (name === 'syncProQuestionnaireDraft') return secureDraftMockResponse(payload);
       if (name === 'submitProQuestionnaireDurable') {
         return {

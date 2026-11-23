@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.61';
 import { validateOrganizedPayload, validateOrganizedResponses, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
 
 import { withEntityLease } from '../../shared/entityLease.ts';
+import { ensureProRetryJobLocked, failProRetryJobLocked } from '../../shared/proSubmissionRetries.ts';
 
 const truncate = (value, max = 500) => String(value ?? '').slice(0, max);
 const safeJsonStringify = (value) => {
@@ -47,6 +48,8 @@ const normalizePayload = (payload, questionnaireSessionId, primaryError) => {
   };
 };
 
+const parseIntakePayload = (value: any) => { try { const parsed = typeof value === 'string' ? JSON.parse(value) : value; return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null; } catch { return null; } };
+
 const getIntakeBySession = async (base44, questionnaireSessionId, submissionAttemptId) => {
   const query = submissionAttemptId
     ? { submission_attempt_id: submissionAttemptId }
@@ -84,6 +87,9 @@ const upsertIntake = async (base44, questionnaireSessionId, submissionAttemptId,
   if (!stored?.id || stored.raw_responses_json !== payload.raw_responses_json || stored.transformed_payload_json !== payload.transformed_payload_json) {
     throw new Error('The intake service did not retain the complete questionnaire snapshot.');
   }
+  const source = await base44.asServiceRole.entities.ProFormDraft.get(nextData.source_draft_id);
+  const job = await ensureProRetryJobLocked({ base44, draft: source, lease, payload: parseIntakePayload(payload.transformed_payload_json), responses: parseIntakePayload(payload.raw_responses_json), attemptId: submissionAttemptId, intakeId: stored.id, createdFrom: 'fallback_intake', allowMappedFallback: false, failedAt: payload.created_at_server });
+  await failProRetryJobLocked(base44, job, { message: 'The saved fallback intake is awaiting a final submission retry.', status: Number(parseIntakePayload(payload.fallback_error_json)?.status || 503) }, { review: !parseIntakePayload(payload.transformed_payload_json) || ['payload_transform_failed','payload_validation_failed'].includes(payload.intake_reason) || ['auth','permission','validation','schema'].includes(payload.primary_failure_kind), lease });
   return stored;
 });
 

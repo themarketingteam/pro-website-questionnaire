@@ -63,6 +63,7 @@ vi.mock('@/api/base44Client', () => {
             return { data: { success: true } };
           }
 
+          if (name === 'registerProSubmissionIntent') return { data: { success: true, intentConfirmed: true, draftId: 'draft-1' } };
           if (name === 'sendToZapier') {
             return { data: { success: true } };
           }

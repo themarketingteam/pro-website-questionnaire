@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 // from the deployed package, so audit the actual transitive import graph.
 describe('deployed Pro function package closure', () => {
   it.each([
-    'syncProQuestionnaireDraft', 'submitProQuestionnaireDurable',
+    'registerProSubmissionIntent', 'processProSubmissionRetries', 'syncProQuestionnaireDraft', 'submitProQuestionnaireDurable',
     'submitProQuestionnaireFallback', 'queryProQuestionnaireRecoveryRecords',
     'repairProQuestionnaireIntakeSubmission', 'retryProQuestionnaireIntakeSubmission',
     'sendToZapier', 'retryProQuestionnaireIntakeSubmission/entry', 'sendToZapier/entry'

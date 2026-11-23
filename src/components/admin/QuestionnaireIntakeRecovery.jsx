@@ -13,6 +13,7 @@ import {
 import { ChevronDown, ChevronUp, Loader2, Stethoscope, Wrench, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import AdminQuestionnairePdfSection from '@/components/admin/AdminQuestionnairePdfSection';
+import ProAutomaticRetryStatus from '@/components/admin/ProAutomaticRetryStatus';
 import { getIntakePdfPayload } from '@/lib/questionnairePdfVersions';
 import { getRecoveryRecord, listRecoveryRecords } from '@/lib/draftRecoveryApi';
 import IdentityResolutionPanel from '@/components/admin/IdentityResolutionPanel';
@@ -269,6 +270,8 @@ function IntakeRow({ intake, expanded, onToggle, onRetry, retrying, onAiAction, 
             <p className="text-slate-600">Fallback attempted: {String(diagnostics?.fallbackAttempted ?? 'unknown')}</p>
             {retryError?.message ? <p className="text-red-700">Last retry error: {retryError.message}</p> : null}
           </div>
+
+          <ProAutomaticRetryStatus recordType="intake" recordId={activeIntake.id} recoveryGrant={recoveryGrant} />
 
           {/* AI Repair status panel */}
           <AiRepairSection

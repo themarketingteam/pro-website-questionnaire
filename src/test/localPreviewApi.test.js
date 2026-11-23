@@ -50,6 +50,8 @@ beforeEach(() => {
   fixtureRoot = path.join(directory, 'fixture-project');
   dataDirectory = path.join(directory, 'local-state');
   fs.mkdirSync(path.join(fixtureRoot, 'src/components/pro-form'), { recursive: true });
+  fs.mkdirSync(path.join(fixtureRoot, 'base44/shared'), { recursive: true });
+  fs.copyFileSync(path.join(repository, 'base44/shared/proServiceCatalog.js'), path.join(fixtureRoot, 'base44/shared/proServiceCatalog.js'));
   fs.mkdirSync(path.join(fixtureRoot, 'fixtures'), { recursive: true });
   fs.copyFileSync(path.join(repository, 'src/components/pro-form/questionData.jsx'), path.join(fixtureRoot, 'src/components/pro-form/questionData.jsx'));
   fs.writeFileSync(path.join(fixtureRoot, 'fixtures/scout-networks-legacy.json'), JSON.stringify(fixturePayload));

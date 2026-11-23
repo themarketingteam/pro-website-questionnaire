@@ -2,6 +2,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.61';
 import { normalizeStoredOrganizedRecord, guardOrganizedDraftMutation, projectOrganizedPages, preserveOrganizedMappedPayload, validateOrganizedPayload, validateOrganizedResponses, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
 
 import { withEntityLease, type EntityLease } from '../../shared/entityLease.ts';
+import { ensureProRetryJobLocked, failProRetryJobLocked, retrySourceFingerprint } from '../../shared/proSubmissionRetries.ts';
 
 const MAX_REQUEST_BYTES = 2_250_000;
 const MAX_RESPONSE_KEYS = 160;
@@ -773,11 +774,25 @@ Deno.serve(async (req) => {
       });
     }
 
+    // A known rejected final save must not leave its earlier intent eligible.
+    const rejectFinalIntent = async (payload: JsonRecord, status = 409) => {
+      if (body?.source === 'final_submission_barrier') {
+        const attemptDraft = { ...draft, business_name: body?.credentials?.businessName || draft.business_name, domain: body?.credentials?.domain || draft.domain };
+        const raw = body?.responses;
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+          const fingerprint = await retrySourceFingerprint(attemptDraft, raw);
+          const retainedJobs = await base44.asServiceRole.entities.ProSubmissionRetryJob.filter({ source_draft_id: draft.id, source_fingerprint: fingerprint }, '-created_date', 20);
+          for (const job of retainedJobs || []) await failProRetryJobLocked(base44, job, { code: payload.code || 'FINAL_SAVE_REJECTED', message: payload.error || 'The final save was rejected.', status }, { review: true, lease });
+        }
+      }
+      return jsonResponse(payload, status);
+    };
+    try {
     const clientInstanceId = cleanText(body?.clientInstanceId, 120);
     const mutationId = cleanText(body?.mutationId, 160);
     const clientSequence = Math.floor(Number(body?.clientSequence) || 0);
     if (!isClientId(clientInstanceId) || !isMutationId(mutationId) || clientSequence < 1) {
-      return jsonResponse({ success: false, error: 'Invalid draft save ordering metadata.' }, 400);
+      return await rejectFinalIntent({ success: false, error: 'Invalid draft save ordering metadata.' }, 400);
     }
 
     const duplicates = await base44.asServiceRole.entities.ProFormDraftRevision.filter({
@@ -811,11 +826,11 @@ Deno.serve(async (req) => {
       baseRevision: body?.baseRevision, currentRevision: rebuiltBefore.revision
     });
     if (!organizerGuard.ok) {
-      return jsonResponse({ success: false, code: organizerGuard.code, error: organizerGuard.errors.join(' ') }, organizerGuard.status);
+      return await rejectFinalIntent({ success: false, code: organizerGuard.code, error: organizerGuard.errors.join(' ') }, organizerGuard.status);
     }
     if (body?.mappedPayload) {
       const mappedValidation = validateOrganizedPayload(body.mappedPayload);
-      if (!mappedValidation.ok) return jsonResponse({ success: false, code: mappedValidation.code, error: mappedValidation.errors.join(' ') }, 400);
+      if (!mappedValidation.ok) return await rejectFinalIntent({ success: false, code: mappedValidation.code, error: mappedValidation.errors.join(' ') }, 400);
     }
     const responseChanges = changedKeys.reduce((result, key) => {
       if (Object.prototype.hasOwnProperty.call(incomingResponses, key)) result[key] = incomingResponses[key];
@@ -835,7 +850,7 @@ Deno.serve(async (req) => {
     const resultSnapshot = applyChanges(structuredClone(rebuiltBefore.snapshot), changes);
     const candidatePayload = preserveOrganizedMappedPayload(body?.mappedPayload || safeParse(draft.mapped_payload_json, {}), resultSnapshot.responses);
     const candidateValidation = validateOrganizedSubmission({ payload: candidatePayload, responses: resultSnapshot.responses });
-    if (!candidateValidation.ok) return jsonResponse({ success: false, code: candidateValidation.code, error: candidateValidation.errors.join(' ') }, candidateValidation.status);
+    if (!candidateValidation.ok) return await rejectFinalIntent({ success: false, code: candidateValidation.code, error: candidateValidation.errors.join(' ') }, candidateValidation.status);
     const now = new Date().toISOString();
     // Revisions are separate entities, so this append cannot share the draft's
     // CAS transaction. Guard immediately before append; lease.update fences the
@@ -884,11 +899,19 @@ Deno.serve(async (req) => {
       intakeId: body?.intakeId,
       mappedPayload: body?.mappedPayload
     }, lease);
+    if (body?.source === 'final_submission_barrier' || body?.status === 'submit_failed') {
+      const retryJob = await ensureProRetryJobLocked({ base44, draft, lease, payload: parseStoredObject(draft.mapped_payload_json, 'mapped_payload_json'), allowMappedFallback: true, responses: rebuiltAfter.snapshot.responses, createdFrom: body?.source || 'failed_submit_checkpoint' });
+      if (body?.status === 'submit_failed' && retryJob) await failProRetryJobLocked(base44, retryJob, safeParse(body?.submitError, {}) || {}, { lease });
+    }
     return jsonResponse({
       success: true,
       revisionId: revision?.id || '',
       draft: publicDraft(draft, rebuiltAfter)
     });
+    } catch (error: any) {
+      if ([400,401,403,409,422].includes(Number(error?.status))) return await rejectFinalIntent({ success: false, code: error.code || '', error: error.message }, Number(error.status));
+      throw error;
+    }
     });
   } catch (error) {
     const safeError = error instanceof Error ? error : new Error('Unknown draft persistence error.');

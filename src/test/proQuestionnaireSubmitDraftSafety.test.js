@@ -57,7 +57,7 @@ const baseArguments = (saveDraftNow) => ({
 describe('final questionnaire draft safety barrier', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.invoke.mockResolvedValue({ data: { success: true } });
+    mocks.invoke.mockImplementation(async name => ({ data: name === 'registerProSubmissionIntent' ? { success: true, intentConfirmed: true, draftId: 'draft-1' } : { success: true } }));
   });
 
   it('links a successful durable submission only after the required final draft save', async () => {

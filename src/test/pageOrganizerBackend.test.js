@@ -1,7 +1,6 @@
-import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
-import { resolve } from 'node:path';
-import ts from 'typescript';
+import { memoryEntity } from './utils/memoryEntities';
+import { loadBackend } from './utils/loadBackend';
 import { describe, expect, it, vi } from 'vitest';
 import * as contract from '../../base44/shared/pageOrganizerContract.js';
 import { repairSubmissionPayloadServer } from '../lib/server/proSubmissionRepairHelpers.js';
@@ -28,34 +27,7 @@ const legacyPayload = () => {
 
 // Execute the actual Deno function source locally with all SDK/network boundaries
 // supplied as fakes. Transpilation resolves no packages and makes no live calls.
-const loadFunction = (relativePath, { base44 = {}, modules = {}, expose = '', fetch = vi.fn() } = {}) => {
-  const source = readFileSync(resolve(process.cwd(), relativePath), 'utf8');
-  const compiled = ts.transpileModule(`${source}\n${expose ? `export const organizerTest = { ${expose} };` : ''}`, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
-  let handler;
-  const exports = {};
-  const require = (name) => {
-    if (modules[name]) return modules[name];
-    if (name.startsWith('npm:@base44/sdk')) return { createClientFromRequest: () => base44 };
-    if (name.endsWith('pageOrganizerContract.js')) return contract;
-    if (name.endsWith('/proDraftSubmissionAuthorization.ts')) {
-      const authExports = {};
-      const authSource = ts.transpileModule(readFileSync(resolve(process.cwd(), 'base44/shared/proDraftSubmissionAuthorization.ts'), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
-      new Function('require', 'exports', 'crypto', authSource)(require, authExports, webcrypto);
-      return authExports;
-    }
-    if (name.endsWith('entityLease.ts')) {
-      const leaseExports = {};
-      const leaseSource = ts.transpileModule(readFileSync(resolve(process.cwd(), 'base44/shared/entityLease.ts'), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
-      new Function('exports', 'crypto', leaseSource)(leaseExports, webcrypto);
-      return leaseExports;
-    }
-    if (modules[name]) return modules[name];
-    throw new Error(`Unexpected function dependency: ${name}`);
-  };
-  const deno = { serve: (fn) => { handler = fn; }, env: { get: () => '' } };
-  new Function('require', 'exports', 'Deno', 'crypto', 'fetch', 'console', compiled)(require, exports, deno, webcrypto, fetch, { warn: vi.fn(), info: vi.fn(), error: vi.fn() });
-  return { handler: handler || exports.default, exposed: exports.organizerTest, fetch };
-};
+const loadFunction = (relativePath, options = {}) => loadBackend(relativePath, { ...options, fetchImpl: options.fetch });
 const request = (body) => new Request('http://localhost/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 describe('page organizer backend contract', () => {
@@ -261,11 +233,12 @@ describe('actual Base44 handlers with local SDK fakes', () => {
   });
 
   it('durably creates the exact supported tree and rejects legacy-only final payloads', async () => {
-    const submissionEntity = { filter: vi.fn(async () => []), create: vi.fn(async (value) => ({ id: 'submission-local', ...value })) };
-    let draft = { id: 'draft-1', session_id: 'local-session', responses_json: JSON.stringify(responses()), status: 'draft' };
+    const submissionEntity = memoryEntity('submission');
+    let draft = { id: 'draft-1', business_name: 'Example', domain: 'example.test', session_id: 'local-session', responses_json: JSON.stringify(responses()), status: 'draft' };
     const draftEntity = { get: async () => clone(draft), updateMany: async (query, update) => { if (Object.entries(query).every(([key, value]) => value && typeof value === 'object' && '$gt' in value ? draft[key] > value.$gt : value == null ? draft[key] == null : draft[key] === value)) { draft = { ...draft, ...update.$set }; return { updated: 1 }; } return { updated: 0 }; }, update: async (_, update) => { draft = { ...draft, ...update }; return clone(draft); } };
-    const authorization = { authorizeDraftSubmission: async () => ({ authorized: true, draft: clone(draft), identity: {} }), createSubmissionContentFingerprint: async () => 'fingerprint', createSubmissionIdentityFingerprint: async () => 'identity', getSubmissionIdentity: () => ({}) };
-    const { handler } = loadFunction('base44/functions/submitProQuestionnaireDurable/entry.ts', { base44: { asServiceRole: { entities: { ProFormSubmission: submissionEntity, ProFormDraft: draftEntity, ProFormDraftRevision: { filter: async () => [] } } } }, modules: { './proDraftSubmissionAuthorization.ts': authorization } });
+    const actualAuthorization = loadBackend('base44/shared/proDraftSubmissionAuthorization.ts', { expose: 'createSubmissionContentFingerprint, createSubmissionIdentityFingerprint, getSubmissionIdentity, hashDraftSubmissionValue' }).exposed;
+    const authorization = { ...actualAuthorization, authorizeDraftSubmission: async () => ({ authorized: true, draft: clone(draft), identity: { businessName: 'Example', domain: 'example.test' } }) };
+    const { handler } = loadFunction('base44/functions/submitProQuestionnaireDurable/entry.ts', { base44: { asServiceRole: { entities: { ProSubmissionRetryJob: memoryEntity('retryJob'), ProFormSubmission: submissionEntity, ProFormDraft: draftEntity, ProFormDraftRevision: { filter: async () => [] } } } }, modules: { './proDraftSubmissionAuthorization.ts': authorization } });
     const body = { draftId: 'draft-1', submissionAttemptId: 'local_submission_attempt_12345', transformedPayload: payload() };
     const result = await handler(request(body));
     expect(result.status).toBe(200);
@@ -290,9 +263,9 @@ describe('actual Base44 handlers with local SDK fakes', () => {
 
   it('never sends an unsupported retry payload to an external webhook', async () => {
     const fakeFetch = vi.fn();
-    const { exposed } = loadFunction('base44/functions/retryProQuestionnaireIntakeSubmission/entry.ts', { expose: 'sendToZapierSafe', fetch: fakeFetch });
+    const { handler } = loadFunction('base44/functions/sendToZapier/entry.ts', { fetch: fakeFetch });
     const value = payload(); value.userdata.service_offerings_structure.format = 'future-format';
-    expect(await exposed.sendToZapierSafe(value)).toMatchObject({ ok: false });
+    expect((await handler(request(value))).status).toBe(400);
     expect(fakeFetch).not.toHaveBeenCalled();
   });
 

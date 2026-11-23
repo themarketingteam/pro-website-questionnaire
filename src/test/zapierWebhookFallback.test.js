@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { loadBackend } from './utils/loadBackend';
 
 const REQUIRED_FALLBACK_URL = 'https://hooks.zapier.com/hooks/catch/23529934/uas7p60/';
 const deliveryFiles = [
@@ -11,90 +12,61 @@ const deliveryFiles = [
   'base44/functions/repairProQuestionnaireIntakeSubmission/entry.ts',
 ];
 
-const readProjectFile = (path) => {
-  const source = readFileSync(resolve(process.cwd(), path), 'utf8');
-  return source.includes("import '../entry.ts';")
-    ? readFileSync(resolve(process.cwd(), path, '../../entry.ts'), 'utf8')
-    : source;
+const readProjectFile = (path) => readFileSync(resolve(process.cwd(), path), 'utf8');
+const resolveHandlerPath = (path) => {
+  const source = readProjectFile(path);
+  const target = source.match(/^export \{ default \} from ['"](.+)['"];\s*$/)?.[1];
+  return target ? resolve(dirname(resolve(process.cwd(), path)), target) : resolve(process.cwd(), path);
 };
-
-const evaluateCanonicalResolver = (getEnv) => {
-  const source = readProjectFile('base44/functions/sendToZapier/entry.ts');
-  const resolverSource = source.slice(0, source.indexOf('Deno.serve')).replace(/^import .*;\s*$/gm, '');
-  const evaluate = new Function(
-    'Deno',
-    `${resolverSource}\nreturn { fallback: ZAPIER_WEBHOOK_FALLBACK_URL, resolved: ZAPIER_WEBHOOK_URL };`,
-  );
-
-  return evaluate({ env: { get: getEnv } });
+const evaluateCanonicalResolver = (env) => {
+  const { exposed } = loadBackend('base44/shared/proSubmissionRetries.ts', { env, expose: 'proRetryWebhookUrl' });
+  return exposed.proRetryWebhookUrl();
 };
 
 describe('Zapier webhook fallback contract', () => {
-  it.each(['sendToZapier', 'retryProQuestionnaireIntakeSubmission'])('keeps the separately packaged legacy %s entry on the same guarded implementation', (name) => {
-    const modern = readFileSync(resolve(process.cwd(), `base44/functions/${name}/entry.ts`), 'utf8');
-    const legacy = readFileSync(resolve(process.cwd(), `base44/functions/${name}/entry/entry.ts`), 'utf8');
-    expect(legacy.replaceAll("'../../../shared/", "'../../shared/")).toBe(modern);
+  it.each(['sendToZapier', 'retryProQuestionnaireIntakeSubmission'])('keeps separately packaged legacy %s on the same guarded shared handler', (name) => {
+    expect(resolveHandlerPath(`base44/functions/${name}/entry/entry.ts`)).toBe(resolveHandlerPath(`base44/functions/${name}/entry.ts`));
   });
 
-  it.each(deliveryFiles)('%s has the validated hardcoded fallback', (path) => {
-    const source = readProjectFile(path);
-
-    expect(source).toContain(`const ZAPIER_WEBHOOK_FALLBACK_URL = '${REQUIRED_FALLBACK_URL}';`);
-    expect(source).toContain("Deno.env.get('ZAPIER_WEBHOOK_URL')");
-    expect(source).toContain('normalizedUrl === ZAPIER_WEBHOOK_FALLBACK_URL');
-    expect(source).toContain('if (!isValidZapierWebhookUrl(configuredUrl)) return ZAPIER_WEBHOOK_FALLBACK_URL;');
+  it('routes every delivery entry through the shared frozen retry ledger instead of direct HTTP', () => {
+    for (const path of deliveryFiles) {
+      const source = readFileSync(resolveHandlerPath(path), 'utf8');
+      expect(source).toMatch(/(?:deliverProRetryJobLocked|runProTeamRetry)\(/);
+      expect(source).not.toMatch(/\bfetch\(/);
+    }
+    const shared = readProjectFile('base44/shared/proSubmissionRetries.ts');
+    expect(shared).toContain(`const WEBHOOK = '${REQUIRED_FALLBACK_URL}';`);
+    expect(shared).toContain("Deno.env.get('ZAPIER_WEBHOOK_URL')");
+    expect(shared).toContain('fetchImpl(proRetryWebhookUrl()');
+    expect(shared).toContain('SUBMISSION_CONTENT_CONFLICT');
   });
 
-  it('contains no obsolete Zapier account endpoint in backend functions', () => {
-    const source = deliveryFiles.map(readProjectFile).join('\n');
-    const obsoleteAccountId = '259' + '64219';
-
-    expect(source).not.toContain(obsoleteAccountId);
-  });
-
-  it('keeps the canonical send function executable and diagnostic', () => {
-    const source = readProjectFile('base44/functions/sendToZapier/entry.ts');
-
-    expect(source).toContain('Deno.serve(async (req) => {');
-    expect(source).toContain('fetch(ZAPIER_WEBHOOK_URL');
-    expect(source).toContain('zapierEndpoint: ZAPIER_WEBHOOK_URL');
+  it('contains no obsolete Zapier account endpoint in any delivery handler or shared sender', () => {
+    const source = [...deliveryFiles.map(path => readFileSync(resolveHandlerPath(path), 'utf8')), readProjectFile('base44/shared/proSubmissionRetries.ts')].join('\n');
+    expect(source).not.toContain('259' + '64219');
   });
 
   it.each([
     ['missing', undefined],
     ['empty', '   '],
     ['not a URL', 'not-a-url'],
-    ['not HTTPS', 'http://hooks.zapier.com/hooks/catch/123/token/'],
-    ['not Zapier', 'https://example.com/hooks/catch/123/token/'],
+    ['not HTTPS', 'http://hooks.zapier.com/hooks/catch/23529934/uas7p60/'],
+    ['not Zapier', 'https://example.com/hooks/catch/23529934/uas7p60/'],
     ['not a Catch Hook', 'https://hooks.zapier.com/apps/'],
-  ])('uses the hardcoded fallback when the environment value is %s', (_label, configuredValue) => {
-    const result = evaluateCanonicalResolver(() => configuredValue);
-
-    expect(result.fallback).toBe(REQUIRED_FALLBACK_URL);
-    expect(result.resolved).toBe(REQUIRED_FALLBACK_URL);
+    ['another valid Catch Hook', 'https://hooks.zapier.com/hooks/catch/123456/example_token'],
+    ['credentials', 'https://username:password@hooks.zapier.com/hooks/catch/23529934/uas7p60/'],
+    ['query', `${REQUIRED_FALLBACK_URL}?redirect=https://example.com`],
+    ['fragment', `${REQUIRED_FALLBACK_URL}#another-destination`],
+    ['spoofed hostname', 'https://hooks.zapier.com.example.com/hooks/catch/23529934/uas7p60/'],
+  ])('uses only the required endpoint when the configured environment value is %s', (_label, configuredValue) => {
+    expect(evaluateCanonicalResolver({ ZAPIER_WEBHOOK_URL: configuredValue })).toBe(REQUIRED_FALLBACK_URL);
   });
 
-  it('uses the fallback when environment access itself fails', () => {
-    const result = evaluateCanonicalResolver(() => {
-      throw new Error('environment unavailable');
-    });
-
-    expect(result.resolved).toBe(REQUIRED_FALLBACK_URL);
+  it('uses the required endpoint when environment access itself fails', () => {
+    expect(evaluateCanonicalResolver({ get ZAPIER_WEBHOOK_URL() { throw new Error('environment unavailable'); } })).toBe(REQUIRED_FALLBACK_URL);
   });
 
-  it('rejects a different valid Zapier Catch Hook and uses the hardcoded endpoint', () => {
-    const result = evaluateCanonicalResolver(
-      () => 'https://hooks.zapier.com/hooks/catch/123456/example_token',
-    );
-
-    expect(result.resolved).toBe(REQUIRED_FALLBACK_URL);
-  });
-
-  it('accepts the required endpoint without a trailing slash and normalizes it', () => {
-    const result = evaluateCanonicalResolver(
-      () => REQUIRED_FALLBACK_URL.slice(0, -1),
-    );
-
-    expect(result.resolved).toBe(REQUIRED_FALLBACK_URL);
+  it.each([REQUIRED_FALLBACK_URL, REQUIRED_FALLBACK_URL.slice(0, -1)])('normalizes the allowlisted endpoint %s', configuredValue => {
+    expect(evaluateCanonicalResolver({ ZAPIER_WEBHOOK_URL: configuredValue })).toBe(REQUIRED_FALLBACK_URL);
   });
 });

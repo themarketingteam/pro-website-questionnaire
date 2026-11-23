@@ -54,6 +54,7 @@ describe('main-page Zapier delivery', () => {
       resolveZapier = resolve;
     });
     base44.functions.invoke.mockImplementation(async (name) => {
+      if (name === 'registerProSubmissionIntent') return { data: { success: true, intentConfirmed: true, draftId: 'draft-live-1' } };
       if (name === 'sendToZapier') return await zapierResponse;
       return { data: { success: true } };
     });
@@ -74,7 +75,7 @@ describe('main-page Zapier delivery', () => {
     });
 
     await vi.waitFor(() => {
-      expect(base44.functions.invoke).toHaveBeenCalledWith('sendToZapier', transformedPayload);
+      expect(base44.functions.invoke).toHaveBeenCalledWith('sendToZapier', expect.objectContaining({ payload: transformedPayload, draftId: 'draft-live-1' }));
     });
     expect(onFinalSubmitSuccess).not.toHaveBeenCalled();
 

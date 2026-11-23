@@ -1,3 +1,4 @@
+import { memoryEntity } from './utils/memoryEntities';
 import { readFileSync } from 'node:fs';
 import { webcrypto } from 'node:crypto';
 import { dirname, resolve } from 'node:path';
@@ -13,7 +14,7 @@ const credential = `${session}.${secret}`;
 const node = (id, label) => ({ id, label, source: 'custom', catalogId: null, children: [] });
 const tree = (...pages) => ({ format: 'page-tree-v1', pages });
 const project = (value) => ({ '3_structure': value, '3': contract.projectOrganizedPages(value).selections, '3_other': contract.projectOrganizedPages(value).otherValues });
-const payloadFor = (value, description = 'Original description') => ({ metadata: { business_name: 'Test', businessDomain: 'example.test', questionnaire_payload_version: 2 }, userdata: { service_offerings_structure: contract.serializePageStructure(value), service_offerings: contract.projectOrganizedPages(value).selections, service_offerings_other: contract.projectOrganizedPages(value).other, company_description: description } });
+const payloadFor = (value, description = 'Original description') => ({ metadata: { business_name: 'Test', businessDomain: 'unit-client.net', questionnaire_payload_version: 2 }, userdata: { additional_pages_list: { meet_the_team_page: { team_photo_with_tags: {} } }, geographic_areas: [], pricing_packaging: [], company_goals: [], certifications_partnerships: [], service_guarantee_items: [], website_objectives: [], client_challenges: [], client_outcomes: [], target_industries: [], service_offerings_structure: contract.serializePageStructure(value), service_offerings: contract.projectOrganizedPages(value).selections, service_offerings_other: contract.projectOrganizedPages(value).other, company_description: description } });
 const request = (body) => new Request('http://localhost/test', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 // Actual deployed sources, including their authorization and CAS lease. The SDK
@@ -46,7 +47,7 @@ const loadHosted = (relativePath, base44, fetchImpl = vi.fn(async () => { throw 
 const fixture = async () => {
   const original = tree(node('original', 'Original service'));
   const accessHash = Buffer.from(await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(secret))).toString('base64url');
-  let draft = { id: 'draft-hosted', session_id: session, access_token_hash: accessHash, status: 'draft', save_revision: 0, business_name: 'Test', domain: 'example.test', responses_json: JSON.stringify({ ...project(original), '6': 'Original description' }), mapped_payload_json: JSON.stringify(payloadFor(original)) };
+  let draft = { id: 'draft-hosted', session_id: session, access_token_hash: accessHash, status: 'draft', save_revision: 0, business_name: 'Test', domain: 'unit-client.net', responses_json: JSON.stringify({ ...project(original), '6': 'Original description' }), mapped_payload_json: JSON.stringify(payloadFor(original)) };
   const workingDrafts = [];
   const revisions = [];
   const submissions = [];
@@ -76,6 +77,8 @@ const fixture = async () => {
     update: vi.fn(async (id, update) => { if (id === draft.id) { draft = { ...draft, ...update }; return clone(draft); } const selected = workingDrafts.find((value) => value.id === id); Object.assign(selected, clone(update)); return clone(selected); })
   };
   const base44 = { asServiceRole: { entities: {
+    ProSubmissionRetryJob: memoryEntity('retryJob'),
+    ProFormDraftEvent: memoryEntity('event'),
     ProFormDraft: draftEntity,
     ProFormDraftRevision: {
       filter: vi.fn(async (query, order, limit = 500, skip = 0) => {
@@ -86,6 +89,7 @@ const fixture = async () => {
       create: vi.fn(async (value) => { await beforeRevision(); const record = { ...clone(value), id: `revision-${revisions.length + 1}` }; revisions.push(record); return clone(record); })
     },
     ProFormSubmission: {
+      update: vi.fn(async (id, update) => { const row = submissions.find(value => value.id === id); Object.assign(row, clone(update)); return clone(row); }),
       filter: vi.fn(async (query) => submissions.filter((value) => matches(value, query)).map((value) => hydrateSubmission(clone(value)))),
       get: vi.fn(async (id) => hydrateSubmission(clone(submissions.find((value) => value.id === id)))),
       create: vi.fn(async (value) => { await beforeSubmission(); const record = storedSubmission({ ...clone(value), id: `submission-${submissions.length + 1}` }); submissions.push(record); return hydrateSubmission(clone(record)); })
@@ -217,7 +221,7 @@ describe('hosted Pro save and submission integrity', () => {
       const f = await fixture();
       f.hydrateSubmissionReads((record) => { const dto = hydrateProSubmissionEntity(record); mutate(dto); return dto; });
       const rejected = await f.submit(f.submission(f.original));
-      expect(rejected.status).toBe(500);
+      expect(rejected.status).toBe(502);
       expect(rejected.body.success).toBe(false);
       expect(f.getDraft().status).toBe('draft');
     }

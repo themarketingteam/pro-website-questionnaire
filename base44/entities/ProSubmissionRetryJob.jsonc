@@ -1,0 +1,154 @@
+{
+  "name": "ProSubmissionRetryJob",
+  "type": "object",
+  "properties": {
+    "job_key": {
+      "type": "string"
+    },
+    "source_draft_id": {
+      "type": "string"
+    },
+    "source_intake_id": {
+      "type": "string"
+    },
+    "source_session_id": {
+      "type": "string"
+    },
+    "submission_attempt_id": {
+      "type": "string"
+    },
+    "submission_id": {
+      "type": "string"
+    },
+    "content_fingerprint": {
+      "type": "string"
+    },
+    "source_fingerprint": {
+      "type": "string"
+    },
+    "raw_responses_json": {
+      "type": "string"
+    },
+    "mapped_payload_json": {
+      "type": "string"
+    },
+    "outbound_payload_json": {
+      "type": "string"
+    },
+    "business_name": {
+      "type": "string"
+    },
+    "business_domain": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "queued",
+        "processing",
+        "retry_waiting",
+        "delivery_unknown",
+        "needs_review",
+        "succeeded",
+        "cancelled",
+        "excluded"
+      ]
+    },
+    "stage": {
+      "type": "string",
+      "enum": [
+        "submission",
+        "delivery"
+      ]
+    },
+    "first_attempt_at": {
+      "type": "string"
+    },
+    "first_failed_at": {
+      "type": "string"
+    },
+    "next_retry_at": {
+      "type": "string"
+    },
+    "last_attempt_at": {
+      "type": "string"
+    },
+    "last_error_json": {
+      "type": "string"
+    },
+    "delivery_key": {
+      "type": "string"
+    },
+    "delivery_accepted_at": {
+      "type": "string"
+    },
+    "delivery_started_at": {
+      "type": "string"
+    },
+    "created_from": {
+      "type": "string"
+    },
+    "idempotency_lock_token": {
+      "type": "string"
+    },
+    "idempotency_lock_key": {
+      "type": "string"
+    },
+    "idempotency_lock_expires_at": {
+      "type": "string"
+    },
+    "attempt_count": {
+      "type": "number",
+      "default": 0
+    },
+    "delivery_http_status": {
+      "type": "number",
+      "default": 0
+    },
+    "manual_force": {
+      "type": "boolean",
+      "default": false
+    },
+    "automatic_retry_excluded": {
+      "type": "boolean",
+      "default": false
+    },
+    "baseline_source_fingerprint": {
+      "type": "string"
+    },
+    "baseline_revision": {
+      "type": "number"
+    },
+    "baseline_restore_allowed": {
+      "type": "boolean",
+      "default": false
+    },
+    "scan_cursor_json": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "job_key",
+    "source_draft_id",
+    "status",
+    "stage"
+  ],
+  "rls": {
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": false
+  }
+}

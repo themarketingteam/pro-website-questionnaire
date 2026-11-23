@@ -613,6 +613,34 @@
     "retention_restore_source_id": {
       "type": "string",
       "description": "Original record ID when this submission was reconstructed from an independent backup"
+    },
+    "automatic_retry_job_key": {
+      "type": "string",
+      "description": "Server-only automatic submission delivery checkpoint."
+    },
+    "automatic_retry_raw_responses_json": {
+      "type": "string",
+      "description": "Server-only automatic submission delivery checkpoint."
+    },
+    "automatic_retry_outbound_payload_json": {
+      "type": "string",
+      "description": "Server-only automatic submission delivery checkpoint."
+    },
+    "automatic_delivery_status": {
+      "type": "string",
+      "description": "Server-only automatic submission delivery checkpoint."
+    },
+    "automatic_delivery_accepted_at": {
+      "type": "string",
+      "description": "Server-only automatic submission delivery checkpoint."
+    },
+    "automatic_delivery_key": {
+      "type": "string",
+      "description": "Server-only automatic submission delivery checkpoint."
+    },
+    "automatic_delivery_started_at": {
+      "type": "string",
+      "description": "Server-only automatic submission delivery checkpoint."
     }
   },
   "required": [

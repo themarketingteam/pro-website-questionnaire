@@ -4,6 +4,7 @@ import { isMissingIdentityValue } from '../../shared/proIdentityResolution.ts';
 import { createIdentityResolverInternalGrant } from '../../shared/draftRecoveryAuthorization.ts';
 
 import { withEntityLease } from '../../shared/entityLease.ts';
+import { runProTeamRetry } from '../../shared/proSubmissionRetries.ts';
 
 // ─── Local repair helpers ────────────────────────────────────────────────────
 
@@ -127,27 +128,6 @@ const authorizeDraftRecoveryRequest = async (base44, body) => {
 
 // Deliver repair-and-retry payloads to the required Zapier workflow. Delivery
 // failures are returned to the admin UI instead of being reported as success.
-const sendToZapierSafe = async (payload) => {
-  const organizerValidation = validateOrganizedPayload(payload);
-  if (!organizerValidation.ok) return { ok: false, error: organizerValidation.errors.join(' ') };
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
-    try {
-      const res = await fetch(ZAPIER_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: controller.signal
-      });
-      return { ok: res.ok, status: res.status };
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  } catch (error) {
-    return { ok: false, error: error?.message || 'zapier_send_failed' };
-  }
-};
 
 const isFileLike = (v) => {
   if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
@@ -833,6 +813,8 @@ Deno.serve(async (req) => {
       // retry is safe only when the repair pipeline produced a validated payload.
       let zapierSent = false;
       let zapierResult = null;
+      let retrySubmissionId = '';
+      let retrySubmissionCreated = false;
       if (mode === 'repair_and_retry') {
         if (!repairResult.ok || !repairResult.payload) {
           return Response.json({
@@ -851,7 +833,10 @@ Deno.serve(async (req) => {
           }, { status: 422 });
         }
 
-        zapierResult = await sendToZapierSafe(repairResult.payload);
+        const delivered = await runProTeamRetry(base44, { draftId: draft.id, forceRetry });
+        retrySubmissionId = delivered.linkedSubmissionId || '';
+        retrySubmissionCreated = Boolean(retrySubmissionId && !delivered.alreadySubmitted);
+        zapierResult = { ok: delivered.success, status: delivered.zapierStatus, error: delivered.error?.message };
         zapierSent = zapierResult.ok;
       }
 
@@ -860,7 +845,8 @@ Deno.serve(async (req) => {
         return Response.json({
           success: false,
           draftMode: true,
-          submissionCreated: false,
+          submissionCreated: retrySubmissionCreated,
+          linkedSubmissionId: retrySubmissionId || undefined,
           repairSource: repairResult.source,
           repairOk: repairResult.ok,
           zapierSent: false,
@@ -876,7 +862,8 @@ Deno.serve(async (req) => {
       return Response.json({
         success: true,
         draftMode: true,
-        submissionCreated: false,
+        submissionCreated: retrySubmissionCreated,
+          linkedSubmissionId: retrySubmissionId || undefined,
         repairSource: repairResult.source,
         repairOk: repairResult.ok,
         zapierSent,
@@ -1000,109 +987,10 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, mode: 'repair_only', repairSource: repairResult.source, report: repairResult.report, intakeId: intake.id });
     }
 
-    // ── FIX 4: repair_and_retry — stronger duplicate guard ────────────────────
-    // Ensure questionnaire_session_id is set on payload before create
-    if (intake.questionnaire_session_id && repairResult.payload?.metadata) {
-      repairResult.payload.metadata.questionnaire_session_id = intake.questionnaire_session_id;
-    }
-    if (repairResult.payload?.metadata) repairResult.payload.metadata.source_intake_id = intake.id;
-
-    // Check for existing submission by session ID (even if linked_submission_id not set)
-    if (intake.questionnaire_session_id && !forceRetry) {
-      const existingBySession = await base44.asServiceRole.entities.ProFormSubmission.filter({
-        'metadata.questionnaire_session_id': intake.questionnaire_session_id
-      });
-      if (Array.isArray(existingBySession) && existingBySession.length > 0) {
-        const existing = existingBySession[0];
-        await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
-          ...baseUpdate,
-          status: 'retry_success',
-          linked_submission_id: existing.id,
-          ai_repair_status: 'retry_success',
-          ai_repair_report_json: JSON.stringify(repairResult.report),
-          ai_repaired_payload_json: JSON.stringify(repairResult.payload),
-          ai_repair_retry_attempted: false,
-          ai_repair_retry_result_json: JSON.stringify({ linkedSubmissionId: existing.id, source: 'existing_found_by_session_id' })
-        });
-        return Response.json({
-          success: true,
-          alreadySubmitted: true,
-          linkedSubmissionId: existing.id,
-          intakeId: intake.id,
-          mode: 'repair_and_retry',
-          submissionCreated: false,
-          zapierSent: false,
-          message: 'An existing final submission was linked. Nothing was retried or redelivered.'
-        });
-      }
-    }
-
-    // Create submission exactly once
-    try {
-      const submission = await base44.asServiceRole.entities.ProFormSubmission.create(repairResult.payload);
-      const retryResult = { linkedSubmissionId: submission.id };
-      await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
-        ...baseUpdate,
-        ai_repair_status: 'retry_success',
-        status: 'retry_success',
-        linked_submission_id: submission.id,
-        ai_repair_report_json: JSON.stringify(repairResult.report),
-        ai_repaired_payload_json: JSON.stringify(repairResult.payload),
-        ai_repair_applied: true,
-        ai_repair_retry_attempted: true,
-        ai_repair_retry_result_json: JSON.stringify(retryResult),
-        ai_repair_error_json: '',
-        last_retry_at: now,
-        retry_count: (Number(intake.retry_count) || 0) + 1
-      });
-      const zapierResult = await sendToZapierSafe(repairResult.payload);
-      if (!zapierResult.ok) {
-        const detail = zapierResult.error || (zapierResult.status ? `HTTP ${zapierResult.status}` : 'unknown error');
-        return Response.json({
-          success: false,
-          mode: 'repair_and_retry',
-          linkedSubmissionId: submission.id,
-          submissionCreated: true,
-          repairSource: repairResult.source,
-          report: repairResult.report,
-          intakeId: intake.id,
-          zapierSent: false,
-          zapierStatus: zapierResult.status ?? null,
-          zapierEndpoint: ZAPIER_WEBHOOK_URL,
-          error: { message: `Submission was created, but Zapier delivery failed: ${detail}` }
-        });
-      }
-      await emitEvent(base44, intake.questionnaire_session_id, 'ai_repair_retry_succeeded', context);
-      return Response.json({
-        success: true,
-        mode: 'repair_and_retry',
-        linkedSubmissionId: submission.id,
-        repairSource: repairResult.source,
-        report: repairResult.report,
-        intakeId: intake.id,
-        zapierSent: true,
-        zapierStatus: zapierResult.status,
-        zapierEndpoint: ZAPIER_WEBHOOK_URL
-      });
-    } catch (createErr) {
-      const errObj = { message: createErr?.message || 'create_failed', status: createErr?.status || null };
-      await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, {
-        ...baseUpdate,
-        ai_repair_status: 'retry_failed',
-        status: 'retry_failed',
-        ai_repair_report_json: JSON.stringify(repairResult.report),
-        ai_repaired_payload_json: JSON.stringify(repairResult.payload),
-        ai_repair_applied: false,
-        ai_repair_retry_attempted: true,
-        ai_repair_retry_result_json: JSON.stringify(errObj),
-        ai_repair_error_json: JSON.stringify(errObj),
-        retry_error_json: JSON.stringify(errObj),
-        last_retry_at: now,
-        retry_count: (Number(intake.retry_count) || 0) + 1
-      });
-      await emitEvent(base44, intake.questionnaire_session_id, 'ai_repair_retry_failed', context);
-      return Response.json({ success: false, mode: 'repair_and_retry', error: errObj, report: repairResult.report, intakeId: intake.id }, { status: 500 });
-    }
+    if (!intake.source_draft_id) return Response.json({ success: false, code: 'RETRY_SOURCE_REQUIRED', error: { message: 'This retained intake has no verifiable source draft. Restore its source before retrying.' } }, { status: 409 });
+    await base44.asServiceRole.entities.ProFormSubmissionIntake.update(intake.id, { ...baseUpdate, transformed_payload_json: JSON.stringify(repairResult.payload), ai_repaired_payload_json: JSON.stringify(repairResult.payload), ai_repair_report_json: JSON.stringify(repairResult.report), ai_repair_applied: true });
+    const delivered = await runProTeamRetry(base44, { intakeId: intake.id, forceRetry });
+    return Response.json({ ...delivered, mode: 'repair_and_retry', report: repairResult.report, repairSource: repairResult.source }, { status: delivered.success ? 200 : delivered.held ? 409 : 502 });
 
   } catch (err) {
     return Response.json({ success: false, error: { message: err?.message || 'internal_error' } }, { status: 500 });

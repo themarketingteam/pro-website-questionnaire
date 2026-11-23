@@ -1,13 +1,12 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.61';
-import { normalizeStoredOrganizedRecord, samePageStructure, validateOrganizedResponses, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
+import { samePageStructure, validateOrganizedResponses, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
 import {
   authorizeDraftSubmission,
-  createSubmissionContentFingerprint,
-  createSubmissionIdentityFingerprint,
-  getSubmissionIdentity
+  createSubmissionContentFingerprint
 } from './proDraftSubmissionAuthorization.ts';
 
 import { withEntityLease } from '../../shared/entityLease.ts';
+import { ensureProRetryJobLocked, createProRetryReceiptLocked, failProRetryJobLocked, retryJobSummary, retrySourceFingerprint } from '../../shared/proSubmissionRetries.ts';
 
 const MAX_REQUEST_BYTES = 2_250_000;
 const cleanText = (value: unknown, maxLength = 500) => (
@@ -41,6 +40,14 @@ Deno.serve(async (req) => {
     return json({ success: false, code: 'INVALID_SUBMISSION_ATTEMPT', error: 'Valid draft and submission-attempt identifiers are required.' }, 400);
   }
 
+  const holdRejectedIntent = async (draft: any, lease: any, rejected: any, status: number) => {
+    if (action !== 'submit' || !draft?.id) return;
+    let raw: any;
+    try { raw = JSON.parse(draft.responses_json || '{}'); } catch { return; }
+    const fingerprint = await retrySourceFingerprint(draft, raw);
+    const retained = await base44.asServiceRole.entities.ProSubmissionRetryJob.filter({ source_draft_id: draft.id, source_fingerprint: fingerprint }, '-created_date', 20);
+    for (const job of retained || []) await failProRetryJobLocked(base44, job, { code: rejected.code || 'SUBMISSION_REJECTED', message: rejected.error || 'The submission was rejected.', status }, { review: true, lease });
+  };
   try {
     let authorization = await authorizeDraftSubmission({
       base44,
@@ -50,6 +57,13 @@ Deno.serve(async (req) => {
       submitContext: body?.submitContext
     });
     if (!authorization.authorized) {
+      // Only a valid source capability can hold its own rejected intent.
+      if (action === 'submit' && authorization.status === 409) {
+        const secured = await authorizeDraftSubmission({ base44, resumeCredential: body?.resumeCredential, expectedDraftId: draftId });
+        if (secured.authorized) await withEntityLease({ entity: base44.asServiceRole.entities.ProFormDraft, entityId: draftId, purpose: 'pro-rejected-submission' }, async lease => {
+          await holdRejectedIntent(await base44.asServiceRole.entities.ProFormDraft.get(draftId), lease, authorization, 409);
+        });
+      }
       console.warn('[Durable questionnaire submission] authorization rejected', {
         code: authorization.code,
         conflictFieldCount: authorization.conflictFields?.length || 0
@@ -62,35 +76,39 @@ Deno.serve(async (req) => {
       }, authorization.status);
     }
     return await withEntityLease({ entity: base44.asServiceRole.entities.ProFormDraft, entityId: draftId, purpose: 'pro-draft-submission' }, async (lease) => {
+    const rejectSubmission = async (value: any, status = 409) => {
+      await holdRejectedIntent(authorization.draft, lease, value, status);
+      return json(value, status);
+    };
     // Authorization and the snapshot must be read again after waiting for saves
     // or a competing submitter holding this same cross-instance lease.
     authorization = await authorizeDraftSubmission({ base44, resumeCredential: body?.resumeCredential, expectedDraftId: draftId, payload, submitContext: body?.submitContext });
-    if (!authorization.authorized) return json({ success: false, code: authorization.code, error: authorization.error }, authorization.status);
+    if (!authorization.authorized) return await rejectSubmission({ success: false, code: authorization.code, error: authorization.error }, authorization.status);
     const latestRevisions = await base44.asServiceRole.entities.ProFormDraftRevision.filter({ draft_id: draftId }, '-server_revision', 1);
     const latestServerRevision = Number(latestRevisions?.[0]?.server_revision) || 0;
     if (latestServerRevision > (Number(authorization.draft.save_revision) || 0)) {
-      return json({ success: false, code: 'DRAFT_SAVE_PENDING', error: 'A newer draft save needs to finish before submission. Save and try again.' }, 409);
+      return await rejectSubmission({ success: false, code: 'DRAFT_SAVE_PENDING', error: 'A newer draft save needs to finish before submission. Save and try again.' }, 409);
     }
     let draftResponses;
     try {
       draftResponses = JSON.parse(authorization.draft.responses_json || '{}');
       if (!draftResponses || typeof draftResponses !== 'object' || Array.isArray(draftResponses)) throw new Error('invalid');
     } catch {
-      return json({ success: false, code: 'DRAFT_SNAPSHOT_INVALID', error: 'The stored draft needs recovery before it can be submitted.' }, 409);
+      return await rejectSubmission({ success: false, code: 'DRAFT_SNAPSHOT_INVALID', error: 'The stored draft needs recovery before it can be submitted.' }, 409);
     }
     const organizerValidation = validateOrganizedSubmission({
       payload, responses: draftResponses, allowMissingPayload: action === 'authorize' && !payload
     });
-    if (!organizerValidation.ok) return json({ success: false, code: organizerValidation.code, error: organizerValidation.errors.join(' ') }, organizerValidation.status);
+    if (!organizerValidation.ok) return await rejectSubmission({ success: false, code: organizerValidation.code, error: organizerValidation.errors.join(' ') }, organizerValidation.status);
     if (body?.rawResponses != null) {
       const rawValidation = validateOrganizedResponses(body.rawResponses);
-      if (!rawValidation.ok) return json({ success: false, code: rawValidation.code, error: rawValidation.errors.join(' ') }, 400);
+      if (!rawValidation.ok) return await rejectSubmission({ success: false, code: rawValidation.code, error: rawValidation.errors.join(' ') }, 400);
       for (const id of ['3', '4']) {
         const key = `${id}_structure`;
         const saved = Object.prototype.hasOwnProperty.call(draftResponses, key);
         const supplied = Object.prototype.hasOwnProperty.call(body.rawResponses, key);
         if ((saved || supplied) && (!saved || !supplied || !samePageStructure(draftResponses[key], body.rawResponses[key]))) {
-          return json({ success: false, code: 'ORGANIZER_SUBMISSION_CONFLICT', error: 'The submitted raw page organization does not match the saved draft.' }, 409);
+          return await rejectSubmission({ success: false, code: 'ORGANIZER_SUBMISSION_CONFLICT', error: 'The submitted raw page organization does not match the saved draft.' }, 409);
         }
       }
     }
@@ -98,94 +116,24 @@ Deno.serve(async (req) => {
       return json({ success: true, authorized: true, finalized: authorization.draft.status === 'submitted' || Boolean(authorization.draft.final_submission_id), draftId: authorization.draft.id, responses: draftResponses });
     }
     if (!payload || typeof payload !== 'object' || Array.isArray(payload) || !payload.userdata || typeof payload.userdata !== 'object') {
-      return json({ success: false, code: 'INVALID_SUBMISSION_PAYLOAD', error: 'A valid transformed questionnaire payload is required.' }, 400);
+      return await rejectSubmission({ success: false, code: 'INVALID_SUBMISSION_PAYLOAD', error: 'A valid transformed questionnaire payload is required.' }, 400);
     }
 
-    const contentFingerprint = await createSubmissionContentFingerprint({
-      payload,
-      draftId,
-      identity: authorization.identity
-    });
+    const expectedFingerprint = await createSubmissionContentFingerprint({ payload, draftId, identity: authorization.identity });
     const suppliedFingerprint = cleanText(body?.submissionContentFingerprint, 100);
-    if (suppliedFingerprint && suppliedFingerprint !== contentFingerprint) {
+    if (suppliedFingerprint && suppliedFingerprint !== expectedFingerprint) {
+      const intent = await ensureProRetryJobLocked({ base44, draft: authorization.draft, lease, payload: null, responses: draftResponses, createdFrom: 'invalid_fingerprint_intent', allowMappedFallback: false });
+      await failProRetryJobLocked(base44, intent, { code: 'SUBMISSION_CONTENT_CONFLICT', message: 'The submission content fingerprint was not valid.', status: 409 }, { review: true, lease });
       return json({ success: false, code: 'SUBMISSION_CONTENT_CONFLICT', error: 'The submission content fingerprint was not valid.' }, 409);
     }
-    const identityFingerprint = await createSubmissionIdentityFingerprint(authorization.identity);
-    const submissions = base44.asServiceRole.entities.ProFormSubmission;
-    const confirmReceipt = async (submission: any) => {
-      try { submission = normalizeStoredOrganizedRecord(submission, payload); }
-      catch { throw Object.assign(new Error('The durable submission service returned an invalid stored page structure.'), { status: 502, code: 'SUBMISSION_STORAGE_INVALID' }); }
-      if (!submission?.id || submission.metadata?.source_draft_id !== draftId) {
-        throw new Error('The durable submission service did not retain its receipt identity.');
-      }
-      if (await createSubmissionIdentityFingerprint(getSubmissionIdentity(submission)) !== identityFingerprint) throw new Error('The durable submission service did not retain the client identity.');
-      const retained = validateOrganizedSubmission({ payload: submission, responses: draftResponses });
-      if (!retained.ok) throw new Error('The durable submission service did not retain the organized pages.');
-      const storedFingerprint = await createSubmissionContentFingerprint({ payload: submission, draftId, identity: authorization.identity });
-      if (storedFingerprint !== contentFingerprint) throw new Error('The durable submission service did not retain the submitted content.');
-      await lease.assertActive();
-      const linked = await lease.update({
-        status: 'submitted', final_submission_id: submission.id,
-        submitted_at: authorization.draft.submitted_at || new Date().toISOString(),
-        submit_error: ''
-      });
-      if (linked?.status !== 'submitted' || linked?.final_submission_id !== submission.id) throw new Error('The durable submission receipt could not be linked to the draft.');
-      return submission;
-    };
-    const attemptMatches = await submissions.filter(
-      { 'metadata.submission_attempt_id': attemptId },
-      '-created_date',
-      10
-    );
-    const priorAttempt = (Array.isArray(attemptMatches) ? attemptMatches : [])[0];
-    if (priorAttempt?.id) {
-      const metadata = priorAttempt.metadata || {};
-      if (
-        metadata.source_draft_id !== draftId
-        || metadata.submission_content_fingerprint !== contentFingerprint
-        || metadata.client_identity_fingerprint !== identityFingerprint
-      ) {
-        return json({ success: false, code: 'SUBMISSION_ATTEMPT_CONFLICT', error: 'This submission attempt identifier is already connected to different content or identity.' }, 409);
-      }
-      return json({ success: true, duplicate: true, submission: await confirmReceipt(priorAttempt) });
+    const retryJob = await ensureProRetryJobLocked({ base44, draft: authorization.draft, lease, payload, responses: draftResponses, attemptId, createdFrom: 'public_durable_submission' });
+    try {
+      const result = await createProRetryReceiptLocked({ base44, draft: authorization.draft, lease, job: retryJob, payload, responses: draftResponses, attemptId });
+      return json({ success: true, duplicate: result.duplicate, submission: result.submission, retryJob: retryJobSummary(retryJob) });
+    } catch (error: any) {
+      await failProRetryJobLocked(base44, retryJob, error, { review: [400,401,403,409,422].includes(Number(error?.status)), increment: true, lease });
+      throw error;
     }
-
-    const contentMatches = await submissions.filter({
-      'metadata.source_draft_id': draftId,
-      'metadata.submission_content_fingerprint': contentFingerprint,
-      'metadata.client_identity_fingerprint': identityFingerprint
-    }, '-created_date', 1);
-    const priorContent = (Array.isArray(contentMatches) ? contentMatches : [])[0];
-    if (priorContent?.id) {
-      return json({ success: true, reused: true, submission: await confirmReceipt(priorContent) });
-    }
-
-    if (authorization.draft.final_submission_id) {
-      const linkedDto = await submissions.get(authorization.draft.final_submission_id).catch(() => null);
-      const linked = linkedDto ? normalizeStoredOrganizedRecord(linkedDto, payload) : null;
-      if (linked?.metadata?.source_draft_id === draftId
-        && await createSubmissionContentFingerprint({ payload: linked, draftId, identity: authorization.identity }) === contentFingerprint) {
-        return json({ success: true, reused: true, submission: await confirmReceipt(linked) });
-      }
-    }
-    if (authorization.draft.status === 'submitted' || authorization.draft.final_submission_id) {
-      return json({ success: false, code: 'DRAFT_ALREADY_SUBMITTED', error: 'This questionnaire already has a durable submission. Restore its receipt or contact support before changing submitted content.' }, 409);
-    }
-    // Receipt creation is a separate entity write. Check ownership immediately;
-    // the draft link is atomically fenced and a retained receipt is reused on retry.
-    await lease.assertActive();
-    const submission = await submissions.create({
-      ...payload,
-      metadata: {
-        ...(payload.metadata || {}),
-        questionnaire_session_id: authorization.draft.session_id,
-        source_draft_id: draftId,
-        submission_attempt_id: attemptId,
-        submission_content_fingerprint: contentFingerprint,
-        client_identity_fingerprint: identityFingerprint
-      }
-    });
-    return json({ success: true, submission: await confirmReceipt(submission) });
     });
   } catch (error) {
     const safeError = error instanceof Error ? error : new Error('Unknown submission failure.');

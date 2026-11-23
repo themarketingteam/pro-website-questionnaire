@@ -6,6 +6,7 @@ import {
 } from '../base44/shared/pageOrganizerContract.js';
 import { countPageSelections, flattenPageStructure, getPageCatalogId } from '../src/lib/pageOrganizerModel.js';
 import { loadCatalog, loadScoutFixture } from './local-preview-fixtures.mjs';
+import { transformResponsesToPayload } from '../base44/shared/proQuestionnairePayload.js';
 const clone = (value) => JSON.parse(JSON.stringify(value));
 const now = () => new Date().toISOString();
 const randomId = (prefix) => `${prefix}_${crypto.randomUUID().replaceAll('-', '')}`;
@@ -115,6 +116,27 @@ export const createLocalApi = (root, { dataDirectory = path.join(root, '.local-p
     return { success: true, submission, zapierSent: false, localOnly: true };
   };
   const invokeOperation = (name, body = {}) => {
+    if (name === 'registerProSubmissionIntent') {
+      const draft = requireDraft(body.resumeCredential);
+      if (body.draftId && body.draftId !== draft.id) fail('Local draft identity mismatch.', 409);
+      if (draft.status === 'submitted' || draft.finalSubmissionId) fail('Submitted answers are read-only.', 409, 'DRAFT_ALREADY_SUBMITTED');
+      if (!body.responses || typeof body.responses !== 'object' || Array.isArray(body.responses) || JSON.stringify(body.responses).length > 1_000_000) fail('A bounded answer snapshot is required.');
+      const context = body.submitContext || {};
+      const credentials = { businessName: context.business_name || context.businessName || draft.credentials.businessName, domain: context.domain || draft.credentials.domain };
+      if (!credentials.businessName || !credentials.domain) fail('A business name and domain are required.');
+      const payload = transformResponsesToPayload(body.responses, credentials.businessName, credentials.domain, catalog.services);
+      assertResult(validateOrganizedSubmission({ payload, responses: body.responses }));
+      const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ draftId: draft.id, responses: body.responses, credentials })).digest('hex');
+      const intents = state.submissionIntents ||= [];
+      let intent = intents.find((item) => item.fingerprint === fingerprint);
+      if (!intent) {
+        intent = { id: randomId('localintent'), fingerprint, sourceDraftId: draft.id, capturedAt: now(), responses: clone(body.responses), credentials: clone(credentials), payload: clone(payload), status: 'local_only', automaticEnabled: false };
+        intents.push(intent);
+      }
+      if (body.failure) intent.failure = clone(body.failure);
+      persist();
+      return { success: true, intentConfirmed: true, draftId: draft.id, localOnly: true, job: { id: intent.id, status: intent.status, automaticEnabled: false } };
+    }
     if (name === 'syncProQuestionnaireDraft') {
       if (body.action === 'start_revision') fail('Submitted questionnaires are read-only. Your team can create a separate revision in recovery.', 403, 'REVISION_REQUIRES_TEAM');
       if (body.action === 'bootstrap') {
@@ -154,7 +176,14 @@ export const createLocalApi = (root, { dataDirectory = path.join(root, '.local-p
       persist(); return { success: true, draft: publicDraft(draft) };
     }
     if (name === 'submitProQuestionnaireDurable' || name === 'submitProQuestionnaireFallback') return submit(body, name);
-    if (name === 'sendToZapier') { const record = capture(body, name); return { success: true, localOnly: true, captureId: record.id, message: 'Captured locally; no Zapier request sent.' }; }
+    if (name === 'sendToZapier') {
+      if (body.resumeCredential) {
+        const draft = requireDraft(body.resumeCredential);
+        if (body.draftId && body.draftId !== draft.id) fail('Local draft identity mismatch.', 409);
+      }
+      const record = capture(body.payload || body, name);
+      return { success: true, localOnly: true, captureId: record.id, message: 'Captured locally; no Zapier request sent.' };
+    }
     if (name === 'validateQuestionText') return { status: 'complete', localOnly: true, feedback: 'Local preview: remote AI validation is disconnected.' };
     if (/generateAI|repairProQuestionnaire/.test(name)) fail('AI services are disabled in this isolated local preview.', 503, 'LOCAL_AI_DISABLED');
     fail(`Function ${name} is unavailable locally; no remote fallback exists.`, 501, 'LOCAL_FUNCTION_UNAVAILABLE');
