@@ -191,4 +191,34 @@ describe('actual Pro automatic submission backend',()=>{
   if(withAttachments){const photo=first.body.submission.userdata.additional_pages_list.meet_the_team_page.team_photo_with_tags;expect(photo.notes).toBe('Keep these client notes');expect(photo.taggedPeople[0].person.name).toBe('Invented Person');expect(photo.files[0].size).toBe(12345);expect(first.body.submission.userdata.certifications_partnerships[0].cert_item_files[0].name).toBe('extra.pdf');expect(first.body.submission.userdata.service_guarantee_items[0].guarantee_file_name).toBe('sla.pdf');}
  });
 
+ it.each([false,true])('never replays a legacy intake with a same-attempt receipt and missing source links (confirmedAccepted=%s)',async accepted=>{
+  const f=await fixture();await f.create();const receipt=f.entities.ProFormSubmission.rows[0],attempt=receipt.metadata.submission_attempt_id;
+  for(const key of Object.keys(receipt))if(key.startsWith('automatic_'))delete receipt[key];
+  if(accepted)Object.assign(receipt,{automatic_delivery_status:'accepted',automatic_delivery_accepted_at:when});
+  f.entities.ProSubmissionRetryJob.rows.splice(0);Object.assign(f.draft,{status:'draft',final_submission_id:'',submitted_at:''});
+  f.entities.ProFormSubmissionIntake.rows.push({id:'historical-unlinked-intake',source_draft_id:f.draft.id,questionnaire_session_id:session,status:'received_intake',submission_attempt_id:attempt,raw_responses_json:JSON.stringify(f.raw),transformed_payload_json:JSON.stringify(f.mapped),created_at_server:when,zapier_sent:false});
+  const before=copyRecord({draft:f.draft,receipt});const dry=await f.worker.send({dryRun:true});expect(dry.body.inventory[accepted?'alreadyDelivered':'needsReview']).toBe(1);expect(f.entities.ProSubmissionRetryJob.rows).toHaveLength(0);
+  vi.setSystemTime(new Date('2026-11-24T01:00:00Z'));await f.worker.send({dryRun:false});expect(f.fetchImpl).not.toHaveBeenCalled();expect(f.entities.ProFormSubmission.rows).toHaveLength(1);expect({draft:f.draft,receipt}).toEqual(before);
+  if(accepted)expect(f.entities.ProSubmissionRetryJob.rows).toHaveLength(0);else{expect(f.job().status).toBe('needs_review');expect(JSON.parse(f.job().last_error_json).message).toMatch(/retained receipt/);}
+ });
+ it('lets an explicit new pending marker reconstruct even when legacy draft/intake rows have missing links',async()=>{
+  const f=await fixture();await f.create();const receipt=f.entities.ProFormSubmission.rows[0];f.entities.ProSubmissionRetryJob.rows.splice(0);Object.assign(f.draft,{status:'submit_attempted',final_submission_id:'',submitted_at:''});
+  f.entities.ProFormSubmissionIntake.rows.push({id:'pending-marker-intake',source_draft_id:f.draft.id,questionnaire_session_id:session,status:'received_intake',submission_attempt_id:receipt.metadata.submission_attempt_id,raw_responses_json:JSON.stringify(f.raw),transformed_payload_json:JSON.stringify(f.mapped),created_at_server:when,zapier_sent:false});
+  vi.setSystemTime(new Date('2026-11-23T23:00:00Z'));await f.worker.send({dryRun:false});expect(f.entities.ProSubmissionRetryJob.rows).toHaveLength(1);expect(f.job().created_from).toBe('atomic_receipt_delivery_marker');expect(f.job().status).toBe('succeeded');expect(f.entities.ProFormSubmission.rows).toHaveLength(1);expect(f.fetchImpl).toHaveBeenCalledOnce();
+ });
+ it('rechecks source/attempt receipts under the lease after an initially empty discovery scan',async()=>{
+  const f=await fixture();await f.create();const receipt=copyRecord(f.entities.ProFormSubmission.rows[0]);for(const key of Object.keys(receipt))if(key.startsWith('automatic_'))delete receipt[key];
+  f.entities.ProFormSubmission.rows.splice(0);f.entities.ProSubmissionRetryJob.rows.splice(0);Object.assign(f.draft,{status:'draft',final_submission_id:'',submitted_at:''});
+  f.entities.ProFormSubmissionIntake.rows.push({id:'race-intake',source_draft_id:f.draft.id,status:'received_intake',submission_attempt_id:receipt.metadata.submission_attempt_id,raw_responses_json:JSON.stringify(f.raw),transformed_payload_json:JSON.stringify(f.mapped),created_at_server:when,zapier_sent:false});
+  const filter=f.entities.ProFormSubmission.filter.getMockImplementation();let inserted=false;f.entities.ProFormSubmission.filter.mockImplementation(async(query,...args)=>{const found=await filter(query,...args);if(!inserted&&Object.keys(query).length===0){inserted=true;f.entities.ProFormSubmission.rows.push(receipt);}return found;});
+  vi.setSystemTime(new Date('2026-11-23T23:00:00Z'));await f.worker.send({dryRun:false});expect(inserted).toBe(true);expect(f.job().status).toBe('needs_review');expect(f.fetchImpl).not.toHaveBeenCalled();expect(f.entities.ProFormSubmission.rows).toHaveLength(1);expect(f.draft.final_submission_id).toBe('');
+ });
+ it('holds historical draft replay when canonical identity has a receipt in another saved session',async()=>{
+  const f=await fixture();await f.create();const receipt=f.entities.ProFormSubmission.rows[0];for(const key of Object.keys(receipt))if(key.startsWith('automatic_'))delete receipt[key];
+  receipt.metadata.source_draft_id='another-source-draft';receipt.metadata.submission_attempt_id='another_submission_attempt';receipt.metadata.businessDomain='HTTPS://WWW.CUSTOMER-UNIT-TESTING.NET/';
+  f.entities.ProSubmissionRetryJob.rows.splice(0);const stable='legacy_stable_submission_attempt';const payload={...f.mapped,metadata:{...f.mapped.metadata,submission_attempt_id:stable}};Object.assign(f.draft,{status:'submit_failed',final_submission_id:'',mapped_payload_json:JSON.stringify(payload)});
+  f.entities.ProFormDraftRevision.rows.push({id:'legacy-final-checkpoint',draft_id:f.draft.id,source:'final_submission_barrier',server_revision:0,result_snapshot_json:JSON.stringify({responses:f.raw}),server_received_at:when});
+  vi.setSystemTime(new Date('2026-11-23T23:00:00Z'));await f.worker.send({dryRun:false});expect(f.job().status).toBe('needs_review');expect(f.fetchImpl).not.toHaveBeenCalled();expect(f.draft.final_submission_id).toBe('');
+ });
+
 });

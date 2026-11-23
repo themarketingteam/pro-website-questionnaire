@@ -1,5 +1,5 @@
 import { normalizeStoredOrganizedRecord, validateOrganizedSubmission } from './pageOrganizerContract.js';
-import { createSubmissionContentFingerprint, createSubmissionIdentityFingerprint, getSubmissionIdentity, hashDraftSubmissionValue } from './proDraftSubmissionAuthorization.ts';
+import { createSubmissionContentFingerprint, createSubmissionIdentityFingerprint, getSubmissionIdentity, hashDraftSubmissionValue, normalizeSubmissionDomain } from './proDraftSubmissionAuthorization.ts';
 import { withEntityLease, type EntityLease } from './entityLease.ts';
 import { transformResponsesToPayload, validateSubmissionPayload } from './proQuestionnairePayload.js';
 import { SERVICE_OPTIONS_GROUPED } from './proServiceCatalog.js';
@@ -180,6 +180,7 @@ export async function createProRetryReceiptLocked({ base44, draft, lease, job, p
   const confirm = async (dto: Row, duplicate: boolean) => {
     let receipt: Row;
     try { receipt = normalizeStoredOrganizedRecord(dto, mapped); } catch { throw retryFault('SUBMISSION_STORAGE_INVALID', 'The durable receipt did not retain the expected payload schema.', 502); }
+    if (String(job?.created_from || '').startsWith('legacy_') && duplicate && !receipt.automatic_delivery_accepted_at && !(receipt.automatic_delivery_status === 'pending' && receipt.automatic_retry_job_key === job.job_key && receipt.automatic_retry_raw_responses_json && receipt.automatic_retry_outbound_payload_json)) throw retryFault('LEGACY_RECEIPT_DELIVERY_UNKNOWN', 'A retained legacy receipt has no verifiable pending delivery checkpoint. Review its downstream delivery before retrying.');
     if (!receipt?.id || receipt.metadata?.source_draft_id !== draft.id
       || await createSubmissionIdentityFingerprint(getSubmissionIdentity(receipt)) !== identityHash
       || await createSubmissionContentFingerprint({ payload: receipt, draftId: draft.id, identity }) !== content) throw retryFault('SUBMISSION_STORAGE_INVALID', 'The durable receipt did not retain this exact questionnaire submission.', 502);
@@ -320,16 +321,54 @@ const collectRetryRows = async (entity: any, query: Row, sort: string) => {
   return rows;
 };
 
+/** Receipt absence and absent link fields never prove a legacy delivery failed. */
+export async function classifyProLegacyReceiptEvidence({ source, payload, attemptId = '', receipts }: any): Promise<'none' | 'review' | 'pending_marker' | 'accepted'> {
+  const domain = normalizeSubmissionDomain(source.domain);
+  const related = receipts.filter((row: Row) => row.metadata?.source_draft_id === source.id || (attemptId && row.metadata?.submission_attempt_id === attemptId) || (domain && normalizeSubmissionDomain(getSubmissionIdentity(row).domain) === domain));
+  if (!related.length) return 'none';
+  const bound = related.filter((row: Row) => row.metadata?.source_draft_id === source.id || (attemptId && row.metadata?.submission_attempt_id === attemptId));
+  const exact = bound.filter((row: Row) => row.metadata?.source_draft_id === source.id && row.metadata?.questionnaire_session_id === source.session_id && row.metadata?.submission_attempt_id && (!attemptId || row.metadata.submission_attempt_id === attemptId));
+  const identityHash = await createSubmissionIdentityFingerprint(identityFor(source));
+  const contentHash = payload ? await createSubmissionContentFingerprint({ payload, draftId: source.id, identity: identityFor(source) }) : '';
+  if (exact.some((row: Row) => row.automatic_delivery_accepted_at && row.metadata?.client_identity_fingerprint === identityHash && contentHash && row.metadata?.submission_content_fingerprint === contentHash)) return 'accepted';
+  // The separate marker pass owns reconstruction of an explicitly pending NEW
+  // receipt. A legacy hold must not shadow that positive durable checkpoint.
+  if (bound.length === 1 && exact.some((row: Row) => row.automatic_delivery_status === 'pending' && !row.automatic_delivery_accepted_at && !row.automatic_delivery_started_at && row.automatic_retry_job_key && parseRetryObject(row.automatic_retry_raw_responses_json) && parseRetryObject(row.automatic_retry_outbound_payload_json))) return 'pending_marker';
+  return 'review';
+}
+
 /** Discovery requires positive failed intent, receipt marker, or delivery event. */
 export async function discoverProRetrySources(base44: any, { dryRun = true, limit = 30 }: any = {}): Promise<Row> {
-  const result: Row = { scanned: 0, eligible: 0, admitted: 0, excluded: 0, needsReview: 0 };
+  const result: Row = { scanned: 0, eligible: 0, admitted: 0, excluded: 0, needsReview: 0, alreadyDelivered: 0 };
+  let receiptHistory: Promise<Row[]> | null = null;
+  const evidenceFor = (source: Row, payload: Row | null, attemptId = '') => {
+    receiptHistory ||= collectRetryRows(base44.asServiceRole.entities.ProFormSubmission, {}, '-created_date');
+    return receiptHistory.then(receipts => classifyProLegacyReceiptEvidence({ source, payload, attemptId, receipts }));
+  };
+  const receiptReview = 'A retained receipt already exists for this client or submission attempt, but pending delivery is not proven. Review its downstream delivery before replaying.';
   const admit = async (source: Row, raw: Row, payload: Row | null, options: Row) => {
     result.eligible++;
     if (dryRun || result.admitted >= limit) return;
     await withEntityLease({ entity: base44.asServiceRole.entities.ProFormDraft, entityId: source.id, purpose: 'pro-retry-discovery' }, async lease => {
       const current = await base44.asServiceRole.entities.ProFormDraft.get(source.id);
       if (hold(current) || isAutomaticRetryExcluded(current)) return;
-      const job = await ensureProRetryJobLocked({ base44, draft: current, lease, responses: raw, payload, allowMappedFallback: false, ...options });
+      let admissionOptions = options;
+      if (String(options.createdFrom || '').startsWith('legacy_')) {
+        // Source/attempt receipts may have been created while discovery waited
+        // for this source lease. Refresh their state before admitting any job.
+        const boundQuery = options.attemptId ? { $or: [{ 'metadata.source_draft_id': current.id }, { 'metadata.submission_attempt_id': options.attemptId }] } : { 'metadata.source_draft_id': current.id };
+        const freshBound = await collectRetryRows(base44.asServiceRole.entities.ProFormSubmission, boundQuery, '-created_date');
+        const history = await (receiptHistory ||= collectRetryRows(base44.asServiceRole.entities.ProFormSubmission, {}, '-created_date'));
+        const merged = [...new Map([...history, ...freshBound].map((row: Row) => [row.id, row])).values()];
+        const evidence = await classifyProLegacyReceiptEvidence({ source: current, payload, attemptId: options.attemptId || '', receipts: merged });
+        if (evidence === 'accepted') { result.alreadyDelivered++; return; }
+        if (evidence === 'pending_marker') return;
+        if (evidence === 'review') {
+          if (!options.initialReview) result.needsReview++;
+          admissionOptions = { ...options, allowCompleted: true, initialReview: receiptReview };
+        }
+      }
+      const job = await ensureProRetryJobLocked({ base44, draft: current, lease, responses: raw, payload, allowMappedFallback: false, ...admissionOptions });
       if (job) result.admitted++;
     });
   };
@@ -341,11 +380,18 @@ export async function discoverProRetrySources(base44: any, { dryRun = true, limi
     if (known?.length) continue;
     const raw = parseRetryObject(source.responses_json), payload = parseRetryObject(source.mapped_payload_json);
     if (!raw) { result.needsReview++; continue; }
+    const stableAttempt = text(payload?.metadata?.submission_attempt_id, 160);
+    const receiptEvidence = await evidenceFor(source, payload, stableAttempt);
+    if (receiptEvidence === 'accepted') { result.alreadyDelivered++; continue; }
+    if (receiptEvidence === 'pending_marker') continue;
+    if (receiptEvidence === 'review') {
+      result.needsReview++;
+      await admit(source, raw, payload, { allowCompleted: true, attemptId: stableAttempt, createdFrom: 'legacy_ambiguous_receipt', initialReview: receiptReview, failedAt: source.last_saved_at || nowIso() });
+      continue;
+    }
     const checkpoints = await base44.asServiceRole.entities.ProFormDraftRevision.filter({ draft_id: source.id, source: 'final_submission_barrier' }, '-server_revision', 1);
     const checkpoint = checkpoints?.[0], frozen = parseRetryObject(checkpoint?.result_snapshot_json);
-    const stableAttempt = text(payload?.metadata?.submission_attempt_id, 160);
-    const later = source.domain ? await base44.asServiceRole.entities.ProFormSubmission.filter({ 'metadata.businessDomain': source.domain }, '-created_date', 1) : [];
-    const trustworthy = stableAttempt && checkpoint?.id && plain(frozen?.responses) && !(later?.length)
+    const trustworthy = stableAttempt && checkpoint?.id && plain(frozen?.responses)
       && await retrySourceFingerprint(source, frozen.responses) === await retrySourceFingerprint(source);
     if (!trustworthy) {
       result.needsReview++;
@@ -365,9 +411,12 @@ export async function discoverProRetrySources(base44: any, { dryRun = true, limi
     if (known?.length) continue;
     const raw = parseRetryObject(intake.raw_responses_json), payload = parseRetryObject(intake.transformed_payload_json);
     if (!raw) { result.needsReview++; continue; }
-    const mismatch = source.final_submission_id || !intake.submission_attempt_id || await retrySourceFingerprint(source, raw) !== await retrySourceFingerprint(source);
+    const receiptEvidence = await evidenceFor(source, payload, intake.submission_attempt_id || '');
+    if (receiptEvidence === 'accepted') { result.alreadyDelivered++; continue; }
+    if (receiptEvidence === 'pending_marker') continue;
+    const mismatch = receiptEvidence === 'review' || source.final_submission_id || !intake.submission_attempt_id || await retrySourceFingerprint(source, raw) !== await retrySourceFingerprint(source);
     if (mismatch) result.needsReview++;
-    await admit(source, raw, payload, { intakeId: intake.id, attemptId: intake.submission_attempt_id || '', createdFrom: 'legacy_failed_intake', initialReview: mismatch ? 'The historical intake cannot be uniquely matched to an unchanged submitted attempt.' : '', failedAt: intake.last_retry_at || intake.created_at_server || nowIso() });
+    await admit(source, raw, payload, { allowCompleted: Boolean(mismatch), intakeId: intake.id, attemptId: intake.submission_attempt_id || '', createdFrom: 'legacy_failed_intake', initialReview: receiptEvidence === 'review' ? receiptReview : mismatch ? 'The historical intake cannot be uniquely matched to an unchanged submitted attempt.' : '', failedAt: intake.last_retry_at || intake.created_at_server || nowIso() });
   }
   // These fields are written atomically on NEW receipt creation. An absent old
   // field never means undelivered, so historical successes are not swept.
@@ -398,6 +447,9 @@ export async function discoverProRetrySources(base44: any, { dryRun = true, limi
     if (known?.length) continue;
     const raw = parseRetryObject(source.responses_json), payload = parseRetryObject(source.mapped_payload_json);
     if (!raw || !payload) { result.needsReview++; continue; }
+    const receiptEvidence = await evidenceFor(source, payload, receipt.metadata?.submission_attempt_id || '');
+    if (receiptEvidence === 'accepted') { result.alreadyDelivered++; continue; }
+    if (receiptEvidence === 'pending_marker') continue;
     // Old browser failure events do not distinguish a rejected HTTP request
     // from a lost response after acceptance. Retain a visible review hold.
     result.needsReview++;
