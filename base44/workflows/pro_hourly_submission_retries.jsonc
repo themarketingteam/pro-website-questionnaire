@@ -32,7 +32,7 @@
           "with": {
             "function_name": "processProSubmissionRetries",
             "args": {
-              "dryRun": true,
+              "dryRun": false,
               "limit": 30
             }
           },
