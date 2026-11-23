@@ -1,5 +1,6 @@
 import { webcrypto } from 'node:crypto';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { hydrateProSubmissionEntity } from './utils/base44SubmissionHydration';
 import { memoryEntity, copyRecord } from './utils/memoryEntities';
 import { loadBackend } from './utils/loadBackend';
 import { transformResponsesToPayload } from '@/components/pro-form/submissionPayload';
@@ -169,6 +170,25 @@ describe('actual Pro automatic submission backend',()=>{
   for(const protectedFields of [{status:'needs_review'},{manual_force:true},{delivery_started_at:when},{submission_id:'already-retained'},{stage:'delivery'},{delivery_accepted_at:when,status:'succeeded'}]){
    const f=await fixture();await f.register();Object.assign(f.job(),protectedFields);const prior=copyRecord(f.job());await f.register({...f.raw,'6':'Newer B'});expect(f.entities.ProSubmissionRetryJob.rows[0]).toEqual(prior);
   }
+ });
+
+ it.each([false,true])('preserves the complete production-mapper receipt through strict Base44 schema projection (attachments=%s)',async withAttachments=>{
+  const raw=answers();raw['1']='no';raw['2']=withAttachments?'yes':'no';
+  const custom=(id,label,children=[])=>({id,label,source:'custom',catalogId:null,children});
+  raw['3']=[];raw['3_other']=['SYNTHETIC Managed IT','SYNTHETIC Help Desk','SYNTHETIC Security'];raw['3_structure']={format:'page-tree-v1',pages:[custom('services','SYNTHETIC Managed IT',[custom('help','SYNTHETIC Help Desk'),custom('security','SYNTHETIC Security')])]};
+  raw['4']=[];raw['4_other']=['SYNTHETIC Financial','SYNTHETIC CPA','SYNTHETIC Accounting'];raw['4_structure']={format:'page-tree-v1',pages:[custom('industries','SYNTHETIC Financial',[custom('cpa','SYNTHETIC CPA'),custom('accounting','SYNTHETIC Accounting')])]};raw['5']=['Chicago, IL','Madison, WI'];raw['5_primary']=0;
+  if(withAttachments){
+   raw['2.1']='Meet our invented unit-test team';raw['2.2']={files:[{url:'https://assets.invalid/team.jpg',name:'team.jpg',fileName:'original-team.jpg',filename:'upload-team.jpg',type:'image/jpeg',mimeType:'image/jpeg',size:12345,uploadedAt:'2026-11-23T12:00:00Z'}],taggedPeople:[{x:15,y:35,person:{name:'Invented Person',position:'Engineer',bio:'Invented biography'}}],tags:['Leadership'],notes:'Keep these client notes',has_team_photo:true};
+   raw['12']='yes';raw['12.1']=[{name:'Invented certification',type:'certification',image:{url:'https://assets.invalid/badge.png',name:'badge.png'},file:{url:'https://assets.invalid/certificate.pdf',name:'certificate.pdf'},files:[{url:'https://assets.invalid/extra.pdf',name:'extra.pdf',type:'application/pdf',size:4321}]}];
+   raw['14']='yes';raw['14.1']=[{name:'Invented SLA',type:'sla',file:{url:'https://assets.invalid/sla.pdf',name:'sla.pdf'},description:'Client guarantee description'}];
+  }
+  const f=await fixture({responses:raw,businessName:'SYNTHETIC SCHEMA ROUNDTRIP DO NOT DELIVER',domain:'schema-roundtrip.invalid'});const entity=f.entities.ProFormSubmission,create=entity.create.getMockImplementation(),get=entity.get.getMockImplementation(),filter=entity.filter.getMockImplementation();
+  entity.create.mockImplementation(async value=>{const projected=hydrateProSubmissionEntity({...value,userdata:{...value.userdata,undeclared_probe:'must be dropped'}});const stored=await create(projected);return hydrateProSubmissionEntity(stored);});
+  entity.get.mockImplementation(async id=>hydrateProSubmissionEntity(await get(id)));entity.filter.mockImplementation(async(...args)=>(await filter(...args)).map(hydrateProSubmissionEntity));
+  expect(hydrateProSubmissionEntity({metadata:{},userdata:{undeclared_probe:'must be dropped'}}).userdata).not.toHaveProperty('undeclared_probe');
+  await f.register();const first=await f.create();expect(first.status).toBe(200);expect(f.job().status).toBe('excluded');expect(first.body.submission.userdata).toEqual(f.mapped.userdata);
+  const duplicate=await f.create();expect(duplicate.status).toBe(200);expect(duplicate.body.submission.id).toBe(first.body.submission.id);expect(entity.rows).toHaveLength(1);expect(duplicate.body.submission.userdata).toEqual(f.mapped.userdata);expect(f.fetchImpl).not.toHaveBeenCalled();
+  if(withAttachments){const photo=first.body.submission.userdata.additional_pages_list.meet_the_team_page.team_photo_with_tags;expect(photo.notes).toBe('Keep these client notes');expect(photo.taggedPeople[0].person.name).toBe('Invented Person');expect(photo.files[0].size).toBe(12345);expect(first.body.submission.userdata.certifications_partnerships[0].cert_item_files[0].name).toBe('extra.pdf');expect(first.body.submission.userdata.service_guarantee_items[0].guarantee_file_name).toBe('sla.pdf');}
  });
 
 });

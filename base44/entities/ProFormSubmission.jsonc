@@ -121,9 +121,75 @@
                           "y": {
                             "type": "number",
                             "description": "Y coordinate of tag on image"
+                          },
+                          "person": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "position": {
+                                "type": "string"
+                              },
+                              "bio": {
+                                "type": "string"
+                              }
+                            },
+                            "description": "Normalized team-member details retained with the photo tag"
                           }
                         }
                       }
+                    },
+                    "imageName": {
+                      "type": "string",
+                      "description": "Original name of the selected team photo"
+                    },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "url": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "fileName": {
+                            "type": "string"
+                          },
+                          "filename": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "size": {
+                            "type": "number"
+                          },
+                          "mimeType": {
+                            "type": "string"
+                          },
+                          "uploadedAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Additional team-photo labels"
+                    },
+                    "notes": {
+                      "type": "string",
+                      "description": "Client notes accompanying the team photo"
+                    },
+                    "has_team_photo": {
+                      "type": "boolean",
+                      "description": "Whether the client supplied or explicitly selected a team photo"
                     }
                   }
                 }
@@ -262,6 +328,46 @@
               "cert_item_file_url": {
                 "type": "string",
                 "description": "Supporting document URL"
+              },
+              "cert_item_image_name": {
+                "type": "string",
+                "description": "Original certification badge filename"
+              },
+              "cert_item_file_name": {
+                "type": "string",
+                "description": "Original supporting-document filename"
+              },
+              "cert_item_files": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "fileName": {
+                      "type": "string"
+                    },
+                    "filename": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "size": {
+                      "type": "number"
+                    },
+                    "mimeType": {
+                      "type": "string"
+                    },
+                    "uploadedAt": {
+                      "type": "string"
+                    }
+                  }
+                }
               }
             }
           }
@@ -295,6 +401,10 @@
               "guarantee_description": {
                 "type": "string",
                 "description": "Description of the guarantee"
+              },
+              "guarantee_file_name": {
+                "type": "string",
+                "description": "Original supporting guarantee-document filename"
               }
             }
           }
