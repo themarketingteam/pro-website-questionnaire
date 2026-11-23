@@ -27,6 +27,41 @@ const outbound = (payload: Row) => ({ metadata: clone(payload.metadata || {}), u
 const safeError = (error: any) => ({ code: text(error?.code || error?.response?.data?.code, 150), message: text(error?.message || error?.response?.data?.error || 'Submission retry failed.', 500), status: Number(error?.status || error?.response?.status || 0) || null });
 export const retryJobSummary = (job: Row | null) => job ? Object.fromEntries(['id','job_key','source_draft_id','source_intake_id','source_session_id','submission_id','status','stage','next_retry_at','attempt_count','first_failed_at','last_attempt_at','last_error_json','delivery_http_status','delivery_accepted_at','created_from'].map(key => [key, job[key] ?? null])) : null;
 
+const pendingSubmissionIntent = (job: Row) => job.stage === 'submission' && ['queued','retry_waiting'].includes(job.status) && !job.submission_id && !job.delivery_started_at && !job.delivery_accepted_at && !job.manual_force && !job.automatic_retry_excluded;
+
+async function newerExplicitIntent(base44: any, job: Row): Promise<Row | null> {
+  if (!pendingSubmissionIntent(job)) return null;
+  const newer = await jobs(base44).filter({ source_draft_id: job.source_draft_id, source_session_id: job.source_session_id, created_from: 'public_submit_intent', manual_force: false, automatic_retry_excluded: false, intent_sequence: { $gt: Number(job.intent_sequence || 0) } }, '-intent_sequence', 1);
+  return newer?.[0] || null;
+}
+
+async function cancelSupersededIntent(base44: any, prior: Row, current: Row, lease: EntityLease): Promise<void> {
+  if (!pendingSubmissionIntent(prior) || prior.id === current.id) return;
+  await lease.assertActive();
+  await jobs(base44).updateMany({ id: prior.id, status: prior.status, stage: 'submission', submission_id: prior.submission_id ?? null, delivery_started_at: prior.delivery_started_at ?? null, delivery_accepted_at: prior.delivery_accepted_at ?? null, manual_force: prior.manual_force ?? null }, { $set: { status: 'cancelled', next_retry_at: '', last_error_json: json({ code: 'SUBMISSION_INTENT_SUPERSEDED', message: 'A newer confirmed submission attempt superseded this unsubmitted snapshot.', superseded_by_job_id: current.id, superseded_by_intent_sequence: current.intent_sequence }) } });
+  const confirmed = await jobs(base44).get(prior.id);
+  if (pendingSubmissionIntent(confirmed)) throw retryFault('RETRY_SUPERSESSION_UNCONFIRMED', 'The newer submission was retained, but the older attempt cancellation was not confirmed.', 503);
+}
+
+async function supersedePriorIntents(base44: any, current: Row, lease: EntityLease): Promise<Row> {
+  if (current.created_from !== 'public_submit_intent' || !Number(current.intent_sequence) || current.automatic_retry_excluded || current.manual_force) return current;
+  const prior = await collectRetryRows(jobs(base44), { source_draft_id: current.source_draft_id, source_session_id: current.source_session_id, stage: 'submission' }, 'created_date');
+  for (const item of prior) if (Number(item.intent_sequence || 0) < Number(current.intent_sequence)) await cancelSupersededIntent(base44, item, current, lease);
+  return current;
+}
+
+async function assertCurrentSubmissionIntent(base44: any, job: Row | null, lease: EntityLease): Promise<void> {
+  if (!job) return;
+  const current = await jobs(base44).get(job.id);
+  if (current.stage !== 'submission') return;
+  if (current.status === 'cancelled') throw retryFault('SUBMISSION_INTENT_SUPERSEDED', 'This retained attempt is cancelled or superseded. Review the newest confirmed submission attempt.');
+  const successor = await newerExplicitIntent(base44, current);
+  if (successor) {
+    await cancelSupersededIntent(base44, current, successor, lease);
+    throw retryFault('SUBMISSION_INTENT_SUPERSEDED', 'A newer confirmed submission attempt superseded this unsubmitted snapshot.');
+  }
+}
+
 /** Caller must already own this draft's entity lease. Snapshot fields never change. */
 export async function ensureProRetryJobLocked({ base44, draft, lease, payload, responses, attemptId = '', intakeId = '', submissionId = '', createdFrom = 'explicit_submission', allowCompleted = false, forceRequestId = '', failedAt = '', allowMappedFallback = true, baselineDraft = null, initialReview = '' }: any): Promise<Row | null> {
   if (!draft?.id || !lease) throw retryFault('RETRY_SOURCE_REQUIRED', 'A locked questionnaire draft is required.');
@@ -34,6 +69,14 @@ export async function ensureProRetryJobLocked({ base44, draft, lease, payload, r
   if (!plain(raw)) throw retryFault('DRAFT_SNAPSHOT_INVALID', 'A readable saved answer map is required.');
   const mapped = plain(payload) ? outbound(payload) : allowMappedFallback ? parseRetryObject(draft.mapped_payload_json) : null;
   const identity = identityFor(draft);
+  const explicitAdmission = createdFrom === 'public_submit_intent' && !initialReview;
+  if (explicitAdmission) {
+    let candidate: Row;
+    try { candidate = transformResponsesToPayload(raw, identity.businessName, identity.domain, SERVICE_OPTIONS_GROUPED); }
+    catch { throw retryFault('RETRY_INTENT_INVALID', 'The explicit submission answers could not be mapped without changing their page structure.', 422); }
+    const generic = validateSubmissionPayload(candidate), organized = validateOrganizedSubmission({ payload: candidate, responses: raw });
+    if (!generic.ok || !organized.ok) throw retryFault('RETRY_INTENT_INVALID', [...generic.errors, ...organized.errors].join(' '), 422);
+  }
   const content = await createSubmissionContentFingerprint({ payload: mapped, rawResponses: raw, draftId: draft.id, identity });
   const source = await retrySourceFingerprint(draft, raw);
   const baseKey = await hashDraftSubmissionValue(`pro:${draft.id}:${source}`);
@@ -41,22 +84,32 @@ export async function ensureProRetryJobLocked({ base44, draft, lease, payload, r
   const found = await jobs(base44).filter({ source_draft_id: draft.id, job_key: key }, 'created_date', 2);
   if (found?.length > 1) throw retryFault('RETRY_JOB_AMBIGUOUS', 'More than one retained retry job matches this submission.');
   if (found?.[0]) {
-    const existing = found[0];
+    let existing = found[0];
+    if (explicitAdmission && existing.status === 'cancelled') throw retryFault('SUBMISSION_INTENT_SUPERSEDED', 'This exact retained snapshot was cancelled or superseded. Review the latest attempt before submitting it again.');
+    if (explicitAdmission && pendingSubmissionIntent(existing) && !Number(existing.intent_sequence)) {
+      const retained = await collectRetryRows(jobs(base44), { source_draft_id: draft.id, source_session_id: draft.session_id || '' }, '-intent_sequence');
+      const sequence = Math.max(0, ...retained.map((item: Row) => Number(item.intent_sequence || 0))) + 1;
+      await lease.assertActive();
+      existing = await jobs(base44).update(existing.id, { intent_sequence: sequence, created_from: 'public_submit_intent' });
+      if (existing.intent_sequence !== sequence || existing.created_from !== 'public_submit_intent') throw retryFault('RETRY_INTENT_UNVERIFIED', 'The latest submission intent ordering was not retained.', 502);
+    }
     if (mapped && !parseRetryObject(existing.mapped_payload_json) && !existing.delivery_accepted_at) {
       await lease.assertActive();
       const promoted = await jobs(base44).update(existing.id, { mapped_payload_json: json(mapped), outbound_payload_json: json(mapped), content_fingerprint: content, submission_attempt_id: attemptId || existing.submission_attempt_id, source_intake_id: intakeId || existing.source_intake_id || '' });
       if (promoted.mapped_payload_json !== json(mapped) || promoted.outbound_payload_json !== json(mapped)) throw retryFault('RETRY_JOB_STORAGE_INVALID', 'The retry service did not retain the complete outbound payload.', 502);
-      return promoted;
+      return explicitAdmission ? supersedePriorIntents(base44, promoted, lease) : promoted;
     }
     if (mapped && parseRetryObject(existing.mapped_payload_json) && existing.content_fingerprint !== content) throw retryFault('RETRY_CONTENT_CHANGED', 'This frozen submission attempt already retained different mapped answers.');
-    return existing;
+    return explicitAdmission ? supersedePriorIntents(base44, existing, lease) : existing;
   }
   // Missing delivery state on an old completed receipt is never evidence that
   // it was unsent. Only a deliberate protected force action may admit it.
   if ((draft.status === 'submitted' || draft.final_submission_id) && !allowCompleted && !forceRequestId) return null;
   const when = nowIso();
   const excluded = hold(draft) || isAutomaticRetryExcluded(draft, mapped);
+  const retained = explicitAdmission && !excluded ? await collectRetryRows(jobs(base44), { source_draft_id: draft.id, source_session_id: draft.session_id || '' }, '-intent_sequence') : [];
   const value = {
+    intent_sequence: explicitAdmission && !excluded ? Math.max(0, ...retained.map((item: Row) => Number(item.intent_sequence || 0))) + 1 : 0,
     job_key: key, source_draft_id: draft.id, source_intake_id: intakeId, source_session_id: draft.session_id || '',
     submission_attempt_id: attemptId || `retry_${baseKey}`, submission_id: submissionId || '',
     content_fingerprint: content, source_fingerprint: source, raw_responses_json: json(raw), mapped_payload_json: json(mapped), outbound_payload_json: mapped ? json(mapped) : '',
@@ -68,8 +121,8 @@ export async function ensureProRetryJobLocked({ base44, draft, lease, payload, r
   };
   await lease.assertActive();
   const stored = await jobs(base44).create(value);
-  if (!stored?.id || ['job_key','source_fingerprint','raw_responses_json','mapped_payload_json','outbound_payload_json','submission_attempt_id'].some(key => stored[key] !== (value as Row)[key])) throw retryFault('RETRY_JOB_STORAGE_INVALID', 'The database did not retain the complete submission retry checkpoint.', 502);
-  return stored;
+  if (!stored?.id || ['job_key','source_fingerprint','raw_responses_json','mapped_payload_json','outbound_payload_json','submission_attempt_id','intent_sequence'].some(key => stored[key] !== (value as Row)[key])) throw retryFault('RETRY_JOB_STORAGE_INVALID', 'The database did not retain the complete submission retry checkpoint.', 502);
+  return explicitAdmission ? supersedePriorIntents(base44, stored, lease) : stored;
 }
 
 export async function failProRetryJobLocked(base44: any, job: Row | null, error: any, { uncertain = false, review = false, increment = false, lease, httpStatus }: any = {}): Promise<Row | null> {
@@ -110,6 +163,7 @@ export async function verifyProRetrySourceLocked({ base44, job, draft, lease }: 
 
 /** Receipt creation/reuse is shared with the public handler and scheduled worker. */
 export async function createProRetryReceiptLocked({ base44, draft, lease, job, payload, responses, attemptId }: any): Promise<{ submission: Row; duplicate: boolean }> {
+  await assertCurrentSubmissionIntent(base44, job, lease);
   const mapped = payload || parseRetryObject(job?.mapped_payload_json);
   const raw = responses || parseRetryObject(job?.raw_responses_json) || parseRetryObject(draft.responses_json);
   if (!plain(mapped?.metadata) || !plain(mapped?.userdata) || !text(mapped.metadata.business_name) || !text(mapped.metadata.businessDomain || mapped.metadata.business_domain)) throw retryFault('RETRY_PAYLOAD_UNAVAILABLE', 'A complete saved submission payload and client identity are required.', 422);
@@ -240,6 +294,7 @@ export async function processProRetryJob(base44: any, jobId: string, { fetchImpl
     }
     if (!job.next_retry_at || Date.parse(job.next_retry_at) > Date.now()) return { success: true, skipped: true };
     try {
+      await assertCurrentSubmissionIntent(base44, job, lease);
       const restored = await restoreProFrozenIntentLocked({ base44, draft, lease, job });
       Object.assign(draft, restored);
       job = await jobs(base44).get(job.id);

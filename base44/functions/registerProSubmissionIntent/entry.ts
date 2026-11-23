@@ -20,7 +20,8 @@ export default async function(req: Request) {
       const attemptIdentity = getSubmissionIdentity(null, body.submitContext);
       if (!attemptIdentity.businessName || !attemptIdentity.domain) return Response.json({ success: false, code: 'SUBMISSION_IDENTITY_REQUIRED', error: 'The confirmed client name and domain are required.' }, { status: 400 });
       const attemptDraft = { ...current, business_name: attemptIdentity.businessName, domain: attemptIdentity.domain };
-      let job = await ensureProRetryJobLocked({ base44, draft: attemptDraft, baselineDraft: current, lease, payload: null, responses: body.responses, createdFrom: 'public_submit_intent', allowMappedFallback: false });
+      const rejectedFailure = body.failure && (['identity','validation','schema','auth','permission'].includes(String(body.failure.failureKind || '')) || [400,401,403,409,422].includes(Number(body.failure.status)));
+      let job = await ensureProRetryJobLocked({ base44, draft: attemptDraft, baselineDraft: current, lease, payload: null, responses: body.responses, createdFrom: 'public_submit_intent', allowMappedFallback: false, initialReview: rejectedFailure ? 'The final save or submission was explicitly rejected and requires review.' : '' });
       if (body.failure && job) job = await failProRetryJobLocked(base44, job, body.failure, { review: ['identity','validation','schema','auth','permission'].includes(String(body.failure.failureKind || '')) || [400,401,403,409,422].includes(Number(body.failure.status)), lease });
       return Response.json({ success: true, intentConfirmed: true, draftId: current.id, job: retryJobSummary(job) }, { headers: { 'Cache-Control': 'no-store' } });
     });

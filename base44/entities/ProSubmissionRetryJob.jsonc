@@ -125,6 +125,10 @@
     },
     "scan_cursor_json": {
       "type": "string"
+    },
+    "intent_sequence": {
+      "type": "number",
+      "default": 0
     }
   },
   "required": [

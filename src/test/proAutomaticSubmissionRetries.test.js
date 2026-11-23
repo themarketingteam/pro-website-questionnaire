@@ -141,4 +141,34 @@ describe('actual Pro automatic submission backend',()=>{
   vi.setSystemTime(new Date('2026-11-23T23:00:00Z'));await f.worker.send({dryRun:false});expect(f.job().status).toBe('needs_review');expect(f.draft.business_name).toBe('');expect(JSON.parse(f.draft.responses_json)).toEqual({});expect(f.fetchImpl).not.toHaveBeenCalled();expect(f.entities.ProFormSubmission.rows).toHaveLength(0);
  });
 
+ it('supersedes older unsubmitted A when valid B final-save500 leaves A as the saved baseline',async()=>{
+  const f=await fixture();await f.register();const prior=copyRecord(f.job());const latest={...f.raw,'6':'Newest explicitly submitted B'};
+  expect((await f.register(latest)).status).toBe(200);expect(f.entities.ProSubmissionRetryJob.rows).toHaveLength(2);expect(f.entities.ProSubmissionRetryJob.rows[0].status).toBe('cancelled');expect(f.entities.ProSubmissionRetryJob.rows[0].raw_responses_json).toBe(prior.raw_responses_json);
+  const b=f.entities.ProSubmissionRetryJob.rows[1];expect(b.intent_sequence).toBeGreaterThan(prior.intent_sequence);await f.register(latest);expect(f.entities.ProSubmissionRetryJob.rows).toHaveLength(2);
+  expect((await f.create()).status).toBe(409);expect(f.entities.ProFormSubmission.rows).toHaveLength(0);
+  vi.setSystemTime(new Date('2026-11-23T23:00:00Z'));await f.worker.send({dryRun:false});expect(f.fetchImpl).toHaveBeenCalledOnce();expect(JSON.parse(f.fetchImpl.mock.calls[0][1].body).userdata.company_description).toBe('Newest explicitly submitted B');expect(f.entities.ProFormSubmission.rows).toHaveLength(1);expect(b.status).toBe('succeeded');
+ });
+ it('fences old A even if B job creation succeeds but the A cancellation write fails',async()=>{
+  const f=await fixture();await f.register();const a=f.job();const update=f.entities.ProSubmissionRetryJob.updateMany.getMockImplementation();
+  f.entities.ProSubmissionRetryJob.updateMany.mockImplementationOnce(async()=>{throw Object.assign(new Error('Cancellation ACK failed'),{status:503});});
+  expect((await f.register({...f.raw,'6':'Frozen B after cancellation failure'})).status).toBe(503);expect(a.status).toBe('queued');expect(f.entities.ProSubmissionRetryJob.rows).toHaveLength(2);
+  f.entities.ProSubmissionRetryJob.updateMany.mockImplementation(update);vi.setSystemTime(new Date('2026-11-23T23:00:00Z'));await f.worker.send({dryRun:false});expect(a.status).toBe('cancelled');expect(f.fetchImpl).toHaveBeenCalledOnce();expect(JSON.parse(f.fetchImpl.mock.calls[0][1].body).userdata.company_description).toBe('Frozen B after cancellation failure');
+ });
+ it('keeps admitted B as a barrier to A after B later requires review, and old A cannot revive by callback',async()=>{
+  const f=await fixture();await f.register();const update=f.entities.ProSubmissionRetryJob.updateMany.getMockImplementation();f.entities.ProSubmissionRetryJob.updateMany.mockImplementationOnce(async()=>{throw new Error('cancel failed');});
+  const latest={...f.raw,'6':'B then rejected'};await f.register(latest);f.entities.ProSubmissionRetryJob.updateMany.mockImplementation(update);await f.intent.send({resumeCredential:credential,responses:latest,submitContext:{business_name:f.draft.business_name,domain:f.draft.domain},failure:{status:409,message:'Final save rejected'}});
+  vi.setSystemTime(new Date('2026-11-23T23:00:00Z'));await f.worker.send({dryRun:false});expect(f.entities.ProSubmissionRetryJob.rows[0].status).toBe('cancelled');expect(f.entities.ProSubmissionRetryJob.rows[1].status).toBe('needs_review');expect((await f.register()).status).toBe(409);expect(f.fetchImpl).not.toHaveBeenCalled();expect(f.entities.ProFormSubmission.rows).toHaveLength(0);
+ });
+ it('does not supersede A when B is malformed, identity-conflicting, excluded, or first reported as rejected',async()=>{
+  const f=await fixture();await f.register();const a=f.job();
+  expect((await f.register({...f.raw,'3_structure':{format:'broken',pages:[]}})).status).toBe(422);expect((await f.register({...f.raw,'6':'B'},{business_name:'Wrong Client',domain:'wrong-client.net'})).status).toBe(409);expect(a.status).toBe('queued');
+  f.draft.delivery_hold=true;expect((await f.register({...f.raw,'6':'Excluded B'})).status).toBe(200);f.draft.delivery_hold=false;expect(a.status).toBe('queued');expect(f.entities.ProSubmissionRetryJob.rows[1]).toMatchObject({status:'excluded',intent_sequence:0});
+  await f.intent.send({resumeCredential:credential,responses:{...f.raw,'6':'Rejected before admission'},submitContext:{business_name:f.draft.business_name,domain:f.draft.domain},failure:{status:409,message:'Rejected'}});expect(a.status).toBe('queued');expect(f.entities.ProSubmissionRetryJob.rows[2]).toMatchObject({status:'needs_review',intent_sequence:0});
+ });
+ it('preserves prior manual, review, HTTP-started and receipt-linked jobs rather than superseding them',async()=>{
+  for(const protectedFields of [{status:'needs_review'},{manual_force:true},{delivery_started_at:when},{submission_id:'already-retained'},{stage:'delivery'},{delivery_accepted_at:when,status:'succeeded'}]){
+   const f=await fixture();await f.register();Object.assign(f.job(),protectedFields);const prior=copyRecord(f.job());await f.register({...f.raw,'6':'Newer B'});expect(f.entities.ProSubmissionRetryJob.rows[0]).toEqual(prior);
+  }
+ });
+
 });
