@@ -1,0 +1,44 @@
+{
+  "name": "pro_hourly_submission_retries",
+  "description": "Retry failed Pro submissions hourly. Each failure skips the next hour boundary (3:33 PM becomes due at 5 PM). Uses frozen attempts and durable delivery acknowledgements.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "scheduled",
+      "events": [],
+      "schedule_mode": "recurring",
+      "cron_expression": "0 * * * *",
+      "one_time_date": null,
+      "timezone": "America/Chicago",
+      "interval_value": null,
+      "interval_unit": null,
+      "interval_anchor": null,
+      "ends_type": "never",
+      "ends_on_date": null,
+      "ends_after_count": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "pro_hourly_submission_retries",
+      "version": "1.0.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "process_due_retries": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "processProSubmissionRetries",
+            "args": {
+              "dryRun": true,
+              "limit": 30
+            }
+          },
+          "then": "end"
+        }
+      }
+    ]
+  }
+}
