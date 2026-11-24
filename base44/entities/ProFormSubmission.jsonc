@@ -194,6 +194,13 @@
                   }
                 }
               }
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Retained legacy additional-page list"
             }
           }
         },
@@ -681,6 +688,176 @@
             "pages"
           ],
           "description": "Optional authoritative mapped page tree. Array position is sibling priority. New pages contain label and source, with children only for nonempty parents; optional historical id/catalogId and empty children remain readable."
+        },
+        "industries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Legacy industry selections retained by the browser submission normalizer"
+        },
+        "locations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Legacy location selections retained by the browser submission normalizer"
+        },
+        "team_photo_with_tags": {
+          "type": "object",
+          "description": "Compatibility copy of the team photo retained by the browser submission normalizer",
+          "properties": {
+            "imageUrl": {
+              "type": "string",
+              "description": "URL of the team photo"
+            },
+            "taggedPeople": {
+              "type": "array",
+              "description": "Array of team members tagged in the photo",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Team member's name"
+                  },
+                  "position": {
+                    "type": "string",
+                    "description": "Team member's position/title"
+                  },
+                  "bio": {
+                    "type": "string",
+                    "description": "Team member's biography"
+                  },
+                  "x": {
+                    "type": "number",
+                    "description": "X coordinate of tag on image"
+                  },
+                  "y": {
+                    "type": "number",
+                    "description": "Y coordinate of tag on image"
+                  },
+                  "person": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "position": {
+                        "type": "string"
+                      },
+                      "bio": {
+                        "type": "string"
+                      }
+                    },
+                    "description": "Normalized team-member details retained with the photo tag"
+                  }
+                }
+              }
+            },
+            "imageName": {
+              "type": "string",
+              "description": "Original name of the selected team photo"
+            },
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "fileName": {
+                    "type": "string"
+                  },
+                  "filename": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "size": {
+                    "type": "number"
+                  },
+                  "mimeType": {
+                    "type": "string"
+                  },
+                  "uploadedAt": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Additional team-photo labels"
+            },
+            "notes": {
+              "type": "string",
+              "description": "Client notes accompanying the team photo"
+            },
+            "has_team_photo": {
+              "type": "boolean",
+              "description": "Whether the client supplied or explicitly selected a team photo"
+            }
+          }
+        },
+        "service_areas": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "city": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "region": {
+                "type": "string"
+              },
+              "county": {
+                "type": "string"
+              },
+              "zip": {
+                "type": "string"
+              },
+              "place_id": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "latitude": {
+                "type": "number"
+              },
+              "longitude": {
+                "type": "number"
+              },
+              "radius": {
+                "type": "number"
+              },
+              "primary": {
+                "type": "boolean"
+              }
+            }
+          },
+          "description": "Legacy service areas retained with normalized location details"
         }
       }
     },
