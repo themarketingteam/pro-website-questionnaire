@@ -1,9 +1,10 @@
-import { normalizeStoredOrganizedRecord, validateOrganizedSubmission, reconcileOrganizedRepairPayload } from '../../shared/pageOrganizerContract.js';
+import { normalizeStoredOrganizedRecord, validateOrganizedSubmission } from '../../shared/pageOrganizerContract.js';
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.61";
 
 import { withEntityLease } from '../../shared/entityLease.ts';
 import { retryJobSummary } from '../../shared/proSubmissionRetries.ts';
 import { createSubmissionContentFingerprint, createSubmissionIdentityFingerprint } from '../../shared/proDraftSubmissionAuthorization.ts';
+import { prepareProRecoveryPayload } from '../../shared/proRecoveryPayload.ts';
 
 // Invalid retained payloads must remain inspectable in recovery. Only the
 // supported entity DTO padding is normalized; submit/retry guards still reject
@@ -734,9 +735,7 @@ const publicVersionDetail = async (base44: any, anchor: any, versionId: string) 
     if (!revision?.id || !relatedDraftIds.has(revision.draft_id)) return null;
     const snapshot = safeParse(revision.result_snapshot_json, {});
     const sourceDraft = relatedDrafts.find((draft) => draft.id === revision.draft_id) || anchor;
-    const mappedPayload = snapshot?.mappedPayload && typeof snapshot.mappedPayload === 'object'
-      ? snapshot.mappedPayload
-      : {};
+    const mappedPayload = Object.hasOwn(snapshot, 'mappedPayload') ? snapshot.mappedPayload : {};
     return {
       versionId,
       sourceType: 'revision',
@@ -1010,10 +1009,8 @@ Deno.serve(async (req) => {
         lastChangedQuestionId: cleanText(snapshot.lastChangedQuestionId, 40),
         progressPercent: Math.max(0, Math.min(100, Number(snapshot.progressPercent) || 0))
       };
-      const versionPayload = version.payload && typeof version.payload === 'object'
-        ? version.payload
-        : {};
-      const organizerRecovery = reconcileOrganizedRepairPayload(versionPayload, responses);
+      const versionPayload = version.payload;
+      const organizerRecovery = await prepareProRecoveryPayload({ payload: versionPayload, responses, identity: baseline.credentials, allowRawRebuild: true });
       if (!organizerRecovery.ok) return jsonResponse({ success: false, code: organizerRecovery.code, error: organizerRecovery.errors.join(' ') }, organizerRecovery.status);
       const payload = organizerRecovery.payload;
       const created = await entity.create({

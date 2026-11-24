@@ -4,6 +4,7 @@ import { withEntityLease, type EntityLease } from './entityLease.ts';
 import { transformResponsesToPayload, validateSubmissionPayload } from './proQuestionnairePayload.js';
 import { SERVICE_OPTIONS_GROUPED } from './proServiceCatalog.js';
 import { isAutomaticRetryExcluded, nextSubmissionRetryAt } from './submissionRetryPolicy.ts';
+import { prepareProRecoveryPayload } from './proRecoveryPayload.ts';
 
 type Row = Record<string, any>;
 const plain = (value: any): value is Row => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -473,8 +474,21 @@ export async function runProTeamRetry(base44: any, body: Row): Promise<Row> {
     const draft = await base44.asServiceRole.entities.ProFormDraft.get(draftId);
     if (hold(draft) || (intake && hold(intake)) || isAutomaticRetryExcluded(draft)) throw retryFault('RETRY_EXCLUDED', 'This questionnaire is held, deleted, archived, or excluded from delivery.');
     const raw = parseRetryObject(intake?.raw_responses_json || draft.responses_json);
-    const payload = parseRetryObject(intake?.transformed_payload_json || draft.mapped_payload_json);
-    if (!raw || !payload) throw retryFault('RETRY_PAYLOAD_UNAVAILABLE', 'The retained submission answers or mapped payload are unreadable.', 422);
+    const savedPayloadJson = intake?.transformed_payload_json || draft.mapped_payload_json;
+    const savedPayload = parseRetryObject(savedPayloadJson);
+    if (!raw) throw retryFault('RETRY_PAYLOAD_UNAVAILABLE', 'The retained submission answers are unreadable.', 422);
+    if (!savedPayload && savedPayloadJson) throw retryFault('RETRY_PAYLOAD_UNAVAILABLE', 'The retained mapped payload is unreadable and requires review.', 422);
+    const recoveryCopy = !intake && !draft.final_submission_id && draft.status !== 'submitted' && parseRetryObject(draft.draft_metadata_json)?.source === 'recovery_version_copy';
+    const prepared = await prepareProRecoveryPayload({ payload: savedPayload, responses: raw, identity: identityFor(draft), allowRawRebuild: recoveryCopy });
+    if (!prepared.ok) throw retryFault(prepared.code || 'RETRY_PAYLOAD_INVALID', prepared.errors.join(' '), prepared.status || 422);
+    const payload = prepared.payload;
+    if (prepared.rebuilt) {
+      const latest = await base44.asServiceRole.entities.ProFormDraftRevision.filter({ draft_id: draft.id }, '-server_revision', 1);
+      if (Number(latest?.[0]?.server_revision || 0) > Number(draft.save_revision || 0)) throw retryFault('DRAFT_SAVE_PENDING', 'A newer retained revision must be recovered before rebuilding this payload.');
+      const saved = await lease.update({ mapped_payload_json: json(payload), metadata_json: json(payload.metadata), userdata_json: json(payload.userdata) });
+      if (saved.mapped_payload_json !== json(payload) || saved.metadata_json !== json(payload.metadata) || saved.userdata_json !== json(payload.userdata)) throw retryFault('RETRY_PAYLOAD_STORAGE_INVALID', 'The complete recovery payload was not retained.', 502);
+      Object.assign(draft, saved);
+    }
     const forceRequestId = body.forceRetry === true ? text(body.forceRequestId, 120) || crypto.randomUUID() : '';
     let job = await ensureProRetryJobLocked({ base44, draft, lease, payload, responses: raw, intakeId: intake?.id || '', attemptId: intake?.submission_attempt_id || '', submissionId: draft.final_submission_id || intake?.linked_submission_id || '', forceRequestId, createdFrom: forceRequestId ? 'explicit_team_redelivery' : 'team_retry' });
     if (!job) throw retryFault('DELIVERY_LEGACY_UNTRACKED', 'This historical completed receipt has no automatic delivery ledger. Use an explicit team redelivery only after reviewing its delivery status.');
